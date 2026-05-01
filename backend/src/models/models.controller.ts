@@ -6,6 +6,7 @@ import {
   Request,
   Get,
   Param,
+  Delete,
   UseInterceptors,
   UploadedFiles,
 } from '@nestjs/common';
@@ -31,10 +32,7 @@ export class ModelsController {
   ) {}
 
   @Post()
-  async createModel(
-    @Body() body: CreateModelDto,
-    @Request() req,
-  ) {
+  async createModel(@Body() body: CreateModelDto, @Request() req) {
     return this.modelsService.createModel(
       body.name,
       body.description || '',
@@ -88,7 +86,12 @@ export class ModelsController {
       postprocess?: Express.Multer.File[];
     },
   ) {
-    return this.modelsService.uploadVersion(id, files, body.examplePayload, body.expectedResult);
+    return this.modelsService.uploadVersion(
+      id,
+      files,
+      body.examplePayload,
+      body.expectedResult,
+    );
   }
 
   @Post(':id/predict')
@@ -98,5 +101,17 @@ export class ModelsController {
       this.httpService.post(`${url}/predict`, data),
     );
     return response.data;
+  }
+
+  @Delete(':id')
+  async deleteModel(@Param('id') id: string) {
+    await this.modelsService.deleteModel(id);
+    return { success: true, message: 'Model deleted successfully' };
+  }
+
+  @Delete('versions/:versionId')
+  async deleteVersion(@Param('versionId') versionId: string) {
+    await this.modelsService.deleteVersion(versionId);
+    return { success: true, message: 'Model version deleted successfully' };
   }
 }

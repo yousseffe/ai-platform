@@ -11,6 +11,7 @@ import { Model } from './models/model.entity';
 import { ModelVersion } from './models/model-version.entity';
 import { Deployment } from './deployments/deployment.entity';
 import { MulterModule } from '@nestjs/platform-express';
+import { MinioModule } from './minio/minio.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { MulterModule } from '@nestjs/platform-express';
     ModelsModule,
     DeploymentsModule,
     QueueModule,
+    MinioModule,
   ],
 })
 export class AppModule {}

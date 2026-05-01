@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { ModelsService } from './models.service';
@@ -7,6 +7,9 @@ import { Model } from './model.entity';
 import { ModelVersion } from './model-version.entity';
 import { DeploymentsModule } from '../deployments/deployments.module';
 import { HttpModule } from '@nestjs/axios';
+import { MinioModule } from '../minio/minio.module';
+import { ModelsRepository } from './models.repository';
+import { ModelVersionsRepository } from './model-versions.repository';
 
 @Module({
   imports: [
@@ -14,11 +17,12 @@ import { HttpModule } from '@nestjs/axios';
     BullModule.registerQueue({
       name: 'build-queue',
     }),
-    DeploymentsModule,
+    forwardRef(() => DeploymentsModule),
     HttpModule,
+    MinioModule,
   ],
-  providers: [ModelsService],
+  providers: [ModelsService, ModelsRepository, ModelVersionsRepository],
   controllers: [ModelsController],
-  exports: [ModelsService],
+  exports: [ModelsService, ModelsRepository, ModelVersionsRepository],
 })
 export class ModelsModule {}

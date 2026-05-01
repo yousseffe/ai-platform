@@ -1,18 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { Deployment, DeploymentStatus } from './deployment.entity';
 import { ModelVersion } from '../models/model-version.entity';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
+import { DeploymentsRepository } from './deployments.repository';
+import { ModelVersionsRepository } from '../models/model-versions.repository';
 
 @Injectable()
 export class DeploymentsService {
   constructor(
-    @InjectRepository(Deployment)
-    private deploymentsRepository: Repository<Deployment>,
-    @InjectRepository(ModelVersion)
-    private modelVersionsRepository: Repository<ModelVersion>,
+    private deploymentsRepository: DeploymentsRepository,
+    private modelVersionsRepository: ModelVersionsRepository,
     @InjectQueue('deploy-queue') private deployQueue: Queue,
   ) {}
 
@@ -68,7 +66,9 @@ export class DeploymentsService {
   }
 
   async stopDeployment(deploymentId: string) {
-    const deployment = await this.deploymentsRepository.findOne({ where: { id: deploymentId } });
+    const deployment = await this.deploymentsRepository.findOne({
+      where: { id: deploymentId },
+    });
     if (!deployment) throw new NotFoundException('Deployment not found');
 
     if (deployment.containerId) {
@@ -86,7 +86,7 @@ export class DeploymentsService {
     await this.deploymentsRepository.update(deploymentId, {
       status: DeploymentStatus.STOPPED,
       port: null as any,
-      url: null as any
+      url: null as any,
     });
     return { success: true };
   }

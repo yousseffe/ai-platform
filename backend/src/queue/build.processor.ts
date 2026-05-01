@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as Docker from 'dockerode';
 import { Logger } from '@nestjs/common';
+import { MinioService } from '../minio/minio.service';
 
 @Processor('build-queue')
 export class BuildProcessor extends WorkerHost {
@@ -16,6 +17,7 @@ export class BuildProcessor extends WorkerHost {
   constructor(
     @InjectRepository(ModelVersion)
     private modelVersionsRepository: Repository<ModelVersion>,
+    private minioService: MinioService,
   ) {
     super();
     this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
@@ -50,24 +52,24 @@ export class BuildProcessor extends WorkerHost {
         path.join(buildDir, 'serve.py'),
       );
 
-      // Copy model files
+      // Download model files from Minio
       if (version.modelFilePath)
-        fs.copyFileSync(
+        await this.minioService.downloadFile(
           version.modelFilePath,
           path.join(buildDir, 'model.pkl'),
         );
       if (version.scalerFilePath)
-        fs.copyFileSync(
+        await this.minioService.downloadFile(
           version.scalerFilePath,
           path.join(buildDir, 'scaler.pkl'),
         );
       if (version.preprocessFilePath)
-        fs.copyFileSync(
+        await this.minioService.downloadFile(
           version.preprocessFilePath,
           path.join(buildDir, 'preprocess.py'),
         );
       if (version.postprocessFilePath)
-        fs.copyFileSync(
+        await this.minioService.downloadFile(
           version.postprocessFilePath,
           path.join(buildDir, 'postprocess.py'),
         );
@@ -120,14 +122,19 @@ numpy
         );
       });
 
-      this.logger.log(`Successfully built docker image for version: ${versionId}`);
+      this.logger.log(
+        `Successfully built docker image for version: ${versionId}`,
+      );
       await this.modelVersionsRepository.update(versionId, {
         status: VersionStatus.READY,
         errorMessage: undefined,
       });
     } catch (e) {
       const error = e as Error;
-      this.logger.error(`Failed to build model version ${versionId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to build model version ${versionId}: ${error.message}`,
+        error.stack,
+      );
       await this.modelVersionsRepository.update(versionId, {
         status: VersionStatus.FAILED,
         errorMessage: error.message || 'Unknown error during containerization',

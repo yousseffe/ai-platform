@@ -28,22 +28,28 @@ export class DeployProcessor extends WorkerHost {
 
     if (!deployment) return;
 
-    this.logger.log(`Starting deployment process for deployment: ${deploymentId} (Model Version: ${deployment.modelVersion.id})`);
+    this.logger.log(
+      `Starting deployment process for deployment: ${deploymentId} (Model Version: ${deployment.modelVersion.id})`,
+    );
 
     try {
       const imageName = `model-version-${deployment.modelVersion.id}`;
 
       // Find next available port starting from 8000
       const activeDeployments = await this.deploymentsRepository.find({
-        where: { status: DeploymentStatus.RUNNING }
+        where: { status: DeploymentStatus.RUNNING },
       });
-      const usedPorts = new Set(activeDeployments.map(d => d.port).filter(p => p != null));
+      const usedPorts = new Set(
+        activeDeployments.map((d) => d.port).filter((p) => p != null),
+      );
       let nextPort = 8000;
       while (usedPorts.has(nextPort)) {
         nextPort++;
       }
 
-      this.logger.log(`Assigning port ${nextPort} to deployment ${deploymentId}`);
+      this.logger.log(
+        `Assigning port ${nextPort} to deployment ${deploymentId}`,
+      );
 
       const container = await this.docker.createContainer({
         Image: imageName,
@@ -69,7 +75,9 @@ export class DeployProcessor extends WorkerHost {
         '127.0.0.1';
       const url = `http://${containerIp}:8000`;
 
-      this.logger.log(`Successfully deployed container ${container.id} at ${url} on HostPort ${nextPort}`);
+      this.logger.log(
+        `Successfully deployed container ${container.id} at ${url} on HostPort ${nextPort}`,
+      );
       await this.deploymentsRepository.update(deploymentId, {
         status: DeploymentStatus.RUNNING,
         containerId: container.id,
@@ -79,7 +87,10 @@ export class DeployProcessor extends WorkerHost {
       });
     } catch (e) {
       const error = e as Error;
-      this.logger.error(`Failed to deploy container for deployment ${deploymentId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to deploy container for deployment ${deploymentId}: ${error.message}`,
+        error.stack,
+      );
       await this.deploymentsRepository.update(deploymentId, {
         status: DeploymentStatus.FAILED,
         errorMessage: error.message || 'Unknown error during deployment',

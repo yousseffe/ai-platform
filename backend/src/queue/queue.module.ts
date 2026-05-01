@@ -5,6 +5,7 @@ import { BuildProcessor } from './build.processor';
 import { DeployProcessor } from './deploy.processor';
 import { ModelVersion } from '../models/model-version.entity';
 import { Deployment } from '../deployments/deployment.entity';
+import { MinioModule } from '../minio/minio.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { Deployment } from '../deployments/deployment.entity';
     BullModule.registerQueue({
       name: 'deploy-queue',
     }),
+    MinioModule,
   ],
   providers: [BuildProcessor, DeployProcessor],
 })

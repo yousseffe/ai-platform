@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, X, UploadCloud, CheckCircle2, FileCode } from 'lucide-react';
+import { Plus, X, UploadCloud, CheckCircle2, FileCode, Trash2 } from 'lucide-react';
 import api from '../api';
 import type { Model, ModelVersion, Deployment } from '../types';
 
@@ -56,6 +56,28 @@ const ModelDetails = () => {
     }
   };
 
+  const handleDeleteModel = async () => {
+    if (!window.confirm('Are you sure you want to delete this entire model and all its versions?')) return;
+    try {
+      await api.delete(`/models/${id}`);
+      navigate('/models');
+    } catch (e: any) {
+      console.error(e);
+      alert(e.response?.data?.message || 'Failed to delete model');
+    }
+  };
+
+  const handleDeleteVersion = async (versionId: string) => {
+    if (!window.confirm('Are you sure you want to delete this version?')) return;
+    try {
+      await api.delete(`/models/versions/${versionId}`);
+      fetchModel();
+    } catch (e: any) {
+      console.error(e);
+      alert(e.response?.data?.message || 'Failed to delete version');
+    }
+  };
+
   const handleUploadVersion = async () => {
     setIsUploading(true);
     try {
@@ -92,9 +114,14 @@ const ModelDetails = () => {
     <div className="animate-fade-in max-w-6xl mx-auto">
       <div className="flex flex-col lg:flex-row gap-8 mb-8">
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-4">
-            <h1 className="text-2xl font-bold text-slate-900">{model.name}</h1>
-            <span className="badge badge-info bg-indigo-50 text-indigo-700">STABLE</span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-slate-900">{model.name}</h1>
+              <span className="badge badge-info bg-indigo-50 text-indigo-700">STABLE</span>
+            </div>
+            <button onClick={handleDeleteModel} className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700 font-medium">
+              <Trash2 className="w-4 h-4" /> Delete Model
+            </button>
           </div>
           <p className="text-slate-600 leading-relaxed mb-6 max-w-3xl">
             {model.description || 'No description provided.'}
@@ -198,6 +225,9 @@ const ModelDetails = () => {
                           )}
                           <button onClick={() => navigate(`/models/${id}/test`)} disabled={displayStatus !== 'deployed'} className={`px-4 py-1.5 border rounded text-xs font-medium transition-colors ${displayStatus === 'deployed' ? 'border-slate-200 text-slate-700 hover:bg-slate-50' : 'border-slate-100 text-slate-300 cursor-not-allowed'}`}>
                             Test
+                          </button>
+                          <button onClick={() => handleDeleteVersion(v.id)} className="px-2 py-1.5 text-slate-400 hover:text-red-500 transition-colors" title="Delete Version">
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
