@@ -1,0 +1,50 @@
+# Node modules
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build artifacts
+dist/
+backend/dist/
+frontend/dist/
+frontend/build/
+
+# Docker data volumes
+database-data/
+postgres-data/
+redis-data/
+volume/
+volumes/
+
+# User uploads and runtime artifacts
+uploads/
+backend/uploads/
+backend/src/deployments/deployments-volume/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Coverage
+coverage/
+.nyc_output/
