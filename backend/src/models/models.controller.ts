@@ -9,7 +9,9 @@ import {
   Delete,
   UseInterceptors,
   UploadedFiles,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ModelsService } from './models.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -36,6 +38,9 @@ export class ModelsController {
     return this.modelsService.createModel(
       body.name,
       body.description || '',
+      body.type || 'TABULAR',
+      body.taskType || 'OTHER',
+      body.framework || 'CUSTOM',
       req.user.id,
     );
   }
@@ -60,7 +65,7 @@ export class ModelsController {
         { name: 'postprocess', maxCount: 1 },
       ],
       {
-        limits: { fileSize: 5 * 1024 * 1024 * 1024 }, // 5GB
+        limits: { fileSize: 15 * 1024 * 1024 * 1024 }, // 15GB
         storage: diskStorage({
           destination: './uploads',
           filename: (req, file, cb) => {
@@ -95,12 +100,32 @@ export class ModelsController {
   }
 
   @Post(':id/predict')
-  async predict(@Param('id') id: string, @Body() data: any) {
+  async predict(@Param('id') id: string, @Body() data: any, @Res() res: Response) {
+    const model = await this.modelsService.getModel(id);
     const url = await this.deploymentsService.getActiveDeploymentUrl(id);
-    const response = await firstValueFrom(
-      this.httpService.post(`${url}/predict`, data),
-    );
-    return response.data;
+    
+    const targetEndpoint = model.type === 'LLM_GGUF' ? '/v1/chat/completions' : '/predict';
+    
+    if (data.stream) {
+      // Proxy the stream for SSE (Server-Sent Events)
+      const response = await firstValueFrom(
+        this.httpService.post(`${url}${targetEndpoint}`, data, {
+          responseType: 'stream',
+        }),
+      );
+      
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      
+      response.data.pipe(res);
+    } else {
+      // Standard JSON response
+      const response = await firstValueFrom(
+        this.httpService.post(`${url}${targetEndpoint}`, data),
+      );
+      res.json(response.data);
+    }
   }
 
   @Delete(':id')

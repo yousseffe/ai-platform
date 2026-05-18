@@ -76,10 +76,18 @@ export class DeploymentsService {
         const Docker = require('dockerode');
         const docker = new Docker({ socketPath: '/var/run/docker.sock' });
         const container = docker.getContainer(deployment.containerId);
-        await container.stop();
-        await container.remove();
+        try {
+          await container.stop();
+        } catch (e) {
+          console.error('Error stopping container (might be stopped already)', e);
+        }
+        try {
+          await container.remove();
+        } catch (e) {
+          console.error('Error removing container', e);
+        }
       } catch (e) {
-        console.error('Error stopping/removing container', e);
+        console.error('Error initializing docker or fetching container', e);
       }
     }
 

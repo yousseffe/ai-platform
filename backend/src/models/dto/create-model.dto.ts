@@ -8,4 +8,16 @@ export class CreateModelDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  type?: string;
+
+  @IsString()
+  @IsOptional()
+  taskType?: string;
+
+  @IsString()
+  @IsOptional()
+  framework?: string;
 }

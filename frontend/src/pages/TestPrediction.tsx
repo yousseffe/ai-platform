@@ -8,8 +8,30 @@ const TestPrediction = () => {
   const { id } = useParams();
 
   const [isRunning, setIsRunning] = useState(false);
-  const [payload, setPayload] = useState('{\n  "features": [1.2, 3.4, 5.6]\n}');
+  const [payload, setPayload] = useState('{\n  "features": [\n    [1.2, 3.4, 5.6]\n  ]\n}');
   const [result, setResult] = useState('');
+  const [modelType, setModelType] = useState('TABULAR');
+
+  React.useEffect(() => {
+    const fetchModel = async () => {
+      try {
+        const res = await api.get(`/models/${id}`);
+        const type = res.data.type || 'TABULAR';
+        setModelType(type);
+        
+        if (type === 'LLM_GGUF') {
+          setPayload('{\n  "messages": [\n    {"role": "system", "content": "You are a helpful AI assistant."},\n    {"role": "user", "content": "Tell me a short joke about programming."}\n  ]\n}');
+        } else if (type === 'NLP') {
+          setPayload('{\n  "input_data": [\n    "This platform is amazing, I highly recommend it!"\n  ]\n}');
+        } else if (type === 'TABULAR') {
+          setPayload('{\n  "features": [\n    [1.2, 3.4, 5.6, 7.8]\n  ]\n}');
+        }
+      } catch (err) {
+        console.error('Failed to load model details', err);
+      }
+    };
+    fetchModel();
+  }, [id]);
 
   const requestHistory = [
     { time: '2023-10-27 10:20:00', reqId: 'req_4920k92', status: 'SUCCESS', latency: '14.5ms', outcome: 'Non-fraudulent (0.99)' },
@@ -19,10 +41,43 @@ const TestPrediction = () => {
 
   const handleRun = async () => {
     setIsRunning(true);
+    setResult(''); // Clear previous results
+    
     try {
       const parsedPayload = JSON.parse(payload);
-      const res = await api.post(`/models/${id}/predict`, parsedPayload);
-      setResult(JSON.stringify(res.data, null, 2));
+      
+      if (parsedPayload.stream) {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(`/api/models/${id}/predict`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify(parsedPayload),
+        });
+
+        if (!response.body) throw new Error('ReadableStream not supported');
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let done = false;
+
+        while (!done) {
+          const { value, done: doneReading } = await reader.read();
+          done = doneReading;
+          if (value) {
+            const chunkValue = decoder.decode(value, { stream: true });
+            
+            // For a chat app, you would parse the "data: {...}" SSE format here.
+            // But for this raw test panel, appending the raw chunks shows exactly what the backend sends!
+            setResult((prev) => prev + chunkValue);
+          }
+        }
+      } else {
+        const res = await api.post(`/models/${id}/predict`, parsedPayload);
+        setResult(JSON.stringify(res.data, null, 2));
+      }
     } catch (err: any) {
       setResult(JSON.stringify(err.response?.data || err.message, null, 2));
     } finally {

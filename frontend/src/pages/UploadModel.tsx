@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { UploadCloud, FileJson, ArrowRight, ShieldCheck, Database, GitCommit, Box, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import api from '../api';
 
 const UploadModel = () => {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [modelType, setModelType] = useState('TABULAR');
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [scalerFile, setScalerFile] = useState<File | null>(null);
   const [preprocessFile, setPreprocessFile] = useState<File | null>(null);
@@ -17,6 +19,7 @@ const UploadModel = () => {
   const [postprocessMode, setPostprocessMode] = useState<'file' | 'code'>('file');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStats, setUploadStats] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
   const [examplePayload, setExamplePayload] = useState(`{
   "input_data": [
@@ -66,9 +69,18 @@ const UploadModel = () => {
               <input type="text" className="form-input" placeholder="e.g. demand-forecast-v1" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div>
-              <label className="form-label text-xs">Model Tags</label>
-              <input type="text" className="form-input" placeholder="e.g. regression, pytorch, finance" />
+              <label className="form-label text-xs">Model Type</label>
+              <select className="form-input bg-white" value={modelType} onChange={(e) => setModelType(e.target.value)}>
+                <option value="TABULAR">Tabular ML (Regression, Classification, Clustering)</option>
+                <option value="NLP">NLP (Text Analysis, Sentiment, etc.)</option>
+                <option value="VISION">Computer Vision (Image Processing)</option>
+                <option value="LLM_GGUF">Large Language Model (GGUF format)</option>
+              </select>
             </div>
+          </div>
+          <div>
+            <label className="form-label text-xs">Model Tags</label>
+            <input type="text" className="form-input mb-4" placeholder="e.g. regression, pytorch, finance" />
           </div>
           <div>
             <label className="form-label text-xs">Description</label>
@@ -83,23 +95,24 @@ const UploadModel = () => {
             <h2 className="text-lg font-bold text-slate-800">Artifacts & Scripts</h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className={`grid grid-cols-1 ${modelType === 'LLM_GGUF' ? '' : 'md:grid-cols-2'} gap-6 mb-6`}>
             <div className={`border border-dashed rounded-xl p-8 flex flex-col items-center text-center hover:bg-slate-50 transition-colors cursor-pointer relative group ${modelFile ? 'border-emerald-400 bg-emerald-50/50' : 'border-slate-300'}`}>
                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => { if (e.target.files?.length) setModelFile(e.target.files[0]); }} />
                <div className="absolute top-3 left-4 flex gap-2">
-                 <span className="text-[10px] font-bold text-slate-800 tracking-wider">MODEL BUNDLE (model.pkl)</span>
+                 <span className="text-[10px] font-bold text-slate-800 tracking-wider">MODEL BUNDLE ({modelType === 'LLM_GGUF' ? 'model.gguf' : 'model.pkl'})</span>
                  <span className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded">REQUIRED</span>
                </div>
-               <span className="absolute top-3 right-4 text-[10px] text-slate-400">Max size: 5GB</span>
+               <span className="absolute top-3 right-4 text-[10px] text-slate-400">Max size: {modelType === 'LLM_GGUF' ? '15GB' : '5GB'}</span>
                
                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 mt-4 group-hover:scale-110 transition-transform ${modelFile ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-50 text-indigo-500'}`}>
                  {modelFile ? <ShieldCheck className="w-6 h-6" /> : <UploadCloud className="w-6 h-6" />}
                </div>
                <p className={`text-sm font-semibold ${modelFile ? 'text-emerald-700' : 'text-slate-700'}`}>{modelFile ? `Attached: ${modelFile.name}` : 'Click to upload'}</p>
-               <p className="text-xs text-slate-400 mt-1">Pickle, ONNX, or H5 format</p>
+               <p className="text-xs text-slate-400 mt-1">{modelType === 'LLM_GGUF' ? 'GGUF format only' : 'Pickle, ONNX, or H5 format'}</p>
             </div>
 
-            <div className={`border border-dashed rounded-xl p-8 flex flex-col items-center text-center hover:bg-slate-50 transition-colors cursor-pointer relative group ${scalerFile ? 'border-emerald-400 bg-emerald-50/50' : 'border-slate-300'}`}>
+            {modelType !== 'LLM_GGUF' && (
+              <div className={`border border-dashed rounded-xl p-8 flex flex-col items-center text-center hover:bg-slate-50 transition-colors cursor-pointer relative group ${scalerFile ? 'border-emerald-400 bg-emerald-50/50' : 'border-slate-300'}`}>
                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => { if (e.target.files?.length) setScalerFile(e.target.files[0]); }} />
                <div className="absolute top-3 left-4 flex gap-2">
                  <span className="text-[10px] font-bold text-slate-800 tracking-wider">SCALER BUNDLE (scaler.pkl)</span>
@@ -111,11 +124,13 @@ const UploadModel = () => {
                  {scalerFile ? <ShieldCheck className="w-6 h-6" /> : <span className="text-xl">⌛</span>}
                </div>
                <p className={`text-sm font-semibold ${scalerFile ? 'text-emerald-700' : 'text-slate-700'}`}>{scalerFile ? `Attached: ${scalerFile.name}` : 'Upload scaler object'}</p>
-               <p className="text-xs text-slate-400 mt-1">Essential for data normalization</p>
-            </div>
+                <p className="text-xs text-slate-400 mt-1">Essential for data normalization</p>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {modelType !== 'LLM_GGUF' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div className="border border-slate-200 rounded-lg overflow-hidden relative flex flex-col">
                 <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex items-center justify-between">
                   <span className="text-[10px] font-bold text-slate-800 tracking-wider">PRE-PROCESSING (preprocess.py)</span>
@@ -180,11 +195,12 @@ const UploadModel = () => {
                 )}
              </div>
           </div>
+          )}
         </div>
 
-        {/* Step 3 */}
-        <div className="card border border-slate-200">
-          <div className="flex items-center gap-3 mb-6">
+        {modelType !== 'LLM_GGUF' && (
+          <div className="card border border-slate-200">
+            <div className="flex items-center gap-3 mb-6">
             <div className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold">3</div>
             <h2 className="text-lg font-bold text-slate-800">Interface Configuration</h2>
           </div>
@@ -213,18 +229,19 @@ const UploadModel = () => {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {isUploading && (
         <div className="mt-8 bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-fade-in">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-bold text-indigo-900">{uploadStatus}</span>
-            <span className="text-sm font-bold text-indigo-600">{uploadProgress}%</span>
+            <span className="text-sm font-bold text-indigo-600">{uploadStats || `${uploadProgress}%`}</span>
           </div>
           <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
             <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }}></div>
           </div>
-          <p className="text-xs text-slate-500 mt-3 text-center">Your artifacts are being pushed to the background worker queue.</p>
+          <p className="text-xs text-slate-500 mt-3 text-center">Your artifacts are uploading. <span className="font-bold text-indigo-600">You can safely leave this page</span>, the upload will continue in the background!</p>
         </div>
       )}
 
@@ -234,7 +251,9 @@ const UploadModel = () => {
           Artifacts will be scanned for security and integrity before deployment.
         </div>
         <div className="flex items-center gap-4">
-          <button className="text-slate-600 font-medium px-4 hover:text-slate-800" onClick={() => navigate('/models')} disabled={isUploading}>Cancel</button>
+          <button className="text-slate-600 font-medium px-4 hover:text-slate-800" onClick={() => navigate('/models')}>
+            {isUploading ? 'Leave Page (Upload continues)' : 'Cancel'}
+          </button>
           <button 
             className={`btn-primary py-2.5 px-6 flex items-center gap-2 transition-all ${isUploading ? 'opacity-70 cursor-wait' : ''}`}
             disabled={isUploading || !name || !modelFile}
@@ -242,45 +261,86 @@ const UploadModel = () => {
               setIsUploading(true);
               setUploadStatus('Initializing model registry entry...');
               setUploadProgress(10);
+              const toastId = toast.loading('Initializing upload...', { duration: 9999999 });
+
               try {
-                const res = await api.post('/models', { name, description });
+                const res = await api.post('/models', { name, description, type: modelType });
                 const modelId = res.data.id;
                 const formData = new FormData();
                 if (modelFile) formData.append('model', modelFile);
-                if (scalerFile) formData.append('scaler', scalerFile);
-                if (preprocessMode === 'file' && preprocessFile) {
-                  formData.append('preprocess', preprocessFile);
-                } else if (preprocessMode === 'code' && preprocessCode.trim()) {
-                  const blob = new Blob([preprocessCode], { type: 'text/plain' });
-                  formData.append('preprocess', blob, 'preprocess.py');
-                }
-                if (postprocessMode === 'file' && postprocessFile) {
-                  formData.append('postprocess', postprocessFile);
-                } else if (postprocessMode === 'code' && postprocessCode.trim()) {
-                  const blob = new Blob([postprocessCode], { type: 'text/plain' });
-                  formData.append('postprocess', blob, 'postprocess.py');
-                }
+                if (scalerFile && modelType !== 'LLM_GGUF') formData.append('scaler', scalerFile);
                 
-                formData.append('examplePayload', examplePayload);
-                formData.append('expectedResult', expectedResult);
+                if (modelType !== 'LLM_GGUF') {
+                  if (preprocessMode === 'file' && preprocessFile) {
+                    formData.append('preprocess', preprocessFile);
+                  } else if (preprocessMode === 'code' && preprocessCode.trim()) {
+                    const blob = new Blob([preprocessCode], { type: 'text/plain' });
+                    formData.append('preprocess', blob, 'preprocess.py');
+                  }
+                  if (postprocessMode === 'file' && postprocessFile) {
+                    formData.append('postprocess', postprocessFile);
+                  } else if (postprocessMode === 'code' && postprocessCode.trim()) {
+                    const blob = new Blob([postprocessCode], { type: 'text/plain' });
+                    formData.append('postprocess', blob, 'postprocess.py');
+                  }
+                  formData.append('examplePayload', examplePayload);
+                  formData.append('expectedResult', expectedResult);
+                }
                 
                 setUploadStatus('Transferring artifacts to remote storage...');
-                await api.post(`/models/${modelId}/versions`, formData, { 
+                
+                // Do not await if we want it to be fully decoupled, but we will await so we can show success
+                let lastUpdate = 0;
+                api.post(`/models/${modelId}/versions`, formData, { 
                   headers: { 'Content-Type': 'multipart/form-data' },
                   onUploadProgress: (progressEvent) => {
                     if (progressEvent.total) {
+                      const now = Date.now();
                       const percentCompleted = Math.round((progressEvent.loaded * 80) / progressEvent.total);
-                      setUploadProgress(10 + percentCompleted);
+                      
+                      const formatBytes = (bytes: number) => {
+                          if (bytes > 1024 * 1024 * 1024) return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+                          if (bytes > 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+                          return (bytes / 1024).toFixed(2) + ' KB';
+                      };
+                      const loadedStr = formatBytes(progressEvent.loaded);
+                      const totalStr = formatBytes(progressEvent.total);
+                      const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                      const statsStr = `${loadedStr} / ${totalStr} (${percent}%)`;
+                      
+                      try {
+                        setUploadProgress(10 + percentCompleted);
+                        setUploadStats(statsStr);
+                      } catch (e) {} // ignore if unmounted
+
+                      if (now - lastUpdate > 500) {
+                        toast.loading(`Uploading... ${statsStr}`, { id: toastId });
+                        lastUpdate = now;
+                      }
                     }
                   }
+                }).then(() => {
+                  try {
+                    setUploadStatus('Artifacts queued for containerization!');
+                    setUploadProgress(100);
+                    setIsUploading(false);
+                  } catch (e) {}
+                  toast.success(`Upload complete: ${name}`, { id: toastId, duration: 5000 });
+                }).catch((e) => {
+                  console.error(e);
+                  toast.error(e.response?.data?.message || e.message || 'Upload failed', { id: toastId, duration: 6000 });
+                  try {
+                    setIsUploading(false);
+                    setUploadProgress(0);
+                  } catch (err) {}
                 });
                 
-                setUploadStatus('Artifacts queued for containerization!');
-                setUploadProgress(100);
-                setTimeout(() => navigate(`/models/${modelId}`), 800);
-              } catch (e) {
+                // Instantly navigate to the model details page while it uploads in the background!
+                navigate(`/models/${modelId}`);
+                
+              } catch (e: any) {
                 console.error(e);
-                alert('Upload failed');
+                toast.error(e.response?.data?.message || e.message || 'Upload failed', { id: toastId, duration: 5000 });
                 setIsUploading(false);
                 setUploadProgress(0);
               }

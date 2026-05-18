@@ -32,15 +32,21 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: always
 
   createbuckets:
     image: minio/mc
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      /usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin;
+      until (/usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin); do echo 'Waiting for minio...'; sleep 3; done;
       /usr/bin/mc mb myminio/models --ignore-existing;
       /usr/bin/mc anonymous set public myminio/models;
       exit 0;
@@ -72,7 +78,7 @@ services:
       - postgres
       - redis
       - minio
-    command: npm run start:dev
+    command: npm run dev
 
   gateway:
     image: nginx:alpine

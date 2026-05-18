@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-import pickle
+import joblib
 import sys
 import os
 import uvicorn
@@ -9,15 +9,13 @@ app = FastAPI()
 
 # Load model
 model_path = os.getenv("MODEL_PATH", "model.pkl")
-with open(model_path, 'rb') as f:
-    model = pickle.load(f)
+model = joblib.load(model_path)
 
 # Load scaler if exists
 scaler = None
 scaler_path = os.getenv("SCALER_PATH")
 if scaler_path and os.path.exists(scaler_path):
-    with open(scaler_path, 'rb') as f:
-        scaler = pickle.load(f)
+    scaler = joblib.load(scaler_path)
 
 # Load preprocess if exists
 preprocess_func = None
@@ -50,10 +48,22 @@ async def predict(request: Request):
         # Simple default behavior if scaler exists
         pass # In a real scenario, we'd know how to apply scaler
     
+    # Format data for inference (Scikit-learn expects 2D array: [[val1, val2]])
+    if isinstance(data, dict):
+        # Handle single dictionary: {"feature1": 1, "feature2": 2} -> [[1, 2]]
+        data = [list(data.values())]
+    elif isinstance(data, list):
+        if len(data) > 0 and isinstance(data[0], dict):
+            # Handle list of dictionaries: [{"f1": 1}, {"f1": 2}] -> [[1], [2]]
+            data = [list(item.values()) for item in data]
+        elif len(data) > 0 and not isinstance(data[0], list):
+            # If it's a list of strings (for NLP models), do NOT wrap it in a 2D array.
+            if not isinstance(data[0], str):
+                # Handle 1D list of numbers: [1, 2, 3] -> [[1, 2, 3]]
+                data = [data]
+            
     # Inference
-    # Assume data is in right format for model.predict
-    # if it's a list or array
-    prediction = model.predict([data] if not isinstance(data, list) else data)
+    prediction = model.predict(data)
     
     # Postprocess
     if postprocess_func:
@@ -62,6 +72,10 @@ async def predict(request: Request):
     # Convert numpy array to list if needed
     if hasattr(prediction, "tolist"):
         prediction = prediction.tolist()
+        
+    # If postprocess returned a custom dictionary, return it directly
+    if isinstance(prediction, dict):
+        return prediction
         
     return {"prediction": prediction}
 

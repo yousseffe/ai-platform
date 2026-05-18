@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, X, UploadCloud, CheckCircle2, FileCode, Trash2 } from 'lucide-react';
 import api from '../api';
+import toast from 'react-hot-toast';
 import type { Model, ModelVersion, Deployment } from '../types';
 
 const ModelDetails = () => {
@@ -35,14 +36,37 @@ const ModelDetails = () => {
     }
   };
 
+  useEffect(() => {
+    let interval: any;
+    if (model) {
+      const needsPolling = model.versions?.some((v) => {
+        if (v.status === 'queued' || v.status === 'building') return true;
+        const latestDeployment = v.deployments && v.deployments.length > 0 
+          ? [...v.deployments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] 
+          : null;
+        if (latestDeployment && (latestDeployment.status === 'starting' || latestDeployment.status === 'stopping')) return true;
+        return false;
+      });
+
+      if (needsPolling) {
+        interval = setInterval(() => {
+          fetchModel();
+        }, 3000);
+      }
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [model]);
+
   const handleDeploy = async (versionId: string) => {
     try {
       await api.post(`/deployments/version/${versionId}`);
-      alert('Deployment started!');
+      toast.success('Deployment started!');
       fetchModel();
     } catch (e) {
       console.error(e);
-      alert('Failed to start deployment');
+      toast.error('Failed to start deployment');
     }
   };
 
@@ -52,7 +76,7 @@ const ModelDetails = () => {
       fetchModel();
     } catch (e) {
       console.error(e);
-      alert('Failed to stop deployment');
+      toast.error('Failed to stop deployment');
     }
   };
 
@@ -63,7 +87,7 @@ const ModelDetails = () => {
       navigate('/models');
     } catch (e: any) {
       console.error(e);
-      alert(e.response?.data?.message || 'Failed to delete model');
+      toast.error(e.response?.data?.message || 'Failed to delete model');
     }
   };
 
@@ -74,7 +98,7 @@ const ModelDetails = () => {
       fetchModel();
     } catch (e: any) {
       console.error(e);
-      alert(e.response?.data?.message || 'Failed to delete version');
+      toast.error(e.response?.data?.message || 'Failed to delete version');
     }
   };
 
@@ -97,11 +121,11 @@ const ModelDetails = () => {
       setScalerFile(null);
       setPreprocessFile(null);
       setPostprocessFile(null);
-      alert('Version queued for build!');
+      toast.success('Version queued for build!');
       fetchModel();
     } catch (e) {
       console.error(e);
-      alert('Failed to upload new version');
+      toast.error('Failed to upload new version');
     } finally {
       setIsUploading(false);
     }
@@ -205,9 +229,20 @@ const ModelDetails = () => {
                         <span className="text-slate-400 text-xs">{v.id.substring(0, 8)}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${(displayStatus === 'ready' || displayStatus === 'deployed') ? 'bg-emerald-500' : (displayStatus === 'building' || displayStatus === 'starting') ? 'bg-blue-500' : hasError ? 'bg-red-500' : 'bg-slate-400'}`}></div>
-                          <span className="font-medium text-slate-700 capitalize">{displayStatus}</span>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${(displayStatus === 'ready' || displayStatus === 'deployed') ? 'bg-emerald-500' : (displayStatus === 'building' || displayStatus === 'starting') ? 'bg-blue-500 animate-pulse' : hasError ? 'bg-red-500' : 'bg-slate-400'}`}></div>
+                            <span className="font-medium text-slate-700 capitalize">{displayStatus}</span>
+                            {(displayStatus === 'building' || displayStatus === 'starting') && (
+                              <svg className="animate-spin h-3 w-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            )}
+                          </div>
+                          {(displayStatus === 'building') && (
+                            <span className="text-[10px] text-slate-400 leading-tight">Creating container image...<br/>(may take 2-5 mins for large models)</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-slate-500">{new Date(v.createdAt).toLocaleDateString()}</td>

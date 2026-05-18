@@ -22,7 +22,7 @@ export class ModelVersion {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Model, (model) => model.versions)
+  @ManyToOne(() => Model, (model) => model.versions, { onDelete: 'CASCADE' })
   model: Model;
 
   @Column()

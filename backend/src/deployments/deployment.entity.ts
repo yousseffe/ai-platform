@@ -20,7 +20,7 @@ export class Deployment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => ModelVersion, (version) => version.deployments)
+  @ManyToOne(() => ModelVersion, (version) => version.deployments, { onDelete: 'CASCADE' })
   modelVersion: ModelVersion;
 
   @Column({ nullable: true })

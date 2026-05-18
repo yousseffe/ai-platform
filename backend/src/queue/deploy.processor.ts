@@ -23,7 +23,7 @@ export class DeployProcessor extends WorkerHost {
     const { deploymentId } = job.data;
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },
-      relations: ['modelVersion'],
+      relations: ['modelVersion', 'modelVersion.model', 'modelVersion.model.user'],
     });
 
     if (!deployment) return;
@@ -51,29 +51,35 @@ export class DeployProcessor extends WorkerHost {
         `Assigning port ${nextPort} to deployment ${deploymentId}`,
       );
 
+      const userEmail = deployment.modelVersion.model.user.email;
+      const emailPrefix = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+      const modelName = deployment.modelVersion.model.name.replace(/[^a-zA-Z0-9]/g, '');
+      const shortDeployId = deploymentId.split('-')[0];
+      const containerName = `${emailPrefix}_${modelName}_v${deployment.modelVersion.versionNumber}_${shortDeployId}`.toLowerCase();
+
+      const isLlm = deployment.modelVersion.model.type === 'LLM_GGUF';
+      const containerPort = isLlm ? '8080/tcp' : '8000/tcp';
+      const urlPort = isLlm ? 8080 : 8000;
+
       const container = await this.docker.createContainer({
+        name: containerName,
         Image: imageName,
         ExposedPorts: {
-          '8000/tcp': {},
+          [containerPort]: {},
         },
         HostConfig: {
           PortBindings: {
-            '8000/tcp': [{ HostPort: nextPort.toString() }],
+            [containerPort]: [{ HostPort: nextPort.toString() }],
           },
+          NetworkMode: 'ai-platform_default',
         },
       });
 
       await container.start();
 
-      const info = await container.inspect();
-
-      // In docker-compose, "localhost" inside the backend container won't reach the model container exposed port on host.
-      // Wait, since both are in same docker host, we can just use the container's IP address in the bridge network!
-      const containerIp =
-        (info as any).NetworkSettings.IPAddress ||
-        (info as any).NetworkSettings.Networks?.bridge?.IPAddress ||
-        '127.0.0.1';
-      const url = `http://${containerIp}:8000`;
+      // Since the container is now in the same docker-compose network,
+      // the backend can resolve it by its container name!
+      const url = `http://${containerName}:${urlPort}`;
 
       this.logger.log(
         `Successfully deployed container ${container.id} at ${url} on HostPort ${nextPort}`,

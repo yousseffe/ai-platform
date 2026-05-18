@@ -32,6 +32,7 @@ export class BuildProcessor extends WorkerHost {
     });
     const version = await this.modelVersionsRepository.findOne({
       where: { id: versionId },
+      relations: ['model'],
     });
 
     if (!version) return;
@@ -45,12 +46,6 @@ export class BuildProcessor extends WorkerHost {
       if (!fs.existsSync(buildDir)) {
         fs.mkdirSync(buildDir, { recursive: true });
       }
-
-      // Copy serve.py
-      fs.copyFileSync(
-        path.join(process.cwd(), 'src', 'queue', 'serve.py'),
-        path.join(buildDir, 'serve.py'),
-      );
 
       // Download model files from Minio
       if (version.modelFilePath)
@@ -74,8 +69,30 @@ export class BuildProcessor extends WorkerHost {
           path.join(buildDir, 'postprocess.py'),
         );
 
-      // Create Dockerfile
-      const dockerfileContent = `
+      let dockerfileContent = '';
+
+      if (version.model.type === 'LLM_GGUF') {
+        dockerfileContent = `
+FROM ghcr.io/ggml-org/llama.cpp:server
+WORKDIR /app
+COPY model.pkl /models/model.gguf
+ENV LC_ALL=C.utf8
+EXPOSE 8080
+ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "--host", "0.0.0.0"]
+        `;
+        fs.writeFileSync(path.join(buildDir, 'requirements.txt'), '');
+      } else {
+        let templateName = 'serve_tabular.py';
+        if (version.model.type === 'NLP') templateName = 'serve_nlp.py';
+        if (version.model.type === 'VISION') templateName = 'serve_vision.py';
+
+        // Copy serve.py
+        fs.copyFileSync(
+          path.join(process.cwd(), 'src', 'queue', 'templates', templateName),
+          path.join(buildDir, 'serve.py'),
+        );
+
+        let dockerfileContent = `
 FROM python:3.9-slim
 WORKDIR /app
 COPY requirements.txt .
@@ -85,23 +102,39 @@ ENV MODEL_PATH=model.pkl
 ENV SCALER_PATH=${version.scalerFilePath ? 'scaler.pkl' : ''}
 ENV PREPROCESS_PATH=${version.preprocessFilePath ? 'preprocess.py' : ''}
 ENV POSTPROCESS_PATH=${version.postprocessFilePath ? 'postprocess.py' : ''}
+ENV FRAMEWORK=${version.model.framework}
+ENV TASK_TYPE=${version.model.taskType}
 EXPOSE 8000
 CMD ["python", "serve.py"]
-      `;
-      fs.writeFileSync(path.join(buildDir, 'Dockerfile'), dockerfileContent);
+        `;
 
-      // Create requirements.txt
-      const requirementsContent = `
+        let requirementsContent = `
 fastapi
 uvicorn
-scikit-learn
 pandas
 numpy
-      `;
-      fs.writeFileSync(
-        path.join(buildDir, 'requirements.txt'),
-        requirementsContent,
-      );
+        `;
+        
+        if (version.model.framework === 'SKLEARN') {
+            requirementsContent += '\nscikit-learn\njoblib';
+        } else if (version.model.framework === 'PYTORCH') {
+            requirementsContent += '\ntorch\ntorchvision';
+        } else if (version.model.framework === 'TENSORFLOW') {
+            requirementsContent += '\ntensorflow';
+        } else if (version.model.framework === 'ONNX') {
+            requirementsContent += '\nonnxruntime';
+        } else {
+            // Default to scikit-learn for backward compatibility or custom
+            requirementsContent += '\nscikit-learn\njoblib';
+        }
+        
+        fs.writeFileSync(
+          path.join(buildDir, 'requirements.txt'),
+          requirementsContent,
+        );
+      }
+
+      fs.writeFileSync(path.join(buildDir, 'Dockerfile'), dockerfileContent);
 
       // We will skip actual docker build here to avoid blocking and complex docker build logic in JS
       // Instead, the Deploy job will just volume mount the folder!
@@ -117,9 +150,12 @@ numpy
       );
 
       await new Promise((resolve, reject) => {
-        this.docker.modem.followProgress(pack, (err, res) =>
-          err ? reject(err) : resolve(res),
-        );
+        this.docker.modem.followProgress(pack, (err, res) => {
+          if (err) return reject(err);
+          const errorObj = Array.isArray(res) ? res.find((r: any) => r.errorDetail) : null;
+          if (errorObj) return reject(new Error(errorObj.error));
+          resolve(res);
+        });
       });
 
       this.logger.log(

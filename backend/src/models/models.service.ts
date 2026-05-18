@@ -20,11 +20,17 @@ export class ModelsService {
   async createModel(
     name: string,
     description: string,
+    type: string,
+    taskType: string,
+    framework: string,
     userId: string,
   ): Promise<Model> {
     const model = this.modelsRepository.create({
       name,
       description,
+      type: type as any,
+      taskType: taskType as any,
+      framework: framework as any,
       user: { id: userId },
     });
     return this.modelsRepository.save(model);
@@ -59,7 +65,7 @@ export class ModelsService {
   ): Promise<ModelVersion> {
     const model = await this.modelsRepository.findOne({
       where: { id: modelId },
-      relations: ['versions'],
+      relations: ['versions', 'user'],
     });
     if (!model) throw new NotFoundException('Model not found');
 
@@ -71,9 +77,13 @@ export class ModelsService {
       )[0];
     }
 
+    const publisher = model.user?.email ? model.user.email.split('@')[0] : 'unknown';
+    const sanitizedPublisher = publisher.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const sanitizedName = model.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+
     const uploadToMinio = async (file: Express.Multer.File | undefined, prefix: string): Promise<string | undefined> => {
       if (!file) return undefined;
-      const objectName = `${modelId}/v${versionNumber}/${prefix}-${file.originalname}`;
+      const objectName = `${sanitizedPublisher}/${sanitizedName}/v${versionNumber}/${prefix}-${file.originalname}`;
       await this.minioService.uploadFile(objectName, file.path, file.mimetype);
       fs.unlinkSync(file.path);
       return objectName;
