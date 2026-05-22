@@ -11,6 +11,7 @@ import { Model } from './modules/models/entities/model.entity';
 import { ModelVersion } from './modules/models/entities/model-version.entity';
 import { Deployment } from './modules/deployments/entities/deployment.entity';
 import { MulterModule } from '@nestjs/platform-express';
+import { MinioModule } from './shared/minio/minio.module';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -42,6 +43,7 @@ import { MulterModule } from '@nestjs/platform-express';
     ModelsModule,
     DeploymentsModule,
     QueueModule,
+    MinioModule,
   ],
 })
 export class AppModule {}

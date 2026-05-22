@@ -114,3 +114,50 @@ export async function runPrediction(
     return { success: false, error: errorMessage };
   }
 }
+
+/**
+ * Deletes a registered machine learning model and all associated versions/deployments.
+ * Updates next cache to refresh list views.
+ *
+ * @param id - The model UUID.
+ * @returns A promise resolving to a success indicator or error message.
+ */
+export async function deleteModel(
+  id: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await smartFetch<{ success: boolean }>(`/models/${id}`, {
+      method: "DELETE",
+    });
+    revalidatePath("/models");
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to delete model";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Deletes a specific model version iteration and cleans up its storage files.
+ *
+ * @param id - The parent model UUID (for path revalidation).
+ * @param versionId - The model version UUID.
+ * @returns A promise resolving to a success indicator or error message.
+ */
+export async function deleteModelVersion(
+  id: string,
+  versionId: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await smartFetch<{ success: boolean }>(`/models/versions/${versionId}`, {
+      method: "DELETE",
+    });
+    revalidatePath(`/models/${id}`);
+    revalidatePath("/models");
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to delete version";
+    return { success: false, error: errorMessage };
+  }
+}

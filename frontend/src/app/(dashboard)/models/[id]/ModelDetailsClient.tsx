@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { deployVersion, stopDeployment } from "@/lib/actions/deployments.actions";
-import type { Model, ModelVersion } from "@/types";
+import type { Model, ModelVersion, Deployment } from "@/types";
 import { UsageMetricsCard } from "@/components/models/UsageMetricsCard";
 import { VersionHistoryTable } from "@/components/models/VersionHistoryTable";
 import { UploadVersionModal } from "@/components/models/UploadVersionModal";
@@ -121,6 +121,51 @@ export default function ModelDetailsClient({ initialModel, modelId }: ModelDetai
 
   // Get active version details to render payload expectations
   const versions = model.versions || [];
+
+  /**
+   * Helper function to check if a model version is in a transient state.
+   * A version is transient if it is currently uploading, building,
+   * or has a running deployment starting up.
+   *
+   * @param v - The model version to check.
+   * @returns True if the version is in a transient/pending state.
+   */
+  const isVersionTransient = (v: ModelVersion): boolean => {
+    const status = v.status?.toLowerCase();
+    if (status === "uploaded" || status === "building") {
+      return true;
+    }
+
+    const latestDeployment =
+      v.deployments && v.deployments.length > 0
+        ? [...v.deployments].sort(
+            (a: Deployment, b: Deployment) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0]
+        : null;
+
+    if (latestDeployment) {
+      const depStatus = latestDeployment.status?.toLowerCase();
+      if (depStatus === "starting") {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  // Poll deployment and build status every 3 seconds if transient states exist
+  useEffect(() => {
+    const hasTransient = versions.some(isVersionTransient);
+    if (!hasTransient) return;
+
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [versions, router]);
+
   const latestVersion = versions.length
     ? [...versions].sort((a: ModelVersion, b: ModelVersion) => b.versionNumber - a.versionNumber)[0]
     : null;

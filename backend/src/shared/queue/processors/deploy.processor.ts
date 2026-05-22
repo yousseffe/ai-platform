@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Deployment } from '../../../modules/deployments/entities/deployment.entity';
 import { DeploymentStatus } from '../../../modules/deployments/enums/deployment-status.enum';
+import { ModelType } from '../../../modules/models/enums/model-type.enum';
 import * as Docker from 'dockerode';
 import { Logger } from '@nestjs/common';
 import { DeployJobPayload } from '../interfaces/queue.interface';
@@ -14,12 +15,12 @@ import { DeployJobPayload } from '../interfaces/queue.interface';
  */
 @Processor('deploy-queue')
 export class DeployProcessor extends WorkerHost {
-  private docker: Docker;
+  private readonly docker: Docker;
   private readonly logger = new Logger(DeployProcessor.name);
 
   constructor(
     @InjectRepository(Deployment)
-    private deploymentsRepository: Repository<Deployment>,
+    private readonly deploymentsRepository: Repository<Deployment>,
   ) {
     super();
     this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
@@ -36,10 +37,13 @@ export class DeployProcessor extends WorkerHost {
     const { deploymentId } = job.data;
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },
-      relations: ['modelVersion'],
+      relations: ['modelVersion', 'modelVersion.model', 'modelVersion.model.user'],
     });
 
-    if (!deployment) return;
+    if (!deployment) {
+      this.logger.error(`Deployment record ${deploymentId} not found in database.`);
+      return;
+    }
 
     this.logger.log(
       `Starting deployment process for deployment: ${deploymentId} (Model Version: ${deployment.modelVersion.id})`,
@@ -53,63 +57,65 @@ export class DeployProcessor extends WorkerHost {
         where: { status: DeploymentStatus.RUNNING },
       });
       const usedPorts = new Set(
-        activeDeployments.map((d) => d.port).filter((p) => p != null),
+        activeDeployments.map((d) => d.port).filter((p) => p != null) as number[],
       );
       let nextPort = 8000;
       while (usedPorts.has(nextPort)) {
         nextPort++;
       }
 
-      this.logger.log(
-        `Assigning port ${nextPort} to deployment ${deploymentId}`,
-      );
+      this.logger.log(`Assigning port ${nextPort} to deployment ${deploymentId}`);
+
+      const userEmail = deployment.modelVersion.model.user?.email || 'unknown@unknown.com';
+      const emailPrefix = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+      const modelName = deployment.modelVersion.model.name.replace(/[^a-zA-Z0-9]/g, '');
+      const shortDeployId = deploymentId.split('-')[0];
+      const containerName = `${emailPrefix}_${modelName}_v${deployment.modelVersion.versionNumber}_${shortDeployId}`.toLowerCase();
+
+      const isLlm = deployment.modelVersion.model.type === ModelType.LLM_GGUF;
+      const containerPort = isLlm ? '8080/tcp' : '8000/tcp';
+      const urlPort = isLlm ? 8080 : 8000;
 
       const container = await this.docker.createContainer({
+        name: containerName,
         Image: imageName,
         ExposedPorts: {
-          '8000/tcp': {},
+          [containerPort]: {},
         },
         HostConfig: {
           PortBindings: {
-            '8000/tcp': [{ HostPort: nextPort.toString() }],
+            [containerPort]: [{ HostPort: nextPort.toString() }],
           },
+          NetworkMode: 'ai-platform_default',
         },
       });
 
       await container.start();
 
-      const info = await container.inspect();
-
-      // In docker-compose, "localhost" inside the backend container won't reach the model container exposed port on host.
-      // Wait, since both are in same docker host, we can just use the container's IP address in the bridge network!
-      const networkSettings = info.NetworkSettings as Record<string, unknown>;
-      const ipAddress =
-        typeof networkSettings.IPAddress === 'string'
-          ? networkSettings.IPAddress
-          : undefined;
-      const bridgeIp = info.NetworkSettings?.Networks?.bridge?.IPAddress;
-      const containerIp = ipAddress || bridgeIp || '127.0.0.1';
-      const url = `http://${containerIp}:8000`;
+      // Since both the backend and target container are in the 'ai-platform_default'
+      // docker network, they can directly communicate using container name and target port
+      const url = `http://${containerName}:${urlPort}`;
 
       this.logger.log(
         `Successfully deployed container ${container.id} at ${url} on HostPort ${nextPort}`,
       );
+
       await this.deploymentsRepository.update(deploymentId, {
         status: DeploymentStatus.RUNNING,
         containerId: container.id,
         port: nextPort,
         url: url,
-        errorMessage: undefined,
+        errorMessage: null,
       });
-    } catch (e) {
-      const error = e as Error;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Failed to deploy container for deployment ${deploymentId}: ${error.message}`,
-        error.stack,
+        `Failed to deploy container for deployment ${deploymentId}: ${message}`,
+        error instanceof Error ? error.stack : undefined,
       );
       await this.deploymentsRepository.update(deploymentId, {
         status: DeploymentStatus.FAILED,
-        errorMessage: error.message || 'Unknown error during deployment',
+        errorMessage: message || 'Unknown error during deployment',
       });
       throw error;
     }

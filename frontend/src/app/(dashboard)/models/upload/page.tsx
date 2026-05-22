@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createModel } from "@/lib/actions/models.actions";
@@ -144,49 +145,37 @@ export default function UploadModelPage() {
 
       setUploadStatus("Transferring artifacts to remote storage...");
 
-      // 3. Upload version via API Handler proxy using XMLHttpRequest to track progress
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", `/api/models/${modelId}/versions`);
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percentCompleted = Math.round((event.loaded * 80) / event.total);
-          setUploadProgress(10 + percentCompleted);
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          setUploadStatus("Artifacts queued for containerization!");
-          setUploadProgress(100);
-          setTimeout(() => {
-            router.push(`/models/${modelId}`);
-            router.refresh();
-          }, 800);
-        } else {
-          let errorMsg = "Upload failed";
-          try {
-            const resData = JSON.parse(xhr.responseText);
-            errorMsg = resData.message || errorMsg;
-          } catch {
-            // Ignore error
+      // 3. Upload version via API Handler proxy using Axios to track progress
+      const response = await axios.post(`/api/models/${modelId}/versions`, formData, {
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 80) / progressEvent.total);
+            setUploadProgress(10 + percentCompleted);
           }
-          alert(errorMsg);
-          setIsUploading(false);
-          setUploadProgress(0);
-        }
-      };
+        },
+      });
 
-      xhr.onerror = () => {
-        alert("A network error occurred during upload.");
+      if (response.status >= 200 && response.status < 300) {
+        setUploadStatus("Artifacts queued for containerization!");
+        setUploadProgress(100);
+        setTimeout(() => {
+          router.push(`/models/${modelId}`);
+          router.refresh();
+        }, 800);
+      } else {
+        const errorMsg = response.data?.message || "Upload failed";
+        alert(errorMsg);
         setIsUploading(false);
         setUploadProgress(0);
-      };
-
-      xhr.send(formData);
-    } catch (e) {
+      }
+    } catch (e: unknown) {
       console.error(e);
-      const errMsg = e instanceof Error ? e.message : "An unexpected error occurred.";
+      let errMsg = "An unexpected error occurred.";
+      if (axios.isAxiosError(e)) {
+        errMsg = e.response?.data?.message || e.message || errMsg;
+      } else if (e instanceof Error) {
+        errMsg = e.message;
+      }
       alert(errMsg);
       setIsUploading(false);
       setUploadProgress(0);

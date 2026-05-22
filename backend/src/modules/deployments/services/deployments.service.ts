@@ -1,12 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Deployment } from '../entities/deployment.entity';
-import { DeploymentStatus } from '../enums/deployment-status.enum';
-import { ModelVersion } from '../../models/entities/model-version.entity';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import * as Docker from 'dockerode';
+import { Deployment } from '../entities/deployment.entity';
+import { DeploymentStatus } from '../enums/deployment-status.enum';
+import { DeploymentsRepository } from '../repositories/deployments.repository';
+import { ModelVersionsRepository } from '../../models/repositories/model-versions.repository';
 
 /**
  * Service managing deployments of model versions. Handles spawning and stopping
@@ -15,13 +14,12 @@ import * as Docker from 'dockerode';
 @Injectable()
 export class DeploymentsService {
   private readonly docker: Docker;
+  private readonly logger = new Logger(DeploymentsService.name);
 
   constructor(
-    @InjectRepository(Deployment)
-    private deploymentsRepository: Repository<Deployment>,
-    @InjectRepository(ModelVersion)
-    private modelVersionsRepository: Repository<ModelVersion>,
-    @InjectQueue('deploy-queue') private deployQueue: Queue,
+    private readonly deploymentsRepository: DeploymentsRepository,
+    private readonly modelVersionsRepository: ModelVersionsRepository,
+    @InjectQueue('deploy-queue') private readonly deployQueue: Queue,
   ) {
     this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
   }
@@ -68,7 +66,9 @@ export class DeploymentsService {
     const version = await this.modelVersionsRepository.findOne({
       where: { id: versionId },
     });
-    if (!version) throw new NotFoundException('Model version not found');
+    if (!version) {
+      throw new NotFoundException('Model version not found');
+    }
 
     const deployment = this.deploymentsRepository.create({
       modelVersion: version,
@@ -102,7 +102,6 @@ export class DeploymentsService {
    *
    * @param deploymentId - The UUID of the deployment to update.
    * @param updateData - The partial deployment data.
-   * @returns A promise that resolves when the update is complete.
    */
   async updateDeployment(
     deploymentId: string,
@@ -123,15 +122,28 @@ export class DeploymentsService {
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },
     });
-    if (!deployment) throw new NotFoundException('Deployment not found');
+    if (!deployment) {
+      throw new NotFoundException('Deployment not found');
+    }
 
     if (deployment.containerId) {
       try {
         const container = this.docker.getContainer(deployment.containerId);
-        await container.stop();
-        await container.remove();
-      } catch (e) {
-        console.error('Error stopping/removing container', e);
+        try {
+          await container.stop();
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Error stopping container (might be stopped already): ${message}`);
+        }
+        try {
+          await container.remove();
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.error(`Error removing container: ${message}`);
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Error interacting with Docker for container ${deployment.containerId}: ${message}`);
       }
     }
 

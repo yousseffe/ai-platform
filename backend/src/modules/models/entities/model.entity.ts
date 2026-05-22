@@ -9,6 +9,9 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { ModelVersion } from './model-version.entity';
+import { ModelType } from '../enums/model-type.enum';
+import { TaskType } from '../enums/task-type.enum';
+import { Framework } from '../enums/framework.enum';
 
 /**
  * Database table representation of an ML model registry.
@@ -33,6 +36,36 @@ export class Model {
    */
   @Column({ type: 'varchar', nullable: true })
   description: string | null;
+
+  /**
+   * Core type classification of the model.
+   */
+  @Column({
+    type: 'varchar',
+    enum: ModelType,
+    default: ModelType.TABULAR,
+  })
+  type: ModelType;
+
+  /**
+   * The specific task executed by this model.
+   */
+  @Column({
+    type: 'varchar',
+    enum: TaskType,
+    default: TaskType.OTHER,
+  })
+  taskType: TaskType;
+
+  /**
+   * The framework engine utilized by this model.
+   */
+  @Column({
+    type: 'varchar',
+    enum: Framework,
+    default: Framework.CUSTOM,
+  })
+  framework: Framework;
 
   /**
    * Owner user account record who registered this model context.

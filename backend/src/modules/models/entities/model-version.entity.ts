@@ -26,7 +26,7 @@ export class ModelVersion {
   /**
    * Parent model registry template this iteration belongs to.
    */
-  @ManyToOne(() => Model, (model) => model.versions)
+  @ManyToOne(() => Model, (model) => model.versions, { onDelete: 'CASCADE' })
   model: Model;
 
   /**

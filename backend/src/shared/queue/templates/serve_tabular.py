@@ -1,0 +1,147 @@
+from fastapi import FastAPI, Request
+import os
+import uvicorn
+import importlib.util
+
+app = FastAPI()
+
+# Load model
+model_path = os.getenv("MODEL_PATH", "model.pkl")
+framework = os.getenv("FRAMEWORK", "SKLEARN")
+task_type = os.getenv("TASK_TYPE", "OTHER")
+
+model = None
+try:
+    if framework == "SKLEARN" or framework == "CUSTOM":
+        import joblib
+        model = joblib.load(model_path)
+    elif framework == "ONNX":
+        import onnxruntime
+        model = onnxruntime.InferenceSession(model_path)
+    elif framework == "PYTORCH":
+        import torch
+        model = torch.load(model_path)
+        model.eval()
+    elif framework == "TENSORFLOW":
+        import tensorflow as tf
+        model = tf.keras.models.load_model(model_path)
+except Exception as e:
+    print(f"Error loading {framework} model: {e}")
+
+# Load scaler if exists
+scaler = None
+scaler_path = os.getenv("SCALER_PATH")
+if scaler_path and os.path.exists(scaler_path):
+    scaler = joblib.load(scaler_path)
+
+# Load preprocess if exists
+preprocess_func = None
+preprocess_path = os.getenv("PREPROCESS_PATH")
+if preprocess_path and os.path.exists(preprocess_path):
+    spec = importlib.util.spec_from_file_location("preprocess", preprocess_path)
+    preprocess_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(preprocess_module)
+    if hasattr(preprocess_module, "preprocess"):
+        preprocess_func = preprocess_module.preprocess
+
+# Load postprocess if exists
+postprocess_func = None
+postprocess_path = os.getenv("POSTPROCESS_PATH")
+if postprocess_path and os.path.exists(postprocess_path):
+    spec = importlib.util.spec_from_file_location("postprocess", postprocess_path)
+    postprocess_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(postprocess_module)
+    if hasattr(postprocess_module, "postprocess"):
+        postprocess_func = postprocess_module.postprocess
+
+@app.post("/predict")
+async def predict(request: Request):
+    data = await request.json()
+    
+    # Preprocess
+    if preprocess_func:
+        data = preprocess_func(data)
+    elif scaler:
+        pass 
+    
+    # Format data for TABULAR inference (Scikit-learn expects 2D array: [[val1, val2]])
+    if isinstance(data, dict):
+        data = [list(data.values())]
+    elif isinstance(data, list):
+        if len(data) > 0 and isinstance(data[0], dict):
+            data = [list(item.values()) for item in data]
+        elif len(data) > 0 and not isinstance(data[0], list):
+            # Always wrap 1D list in a 2D array for tabular models
+            data = [data]
+            
+    # Inference
+    # Inference
+    try:
+        prediction_proba = None
+        
+        if framework == "SKLEARN" or framework == "CUSTOM":
+            prediction = model.predict(data)
+            
+            # If it's a classification task, we can also try to return probabilities
+            if task_type == "CLASSIFICATION" and hasattr(model, "predict_proba"):
+                prediction_proba = model.predict_proba(data)
+                
+        elif framework == "ONNX":
+            import numpy as np
+            input_name = model.get_inputs()[0].name
+            # convert data to numpy float32 array
+            np_data = np.array(data).astype(np.float32)
+            outputs = model.run(None, {input_name: np_data})
+            prediction = outputs[0]
+            # ONNX usually returns probabilities as the second output for classification
+            if task_type == "CLASSIFICATION" and len(outputs) > 1:
+                prediction_proba = outputs[1]
+                
+        elif framework == "PYTORCH":
+            import torch
+            tensor_data = torch.tensor(data, dtype=torch.float32)
+            with torch.no_grad():
+                prediction = model(tensor_data)
+                
+                # For classification, PyTorch models usually output logits. Apply softmax.
+                if task_type == "CLASSIFICATION":
+                    prediction_proba = torch.nn.functional.softmax(prediction, dim=1).numpy()
+                    prediction = torch.argmax(prediction, dim=1).numpy()
+                else:
+                    prediction = prediction.numpy()
+                    
+        elif framework == "TENSORFLOW":
+            import numpy as np
+            np_data = np.array(data).astype(np.float32)
+            prediction = model.predict(np_data)
+            
+            # TF usually outputs probabilities for classification
+            if task_type == "CLASSIFICATION":
+                prediction_proba = prediction
+                prediction = np.argmax(prediction, axis=1)
+                
+    except Exception as e:
+        return {"error": str(e)}
+    
+    # Postprocess
+    if postprocess_func:
+        prediction = postprocess_func(prediction)
+    
+    if hasattr(prediction, "tolist"):
+        prediction = prediction.tolist()
+        
+    if prediction_proba is not None and hasattr(prediction_proba, "tolist"):
+        prediction_proba = prediction_proba.tolist()
+        
+    if isinstance(prediction, dict):
+        result = prediction
+    else:
+        result = {"prediction": prediction}
+        
+    if prediction_proba is not None:
+        result["probabilities"] = prediction_proba
+        
+    return result
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
