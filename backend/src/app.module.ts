@@ -1,17 +1,21 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
-import { UsersModule } from './users/users.module';
-import { AuthModule } from './auth/auth.module';
-import { ModelsModule } from './models/models.module';
-import { DeploymentsModule } from './deployments/deployments.module';
-import { QueueModule } from './queue/queue.module';
-import { User } from './users/user.entity';
-import { Model } from './models/model.entity';
-import { ModelVersion } from './models/model-version.entity';
-import { Deployment } from './deployments/deployment.entity';
+import { UsersModule } from './modules/users/users.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { ModelsModule } from './modules/models/models.module';
+import { DeploymentsModule } from './modules/deployments/deployments.module';
+import { QueueModule } from './shared/queue/queue.module';
+import { User } from './modules/users/entities/user.entity';
+import { Model } from './modules/models/entities/model.entity';
+import { ModelVersion } from './modules/models/entities/model-version.entity';
+import { Deployment } from './modules/deployments/entities/deployment.entity';
 import { MulterModule } from '@nestjs/platform-express';
 
+/**
+ * Root application module configuring TypeORM database connectivity, Redis-backed
+ * queues, global Multer options, and domain feature modules.
+ */
 @Module({
   imports: [
     TypeOrmModule.forRoot({
