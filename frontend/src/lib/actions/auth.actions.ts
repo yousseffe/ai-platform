@@ -1,5 +1,7 @@
 "use server";
 
+import * as authService from "@/lib/services/auth.service";
+
 /**
  * Registers a new user account with the backend service.
  *
@@ -11,22 +13,8 @@ export async function registerUser(
   email: string,
   password: string
 ): Promise<{ success: true; data: unknown } | { success: false; error: string }> {
-  const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
   try {
-    const res = await fetch(`${backendUrl}/auth/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.message || "Failed to register");
-    }
-
+    const data = await authService.registerUser(email, password);
     return { success: true, data };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Registration failed";

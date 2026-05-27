@@ -1,6 +1,6 @@
 "use server";
 
-import { smartFetch } from "@/lib/utils/smart-fetch";
+import * as deploymentsService from "@/lib/services/deployments.service";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -16,9 +16,7 @@ export async function deployVersion(
   modelId: string
 ): Promise<{ success: true; data: unknown } | { success: false; error: string }> {
   try {
-    const res = await smartFetch(`/deployments/version/${versionId}`, {
-      method: "POST",
-    });
+    const res = await deploymentsService.deployVersion(versionId);
     revalidatePath(`/models/${modelId}`);
     revalidatePath("/models");
     revalidatePath("/");
@@ -42,9 +40,7 @@ export async function stopDeployment(
   modelId: string
 ): Promise<{ success: true; data: unknown } | { success: false; error: string }> {
   try {
-    const res = await smartFetch(`/deployments/${deploymentId}/stop`, {
-      method: "POST",
-    });
+    const res = await deploymentsService.stopDeployment(deploymentId);
     revalidatePath(`/models/${modelId}`);
     revalidatePath("/models");
     revalidatePath("/");

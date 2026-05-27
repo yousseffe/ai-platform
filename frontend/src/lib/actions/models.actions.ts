@@ -1,6 +1,6 @@
 "use server";
 
-import { smartFetch } from "@/lib/utils/smart-fetch";
+import * as modelsService from "@/lib/services/models.service";
 import { Model, ModelVersion } from "@/types";
 import { revalidatePath } from "next/cache";
 
@@ -12,9 +12,7 @@ import { revalidatePath } from "next/cache";
  */
 export async function getModels(): Promise<Model[]> {
   try {
-    return await smartFetch<Model[]>("/models", {
-      cache: "no-store",
-    });
+    return await modelsService.getModels();
   } catch (error) {
     console.error("getModels error:", error);
     return [];
@@ -30,9 +28,7 @@ export async function getModels(): Promise<Model[]> {
  */
 export async function getModel(id: string): Promise<Model | null> {
   try {
-    return await smartFetch<Model>(`/models/${id}`, {
-      cache: "no-store",
-    });
+    return await modelsService.getModel(id);
   } catch (error) {
     console.error(`getModel error for ${id}:`, error);
     return null;
@@ -52,10 +48,7 @@ export async function createModel(
   description: string
 ): Promise<{ success: true; data: Model } | { success: false; error: string }> {
   try {
-    const res = await smartFetch<Model>("/models", {
-      method: "POST",
-      body: JSON.stringify({ name, description }),
-    });
+    const res = await modelsService.createModel(name, description);
     revalidatePath("/models");
     revalidatePath("/");
     return { success: true, data: res };
@@ -78,10 +71,7 @@ export async function uploadModelVersion(
   formData: FormData
 ): Promise<{ success: true; data: ModelVersion } | { success: false; error: string }> {
   try {
-    const res = await smartFetch<ModelVersion>(`/models/${id}/versions`, {
-      method: "POST",
-      body: formData,
-    });
+    const res = await modelsService.uploadModelVersion(id, formData);
     revalidatePath(`/models/${id}`);
     revalidatePath("/models");
     revalidatePath("/");
@@ -104,10 +94,7 @@ export async function runPrediction(
   parsedPayload: unknown
 ): Promise<{ success: true; data: Record<string, unknown> } | { success: false; error: string }> {
   try {
-    const res = await smartFetch<Record<string, unknown>>(`/models/${id}/predict`, {
-      method: "POST",
-      body: JSON.stringify(parsedPayload),
-    });
+    const res = await modelsService.runPrediction(id, parsedPayload);
     return { success: true, data: res };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Prediction request failed";
@@ -126,9 +113,7 @@ export async function deleteModel(
   id: string
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    await smartFetch<{ success: boolean }>(`/models/${id}`, {
-      method: "DELETE",
-    });
+    await modelsService.deleteModel(id);
     revalidatePath("/models");
     revalidatePath("/");
     return { success: true };
@@ -150,9 +135,7 @@ export async function deleteModelVersion(
   versionId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    await smartFetch<{ success: boolean }>(`/models/versions/${versionId}`, {
-      method: "DELETE",
-    });
+    await modelsService.deleteModelVersion(versionId);
     revalidatePath(`/models/${id}`);
     revalidatePath("/models");
     return { success: true };

@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { deployVersion, stopDeployment } from "@/lib/actions/deployments.actions";
-import type { Model, ModelVersion, Deployment } from "@/types";
+import { useModelDetails } from "@/hooks/use-model-details";
+import type { Model } from "@/types";
 import { UsageMetricsCard } from "@/components/models/UsageMetricsCard";
 import { VersionHistoryTable } from "@/components/models/VersionHistoryTable";
 import { UploadVersionModal } from "@/components/models/UploadVersionModal";
@@ -17,158 +17,36 @@ interface ModelDetailsClientProps {
 /**
  * Client-side layout view for Model Details page.
  * Orchestrates modal controls, deployment actions, and renders components
- * representing stats and historical artifact version tables.
+ * representing stats and historical artifact version tables using a custom state hook.
  *
  * @param props - ModelDetailsClient component properties.
  * @returns The React component layout rendering model version grids.
  */
 export default function ModelDetailsClient({ initialModel, modelId }: ModelDetailsClientProps) {
   const router = useRouter();
-  const model = initialModel; // Synchronized directly from Server Component via router.refresh()
-
-  // New Version Modal states
-  const [showVersionModal, setShowVersionModal] = useState(false);
-  const [modelFile, setModelFile] = useState<File | null>(null);
-  const [scalerFile, setScalerFile] = useState<File | null>(null);
-  const [preprocessFile, setPreprocessFile] = useState<File | null>(null);
-  const [postprocessFile, setPostprocessFile] = useState<File | null>(null);
-  const [examplePayload, setExamplePayload] = useState("");
-  const [expectedResult, setExpectedResult] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
-
-  /**
-   * Initiates deployment server requests for a chosen version ID.
-   *
-   * @param versionId - Target model version to run.
-   */
-  const handleDeploy = async (versionId: string) => {
-    try {
-      const res = await deployVersion(versionId, modelId);
-      if (res.success) {
-        alert("Deployment started!");
-        router.refresh();
-      } else {
-        alert(res.error || "Failed to start deployment");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Failed to start deployment");
-    }
-  };
-
-  /**
-   * Terminates active model instance execution workloads.
-   *
-   * @param deploymentId - Unique container runtime deployment database identifier.
-   */
-  const handleStop = async (deploymentId: string) => {
-    try {
-      const res = await stopDeployment(deploymentId, modelId);
-      if (res.success) {
-        alert("Deployment stopped!");
-        router.refresh();
-      } else {
-        alert(res.error || "Failed to stop deployment");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Failed to stop deployment");
-    }
-  };
-
-  /**
-   * Packs artifacts into FormData packages and posts new model versions to backend endpoints.
-   */
-  const handleUploadVersion = async () => {
-    setIsUploading(true);
-    try {
-      const formData = new FormData();
-      if (modelFile) formData.append("model", modelFile);
-      if (scalerFile) formData.append("scaler", scalerFile);
-      if (preprocessFile) formData.append("preprocess", preprocessFile);
-      if (postprocessFile) formData.append("postprocess", postprocessFile);
-      if (examplePayload) formData.append("examplePayload", examplePayload);
-      if (expectedResult) formData.append("expectedResult", expectedResult);
-
-      const res = await fetch(`/api/models/${modelId}/versions`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const resData = await res.json();
-
-      if (!res.ok) {
-        throw new Error(resData.message || "Failed to upload version");
-      }
-
-      setShowVersionModal(false);
-      setModelFile(null);
-      setScalerFile(null);
-      setPreprocessFile(null);
-      setPostprocessFile(null);
-      setExamplePayload("");
-      setExpectedResult("");
-      alert("New version queued for build!");
-      router.refresh();
-    } catch (e) {
-      console.error(e);
-      const errMsg = e instanceof Error ? e.message : "Failed to upload new version";
-      alert(errMsg);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // Get active version details to render payload expectations
-  const versions = model.versions || [];
-
-  /**
-   * Helper function to check if a model version is in a transient state.
-   * A version is transient if it is currently uploading, building,
-   * or has a running deployment starting up.
-   *
-   * @param v - The model version to check.
-   * @returns True if the version is in a transient/pending state.
-   */
-  const isVersionTransient = (v: ModelVersion): boolean => {
-    const status = v.status?.toLowerCase();
-    if (status === "uploaded" || status === "building") {
-      return true;
-    }
-
-    const latestDeployment =
-      v.deployments && v.deployments.length > 0
-        ? [...v.deployments].sort(
-            (a: Deployment, b: Deployment) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )[0]
-        : null;
-
-    if (latestDeployment) {
-      const depStatus = latestDeployment.status?.toLowerCase();
-      if (depStatus === "starting") {
-        return true;
-      }
-    }
-
-    return false;
-  };
-
-  // Poll deployment and build status every 3 seconds if transient states exist
-  useEffect(() => {
-    const hasTransient = versions.some(isVersionTransient);
-    if (!hasTransient) return;
-
-    const interval = setInterval(() => {
-      router.refresh();
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [versions, router]);
-
-  const latestVersion = versions.length
-    ? [...versions].sort((a: ModelVersion, b: ModelVersion) => b.versionNumber - a.versionNumber)[0]
-    : null;
+  const {
+    model,
+    versions,
+    latestVersion,
+    showVersionModal,
+    setShowVersionModal,
+    modelFile,
+    setModelFile,
+    scalerFile,
+    setScalerFile,
+    preprocessFile,
+    setPreprocessFile,
+    postprocessFile,
+    setPostprocessFile,
+    examplePayload,
+    setExamplePayload,
+    expectedResult,
+    setExpectedResult,
+    isUploading,
+    handleDeploy,
+    handleStop,
+    handleUploadVersion,
+  } = useModelDetails(modelId, initialModel);
 
   return (
     <div className="max-w-6xl mx-auto">
