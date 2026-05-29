@@ -1,11 +1,12 @@
 import { User } from "../user";
+import { DeploymentStatus, VersionStatus, PredictionStatus } from "../enums";
 
 export interface Deployment {
   id: string;
   containerId?: string;
   url?: string;
   port?: number;
-  status: 'starting' | 'running' | 'stopped' | 'failed';
+  status: DeploymentStatus;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
@@ -14,7 +15,7 @@ export interface Deployment {
 export interface ModelVersion {
   id: string;
   versionNumber: number;
-  status: 'uploaded' | 'building' | 'ready' | 'failed';
+  status: VersionStatus;
   modelFilePath: string;
   scalerFilePath?: string;
   preprocessFilePath?: string;
@@ -40,7 +41,7 @@ export interface Model {
 export interface HistoryItem {
   time: string;
   reqId: string;
-  status: "SUCCESS" | "FAILED";
+  status: PredictionStatus;
   latency: string;
   outcome: string;
   payload: string;

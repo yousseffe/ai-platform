@@ -132,18 +132,24 @@ export class DeploymentsService {
         try {
           await container.stop();
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
-          this.logger.warn(`Error stopping container (might be stopped already): ${message}`);
+          const message =
+            error instanceof Error ? error.message : String(error);
+          this.logger.warn(
+            `Error stopping container (might be stopped already): ${message}`,
+          );
         }
         try {
           await container.remove();
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           this.logger.error(`Error removing container: ${message}`);
         }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(`Error interacting with Docker for container ${deployment.containerId}: ${message}`);
+        this.logger.error(
+          `Error interacting with Docker for container ${deployment.containerId}: ${message}`,
+        );
       }
     }
 

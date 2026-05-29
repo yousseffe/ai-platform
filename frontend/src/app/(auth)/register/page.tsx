@@ -1,21 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Layers, ArrowRight, Mail, Lock } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Layers } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { registerUser } from "@/lib/actions/auth.actions";
+import { registerUser, verifyUser } from "@/lib/actions/auth.actions";
 import { signIn, useSession } from "next-auth/react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { registerSchema, RegisterInput } from "@/lib/schemas";
+import { Card, CardContent } from "@/components/ui/card";
+import RegisterForm from "@/components/auth/RegisterForm";
+import OtpVerifyForm from "@/components/auth/OtpVerifyForm";
+import { RegisterInput } from "@/lib/schemas";
 
 /**
  * Registration page client component.
- * Allows users to register new credentials, performing schemas validations via Zod
- * and Hook Form, and logging them in on successful creation.
- *
- * @returns The RegisterPage component rendering the onboarding card.
+ * Integrates a two-step wizard: account profile credentials followed by email OTP validation.
+ * Migrated to Shadcn UI Card layout.
  */
 export default function RegisterPage() {
   const router = useRouter();
@@ -23,14 +22,13 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<RegisterInput>({
-    resolver: zodResolver(registerSchema),
-    mode: "onChange",
-  });
+  // Wizard steps state
+  const [step, setStep] = useState<"REGISTER" | "VERIFY">("REGISTER");
+  const [tempPassword, setTempPassword] = useState("");
+  const [registeredEmail, setRegisteredEmail] = useState("");
+  const [otpValues, setOtpValues] = useState<string[]>(Array(6).fill(""));
+
+  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   useEffect(() => {
     if (session) {
@@ -38,25 +36,16 @@ export default function RegisterPage() {
     }
   }, [session, router]);
 
-  const handleRegister = async (data: RegisterInput) => {
+  const handleRegisterSubmit = async (data: RegisterInput) => {
     setError("");
     setLoading(true);
 
     try {
-      const res = await registerUser(data.email, data.password);
+      const res = await registerUser(data.email, data.username, data.password);
       if (res.success) {
-        const loginRes = await signIn("credentials", {
-          email: data.email,
-          password: data.password,
-          redirect: false,
-        });
-
-        if (loginRes?.error) {
-          router.push("/login");
-        } else {
-          router.push("/");
-          router.refresh();
-        }
+        setRegisteredEmail(data.email);
+        setTempPassword(data.password);
+        setStep("VERIFY");
       } else {
         setError(res.error || "Failed to register");
       }
@@ -67,9 +56,65 @@ export default function RegisterPage() {
     }
   };
 
+  const handleOtpChange = (index: number, val: string) => {
+    if (!/^[0-9]?$/.test(val)) return;
+    const updated = [...otpValues];
+    updated[index] = val;
+    setOtpValues(updated);
+
+    if (val && index < 5) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otpValues[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    const fullOtp = otpValues.join("");
+    if (fullOtp.length < 6) {
+      setError("Please enter the full 6-digit OTP code");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await verifyUser(registeredEmail, fullOtp);
+      if (res.success) {
+        const loginRes = await signIn("credentials", {
+          email: registeredEmail,
+          password: tempPassword,
+          redirect: false,
+        });
+
+        if (loginRes?.error) {
+          setError("Verification successful, but sign in failed. Please login manually.");
+          setTimeout(() => router.push("/login"), 2000);
+        } else {
+          router.push("/");
+          router.refresh();
+        }
+      } else {
+        setError(res.error || "Verification failed");
+      }
+    } catch {
+      setError("Failed to verify code. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-main flex flex-col justify-center items-center p-4">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-md animate-fade-in">
+        {/* Title logo area */}
         <div className="flex items-center justify-center gap-2 text-primary-600 font-bold text-2xl tracking-tight mb-8">
           <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
             <Layers className="w-6 h-6 text-white" />
@@ -77,101 +122,38 @@ export default function RegisterPage() {
           ModelOps AI
         </div>
 
-        <div className="card shadow-md border border-slate-200">
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">
-            Create an account
-          </h1>
-          <p className="text-slate-500 mb-6">
-            Start deploying your machine learning models today.
-          </p>
-
-          {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit(handleRegister)} className="space-y-5">
-            <div>
-              <label className="form-label text-xs">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="email"
-                  className={`form-input pl-10 ${
-                    errors.email ? "border-red-500 focus:ring-red-100" : ""
-                  }`}
-                  placeholder="name@company.com"
-                  {...register("email")}
-                  disabled={loading}
-                />
+        <Card className="border border-slate-200 shadow-sm p-0">
+          <CardContent className="p-6">
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+                {error}
               </div>
-              {errors.email && (
-                <p className="text-xs text-red-500 mt-1.5 font-medium">
-                  {errors.email.message}
-                </p>
-              )}
-            </div>
+            )}
 
-            <div>
-              <label className="form-label text-xs">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="password"
-                  className={`form-input pl-10 ${
-                    errors.password ? "border-red-500 focus:ring-red-100" : ""
-                  }`}
-                  placeholder="••••••••"
-                  {...register("password")}
-                  disabled={loading}
-                />
+            {step === "REGISTER" ? (
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 mb-2">Create an account</h1>
+                <p className="text-slate-500 text-sm mb-6">Start deploying your machine learning models today.</p>
+                <RegisterForm onSubmit={handleRegisterSubmit} loading={loading} />
               </div>
-              {errors.password && (
-                <p className="text-xs text-red-500 mt-1.5 font-medium">
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="form-label text-xs">Confirm Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="password"
-                  className={`form-input pl-10 ${
-                    errors.confirmPassword ? "border-red-500 focus:ring-red-100" : ""
-                  }`}
-                  placeholder="••••••••"
-                  {...register("confirmPassword")}
-                  disabled={loading}
-                />
-              </div>
-              {errors.confirmPassword && (
-                <p className="text-xs text-red-500 mt-1.5 font-medium">
-                  {errors.confirmPassword.message}
-                </p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full py-2.5 flex justify-center mt-2 cursor-pointer"
-            >
-              {loading ? "Creating Account..." : "Create Account"}{" "}
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </button>
-          </form>
-        </div>
+            ) : (
+              <OtpVerifyForm
+                registeredEmail={registeredEmail}
+                otpValues={otpValues}
+                onOtpChange={handleOtpChange}
+                onOtpKeyDown={handleOtpKeyDown}
+                onSubmit={handleVerifySubmit}
+                onGoBack={() => setStep("REGISTER")}
+                loading={loading}
+                otpRefs={otpRefs}
+              />
+            )}
+          </CardContent>
+        </Card>
 
         <p className="text-center text-sm text-slate-500 mt-6">
           Already have an account?{" "}
-          <Link
-            href="/login"
-            className="font-bold text-primary-600 hover:text-primary-700"
-          >
+          <Link href="/login" className="font-bold text-primary-600 hover:text-primary-700">
             Sign in
           </Link>
         </p>

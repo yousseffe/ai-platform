@@ -120,7 +120,8 @@ export class ModelsController {
         storage: diskStorage({
           destination: './uploads',
           filename: (req, file, cb) => {
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+            const uniqueSuffix =
+              Date.now() + '-' + Math.round(Math.random() * 1e9);
             cb(
               null,
               file.fieldname + '-' + uniqueSuffix + extname(file.originalname),
@@ -166,7 +167,8 @@ export class ModelsController {
     const model = await this.modelsService.getModel(id);
     const url = await this.deploymentsService.getActiveDeploymentUrl(id);
 
-    const targetEndpoint = model.type === ModelType.LLM_GGUF ? '/v1/chat/completions' : '/predict';
+    const targetEndpoint =
+      model.type === ModelType.LLM_GGUF ? '/v1/chat/completions' : '/predict';
 
     if (data.stream === true) {
       const response = await firstValueFrom(

@@ -24,7 +24,9 @@ export class Deployment {
   /**
    * The model version iteration packaged into this running container.
    */
-  @ManyToOne(() => ModelVersion, (version) => version.deployments, { onDelete: 'CASCADE' })
+  @ManyToOne(() => ModelVersion, (version) => version.deployments, {
+    onDelete: 'CASCADE',
+  })
   modelVersion: ModelVersion;
 
   /**

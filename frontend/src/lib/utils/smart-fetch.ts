@@ -23,15 +23,25 @@ export async function smartFetch<T = unknown>(path: string, options: RequestInit
     : (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000");
 
   let session: Session | null = null;
+  let activeWorkspaceId: string | undefined = undefined;
+
   if (isServer) {
     session = await getServerSession(authOptions);
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    activeWorkspaceId = cookieStore.get("activeWorkspaceId")?.value;
   } else {
     session = await getSession();
+    const match = document.cookie.match(/(?:^|; )activeWorkspaceId=([^;]*)/);
+    activeWorkspaceId = match ? decodeURIComponent(match[1]) : undefined;
   }
 
   const headers = new Headers(options.headers);
   if (session?.accessToken) {
     headers.set("Authorization", `Bearer ${session.accessToken}`);
+  }
+  if (activeWorkspaceId) {
+    headers.set("X-Workspace-Id", activeWorkspaceId);
   }
 
   // Let the browser set the boundary for FormData requests, otherwise default to json

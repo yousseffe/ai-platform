@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { getSession } from "next-auth/react";
 import { runPrediction } from "@/lib/actions/models.actions";
-import type { Model, ModelVersion, HistoryItem } from "@/types";
+import { Model, ModelVersion, HistoryItem, DeploymentStatus, PredictionStatus } from "@/types";
 
 /**
  * Custom hook to manage real-time prediction state, metrics, query formatting, and execution history.
@@ -20,7 +20,7 @@ export function usePrediction(model: Model) {
   // Retrieve active deployment
   const activeDeployment = versions
     .flatMap((v) => v.deployments || [])
-    .find((d) => d.status === "running");
+    .find((d) => d.status === DeploymentStatus.RUNNING);
 
   const fallbackPayload = '{\n  "features": [1.2, 3.4, 5.6]\n}';
   const initialPayload = latestVersion?.examplePayload || fallbackPayload;
@@ -70,7 +70,7 @@ export function usePrediction(model: Model) {
         {
           time: new Date(Date.now() - 1000 * 60 * 10).toISOString().replace("T", " ").substring(0, 19),
           reqId: "req_" + Math.random().toString(36).substring(2, 9),
-          status: "SUCCESS",
+          status: PredictionStatus.SUCCESS,
           latency: "14.5ms",
           outcome: "Prediction completed",
           payload: initialPayload,
@@ -151,7 +151,7 @@ export function usePrediction(model: Model) {
         const newItem: HistoryItem = {
           time: new Date().toISOString().replace("T", " ").substring(0, 19),
           reqId: "req_" + Math.random().toString(36).substring(2, 9),
-          status: "SUCCESS",
+          status: PredictionStatus.SUCCESS,
           latency: `${latencyMs}ms`,
           outcome: "Stream completed",
           payload,
@@ -192,7 +192,7 @@ export function usePrediction(model: Model) {
               const numericVals = Object.values(responseData).filter(
                 (v) => typeof v === "number"
               ) as number[];
-
+ 
               if (numericVals.length > 0) {
                 const possibleProb = numericVals.find((n) => n > 0 && n <= 1);
                 if (possibleProb) {
@@ -212,7 +212,7 @@ export function usePrediction(model: Model) {
           const newItem: HistoryItem = {
             time: new Date().toISOString().replace("T", " ").substring(0, 19),
             reqId: "req_" + Math.random().toString(36).substring(2, 9),
-            status: "SUCCESS",
+            status: PredictionStatus.SUCCESS,
             latency: `${latencyMs}ms`,
             outcome: responseData?.prediction || responseData?.class || "Success",
             payload,
@@ -234,7 +234,7 @@ export function usePrediction(model: Model) {
           const newItem: HistoryItem = {
             time: new Date().toISOString().replace("T", " ").substring(0, 19),
             reqId: "req_" + Math.random().toString(36).substring(2, 9),
-            status: "FAILED",
+            status: PredictionStatus.FAILED,
             latency: `${latencyMs}ms`,
             outcome: res.error || "Failed",
             payload,
@@ -262,7 +262,7 @@ export function usePrediction(model: Model) {
       const newItem: HistoryItem = {
         time: new Date().toISOString().replace("T", " ").substring(0, 19),
         reqId: "req_" + Math.random().toString(36).substring(2, 9),
-        status: "FAILED",
+        status: PredictionStatus.FAILED,
         latency: `${latencyMs}ms`,
         outcome: errorMsg,
         payload,
@@ -319,7 +319,7 @@ export function usePrediction(model: Model) {
     setLastLatency(item.latency);
     setLastConfidence(item.confidence || "--");
     setLastMemory(item.memory || "--");
-    setHttpStatus(item.status === "SUCCESS" ? "200 OK" : "500 Error");
+    setHttpStatus(item.status === PredictionStatus.SUCCESS ? "200 OK" : "500 Error");
   };
 
   return {

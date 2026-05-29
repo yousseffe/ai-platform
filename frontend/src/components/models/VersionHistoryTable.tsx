@@ -1,5 +1,6 @@
 import React from "react";
 import type { ModelVersion, Deployment } from "@/types";
+import { DeploymentStatus, VersionStatus } from "@/types";
 
 interface VersionHistoryTableProps {
   versions: ModelVersion[];
@@ -50,10 +51,10 @@ export function VersionHistoryTable({
 
                 let displayStatus = v.status as string;
                 if (latestDeployment) {
-                  displayStatus = latestDeployment.status === "running" ? "deployed" : latestDeployment.status;
+                  displayStatus = latestDeployment.status === DeploymentStatus.RUNNING ? "deployed" : latestDeployment.status;
                 }
 
-                const hasError = v.status === "failed" || (latestDeployment && latestDeployment.status === "failed");
+                const hasError = v.status === VersionStatus.FAILED || (latestDeployment && latestDeployment.status === DeploymentStatus.FAILED);
                 const errorMessage = v.errorMessage || (latestDeployment && latestDeployment.errorMessage);
 
                 return (
@@ -67,9 +68,9 @@ export function VersionHistoryTable({
                         <div className="flex items-center gap-2">
                           <div
                             className={`w-2 h-2 rounded-full ${
-                              displayStatus === "ready" || displayStatus === "deployed"
+                              displayStatus === VersionStatus.READY || displayStatus === "deployed"
                                 ? "bg-emerald-500"
-                                : displayStatus === "building" || displayStatus === "starting"
+                                : displayStatus === VersionStatus.BUILDING || displayStatus === DeploymentStatus.STARTING
                                 ? "bg-blue-500"
                                 : hasError
                                 ? "bg-red-500"
@@ -83,7 +84,7 @@ export function VersionHistoryTable({
                       <td className="px-6 py-4 font-medium text-slate-900">--</td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          {v.status === "ready" && (!latestDeployment || latestDeployment.status !== "running") && (
+                          {v.status === VersionStatus.READY && (!latestDeployment || latestDeployment.status !== DeploymentStatus.RUNNING) && (
                             <button
                               onClick={() => onDeploy(v.id)}
                               className="px-4 py-1.5 bg-primary-600 text-white rounded text-xs font-medium hover:bg-primary-700 transition-colors cursor-pointer"
@@ -91,7 +92,7 @@ export function VersionHistoryTable({
                               Deploy
                             </button>
                           )}
-                          {latestDeployment && latestDeployment.status === "running" && (
+                          {latestDeployment && latestDeployment.status === DeploymentStatus.RUNNING && (
                             <button
                               onClick={() => onStop(latestDeployment.id)}
                               className="px-4 py-1.5 border border-red-200 text-red-600 rounded text-xs font-medium hover:bg-red-50 transition-colors cursor-pointer"

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import * as fs from 'fs';
@@ -11,6 +15,7 @@ import { Framework } from '../enums/framework.enum';
 import { ModelsRepository } from '../repositories/models.repository';
 import { ModelVersionsRepository } from '../repositories/model-versions.repository';
 import { MinioService } from '../../../shared/minio/minio.service';
+import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 
 /**
  * Service managing model registration, listing, version uploads, MinIO storage sync,
@@ -127,9 +132,15 @@ export class ModelsService {
       )[0];
     }
 
-    const publisher = model.user?.email ? model.user.email.split('@')[0] : 'unknown';
-    const sanitizedPublisher = publisher.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-    const sanitizedName = model.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const publisher = model.user?.email
+      ? model.user.email.split('@')[0]
+      : 'unknown';
+    const sanitizedPublisher = publisher
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .toLowerCase();
+    const sanitizedName = model.name
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .toLowerCase();
 
     const uploadToMinio = async (
       file: Express.Multer.File | undefined,
@@ -145,19 +156,28 @@ export class ModelsService {
           fs.unlinkSync(file.path);
         }
       } catch (error: unknown) {
-        // Log minor fs cleanup errors, don't throw to disrupt flow
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`Failed to cleanup temp upload file: ${message}`);
       }
       return objectName;
     };
 
     const modelObjName = await uploadToMinio(files.model?.[0], 'model');
     const scalerObjName = await uploadToMinio(files.scaler?.[0], 'scaler');
-    const preprocessObjName = await uploadToMinio(files.preprocess?.[0], 'preprocess');
-    const postprocessObjName = await uploadToMinio(files.postprocess?.[0], 'postprocess');
+    const preprocessObjName = await uploadToMinio(
+      files.preprocess?.[0],
+      'preprocess',
+    );
+    const postprocessObjName = await uploadToMinio(
+      files.postprocess?.[0],
+      'postprocess',
+    );
 
     const finalModelPath = modelObjName || prevVersion?.modelFilePath;
     if (!finalModelPath) {
-      throw new BadRequestException('Model weights file is required for the first version');
+      throw new BadRequestException(
+        'Model weights file is required for the first version',
+      );
     }
 
     const modelVersion = this.modelVersionsRepository.create({
@@ -166,8 +186,10 @@ export class ModelsService {
       status: VersionStatus.UPLOADED,
       modelFilePath: finalModelPath,
       scalerFilePath: scalerObjName || prevVersion?.scalerFilePath || null,
-      preprocessFilePath: preprocessObjName || prevVersion?.preprocessFilePath || null,
-      postprocessFilePath: postprocessObjName || prevVersion?.postprocessFilePath || null,
+      preprocessFilePath:
+        preprocessObjName || prevVersion?.preprocessFilePath || null,
+      postprocessFilePath:
+        postprocessObjName || prevVersion?.postprocessFilePath || null,
       examplePayload: examplePayload || prevVersion?.examplePayload || null,
       expectedResult: expectedResult || prevVersion?.expectedResult || null,
     });
@@ -199,7 +221,10 @@ export class ModelsService {
    * @param versionId - The version UUID.
    * @param status - The new status value.
    */
-  async updateVersionStatus(versionId: string, status: VersionStatus): Promise<void> {
+  async updateVersionStatus(
+    versionId: string,
+    status: VersionStatus,
+  ): Promise<void> {
     await this.modelVersionsRepository.update(versionId, { status });
   }
 
@@ -220,10 +245,14 @@ export class ModelsService {
     }
 
     const hasActiveDeployment = version.deployments?.some(
-      (d) => d.status === 'starting' || d.status === 'running',
+      (d) =>
+        d.status === DeploymentStatus.STARTING ||
+        d.status === DeploymentStatus.RUNNING,
     );
     if (hasActiveDeployment) {
-      throw new BadRequestException('Cannot delete version with active deployments');
+      throw new BadRequestException(
+        'Cannot delete version with active deployments',
+      );
     }
 
     // Delete files from MinIO
@@ -262,7 +291,9 @@ export class ModelsService {
 
     const hasActiveDeployment = model.versions.some((version) =>
       version.deployments?.some(
-        (d) => d.status === 'starting' || d.status === 'running',
+        (d) =>
+          d.status === DeploymentStatus.STARTING ||
+          d.status === DeploymentStatus.RUNNING,
       ),
     );
     if (hasActiveDeployment) {

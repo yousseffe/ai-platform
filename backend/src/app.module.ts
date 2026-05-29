@@ -12,6 +12,12 @@ import { ModelVersion } from './modules/models/entities/model-version.entity';
 import { Deployment } from './modules/deployments/entities/deployment.entity';
 import { MulterModule } from '@nestjs/platform-express';
 import { MinioModule } from './shared/minio/minio.module';
+import { RedisModule } from './shared/redis/redis.module';
+import { WalletsModule } from './modules/wallets/wallets.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { Wallet } from './modules/wallets/entities/wallet.entity';
+import { Organization } from './modules/organizations/entities/organization.entity';
+import { OrgMember } from './modules/organizations/entities/org-member.entity';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -26,7 +32,15 @@ import { MinioModule } from './shared/minio/minio.module';
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'password',
       database: process.env.DB_NAME || 'aidb',
-      entities: [User, Model, ModelVersion, Deployment],
+      entities: [
+        User,
+        Model,
+        ModelVersion,
+        Deployment,
+        Wallet,
+        Organization,
+        OrgMember,
+      ],
       synchronize: true, // For MVP only
     }),
     BullModule.forRoot({
@@ -44,6 +58,9 @@ import { MinioModule } from './shared/minio/minio.module';
     DeploymentsModule,
     QueueModule,
     MinioModule,
+    RedisModule,
+    WalletsModule,
+    OrganizationsModule,
   ],
 })
 export class AppModule {}

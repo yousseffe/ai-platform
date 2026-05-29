@@ -1,12 +1,22 @@
 import React from "react";
+import { Metadata } from "next";
 import { Filter, Plus } from "lucide-react";
 import Link from "next/link";
 import { getModels } from "@/lib/actions/models.actions";
 import type { Model, ModelVersion } from "@/types";
+import { DeploymentStatus, VersionStatus } from "@/types";
 import { RegistryStatsOverview } from "@/components/models/RegistryStatsOverview";
 import { ModelsTable, RegistryModelItem } from "@/components/models/ModelsTable";
 
 export const revalidate = 0;
+
+/**
+ * Static metadata configuration for the Models Registry page.
+ */
+export const metadata: Metadata = {
+  title: "Models Registry - ModelOps AI",
+  description: "Browse, version, and manage machine learning models, preprocess scalers, and custom scripts in the ModelOps model catalog.",
+};
 
 /**
  * Server Component representing the Model Registry listing page.
@@ -28,8 +38,8 @@ export default async function ModelsRegistryPage() {
 
     let status = "Draft";
     if (latestVersion) {
-      status = latestVersion.status === "ready" ? "Ready" : latestVersion.status;
-      const activeDeployment = latestVersion.deployments?.find((d) => d.status === "running");
+      status = latestVersion.status === VersionStatus.READY ? "Ready" : latestVersion.status;
+      const activeDeployment = latestVersion.deployments?.find((d) => d.status === DeploymentStatus.RUNNING);
       if (activeDeployment) {
         status = "Deployed";
       }
@@ -49,8 +59,8 @@ export default async function ModelsRegistryPage() {
 
   // Calculate status counts for stats grid
   const productionReadyCount = models.filter((m) => m.status === "Deployed" || m.status === "Ready").length;
-  const buildingCount = models.filter((m) => m.status.toLowerCase() === "building").length;
-  const failedCount = models.filter((m) => m.status.toLowerCase() === "failed").length;
+  const buildingCount = models.filter((m) => m.status === VersionStatus.BUILDING).length;
+  const failedCount = models.filter((m) => m.status === VersionStatus.FAILED || m.status === DeploymentStatus.FAILED).length;
 
   return (
     <div className="max-w-6xl mx-auto">

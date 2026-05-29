@@ -160,3 +160,14 @@ export class DeploymentsController {
   }
 }
 ```
+
+---
+
+## 7. Standardized Enums Policy
+
+To ensure compile-time safety and maintainability, **raw string literals or string union types MUST NOT be used** for representing entity/system statuses, membership roles, and workspace types. 
+
+All statuses, roles, and types must be defined as standard TypeScript Enums:
+*   **Location**: If an enum is domain-specific, place it in `src/modules/<domain>/enums/`. If it is shared between multiple domains, place it in `src/shared/enums/`.
+*   **Enforcement**: Any string literal comparison (e.g. `status === 'ACTIVE'`) is strictly banned. Always use the enum definition (e.g. `status === UserStatus.ACTIVE`).
+

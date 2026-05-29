@@ -6,8 +6,11 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+import { UserStatus } from '../../../shared/enums/user-status.enum';
+
 /**
  * Physical database table mapping representing a registered platform user account.
+ * Extends the basic account details with multitenant and verification states.
  */
 @Entity('users')
 export class User {
@@ -28,6 +31,30 @@ export class User {
    */
   @Column()
   passwordHash: string;
+
+  /**
+   * User display username. Unique across the platform.
+   */
+  @Column({ unique: true })
+  username: string;
+
+  /**
+   * Tracks if OTP verification is completed.
+   */
+  @Column({ default: false })
+  isVerified: boolean;
+
+  /**
+   * Toggled to true if individual provider mode is enabled.
+   */
+  @Column({ default: false })
+  isProvider: boolean;
+
+  /**
+   * The status state of the user account.
+   */
+  @Column({ type: 'varchar', enum: UserStatus, default: UserStatus.PENDING })
+  status: UserStatus;
 
   /**
    * Timestamp record indicating when the user profile was originally registered.

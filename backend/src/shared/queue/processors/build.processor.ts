@@ -56,7 +56,11 @@ export class BuildProcessor extends WorkerHost {
     }
 
     try {
-      const buildDir = path.join(process.cwd(), 'uploads', `build-${versionId}`);
+      const buildDir = path.join(
+        process.cwd(),
+        'uploads',
+        `build-${versionId}`,
+      );
       if (!fs.existsSync(buildDir)) {
         fs.mkdirSync(buildDir, { recursive: true });
       }
@@ -108,7 +112,14 @@ ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "
 
         // Copy serve.py
         fs.copyFileSync(
-          path.join(process.cwd(), 'src', 'shared', 'queue', 'templates', templateName),
+          path.join(
+            process.cwd(),
+            'src',
+            'shared',
+            'queue',
+            'templates',
+            templateName,
+          ),
           path.join(buildDir, 'serve.py'),
         );
 
@@ -190,7 +201,9 @@ numpy
         );
       });
 
-      this.logger.log(`Successfully built docker image for version: ${versionId}`);
+      this.logger.log(
+        `Successfully built docker image for version: ${versionId}`,
+      );
       await this.modelVersionsRepository.update(versionId, {
         status: VersionStatus.READY,
         errorMessage: null,
@@ -202,7 +215,8 @@ numpy
           fs.rmSync(buildDir, { recursive: true, force: true });
         }
       } catch (error: unknown) {
-        // Log minor fs cleanup errors, don't throw
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to cleanup build directory: ${message}`);
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);

@@ -1,36 +1,57 @@
-import React from "react";
-import { Upload } from "lucide-react";
-import Link from "next/link";
-import { getModels } from "@/lib/actions/models.actions";
-import { Model, ModelVersion } from "@/types";
-import { StatsOverview } from "@/components/dashboard/StatsOverview";
-import { RecentModelsTable, RecentModelItem } from "@/components/dashboard/RecentModelsTable";
-import { ResourceUtilization } from "@/components/dashboard/ResourceUtilization";
+"use client";
 
-export const revalidate = 0;
+import React, { useState, useEffect } from "react";
+import { getModels } from "@/lib/actions/models.actions";
+import { Model, ModelVersion, DeploymentStatus, VersionStatus, WalletType } from "@/types";
+import { useWorkspace } from "@/hooks/use-workspace";
+import { RecentModelItem } from "@/components/dashboard/RecentModelsTable";
+import ConsumerDashboard from "@/components/dashboard/ConsumerDashboard";
+import PublisherDashboard from "@/components/dashboard/PublisherDashboard";
 
 /**
- * Server Component representing the landing system overview dashboard page.
- * Fetches all models and maps active deployments and recent activities.
- *
- * @returns The page component structure for System Overview.
+ * Dashboard Controller page resolving consumer vs provider workspace layouts.
+ * Loads registered platform models from actions and delegates rendering to subcomponents.
  */
-export default async function DashboardPage() {
-  const models = await getModels();
+export default function DashboardPage() {
+  const { viewMode, balance } = useWorkspace();
+  const [models, setModels] = useState<Model[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    getModels()
+      .then((data) => {
+        if (active) {
+          setModels(data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Calculate live deployments
   let activeDeploymentsCount = 0;
   models.forEach((m) => {
     m.versions?.forEach((v) => {
       v.deployments?.forEach((d) => {
-        if (d.status === "running") {
+        if (d.status === DeploymentStatus.RUNNING) {
           activeDeploymentsCount++;
         }
       });
     });
   });
 
-  // Calculate recent model configurations
+  // Calculate recent model configurations (for Consumer)
   const recentModels: RecentModelItem[] = models.slice(0, 5).map((m: Model) => {
     const versions = m.versions || [];
     const latestVersion = versions.length
@@ -39,8 +60,8 @@ export default async function DashboardPage() {
 
     let status = "DRAFT";
     if (latestVersion) {
-      status = latestVersion.status === "ready" ? "READY" : latestVersion.status.toUpperCase();
-      const hasActive = latestVersion.deployments?.some((d) => d.status === "running");
+      status = latestVersion.status === VersionStatus.READY ? "READY" : latestVersion.status.toUpperCase();
+      const hasActive = latestVersion.deployments?.some((d) => d.status === DeploymentStatus.RUNNING);
       if (hasActive) {
         status = "LIVE";
       }
@@ -55,33 +76,26 @@ export default async function DashboardPage() {
     };
   });
 
-  return (
-    <div className="max-w-6xl mx-auto">
-      {/* Header section */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">System Overview</h1>
-          <p className="text-slate-500 mt-1">Manage and monitor your machine learning infrastructure.</p>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
+          <span className="text-xs text-slate-500 font-medium">Resolving workspace dashboard...</span>
         </div>
-        <Link href="/models/upload" className="btn-primary">
-          <Upload className="w-4 h-4" />
-          Upload Model
-        </Link>
       </div>
+    );
+  }
 
-      {/* Stats Summary Grid */}
-      <StatsOverview
-        totalModels={models.length}
-        activeDeploymentsCount={activeDeploymentsCount}
-      />
+  if (viewMode === WalletType.PROVIDER) {
+    return <PublisherDashboard models={models} balance={balance} />;
+  }
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Models Table Widget */}
-        <RecentModelsTable recentModels={recentModels} />
-
-        {/* Resources Metrics & Recommendations */}
-        <ResourceUtilization />
-      </div>
-    </div>
+  return (
+    <ConsumerDashboard
+      models={models}
+      activeDeploymentsCount={activeDeploymentsCount}
+      recentModels={recentModels}
+    />
   );
 }

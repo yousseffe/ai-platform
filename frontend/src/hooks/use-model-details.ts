@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { deployVersion, stopDeployment } from "@/lib/actions/deployments.actions";
-import type { Model, ModelVersion, Deployment } from "@/types";
+import { Model, ModelVersion, Deployment, DeploymentStatus, VersionStatus } from "@/types";
 
 /**
  * Custom hook to manage the state and operations for the Model Details view.
@@ -117,8 +117,7 @@ export function useModelDetails(modelId: string, initialModel: Model) {
    * @returns True if the version is in a transient/pending state.
    */
   const isVersionTransient = (v: ModelVersion): boolean => {
-    const status = v.status?.toLowerCase();
-    if (status === "uploaded" || status === "building") {
+    if (v.status === VersionStatus.UPLOADED || v.status === VersionStatus.BUILDING) {
       return true;
     }
 
@@ -131,8 +130,7 @@ export function useModelDetails(modelId: string, initialModel: Model) {
         : null;
 
     if (latestDeployment) {
-      const depStatus = latestDeployment.status?.toLowerCase();
-      if (depStatus === "starting") {
+      if (latestDeployment.status === DeploymentStatus.STARTING) {
         return true;
       }
     }

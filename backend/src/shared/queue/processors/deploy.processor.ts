@@ -37,11 +37,17 @@ export class DeployProcessor extends WorkerHost {
     const { deploymentId } = job.data;
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },
-      relations: ['modelVersion', 'modelVersion.model', 'modelVersion.model.user'],
+      relations: [
+        'modelVersion',
+        'modelVersion.model',
+        'modelVersion.model.user',
+      ],
     });
 
     if (!deployment) {
-      this.logger.error(`Deployment record ${deploymentId} not found in database.`);
+      this.logger.error(
+        `Deployment record ${deploymentId} not found in database.`,
+      );
       return;
     }
 
@@ -57,20 +63,27 @@ export class DeployProcessor extends WorkerHost {
         where: { status: DeploymentStatus.RUNNING },
       });
       const usedPorts = new Set(
-        activeDeployments.map((d) => d.port).filter((p) => p != null) as number[],
+        activeDeployments.map((d) => d.port).filter((p) => p != null),
       );
       let nextPort = 8000;
       while (usedPorts.has(nextPort)) {
         nextPort++;
       }
 
-      this.logger.log(`Assigning port ${nextPort} to deployment ${deploymentId}`);
+      this.logger.log(
+        `Assigning port ${nextPort} to deployment ${deploymentId}`,
+      );
 
-      const userEmail = deployment.modelVersion.model.user?.email || 'unknown@unknown.com';
+      const userEmail =
+        deployment.modelVersion.model.user?.email || 'unknown@unknown.com';
       const emailPrefix = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-      const modelName = deployment.modelVersion.model.name.replace(/[^a-zA-Z0-9]/g, '');
+      const modelName = deployment.modelVersion.model.name.replace(
+        /[^a-zA-Z0-9]/g,
+        '',
+      );
       const shortDeployId = deploymentId.split('-')[0];
-      const containerName = `${emailPrefix}_${modelName}_v${deployment.modelVersion.versionNumber}_${shortDeployId}`.toLowerCase();
+      const containerName =
+        `${emailPrefix}_${modelName}_v${deployment.modelVersion.versionNumber}_${shortDeployId}`.toLowerCase();
 
       const isLlm = deployment.modelVersion.model.type === ModelType.LLM_GGUF;
       const containerPort = isLlm ? '8080/tcp' : '8000/tcp';

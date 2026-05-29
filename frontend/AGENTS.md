@@ -182,14 +182,25 @@ frontend/
 - **Domain-Specific Services**: Group services logically by domains (e.g., `src/lib/services/models.service.ts`, `src/lib/services/deployments.service.ts`, `src/lib/services/auth.service.ts`).
 - **Isomorphic Architecture**: Write services to be isomorphic using `smartFetch` so they operate cleanly on both the server (inside Server Actions) and the client (inside custom React hooks).
 
-### F. Custom Hooks for Client State & Data Flow
+### F. Custom Hooks & Zustand for Client State
 - **Decouple View and Logic**: Refactor complex client state management, file upload forms, polling loops, streaming response builders, and API triggers out of layout/view components and into custom React hooks in `src/hooks/`.
-- **Naming Pattern**: Name hooks clearly based on context or feature (e.g., `useModelDetails.ts`, `usePrediction.ts`).
-- **Maintain Small Components**: By delegating state coordination to custom hooks, client view components must remain under ~250 lines, focused solely on presentation layout and HTML binding.
+- **Global State with Zustand**: Use **Zustand** instead of React Context Providers for global state management (such as workspace context or active view mode selections). This keeps the component layout tree flat, prevents unnecessary context re-renders, and makes global state accessible outside of React render lifecycles.
+- **Naming Pattern**: Name hooks clearly based on context or feature (e.g., `useModelDetails.ts`, `usePrediction.ts`, `useWorkspace.ts`).
+- **Maintain Small Components**: By delegating state coordination to custom hooks and Zustand stores, client view components must remain under ~250 lines, focused solely on presentation layout and HTML binding.
 
 ---
 
-## 7. Command Reference
+## 7. Standardized Enums Policy
+
+To ensure compile-time safety and absolute type safety, **raw string literals or string union types MUST NOT be used** for representing entity statuses, deployment stages, roles, or workspace types in the frontend.
+
+All statuses, roles, and types must be defined as standard TypeScript Enums:
+*   **Location**: `src/types/enums.ts` (and exported from `src/types/index.ts`).
+*   **Enforcement**: Use the imported enum definitions (e.g. `viewMode === WalletType.PROVIDER` or `status === DeploymentStatus.RUNNING`) rather than raw string comparisons.
+
+---
+
+## 8. Command Reference
 
 Use these commands for project configuration and validations:
 

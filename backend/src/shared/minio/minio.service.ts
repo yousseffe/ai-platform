@@ -90,7 +90,9 @@ export class MinioService implements OnModuleInit {
       await this.minioClient.removeObject(this.bucketName, objectName);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Error deleting file ${objectName} from MinIO: ${message}`);
+      this.logger.error(
+        `Error deleting file ${objectName} from MinIO: ${message}`,
+      );
     }
   }
 }

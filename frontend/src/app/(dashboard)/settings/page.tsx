@@ -12,6 +12,8 @@ import {
   RefreshCw,
   Server
 } from "lucide-react";
+import BecomeProviderCard from "@/components/dashboard/BecomeProviderCard";
+import WalletTopUpCard from "@/components/dashboard/WalletTopUpCard";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -83,12 +85,18 @@ export default function SettingsPage() {
               <input
                 type="text"
                 className="form-input bg-slate-50 text-slate-600 cursor-not-allowed"
-                value="Platform Administrator"
+                value="Platform User"
                 readOnly
               />
             </div>
           </div>
         </div>
+
+        {/* Dual Roles / Become Provider Mode Enrollment Banner */}
+        <BecomeProviderCard />
+
+        {/* Stripe Wallet Top-up */}
+        <WalletTopUpCard />
 
         {/* API Credentials Card */}
         <div className="card border border-slate-200 shadow-sm">
