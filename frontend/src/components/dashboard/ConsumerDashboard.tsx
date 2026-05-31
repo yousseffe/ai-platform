@@ -6,6 +6,7 @@ import Link from "next/link";
 import { StatsOverview } from "./StatsOverview";
 import { RecentModelsTable, RecentModelItem } from "./RecentModelsTable";
 import { ResourceUtilization } from "./ResourceUtilization";
+import ContributionsHeatmap from "./ContributionsHeatmap";
 import { Model } from "@/types";
 
 interface ConsumerDashboardProps {
@@ -28,14 +29,16 @@ export default function ConsumerDashboard({
   recentModels,
 }: ConsumerDashboardProps) {
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in text-foreground">
       {/* Header section */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">System Overview</h1>
-          <p className="text-slate-500 mt-1">Manage and monitor your machine learning infrastructure.</p>
+          <h1 className="text-xl font-bold text-foreground font-mono">Developer Console</h1>
+          <p className="text-xs text-muted-foreground mt-1 font-mono">
+            Manage, deploy, and monitor your machine learning models and serverless infrastructure.
+          </p>
         </div>
-        <Link href="/models/upload" className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-all shadow-sm shadow-primary-500/10">
+        <Link href="/models/upload" className="btn-primary flex items-center gap-2">
           <Upload className="w-4 h-4" />
           Upload Model
         </Link>
@@ -46,6 +49,9 @@ export default function ConsumerDashboard({
         totalModels={models.length}
         activeDeploymentsCount={activeDeploymentsCount}
       />
+
+      {/* Inference Activity Heatmap Grid */}
+      <ContributionsHeatmap />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Models Table Widget */}

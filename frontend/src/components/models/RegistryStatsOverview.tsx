@@ -1,4 +1,5 @@
 import React from "react";
+import { Badge } from "@/components/ui/badge";
 
 interface RegistryStatsOverviewProps {
   totalModels: number;
@@ -21,44 +22,46 @@ export function RegistryStatsOverview({
   failedCount,
 }: RegistryStatsOverviewProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 font-mono">
       {/* Total Models */}
-      <div className="card">
+      <div className="border border-border rounded-xl bg-card p-5 shadow-sm">
         <div className="flex justify-between items-start mb-2">
-          <div className="w-8 h-8 rounded bg-indigo-50 flex items-center justify-center text-indigo-600">
-            <span className="font-bold text-lg">⌬</span>
+          <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+            <span className="font-bold text-lg select-none">⌬</span>
           </div>
-          <span className="badge badge-success bg-emerald-50 text-emerald-600 border-none">+12%</span>
+          <Badge className="bg-emerald-950/40 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold tracking-wider rounded-full">
+            +12%
+          </Badge>
         </div>
-        <p className="text-sm font-semibold text-slate-500 mb-1">Total Models</p>
-        <h2 className="text-2xl font-bold text-slate-900">{totalModels}</h2>
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Models</p>
+        <h2 className="text-2xl font-extrabold text-foreground">{totalModels}</h2>
       </div>
 
       {/* Production Ready */}
-      <div className="card">
-        <div className="w-8 h-8 rounded bg-emerald-50 flex items-center justify-center text-emerald-600 mb-2">
-          <span className="font-bold">✓</span>
+      <div className="border border-border rounded-xl bg-card p-5 shadow-sm">
+        <div className="w-8 h-8 rounded bg-emerald-950/40 flex items-center justify-center text-emerald-400 border border-emerald-500/20 mb-2">
+          <span className="font-bold select-none">✓</span>
         </div>
-        <p className="text-sm font-semibold text-slate-500 mb-1">Production Ready</p>
-        <h2 className="text-2xl font-bold text-slate-900">{productionReadyCount}</h2>
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Production Ready</p>
+        <h2 className="text-2xl font-extrabold text-foreground">{productionReadyCount}</h2>
       </div>
 
       {/* Building */}
-      <div className="card">
-        <div className="w-8 h-8 rounded bg-amber-50 flex items-center justify-center text-amber-600 mb-2">
-          <span className="font-bold">...</span>
+      <div className="border border-border rounded-xl bg-card p-5 shadow-sm">
+        <div className="w-8 h-8 rounded bg-amber-950/40 flex items-center justify-center text-amber-400 border border-amber-500/20 mb-2">
+          <span className="font-bold select-none animate-pulse">...</span>
         </div>
-        <p className="text-sm font-semibold text-slate-500 mb-1">Building</p>
-        <h2 className="text-2xl font-bold text-slate-900">{buildingCount}</h2>
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Building</p>
+        <h2 className="text-2xl font-extrabold text-foreground">{buildingCount}</h2>
       </div>
 
       {/* Failed Runs */}
-      <div className="card">
-        <div className="w-8 h-8 rounded bg-red-50 flex items-center justify-center text-red-600 mb-2">
-          <span className="font-bold">!</span>
+      <div className="border border-border rounded-xl bg-card p-5 shadow-sm">
+        <div className="w-8 h-8 rounded bg-red-950/40 flex items-center justify-center text-red-400 border border-red-500/20 mb-2">
+          <span className="font-bold select-none">!</span>
         </div>
-        <p className="text-sm font-semibold text-slate-500 mb-1">Failed Runs</p>
-        <h2 className="text-2xl font-bold text-slate-900">{failedCount}</h2>
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Failed Runs</p>
+        <h2 className="text-2xl font-extrabold text-foreground">{failedCount}</h2>
       </div>
     </div>
   );

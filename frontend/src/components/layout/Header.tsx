@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Search, Bell, HelpCircle, Coins, TrendingUp } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Search, Bell, HelpCircle, Coins, TrendingUp, Sun, Moon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Session } from "next-auth";
 import Image from "next/image";
@@ -25,6 +25,27 @@ interface HeaderProps {
 export default function Header({ session }: HeaderProps) {
   const pathname = usePathname();
   const { activeWorkspace, viewMode, balance } = useWorkspace();
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
+      return savedTheme || "dark";
+    }
+    return "dark";
+  });
+
+  useEffect(() => {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+  };
 
   const getBreadcrumb = () => {
     const wsName = activeWorkspace ? activeWorkspace.name : "Workspace";
@@ -38,21 +59,21 @@ export default function Header({ session }: HeaderProps) {
   const userEmail = session?.user?.email || "User";
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(
     userEmail
-  )}&background=6366f1&color=fff`;
+  )}&background=2f81f7&color=fff`;
 
   return (
-    <div className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0 relative z-20">
-      <div className="font-semibold text-slate-800 tracking-wide text-xs hidden lg:block">
+    <div className="h-16 bg-background border-b border-border flex items-center justify-between px-8 shrink-0 relative z-20">
+      <div className="font-semibold text-muted-foreground tracking-wide text-xs hidden lg:block font-mono">
         {getBreadcrumb()}
       </div>
 
       <div className="flex-1 flex justify-center max-w-xl px-4">
         <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search models, experiments, or deployments..."
-            className="w-full pl-10 pr-4 py-2 h-9 bg-slate-50 border-slate-200 text-xs focus-visible:ring-primary-500/20 focus-visible:border-primary-500 transition-all"
+            className="w-full pl-10 pr-4 py-2 h-9 bg-card border-border text-foreground text-xs focus-visible:ring-primary/20 focus-visible:border-primary transition-all rounded-lg"
           />
         </div>
       </div>
@@ -60,10 +81,10 @@ export default function Header({ session }: HeaderProps) {
       <div className="flex items-center gap-4">
         {/* Active Wallet Balance Meter */}
         {activeWorkspace && (
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold select-none ${
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold select-none font-mono ${
             viewMode === WalletType.PROVIDER
-              ? "bg-emerald-50 border-emerald-100 text-emerald-700"
-              : "bg-indigo-50 border-indigo-100 text-indigo-700"
+              ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-400"
+              : "bg-primary/10 border-primary/20 text-primary"
           }`}>
             {viewMode === WalletType.PROVIDER ? (
               <>
@@ -79,13 +100,22 @@ export default function Header({ session }: HeaderProps) {
           </div>
         )}
 
-        <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600 cursor-pointer h-8 w-8">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={toggleTheme}
+          className="text-muted-foreground hover:text-foreground cursor-pointer h-8 w-8 hover:bg-accent rounded-lg"
+          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+          {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </Button>
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground cursor-pointer h-8 w-8 hover:bg-accent rounded-lg">
           <Bell className="w-4 h-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600 cursor-pointer h-8 w-8">
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground cursor-pointer h-8 w-8 hover:bg-accent rounded-lg">
           <HelpCircle className="w-4 h-4" />
         </Button>
-        <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 ml-2 cursor-pointer" title={userEmail}>
+        <div className="w-8 h-8 rounded-full bg-muted overflow-hidden border border-border ml-2 cursor-pointer" title={userEmail}>
           <Image
             src={avatarUrl}
             alt="User avatar"

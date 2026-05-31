@@ -15,6 +15,10 @@ import {
 import BecomeProviderCard from "@/components/dashboard/BecomeProviderCard";
 import WalletTopUpCard from "@/components/dashboard/WalletTopUpCard";
 
+/**
+ * SettingsPage component for user account configurations,
+ * API token rotation, and local development spec grids.
+ */
 export default function SettingsPage() {
   const { data: session } = useSession();
   const [apiKey, setApiKey] = useState("sk_live_51Ny93KLo8zPxqE6m9A4b8d7c1e3f5g...");
@@ -44,47 +48,47 @@ export default function SettingsPage() {
     }, 800);
   };
 
-  const userEmail = session?.user?.email || "user@modelops.ai";
+  const userEmail = session?.user?.email || "user@mlhub.ai";
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(
     userEmail
-  )}&background=6366f1&color=fff`;
+  )}&background=2f81f7&color=fff`;
 
   return (
-    <div className="animate-fade-in max-w-4xl mx-auto pb-12">
+    <div className="animate-fade-in max-w-4xl mx-auto pb-12 text-foreground">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-        <p className="text-slate-500 text-sm mt-1">
+        <h1 className="text-xl font-bold text-foreground font-mono">Settings</h1>
+        <p className="text-xs text-muted-foreground mt-1 font-mono">
           Manage your account settings, API keys, and platform preferences.
         </p>
       </div>
 
       <div className="space-y-6">
         {/* Profile Card */}
-        <div className="card border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-4 border-b border-slate-100 pb-5 mb-5">
-            <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-200">
+        <div className="card font-mono text-xs">
+          <div className="flex items-center gap-4 border-b border-border pb-5 mb-5 select-none">
+            <div className="w-12 h-12 rounded-full overflow-hidden border border-border">
               <Image src={avatarUrl} alt="Avatar" width={48} height={48} />
             </div>
             <div>
-              <h2 className="font-bold text-slate-800 text-base">Account Profile</h2>
-              <p className="text-xs text-slate-400">Your registered platform account details</p>
+              <h2 className="font-bold text-foreground text-sm">Account Profile</h2>
+              <p className="text-[10px] text-muted-foreground">Your registered platform account details</p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="form-label text-xs">Email Address</label>
+              <label className="form-label">Email Address</label>
               <input
                 type="text"
-                className="form-input bg-slate-50 text-slate-600 cursor-not-allowed"
+                className="form-input bg-background border-border text-muted-foreground cursor-not-allowed"
                 value={userEmail}
                 readOnly
               />
             </div>
             <div>
-              <label className="form-label text-xs">Role</label>
+              <label className="form-label">Role</label>
               <input
                 type="text"
-                className="form-input bg-slate-50 text-slate-600 cursor-not-allowed"
+                className="form-input bg-background border-border text-muted-foreground cursor-not-allowed"
                 value="Platform User"
                 readOnly
               />
@@ -99,84 +103,84 @@ export default function SettingsPage() {
         <WalletTopUpCard />
 
         {/* API Credentials Card */}
-        <div className="card border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-5 mb-5">
-            <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-primary-500">
+        <div className="card font-mono text-xs">
+          <div className="flex items-center gap-3 border-b border-border pb-5 mb-5 select-none">
+            <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
               <Key className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-slate-800 text-base">API Authentication Keys</h2>
-              <p className="text-xs text-slate-400">Use this token to query your deployed models via SDK or REST endpoint</p>
+              <h2 className="font-bold text-foreground text-sm">API Authentication Keys</h2>
+              <p className="text-[10px] text-muted-foreground">Use this token to query your deployed models via SDK or REST endpoint</p>
             </div>
           </div>
           <div>
-            <label className="form-label text-xs">Sandbox / Production Secret Key</label>
+            <label className="form-label">Sandbox / Production Secret Key</label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input
                   type="text"
-                  className="form-input font-mono bg-slate-50 text-slate-700 pr-10"
+                  className="form-input bg-background border-border text-foreground pr-10"
                   value={apiKey}
                   readOnly
                 />
                 <button
                   onClick={handleCopy}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
                   title="Copy to clipboard"
                 >
-                  {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                 </button>
               </div>
               <button
                 onClick={handleRotateKey}
                 disabled={rotating}
-                className="btn-outline flex items-center gap-2 cursor-pointer text-sm whitespace-nowrap"
+                className="btn-outline flex items-center gap-2 cursor-pointer text-xs whitespace-nowrap"
               >
-                <RefreshCw className={`w-4 h-4 ${rotating ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${rotating ? "animate-spin" : ""}`} />
                 Rotate Token
               </button>
             </div>
-            <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+            <p className="text-[9px] text-red-400 mt-2 leading-relaxed">
               WARNING: Rotating this token will invalidate the previous key immediately. Update your environment files accordingly.
             </p>
           </div>
         </div>
 
         {/* Platform Node Info Card */}
-        <div className="card border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-5 mb-5">
-            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+        <div className="card font-mono text-xs">
+          <div className="flex items-center gap-3 border-b border-border pb-5 mb-5 select-none">
+            <div className="w-10 h-10 rounded bg-emerald-950/40 border border-emerald-500/20 flex items-center justify-center text-emerald-450">
               <Server className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-slate-800 text-base">Platform Node Specifications</h2>
-              <p className="text-xs text-slate-400">Active server, ports, and runtime environment specifications</p>
+              <h2 className="font-bold text-foreground text-sm">Platform Node Specifications</h2>
+              <p className="text-[10px] text-muted-foreground">Active server, ports, and runtime environment specifications</p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="border border-slate-100 rounded-lg p-4 bg-slate-50/50">
-              <div className="flex items-center gap-2 mb-2">
-                <Cpu className="w-4 h-4 text-slate-400" />
-                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Client Frontend</span>
+            <div className="border border-border rounded-lg p-4 bg-background">
+              <div className="flex items-center gap-2 mb-2 select-none">
+                <Cpu className="w-4 h-4 text-muted-foreground" />
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Client Frontend</span>
               </div>
-              <p className="font-semibold text-slate-800 text-sm">Next.js 15+ (App Router)</p>
-              <p className="text-xs text-indigo-600 font-mono mt-1">Port: 3001</p>
+              <p className="font-bold text-foreground text-xs">Next.js 16 (App Router)</p>
+              <p className="text-xs text-primary font-bold mt-1">Port: 3001</p>
             </div>
-            <div className="border border-slate-100 rounded-lg p-4 bg-slate-50/50">
-              <div className="flex items-center gap-2 mb-2">
-                <Server className="w-4 h-4 text-slate-400" />
-                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">API Server</span>
+            <div className="border border-border rounded-lg p-4 bg-background">
+              <div className="flex items-center gap-2 mb-2 select-none">
+                <Server className="w-4 h-4 text-muted-foreground" />
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">API Server</span>
               </div>
-              <p className="font-semibold text-slate-800 text-sm">NestJS Gateway</p>
-              <p className="text-xs text-indigo-600 font-mono mt-1">Port: 3000</p>
+              <p className="font-bold text-foreground text-xs">NestJS Gateway</p>
+              <p className="text-xs text-primary font-bold mt-1">Port: 3000</p>
             </div>
-            <div className="border border-slate-100 rounded-lg p-4 bg-slate-50/50">
-              <div className="flex items-center gap-2 mb-2">
-                <Database className="w-4 h-4 text-slate-400" />
-                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Database Node</span>
+            <div className="border border-border rounded-lg p-4 bg-background">
+              <div className="flex items-center gap-2 mb-2 select-none">
+                <Database className="w-4 h-4 text-muted-foreground" />
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Database Node</span>
               </div>
-              <p className="font-semibold text-slate-800 text-sm">PostgreSQL Engine</p>
-              <p className="text-xs text-emerald-600 font-mono mt-1">Status: Connected</p>
+              <p className="font-bold text-foreground text-xs">PostgreSQL Engine</p>
+              <p className="text-xs text-emerald-450 font-bold mt-1">Status: Connected</p>
             </div>
           </div>
         </div>

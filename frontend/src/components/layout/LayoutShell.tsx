@@ -27,17 +27,17 @@ export default function LayoutShell({ session, children }: LayoutShellProps) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground animate-fade-in">
         <div className="flex flex-col items-center gap-2">
-          <div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div>
-          <span className="text-xs text-slate-500 font-medium">Loading workspace state...</span>
+          <div className="w-8 h-8 rounded-full border-4 border-muted border-t-primary animate-spin"></div>
+          <span className="text-xs text-muted-foreground font-mono font-medium">Loading workspace state...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-main">
+    <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar />
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <Header session={session} />

@@ -22,13 +22,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!model) {
     return {
-      title: "Model Not Found | ModelOps AI",
+      title: "Model Not Found | MLHub",
       description: "The requested machine learning model could not be found.",
     };
   }
 
   return {
-    title: `${model.name} - Model Details | ModelOps AI`,
+    title: `${model.name} - Model Details | MLHub`,
     description: model.description || `Explore version history, framework configurations, and sandbox deployments for ${model.name}.`,
   };
 }

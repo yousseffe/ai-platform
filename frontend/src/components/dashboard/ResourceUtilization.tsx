@@ -13,45 +13,47 @@ export function ResourceUtilization() {
   return (
     <div className="flex flex-col gap-6">
       {/* Resource Utilization Cards */}
-      <Card className="border border-slate-200 shadow-sm p-0">
+      <Card className="border border-border bg-card p-0">
         <CardHeader className="p-5 pb-0 border-none">
-          <CardTitle className="font-bold text-slate-800 text-base">Resource Utilization</CardTitle>
+          <CardTitle className="font-bold text-foreground text-sm font-mono">Resource Utilization</CardTitle>
         </CardHeader>
-        <CardContent className="p-5 pt-4 space-y-4">
+        <CardContent className="p-5 pt-4 space-y-4 font-mono">
           {/* GPU Clusters */}
           <div>
-            <div className="flex justify-between text-sm mb-1.5">
-              <span className="text-slate-600 font-medium">GPU Clusters</span>
-              <span className="text-slate-900 font-semibold">78%</span>
+            <div className="flex justify-between text-xs mb-1.5">
+              <span className="text-muted-foreground">GPU Clusters</span>
+              <span className="text-foreground font-semibold">78%</span>
             </div>
-            <Progress value={78} className="h-2 bg-slate-100" />
+            <Progress value={78} className="h-2 bg-background border border-border" />
           </div>
           
           {/* Storage S3 */}
           <div>
-            <div className="flex justify-between text-sm mb-1.5">
-              <span className="text-slate-600 font-medium">Storage S3</span>
-              <span className="text-slate-900 font-semibold">42%</span>
+            <div className="flex justify-between text-xs mb-1.5">
+              <span className="text-muted-foreground">Storage S3</span>
+              <span className="text-foreground font-semibold">42%</span>
             </div>
-            <Progress value={42} className="h-2 bg-slate-100" />
+            <Progress value={42} className="h-2 bg-background border border-border" />
           </div>
         </CardContent>
       </Card>
 
       {/* Optimizations Alert Box */}
-      <Card className="bg-indigo-50 border-indigo-100 shadow-sm p-0">
+      <Card className="bg-primary/10 border-primary/20 shadow-sm p-0">
         <CardContent className="p-6">
           <div className="flex gap-4">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
               <Activity className="w-5 h-5" />
             </div>
-            <div className="flex-1">
-              <h4 className="font-bold text-slate-900 text-sm">Optimizations Available</h4>
-              <p className="text-xs text-slate-600 mt-1 mb-3">3 models could be quantized to INT8 for better performance.</p>
+            <div className="flex-1 font-mono">
+              <h4 className="font-bold text-foreground text-xs uppercase tracking-wide">Optimizations Available</h4>
+              <p className="text-[11px] text-muted-foreground mt-1 mb-3 leading-relaxed">
+                3 models could be quantized to INT8 format for improved throughput and lower cost.
+              </p>
               <Button 
                 type="button" 
                 variant="outline"
-                className="w-full bg-white border border-indigo-200 text-indigo-700 text-sm font-medium py-2 rounded-lg hover:bg-indigo-50 hover:text-indigo-800 transition-colors cursor-pointer"
+                className="w-full bg-card border-border text-foreground hover:bg-accent hover:text-foreground text-xs font-semibold py-2 rounded-lg transition-colors cursor-pointer"
               >
                 View Recommendations
               </Button>

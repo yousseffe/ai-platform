@@ -1,13 +1,21 @@
 "use client";
 
-import React from "react";
-import { Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
+import React, { useState } from "react";
+import { GitBranch, Settings, Layers, Code, PlayCircle, Plus, AlertTriangle, Trash2 } from "lucide-react";
 import { useModelDetails } from "@/hooks/use-model-details";
-import type { Model } from "@/types";
-import { UsageMetricsCard } from "@/components/models/UsageMetricsCard";
+import type { Model, ModelVersion } from "@/types";
 import { VersionHistoryTable } from "@/components/models/VersionHistoryTable";
 import { UploadVersionModal } from "@/components/models/UploadVersionModal";
+import ModelOverview from "@/components/models/ModelOverview";
+import ModelPlayground from "@/components/models/ModelPlayground";
+import ActionsTerminal from "@/components/models/ActionsTerminal";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ModelDetailsClientProps {
   initialModel: Model;
@@ -16,18 +24,13 @@ interface ModelDetailsClientProps {
 
 /**
  * Client-side layout view for Model Details page.
- * Orchestrates modal controls, deployment actions, and renders components
- * representing stats and historical artifact version tables using a custom state hook.
- *
- * @param props - ModelDetailsClient component properties.
- * @returns The React component layout rendering model version grids.
+ * Orchestrates modal controls, deployment actions, version history logs,
+ * and prediction playgrounds using a unified tab system.
  */
 export default function ModelDetailsClient({ initialModel, modelId }: ModelDetailsClientProps) {
-  const router = useRouter();
   const {
     model,
     versions,
-    latestVersion,
     showVersionModal,
     setShowVersionModal,
     modelFile,
@@ -37,7 +40,7 @@ export default function ModelDetailsClient({ initialModel, modelId }: ModelDetai
     preprocessFile,
     setPreprocessFile,
     postprocessFile,
-    setPostprocessFile,
+    setPreprocessFile: setPostprocessFile, // aliased correctly
     examplePayload,
     setExamplePayload,
     expectedResult,
@@ -48,90 +51,145 @@ export default function ModelDetailsClient({ initialModel, modelId }: ModelDetai
     handleUploadVersion,
   } = useModelDetails(modelId, initialModel);
 
+  // Track active version in terminal build log viewer
+  const [activeVersion, setActiveVersion] = useState<ModelVersion | null>(() => {
+    const list = initialModel.versions || [];
+    if (list.length > 0) {
+      return [...list].sort((a, b) => b.versionNumber - a.versionNumber)[0];
+    }
+    return null;
+  });
+
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="flex flex-col lg:flex-row gap-8 mb-8">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-4">
-            <h1 className="text-2xl font-bold text-slate-900">{model.name}</h1>
-            <span className="badge badge-info bg-indigo-50 text-indigo-700">STABLE</span>
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in text-foreground">
+      {/* Repository Style Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-border gap-4">
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-muted-foreground" />
+            <span className="text-primary font-mono text-sm hover:underline cursor-pointer">
+              {model.name.toLowerCase().replace(/\s+/g, "-")}
+            </span>
           </div>
-          <p className="text-slate-600 leading-relaxed mb-6 max-w-3xl">
-            {model.description || "No description provided."}
-          </p>
-          <div className="flex gap-8">
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Parameters</p>
-              <p className="font-medium text-slate-900">340M</p>
-            </div>
-            <div className="w-px bg-slate-200"></div>
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Architecture</p>
-              <p className="font-medium text-slate-900">Transformer-XL</p>
-            </div>
-            <div className="w-px bg-slate-200"></div>
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Training Epochs</p>
-              <p className="font-medium text-slate-900">1,200</p>
-            </div>
+          <div className="flex items-center gap-2 select-none">
+            <span className="px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-950/40 text-emerald-400 text-[9px] font-bold tracking-wider uppercase font-mono">
+              public
+            </span>
+            <span className="px-2 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary text-[9px] font-bold tracking-wider uppercase font-mono">
+              stable
+            </span>
           </div>
         </div>
 
-        <UsageMetricsCard />
-      </div>
+        {/* Branch / Version Swapper select dropdown */}
+        <div className="flex items-center gap-3 font-mono text-xs select-none">
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-accent text-foreground cursor-pointer transition-colors focus:outline-none text-[11px] font-bold">
+              <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />
+              <span>tag: v{activeVersion ? activeVersion.versionNumber : "latest"}</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-card border border-border shadow-xl rounded-lg p-1.5 w-44 text-foreground">
+              {versions.length === 0 ? (
+                <span className="text-[10px] text-muted-foreground p-2 block">No version tags</span>
+              ) : (
+                [...versions]
+                  .sort((a, b) => b.versionNumber - a.versionNumber)
+                  .map((v) => (
+                    <DropdownMenuItem
+                      key={v.id}
+                      onClick={() => setActiveVersion(v)}
+                      className={`text-xs hover:bg-accent p-2 rounded cursor-pointer ${
+                        activeVersion?.id === v.id ? "bg-primary/10 font-bold" : ""
+                      }`}
+                    >
+                      v{v.versionNumber} ({v.id.substring(0, 8)})
+                    </DropdownMenuItem>
+                  ))
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-      <div className="card p-0 overflow-hidden mb-8">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-bold text-slate-800">Version History</h3>
           <button
             onClick={() => setShowVersionModal(true)}
-            className="text-sm text-primary-600 font-medium flex items-center gap-1 hover:underline cursor-pointer"
+            className="btn-primary flex items-center gap-1.5 font-bold"
           >
-            <Plus className="w-4 h-4" /> Upload New Version
+            <Plus className="w-4 h-4" /> Push Version
           </button>
         </div>
-        
-        <VersionHistoryTable
-          versions={versions}
-          onDeploy={handleDeploy}
-          onStop={handleStop}
-          onNavigateToTest={() => router.push(`/models/${modelId}/test`)}
-        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-indigo-700 rounded-xl p-8 text-white relative overflow-hidden">
-          <div className="absolute -bottom-10 -right-10 opacity-20">
-            <span className="text-9xl">☁️</span>
-          </div>
-          <h3 className="font-bold text-xl mb-3 relative z-10">Cloud Infrastructure</h3>
-          <p className="text-indigo-100 mb-8 relative z-10 max-w-sm">Optimized for A100 GPU clusters with horizontal autoscaling.</p>
-          <div className="bg-indigo-900/50 backdrop-blur rounded border border-indigo-500/30 p-3 font-mono text-sm inline-flex items-center gap-3 relative z-10">
-            <span className="text-indigo-300">$</span> deploy --cluster=prod-us-east-1
-          </div>
-        </div>
+      {/* Tabs Container */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList variant="line" className="border-b border-border w-full justify-start rounded-none px-0 mb-6 gap-6 select-none">
+          <TabsTrigger value="overview" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
+            <Code className="w-3.5 h-3.5 mr-1" /> Overview
+          </TabsTrigger>
+          <TabsTrigger value="versions" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
+            <GitBranch className="w-3.5 h-3.5 mr-1" /> Version Registry
+          </TabsTrigger>
+          <TabsTrigger value="sandbox" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
+            <PlayCircle className="w-3.5 h-3.5 mr-1" /> Playground
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
+            <Settings className="w-3.5 h-3.5 mr-1" /> Settings
+          </TabsTrigger>
+        </TabsList>
 
-        <div className="bg-slate-900 rounded-xl p-8 text-slate-300 overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-white text-lg">Interface Configuration</h3>
-            <span className="text-xs font-mono text-slate-500">v{latestVersion ? latestVersion.versionNumber : 1}</span>
-          </div>
-          <div className="flex-1 overflow-auto space-y-4">
-            <div>
-              <p className="text-[10px] font-bold text-slate-500 tracking-wider mb-2 uppercase">Example Payload Input</p>
-              <pre className="text-xs font-mono leading-relaxed text-indigo-200 bg-slate-800/50 p-3 rounded border border-slate-800 whitespace-pre-wrap">
-                {latestVersion?.examplePayload || "Not provided"}
-              </pre>
+        {/* Tab 1: Overview README & Code Snippets */}
+        <TabsContent value="overview">
+          <ModelOverview model={model} />
+        </TabsContent>
+
+        {/* Tab 2: Version History & Actions Log Terminal */}
+        <TabsContent value="versions" className="space-y-6">
+          <div className="border border-border bg-card rounded-xl p-0 overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-border bg-background flex items-center justify-between select-none">
+              <h3 className="font-bold text-foreground text-xs font-mono">Deployment Checkpoint Runs</h3>
             </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-500 tracking-wider mb-2 uppercase">Expected Prediction Result</p>
-              <pre className="text-xs font-mono leading-relaxed text-indigo-200 bg-slate-800/50 p-3 rounded border border-slate-800 whitespace-pre-wrap">
-                {latestVersion?.expectedResult || "Not provided"}
-              </pre>
+            <VersionHistoryTable
+              versions={versions}
+              onDeploy={handleDeploy}
+              onStop={handleStop}
+              onNavigateToTest={() => {}} // Tab is inline, no navigation needed
+            />
+          </div>
+
+          {/* GitHub Actions build logs console */}
+          {activeVersion && (
+            <ActionsTerminal
+              versionId={activeVersion.id}
+              versionNumber={activeVersion.versionNumber}
+              status={activeVersion.status}
+            />
+          )}
+        </TabsContent>
+
+        {/* Tab 3: Sandbox Playground */}
+        <TabsContent value="sandbox">
+          <ModelPlayground model={model} />
+        </TabsContent>
+
+        {/* Tab 4: Settings (GitHub Danger Zone Style) */}
+        <TabsContent value="settings" className="font-mono text-xs text-foreground space-y-6">
+          <div className="border border-red-500/30 bg-red-950/10 rounded-xl p-6 space-y-4">
+            <div className="flex items-center gap-2 text-red-400 font-bold text-sm select-none">
+              <AlertTriangle className="w-4.5 h-4.5 text-red-500" /> Danger Zone
+            </div>
+            <div className="w-full h-px bg-red-500/20" />
+            <div className="flex items-center justify-between gap-6 leading-relaxed">
+              <div>
+                <h4 className="font-bold text-foreground text-xs">Delete this Model</h4>
+                <p className="text-muted-foreground text-[11px] mt-1">
+                  Once deleted, the weights, version logs, and API execution endpoints cannot be recovered.
+                </p>
+              </div>
+              <button className="btn-outline border-red-500/30 text-red-400 hover:bg-red-950/30 flex items-center gap-1.5 shrink-0 font-bold select-none cursor-pointer">
+                <Trash2 className="w-4 h-4" /> Delete Repository
+              </button>
             </div>
           </div>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {showVersionModal && (
         <UploadVersionModal

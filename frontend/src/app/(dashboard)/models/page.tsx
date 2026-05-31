@@ -14,8 +14,8 @@ export const revalidate = 0;
  * Static metadata configuration for the Models Registry page.
  */
 export const metadata: Metadata = {
-  title: "Models Registry - ModelOps AI",
-  description: "Browse, version, and manage machine learning models, preprocess scalers, and custom scripts in the ModelOps model catalog.",
+  title: "Models Registry - MLHub",
+  description: "Browse, version, and manage machine learning models, preprocess scalers, and custom scripts in the MLHub model catalog.",
 };
 
 /**
@@ -67,8 +67,8 @@ export default async function ModelsRegistryPage() {
       {/* Title & Action Buttons Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Models Registry</h1>
-          <p className="text-slate-500 mt-1">Manage, version, and deploy your machine learning assets across environments.</p>
+          <h1 className="text-xl font-bold text-foreground font-mono">Models Registry</h1>
+          <p className="text-xs text-muted-foreground mt-1 font-mono">Manage, version, and deploy your machine learning assets across environments.</p>
         </div>
         <div className="flex gap-3">
           <button type="button" className="btn-outline cursor-pointer flex items-center gap-1.5">

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Layers } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { registerUser, verifyUser } from "@/lib/actions/auth.actions";
@@ -112,28 +112,35 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
+    <div className="min-h-screen bg-background text-foreground flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-md animate-fade-in">
         {/* Title logo area */}
-        <div className="flex items-center justify-center gap-2 text-primary-600 font-bold text-2xl tracking-tight mb-8">
-          <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
-            <Layers className="w-6 h-6 text-white" />
+        <div className="flex items-center justify-center gap-2.5 text-primary font-bold text-xl tracking-tight mb-8">
+          <div className="w-9 h-9 relative flex items-center justify-center shrink-0">
+            <Image
+              src="/logo.png"
+              alt="MLHub Logo"
+              width={34}
+              height={34}
+              className="object-contain"
+              style={{ width: "auto" }}
+            />
           </div>
-          ModelOps AI
+          <span className="font-mono text-xl font-extrabold text-foreground">MLHub</span>
         </div>
 
-        <Card className="border border-slate-200 shadow-sm p-0">
-          <CardContent className="p-6">
+        <Card className="border border-border bg-card p-0">
+          <CardContent className="p-6 font-mono text-xs text-foreground">
             {error && (
-              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/40 dark:border-red-500/30 dark:text-red-400 text-xs font-semibold leading-relaxed">
                 {error}
               </div>
             )}
 
             {step === "REGISTER" ? (
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 mb-2">Create an account</h1>
-                <p className="text-slate-500 text-sm mb-6">Start deploying your machine learning models today.</p>
+                <h1 className="text-lg font-bold text-foreground mb-1 select-none">Create an account</h1>
+                <p className="text-muted-foreground mb-6 select-none">Start deploying your machine learning models today.</p>
                 <RegisterForm onSubmit={handleRegisterSubmit} loading={loading} />
               </div>
             ) : (
@@ -151,9 +158,9 @@ export default function RegisterPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-sm text-slate-500 mt-6">
+        <p className="text-center text-xs text-muted-foreground mt-6 font-mono select-none">
           Already have an account?{" "}
-          <Link href="/login" className="font-bold text-primary-600 hover:text-primary-700">
+          <Link href="/login" className="font-bold text-primary hover:underline">
             Sign in
           </Link>
         </p>

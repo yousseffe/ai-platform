@@ -183,10 +183,10 @@ export default function UploadModelPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto pb-12 animate-fade-in">
+    <div className="max-w-6xl mx-auto pb-12 animate-fade-in text-foreground">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Upload Model Artifacts</h1>
-        <p className="text-slate-500 mt-1">
+        <h1 className="text-xl font-bold text-foreground font-mono">Upload Model Artifacts</h1>
+        <p className="text-xs text-muted-foreground mt-1 font-mono">
           Initialize your production environment by uploading your pre-trained model and support scripts.
         </p>
       </div>
@@ -205,30 +205,30 @@ export default function UploadModelPage() {
         <InterfaceConfigForm register={register} errors={errors} isUploading={isUploading} />
 
         {isUploading && (
-          <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-fade-in">
+          <div className="bg-card p-6 rounded-xl border border-border animate-fade-in font-mono text-xs">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-bold text-indigo-900">{uploadStatus}</span>
-              <span className="text-sm font-bold text-indigo-600">{uploadProgress}%</span>
+              <span className="font-bold text-foreground">{uploadStatus}</span>
+              <span className="font-bold text-primary">{uploadProgress}%</span>
             </div>
-            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+            <div className="w-full bg-background border border-border rounded-full h-2 overflow-hidden">
               <div
-                className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                className="bg-primary h-full rounded-full transition-all duration-300 ease-out"
                 style={{ width: `${uploadProgress}%` }}
               ></div>
             </div>
-            <p className="text-xs text-slate-500 mt-3 text-center">Your artifacts are being pushed to the background worker queue.</p>
+            <p className="text-[10px] text-muted-foreground mt-3 text-center">Your weights artifacts are being transferred to the compilation queue.</p>
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-slate-200 pt-6">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <ShieldCheck className="w-5 h-5 text-emerald-500" />
+        <div className="flex items-center justify-between border-t border-border pt-6 font-mono text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-emerald-400" />
             Artifacts will be scanned for security and integrity before deployment.
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 select-none">
             <button
               type="button"
-              className="text-slate-600 font-medium px-4 hover:text-slate-800 cursor-pointer disabled:opacity-50"
+              className="text-muted-foreground hover:text-foreground font-bold px-4 cursor-pointer disabled:opacity-50"
               onClick={() => router.push("/models")}
               disabled={isUploading}
             >
@@ -236,7 +236,7 @@ export default function UploadModelPage() {
             </button>
             <button
               type="submit"
-              className="btn-primary py-2.5 px-6 flex items-center gap-2 transition-all cursor-pointer"
+              className="btn-primary py-2 px-4 flex items-center gap-2 transition-all cursor-pointer"
               disabled={isUploading || !nameValue || !modelFileValue}
             >
               {isUploading ? "Processing..." : "Submit to Queue"} <ArrowRight className="w-4 h-4" />

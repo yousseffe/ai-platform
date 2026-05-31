@@ -113,11 +113,18 @@ export default function CreateWorkspacePage() {
         <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] rounded-full bg-purple-900/20 blur-[120px] pointer-events-none" />
 
         {/* Branding header */}
-        <div className="relative z-10 flex items-center gap-2.5 text-primary-400 font-bold text-lg">
-          <div className="w-7 h-7 rounded bg-primary-600 flex items-center justify-center text-white">
-            <Check className="w-4 h-4" />
+        <div className="relative z-10 flex items-center gap-2.5 text-primary font-bold text-lg">
+          <div className="w-8 h-8 relative flex items-center justify-center shrink-0">
+            <Image
+              src="/logo.png"
+              alt="MLHub Logo"
+              width={30}
+              height={30}
+              className="object-contain"
+              style={{ width: "auto" }}
+            />
           </div>
-          ModelOps Cloud
+          <span className="font-mono text-base font-extrabold text-white">MLHub Cloud</span>
         </div>
 
         {/* Illustration */}
