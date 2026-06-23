@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import NextAuthSessionProvider from "@/components/providers/SessionProvider";
+import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -32,6 +33,18 @@ export default function RootLayout({
           }}
         />
         <NextAuthSessionProvider>
+          <Toaster 
+            position="top-right" 
+            toastOptions={{
+              className: 'dark:bg-[#121316] dark:text-[#ededed] dark:border-[#222326] border bg-white text-slate-800 text-xs font-sans rounded-lg shadow-lg',
+              success: {
+                iconTheme: {
+                  primary: '#10b981',
+                  secondary: '#ffffff',
+                },
+              },
+            }}
+          />
           {children}
         </NextAuthSessionProvider>
       </body>

@@ -17,7 +17,7 @@ interface RegisterFormProps {
 /**
  * Registration form component handling user profile details onboarding.
  * Implements inline validation using Zod and react-hook-form.
- * Migrated to Shadcn UI components.
+ * Redesigned in the premium Expo Go console theme.
  *
  * @param props - Component properties containing submission trigger and loading state.
  * @returns The React component rendering the registration input fields.
@@ -33,106 +33,106 @@ export default function RegisterForm({ onSubmit, loading }: RegisterFormProps) {
   });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      <div className="space-y-1.5">
-        <Label htmlFor="reg-email" className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 font-sans">
+      <div className="space-y-1.5 text-left">
+        <Label htmlFor="reg-email" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           Email Address
         </Label>
         <div className="relative">
-          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 select-none" />
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground select-none" />
           <Input
             id="reg-email"
             type="email"
-            className={`pl-10 h-10 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-foreground placeholder-slate-400 dark:placeholder-slate-500 focus-visible:bg-white dark:focus-visible:bg-slate-950/80 focus-visible:ring-4 focus-visible:ring-primary/15 focus-visible:border-primary ${
-              errors.email ? "border-red-500 focus-visible:ring-red-100" : ""
+            className={`pl-10 w-full h-9 bg-background border border-border rounded-lg text-xs text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-all ${
+              errors.email ? "border-destructive focus-visible:ring-destructive/20 focus-visible:border-destructive" : ""
             }`}
-            style={{ paddingLeft: "2.5rem" }}
+            style={{ paddingLeft: "2.25rem" }}
             placeholder="name@company.com"
             {...register("email")}
             disabled={loading}
           />
         </div>
         {errors.email && (
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-semibold">{errors.email.message}</p>
+          <p className="text-[10px] text-destructive mt-1 font-semibold">{errors.email.message}</p>
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="reg-full-name" className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+      <div className="space-y-1.5 text-left">
+        <Label htmlFor="reg-full-name" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           Full Name
         </Label>
         <div className="relative">
-          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 select-none" />
+          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground select-none" />
           <Input
             id="reg-full-name"
             type="text"
-            className={`pl-10 h-10 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-foreground placeholder-slate-400 dark:placeholder-slate-500 focus-visible:bg-white dark:focus-visible:bg-slate-950/80 focus-visible:ring-4 focus-visible:ring-primary/15 focus-visible:border-primary ${
-              errors.full_name ? "border-red-500 focus-visible:ring-red-100" : ""
+            className={`pl-10 w-full h-9 bg-background border border-border rounded-lg text-xs text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-all ${
+              errors.full_name ? "border-destructive focus-visible:ring-destructive/20 focus-visible:border-destructive" : ""
             }`}
-            style={{ paddingLeft: "2.5rem" }}
+            style={{ paddingLeft: "2.25rem" }}
             placeholder="Ahmed Amr"
             {...register("full_name")}
             disabled={loading}
           />
         </div>
         {errors.full_name && (
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-semibold">{errors.full_name.message}</p>
+          <p className="text-[10px] text-destructive mt-1 font-semibold">{errors.full_name.message}</p>
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="reg-password" className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+      <div className="space-y-1.5 text-left">
+        <Label htmlFor="reg-password" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           Password
         </Label>
         <div className="relative">
-          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 select-none" />
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground select-none" />
           <Input
             id="reg-password"
             type="password"
-            className={`pl-10 h-10 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-foreground placeholder-slate-400 dark:placeholder-slate-500 focus-visible:bg-white dark:focus-visible:bg-slate-950/80 focus-visible:ring-4 focus-visible:ring-primary/15 focus-visible:border-primary ${
-              errors.password ? "border-red-500 focus-visible:ring-red-100" : ""
+            className={`pl-10 w-full h-9 bg-background border border-border rounded-lg text-xs text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-all ${
+              errors.password ? "border-destructive focus-visible:ring-destructive/20 focus-visible:border-destructive" : ""
             }`}
-            style={{ paddingLeft: "2.5rem" }}
+            style={{ paddingLeft: "2.25rem" }}
             placeholder="••••••••"
             {...register("password")}
             disabled={loading}
           />
         </div>
         {errors.password && (
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-semibold">{errors.password.message}</p>
+          <p className="text-[10px] text-destructive mt-1 font-semibold">{errors.password.message}</p>
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="reg-confirm-password" className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+      <div className="space-y-1.5 text-left">
+        <Label htmlFor="reg-confirm-password" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           Confirm Password
         </Label>
         <div className="relative">
-          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 select-none" />
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground select-none" />
           <Input
             id="reg-confirm-password"
             type="password"
-            className={`pl-10 h-10 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-foreground placeholder-slate-400 dark:placeholder-slate-500 focus-visible:bg-white dark:focus-visible:bg-slate-950/80 focus-visible:ring-4 focus-visible:ring-primary/15 focus-visible:border-primary ${
-              errors.confirmPassword ? "border-red-500 focus-visible:ring-red-100" : ""
+            className={`pl-10 w-full h-9 bg-background border border-border rounded-lg text-xs text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-all ${
+              errors.confirmPassword ? "border-destructive focus-visible:ring-destructive/20 focus-visible:border-destructive" : ""
             }`}
-            style={{ paddingLeft: "2.5rem" }}
+            style={{ paddingLeft: "2.25rem" }}
             placeholder="••••••••"
             {...register("confirmPassword")}
             disabled={loading}
           />
         </div>
         {errors.confirmPassword && (
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-semibold">{errors.confirmPassword.message}</p>
+          <p className="text-[10px] text-destructive mt-1 font-semibold">{errors.confirmPassword.message}</p>
         )}
       </div>
 
       <Button
         type="submit"
         disabled={loading}
-        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-10 flex justify-center mt-2 cursor-pointer rounded-lg text-xs font-bold uppercase tracking-wider"
+        className="btn-primary w-full py-2 flex justify-center mt-3 cursor-pointer rounded-lg text-xs font-semibold shadow-sm h-9"
       >
         {loading ? "Creating Account..." : "Create Account"}{" "}
-        <ArrowRight className="w-4 h-4 ml-2" />
+        <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
       </Button>
     </form>
   );

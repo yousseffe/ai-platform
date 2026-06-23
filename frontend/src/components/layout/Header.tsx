@@ -17,7 +17,7 @@ interface HeaderProps {
 /**
  * Top platform Header component.
  * Integrates breadcrumbs matching the active workspace, dynamic search inputs,
- * and live wallet status pill meters. Migrated to Shadcn UI components.
+ * and live wallet status pill meters. Refined in the Expo Go developer console style.
  *
  * @param props - Component properties containing the session context.
  * @returns The React component rendering the header.
@@ -52,7 +52,7 @@ export default function Header({ session }: HeaderProps) {
     if (pathname === "/dashboard") return `${wsName} / Dashboard`;
     if (pathname === "/") return `Marketplace`;
     if (pathname.startsWith("/explore")) return `Marketplace / Explore`;
-    if (pathname.startsWith("/models/upload")) return `${wsName} / Models / Upload New Model`;
+    if (pathname.startsWith("/models/upload")) return `${wsName} / Models / Upload`;
     if (pathname.startsWith("/models/")) return `${wsName} / Models / Details`;
     if (pathname === "/models") return `${wsName} / Models Registry`;
     return `${wsName} / Dashboard`;
@@ -61,68 +61,76 @@ export default function Header({ session }: HeaderProps) {
   const userEmail = session?.user?.email || "User";
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(
     userEmail
-  )}&background=2f81f7&color=fff`;
+  )}&background=4630eb&color=fff`;
 
   return (
-    <div className="h-16 bg-background border-b border-border flex items-center justify-between px-8 shrink-0 relative z-20">
-      <div className="font-semibold text-muted-foreground tracking-wide text-xs hidden lg:block font-mono">
+    <div className="h-14 bg-card border-b border-border flex items-center justify-between px-6 shrink-0 relative z-20 font-sans">
+      {/* Breadcrumb path */}
+      <div className="font-semibold text-muted-foreground tracking-wide text-[10px] hidden md:block uppercase">
         {getBreadcrumb()}
       </div>
 
-      <div className="flex-1 flex justify-center max-w-xl px-4">
+      {/* Global developer search */}
+      <div className="flex-1 flex justify-center max-w-md px-4 mx-auto">
         <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search models, experiments, or deployments..."
-            className="w-full pl-10 pr-4 py-2 h-9 bg-card border-border text-foreground text-xs focus-visible:ring-primary/20 focus-visible:border-primary transition-all rounded-lg"
+            placeholder="Search models, tasks, or API logs..."
+            className="w-full pl-8 pr-3 py-1.5 h-8 bg-background border-border text-foreground text-xs focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:border-primary transition-all rounded-lg"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        {/* Active Wallet Balance Meter */}
+      {/* Header Actions */}
+      <div className="flex items-center gap-3">
+        {/* Wallet stats badge */}
         {activeWorkspace && (
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold select-none font-mono ${
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-semibold select-none ${
             viewMode === WalletType.PROVIDER
-              ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-400"
+              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
               : "bg-primary/10 border-primary/20 text-primary"
           }`}>
             {viewMode === WalletType.PROVIDER ? (
               <>
-                <TrendingUp className="w-3.5 h-3.5" />
+                <TrendingUp className="w-3 h-3" />
                 <span>Earnings: ${balance.toFixed(2)}</span>
               </>
             ) : (
               <>
-                <Coins className="w-3.5 h-3.5" />
+                <Coins className="w-3 h-3" />
                 <span>Credits: ${balance.toFixed(2)}</span>
               </>
             )}
           </div>
         )}
 
+        {/* Theme toggler */}
         <Button 
           variant="ghost" 
           size="icon" 
           onClick={toggleTheme}
-          className="text-muted-foreground hover:text-foreground cursor-pointer h-8 w-8 hover:bg-accent rounded-lg"
+          className="text-muted-foreground hover:text-foreground cursor-pointer h-8 w-8 hover:bg-secondary rounded-lg transition-colors"
           title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
         >
-          {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
         </Button>
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground cursor-pointer h-8 w-8 hover:bg-accent rounded-lg">
-          <Bell className="w-4 h-4" />
+
+        {/* Notifications and help shortcuts */}
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground cursor-pointer h-8 w-8 hover:bg-secondary rounded-lg transition-colors">
+          <Bell className="w-3.5 h-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground cursor-pointer h-8 w-8 hover:bg-accent rounded-lg">
-          <HelpCircle className="w-4 h-4" />
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground cursor-pointer h-8 w-8 hover:bg-secondary rounded-lg transition-colors">
+          <HelpCircle className="w-3.5 h-3.5" />
         </Button>
-        <div className="w-8 h-8 rounded-full bg-muted overflow-hidden border border-border ml-2 cursor-pointer" title={userEmail}>
+
+        {/* User profile avatar */}
+        <div className="w-7 h-7 rounded-full bg-muted overflow-hidden border border-border ml-1 cursor-pointer shrink-0" title={userEmail}>
           <Image
             src={avatarUrl}
             alt="User avatar"
-            width={32}
-            height={32}
+            width={28}
+            height={28}
           />
         </div>
       </div>
