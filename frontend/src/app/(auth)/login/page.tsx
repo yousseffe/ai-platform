@@ -32,7 +32,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (session) {
-      router.push("/");
+      if (session.user?.email?.toLowerCase().includes("admin")) {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
     }
   }, [session, router]);
 
@@ -50,7 +54,11 @@ export default function LoginPage() {
       if (res?.error) {
         setError("Invalid email or password");
       } else {
-        router.push("/");
+        if (data.email.toLowerCase().includes("admin")) {
+          router.push("/admin");
+        } else {
+          router.push("/");
+        }
         router.refresh();
       }
     } catch {

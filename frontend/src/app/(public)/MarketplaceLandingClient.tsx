@@ -519,7 +519,7 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
                 return (
                   <Link
                     key={model.id}
-                    href={`/models/${model.id}`}
+                    href={`/explore/${model.id}`}
                     className="featured-card-el group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/5 hover:border-primary/30"
                   >
                     {/* Top gradient accent bar */}
@@ -619,7 +619,7 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
                 return (
                   <Link
                     key={model.id}
-                    href={`/models/${model.id}`}
+                    href={`/explore/${model.id}`}
                     className="recent-card-el flex items-start gap-4 p-5 rounded-2xl border border-border bg-card/60 hover:bg-card hover:border-primary/30 hover:shadow-sm transition-all duration-200 group"
                   >
                     {/* Initials — font-mono fine */}

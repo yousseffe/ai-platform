@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { getModels, getConsumerLogs, getProviderLogs } from "@/lib/actions/models.actions";
 import { Model, ModelLog, WalletType } from "@/types";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -12,10 +13,18 @@ import PublisherDashboard from "@/components/dashboard/PublisherDashboard";
  * Loads registered platform models and user prediction logs to render role-specific consoles.
  */
 export default function DashboardPage() {
-  const { viewMode, balance } = useWorkspace();
+  const router = useRouter();
+  const { viewMode, balance, isAdmin } = useWorkspace();
   const [models, setModels] = useState<Model[]>([]);
   const [logs, setLogs] = useState<ModelLog[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Redirect admin users to their console
+  useEffect(() => {
+    if (isAdmin) {
+      router.push("/admin");
+    }
+  }, [isAdmin, router]);
 
   useEffect(() => {
     let active = true;

@@ -58,7 +58,7 @@ export async function getPublicModels(): Promise<Model[]> {
  * @returns A promise resolving to the Model object.
  */
 export async function getPublicModelById(id: string): Promise<Model> {
-  return smartFetch<Model>(`/models/${id}`, {
+  return smartFetch<Model>(`/models/marketplace/${id}`, {
     cache: "no-store",
   });
 }

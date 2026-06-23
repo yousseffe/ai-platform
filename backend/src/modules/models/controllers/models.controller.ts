@@ -128,6 +128,17 @@ export class ModelsController {
   }
 
   /**
+   * Retrieves a single public model by ID for guest users.
+   *
+   * @param id - The model UUID.
+   * @returns A promise resolving to the public Model.
+   */
+  @Get('marketplace/:id')
+  async getPublicModel(@Param('id') id: string): Promise<Model> {
+    return this.modelsService.getPublicModel(id);
+  }
+
+  /**
    * Retrieves prediction logs made by the authenticated user (Consumer).
    *
    * @param req - Authenticated user request context.

@@ -20,6 +20,7 @@ import {
 interface ModelDetailsClientProps {
   initialModel: Model;
   modelId: string;
+  isOwner?: boolean;
 }
 
 /**
@@ -27,7 +28,7 @@ interface ModelDetailsClientProps {
  * Orchestrates modal controls, deployment actions, version history logs,
  * and prediction playgrounds using a unified tab system.
  */
-export default function ModelDetailsClient({ initialModel, modelId }: ModelDetailsClientProps) {
+export default function ModelDetailsClient({ initialModel, modelId, isOwner = true }: ModelDetailsClientProps) {
   const {
     model,
     versions,
@@ -109,12 +110,14 @@ export default function ModelDetailsClient({ initialModel, modelId }: ModelDetai
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <button
-            onClick={() => setShowVersionModal(true)}
-            className="btn-primary flex items-center gap-1.5 font-bold"
-          >
-            <Plus className="w-4 h-4" /> Push Version
-          </button>
+          {isOwner && (
+            <button
+              onClick={() => setShowVersionModal(true)}
+              className="btn-primary flex items-center gap-1.5 font-bold"
+            >
+              <Plus className="w-4.5 h-4.5" /> Push Version
+            </button>
+          )}
         </div>
       </div>
 
@@ -130,9 +133,11 @@ export default function ModelDetailsClient({ initialModel, modelId }: ModelDetai
           <TabsTrigger value="sandbox" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
             <PlayCircle className="w-3.5 h-3.5 mr-1" /> Playground
           </TabsTrigger>
-          <TabsTrigger value="settings" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
-            <Settings className="w-3.5 h-3.5 mr-1" /> Settings
-          </TabsTrigger>
+          {isOwner && (
+            <TabsTrigger value="settings" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
+              <Settings className="w-3.5 h-3.5 mr-1" /> Settings
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Tab 1: Overview README & Code Snippets */}
@@ -151,6 +156,7 @@ export default function ModelDetailsClient({ initialModel, modelId }: ModelDetai
               onDeploy={handleDeploy}
               onStop={handleStop}
               onNavigateToTest={() => {}} // Tab is inline, no navigation needed
+              isOwner={isOwner}
             />
           </div>
 
@@ -170,25 +176,27 @@ export default function ModelDetailsClient({ initialModel, modelId }: ModelDetai
         </TabsContent>
 
         {/* Tab 4: Settings (GitHub Danger Zone Style) */}
-        <TabsContent value="settings" className="font-mono text-xs text-foreground space-y-6">
-          <div className="border border-red-500/30 bg-red-950/10 rounded-xl p-6 space-y-4">
-            <div className="flex items-center gap-2 text-red-400 font-bold text-sm select-none">
-              <AlertTriangle className="w-4.5 h-4.5 text-red-500" /> Danger Zone
-            </div>
-            <div className="w-full h-px bg-red-500/20" />
-            <div className="flex items-center justify-between gap-6 leading-relaxed">
-              <div>
-                <h4 className="font-bold text-foreground text-xs">Delete this Model</h4>
-                <p className="text-muted-foreground text-[11px] mt-1">
-                  Once deleted, the weights, version logs, and API execution endpoints cannot be recovered.
-                </p>
+        {isOwner && (
+          <TabsContent value="settings" className="font-mono text-xs text-foreground space-y-6">
+            <div className="border border-red-500/30 bg-red-950/10 rounded-xl p-6 space-y-4">
+              <div className="flex items-center gap-2 text-red-400 font-bold text-sm select-none">
+                <AlertTriangle className="w-4.5 h-4.5 text-red-500" /> Danger Zone
               </div>
-              <button className="btn-outline border-red-500/30 text-red-400 hover:bg-red-950/30 flex items-center gap-1.5 shrink-0 font-bold select-none cursor-pointer">
-                <Trash2 className="w-4 h-4" /> Delete Repository
-              </button>
+              <div className="w-full h-px bg-red-500/20" />
+              <div className="flex items-center justify-between gap-6 leading-relaxed">
+                <div>
+                  <h4 className="font-bold text-foreground text-xs">Delete this Model</h4>
+                  <p className="text-muted-foreground text-[11px] mt-1">
+                    Once deleted, the weights, version logs, and API execution endpoints cannot be recovered.
+                  </p>
+                </div>
+                <button className="btn-outline border-red-500/30 text-red-400 hover:bg-red-950/30 flex items-center gap-1.5 shrink-0 font-bold select-none cursor-pointer">
+                  <Trash2 className="w-4 h-4" /> Delete Repository
+                </button>
+              </div>
             </div>
-          </div>
-        </TabsContent>
+          </TabsContent>
+        )}
       </Tabs>
 
       {showVersionModal && (

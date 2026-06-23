@@ -102,6 +102,24 @@ export class ModelsService {
   }
 
   /**
+   * Retrieves a single public model by ID.
+   *
+   * @param modelId - The UUID of the public model to fetch.
+   * @returns A promise resolving to the Model entity.
+   * @throws {NotFoundException} If the model does not exist or is not public.
+   */
+  async getPublicModel(modelId: string): Promise<Model> {
+    const model = await this.modelsRepository.findOne({
+      where: { id: modelId, isPublic: true },
+      relations: ['versions', 'versions.deployments', 'user'],
+    });
+    if (!model) {
+      throw new NotFoundException('Public model not found');
+    }
+    return model;
+  }
+
+  /**
    * Retrieves metadata and history for a specific model.
    *
    * @param modelId - The UUID of the model to fetch.

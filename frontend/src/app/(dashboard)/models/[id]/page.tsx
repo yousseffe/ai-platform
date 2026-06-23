@@ -2,6 +2,8 @@ import React from "react";
 import { Metadata } from "next";
 import { getModel } from "@/lib/actions/models.actions";
 import { notFound } from "next/navigation";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/auth";
 import ModelDetailsClient from "./ModelDetailsClient";
 
 export const revalidate = 0;
@@ -36,11 +38,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ModelDetailsPage({ params }: PageProps) {
   // Await params if it's a promise (standard in Next 15/16)
   const resolvedParams = await params;
-  const model = await getModel(resolvedParams.id);
+  const [model, session] = await Promise.all([
+    getModel(resolvedParams.id),
+    getServerSession(authOptions),
+  ]);
 
   if (!model) {
     notFound();
   }
 
-  return <ModelDetailsClient initialModel={model} modelId={resolvedParams.id} />;
+  const isOwner = session?.user?.id === model.user?.id;
+  const isPublic = !!model.isPublic;
+
+  // Protect private models from non-owners
+  if (!isOwner && !isPublic) {
+    notFound();
+  }
+
+  return <ModelDetailsClient initialModel={model} modelId={resolvedParams.id} isOwner={isOwner} />;
 }

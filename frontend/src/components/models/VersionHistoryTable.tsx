@@ -8,6 +8,7 @@ interface VersionHistoryTableProps {
   onDeploy: (versionId: string) => void;
   onStop: (deploymentId: string) => void;
   onNavigateToTest: () => void;
+  isOwner?: boolean;
 }
 
 /**
@@ -22,6 +23,7 @@ export function VersionHistoryTable({
   onDeploy,
   onStop,
   onNavigateToTest,
+  isOwner = true,
 }: VersionHistoryTableProps) {
   return (
     <div className="overflow-x-auto">
@@ -98,7 +100,7 @@ export function VersionHistoryTable({
                       <td className="px-6 py-4 text-muted-foreground">--</td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          {v.status === VersionStatus.READY && (!latestDeployment || latestDeployment.status !== DeploymentStatus.RUNNING) && (
+                          {isOwner && v.status === VersionStatus.READY && (!latestDeployment || latestDeployment.status !== DeploymentStatus.RUNNING) && (
                             <button
                               onClick={() => onDeploy(v.id)}
                               className="btn-primary px-3 py-1 text-[11px]"
@@ -106,7 +108,7 @@ export function VersionHistoryTable({
                               Deploy
                             </button>
                           )}
-                          {latestDeployment && latestDeployment.status === DeploymentStatus.RUNNING && (
+                          {isOwner && latestDeployment && latestDeployment.status === DeploymentStatus.RUNNING && (
                             <button
                               onClick={() => onStop(latestDeployment.id)}
                               className="btn-outline px-3 py-1 text-[11px] border-red-900/50 bg-red-950/20 text-red-400 hover:bg-red-950/40 hover:text-red-300"
