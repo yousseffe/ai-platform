@@ -79,6 +79,53 @@ export class StripeService {
   }
 
   /**
+   * Generates a Stripe Checkout Session for organization creation fee payment.
+   *
+   * @param amount - The organization creation fee amount (in USD).
+   * @param pendingId - The pending organization reference UUID.
+   * @param ownerUserId - The owner user UUID.
+   * @returns A promise resolving to the created Stripe Session object as a record.
+   */
+  async createOrgCheckoutSession(
+    amount: number,
+    pendingId: string,
+    ownerUserId: string,
+  ): Promise<Record<string, unknown>> {
+    const amountInCents = Math.round(amount * 100);
+    const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/?status=org_success`;
+    const cancelUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/workspaces/create?status=cancelled`;
+
+    const stripeInstance = this.getStripe();
+    const session = await stripeInstance.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'ModelOps AI Organization Creation Fee',
+              description: `Pending Org ID: ${pendingId}`,
+            },
+            unit_amount: amountInCents,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        type: 'org_creation',
+        pendingId,
+        amount: amount.toString(),
+        ownerUserId,
+      },
+    });
+
+    return session as unknown as Record<string, unknown>;
+  }
+
+  /**
    * Verifies the cryptographic signature of a Stripe webhook event.
    *
    * @param rawBody - The unparsed raw body Buffer.
