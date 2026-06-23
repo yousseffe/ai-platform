@@ -49,7 +49,9 @@ export default function Header({ session }: HeaderProps) {
 
   const getBreadcrumb = () => {
     const wsName = activeWorkspace ? activeWorkspace.name : "Workspace";
-    if (pathname === "/") return `${wsName} / Dashboard`;
+    if (pathname === "/dashboard") return `${wsName} / Dashboard`;
+    if (pathname === "/") return `Marketplace`;
+    if (pathname.startsWith("/explore")) return `Marketplace / Explore`;
     if (pathname.startsWith("/models/upload")) return `${wsName} / Models / Upload New Model`;
     if (pathname.startsWith("/models/")) return `${wsName} / Models / Details`;
     if (pathname === "/models") return `${wsName} / Models Registry`;

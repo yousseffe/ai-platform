@@ -27,44 +27,58 @@ export class User {
   email: string;
 
   /**
-   * Salted and hashed password string (Bcrypt hash).
+   * Salted and hashed password string (Bcrypt hash with cost >= 12).
    */
-  @Column()
+  @Column({ name: 'password_hash' })
   passwordHash: string;
 
   /**
-   * User display username. Unique across the platform.
+   * User display full name. Unique across the platform.
    */
-  @Column({ unique: true })
-  username: string;
-
-  /**
-   * Tracks if OTP verification is completed.
-   */
-  @Column({ default: false })
-  isVerified: boolean;
+  @Column({ name: 'full_name', length: 100 })
+  fullName: string;
 
   /**
    * Toggled to true if individual provider mode is enabled.
    */
-  @Column({ default: false })
-  isProvider: boolean;
+  @Column({ name: 'provider_mode', default: false })
+  providerMode: boolean;
+
+  /**
+   * Toggled to true if user account has administrator privileges.
+   */
+  @Column({ name: 'is_admin', default: false })
+  isAdmin: boolean;
 
   /**
    * The status state of the user account.
    */
-  @Column({ type: 'varchar', enum: UserStatus, default: UserStatus.PENDING })
+  @Column({
+    type: 'varchar',
+    enum: UserStatus,
+    default: UserStatus.PENDING_VERIFICATION,
+  })
   status: UserStatus;
+
+  /**
+   * Timestamp record indicating when the user last logged in or out.
+   */
+  @Column({
+    name: 'last_login_at',
+    type: 'timestamp with time zone',
+    nullable: true,
+  })
+  lastLoginAt: Date | null;
 
   /**
    * Timestamp record indicating when the user profile was originally registered.
    */
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   /**
    * Timestamp record indicating when the user profile details were last modified.
    */
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

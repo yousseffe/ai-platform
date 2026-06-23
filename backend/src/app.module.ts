@@ -7,6 +7,7 @@ import { ModelsModule } from './modules/models/models.module';
 import { DeploymentsModule } from './modules/deployments/deployments.module';
 import { QueueModule } from './shared/queue/queue.module';
 import { User } from './modules/users/entities/user.entity';
+import { AuditLog } from './modules/users/entities/audit-log.entity';
 import { Model } from './modules/models/entities/model.entity';
 import { ModelVersion } from './modules/models/entities/model-version.entity';
 import { Deployment } from './modules/deployments/entities/deployment.entity';
@@ -16,8 +17,17 @@ import { RedisModule } from './shared/redis/redis.module';
 import { WalletsModule } from './modules/wallets/wallets.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { Wallet } from './modules/wallets/entities/wallet.entity';
+import { Transaction } from './modules/wallets/entities/transaction.entity';
+import { ProcessedWebhook } from './modules/wallets/entities/processed-webhook.entity';
 import { Organization } from './modules/organizations/entities/organization.entity';
 import { OrgMember } from './modules/organizations/entities/org-member.entity';
+import { VerificationCode } from './modules/auth/entities/verification-code.entity';
+import { ApiKey } from './modules/auth/entities/api-key.entity';
+import { ModelLog } from './modules/models/entities/model-log.entity';
+import { SystemConfig } from './modules/wallets/entities/system-config.entity';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { OpenSearchModule } from './shared/opensearch/opensearch.module';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -34,12 +44,19 @@ import { OrgMember } from './modules/organizations/entities/org-member.entity';
       database: process.env.DB_NAME || 'aidb',
       entities: [
         User,
+        AuditLog,
         Model,
         ModelVersion,
         Deployment,
         Wallet,
+        Transaction,
+        ProcessedWebhook,
         Organization,
         OrgMember,
+        VerificationCode,
+        ApiKey,
+        ModelLog,
+        SystemConfig,
       ],
       synchronize: true, // For MVP only
     }),
@@ -61,6 +78,9 @@ import { OrgMember } from './modules/organizations/entities/org-member.entity';
     RedisModule,
     WalletsModule,
     OrganizationsModule,
+    OpenSearchModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

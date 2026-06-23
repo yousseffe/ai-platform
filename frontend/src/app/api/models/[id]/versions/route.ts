@@ -20,7 +20,7 @@ export async function POST(
     const formData = await req.formData();
     const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
 
-    const res = await fetch(`${backendUrl}/models/${id}/versions`, {
+    const res = await fetch(`${backendUrl}/api/v1/models/${id}/versions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${session.accessToken}`,

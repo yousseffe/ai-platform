@@ -7,18 +7,18 @@
  * @returns A promise resolving to the JSON body returned by the registration response.
  * @throws {Error} If registration fails or responds with a non-OK status.
  */
-export async function registerUser(email: string, username: string, password: string): Promise<unknown> {
+export async function registerUser(email: string, full_name: string, password: string): Promise<unknown> {
   const backendUrl =
     (typeof window === "undefined"
       ? process.env.BACKEND_URL
       : process.env.NEXT_PUBLIC_BACKEND_URL) || "http://localhost:3000";
 
-  const res = await fetch(`${backendUrl}/auth/register`, {
+  const res = await fetch(`${backendUrl}/api/v1/auth/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, username, password }),
+    body: JSON.stringify({ email, full_name, password }),
   });
 
   const data = await res.json();
@@ -44,7 +44,7 @@ export async function verifyUser(email: string, otp: string): Promise<unknown> {
       ? process.env.BACKEND_URL
       : process.env.NEXT_PUBLIC_BACKEND_URL) || "http://localhost:3000";
 
-  const res = await fetch(`${backendUrl}/auth/verify`, {
+  const res = await fetch(`${backendUrl}/api/v1/auth/verify`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

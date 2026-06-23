@@ -5,6 +5,8 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 
+import { OrgStatus } from '../enums/org-status.enum';
+
 /**
  * Entity representing an organization workspace container.
  */
@@ -17,9 +19,9 @@ export class Organization {
   id: string;
 
   /**
-   * Display name of the organization.
+   * Display name of the organization. Unique, 3-80 chars.
    */
-  @Column()
+  @Column({ unique: true, length: 80 })
   name: string;
 
   /**
@@ -29,20 +31,30 @@ export class Organization {
   slug: string;
 
   /**
-   * Creator/owner user UUID.
+   * Organization workspace status (ACTIVE or INACTIVE).
    */
-  @Column()
-  ownerUserId: string;
+  @Column({
+    type: 'varchar',
+    enum: OrgStatus,
+    default: OrgStatus.ACTIVE,
+  })
+  status: OrgStatus;
 
   /**
-   * Tracks if the organization is registered to publish ML models.
+   * UUID link to the organization's PROVIDER wallet.
    */
-  @Column({ default: false })
-  isProvider: boolean;
+  @Column({ name: 'wallet_id', type: 'uuid', nullable: true })
+  walletId: string | null;
+
+  /**
+   * Creator/owner user UUID.
+   */
+  @Column({ name: 'created_by', type: 'uuid' })
+  createdBy: string;
 
   /**
    * Time the organization was created.
    */
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

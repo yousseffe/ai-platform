@@ -18,12 +18,21 @@ interface WorkspaceState {
   balance: number;
   isLoading: boolean;
   isProviderModeEnabled: boolean;
+  switchingWorkspace: Workspace | null;
+  isOtpModalOpen: boolean;
+  isAdmin: boolean;
+  apiKey: string;
+  setOtpModalOpen: (open: boolean) => void;
   setActiveWorkspace: (workspace: Workspace) => void;
   setViewMode: (mode: WalletType) => void;
-  createOrganization: (name: string, slug: string) => Promise<{ success: boolean; error?: string }>;
+  createOrganization: (name: string, slug: string, collaborators?: Array<{ email: string; role: string }>) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   becomeProvider: () => Promise<{ success: boolean; error?: string }>;
   fetchWorkspaceDetails: (session: Session | null) => Promise<void>;
   refreshData: () => Promise<void>;
+  triggerWorkspaceSwitch: (workspace: Workspace) => Promise<{ success: boolean; requiresOtp: boolean; error?: string }>;
+  confirmWorkspaceSwitch: (code: string) => Promise<{ success: boolean; error?: string }>;
+  rotateApiKey: () => Promise<{ success: boolean; error?: string }>;
+  withdrawFunds: (amount: number) => Promise<{ success: boolean; error?: string }>;
 }
 
 /**
@@ -51,7 +60,7 @@ function getCookie(name: string): string | null {
 
 /**
  * Zustand store to manage multi-tenant workspaces, active view mode,
- * credit ledgers, and organization creation onboarding parameters.
+ * credit ledgers, organization switcher OTP security verification, and provider status.
  */
 export const useWorkspace = create<WorkspaceState>((set, get) => ({
   activeWorkspace: null,
@@ -60,6 +69,12 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   balance: 0.00,
   isLoading: true,
   isProviderModeEnabled: false,
+  switchingWorkspace: null,
+  isOtpModalOpen: false,
+  isAdmin: false,
+  apiKey: "",
+
+  setOtpModalOpen: (open) => set({ isOtpModalOpen: open }),
 
   setActiveWorkspace: (workspace) => {
     setCookie("activeWorkspaceId", workspace.id);
@@ -93,14 +108,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     }
   },
 
-  createOrganization: async (name, slug) => {
+  createOrganization: async (name, slug, collaborators = []) => {
     try {
-      await smartFetch("/organizations", {
+      const res = await smartFetch<{ id: string; name: string; slug: string }>("/organizations", {
         method: "POST",
-        body: JSON.stringify({ name, slug }),
+        body: JSON.stringify({ name, slug, collaborators }),
       });
       await get().refreshData();
-      return { success: true };
+      return { success: true, data: res };
     } catch (err) {
       return {
         success: false,
@@ -111,7 +126,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   becomeProvider: async () => {
     try {
-      await smartFetch("/users/enable-provider", {
+      await smartFetch("/users/me/enable-provider", {
         method: "POST",
       });
       await get().refreshData();
@@ -120,6 +135,66 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       return {
         success: false,
         error: err instanceof Error ? err.message : "Failed to enable provider mode",
+      };
+    }
+  },
+
+  triggerWorkspaceSwitch: async (workspace) => {
+    if (workspace.type === OwnerType.USER) {
+      get().setActiveWorkspace(workspace);
+      return { success: true, requiresOtp: false };
+    }
+
+    try {
+      await smartFetch(`/organizations/${workspace.id}/access-otp/send`, {
+        method: "POST",
+      });
+      
+      set({
+        switchingWorkspace: workspace,
+        isOtpModalOpen: true,
+      });
+      
+      return { success: true, requiresOtp: true };
+    } catch (err) {
+      return {
+        success: false,
+        requiresOtp: false,
+        error: err instanceof Error ? err.message : "Failed to trigger access OTP",
+      };
+    }
+  },
+
+  confirmWorkspaceSwitch: async (code) => {
+    const { switchingWorkspace } = get();
+    if (!switchingWorkspace) {
+      return { success: false, error: "No organization selected" };
+    }
+
+    try {
+      await smartFetch(`/organizations/${switchingWorkspace.id}/access-otp/verify`, {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      });
+
+      // Verification successful, switch context
+      setCookie("activeWorkspaceId", switchingWorkspace.id);
+      setCookie("viewMode", WalletType.CONSUMER);
+
+      set({
+        activeWorkspace: switchingWorkspace,
+        viewMode: WalletType.CONSUMER,
+        switchingWorkspace: null,
+        isOtpModalOpen: false,
+        isLoading: true,
+      });
+
+      await get().refreshData();
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Invalid code. Access denied.",
       };
     }
   },
@@ -133,14 +208,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     try {
       // 1. Fetch user profile and workspaces list
       const profile = await smartFetch<{
-        user: { id: string; email: string; username: string; isProvider: boolean };
-        workspaces: Array<{ id: string; name: string; slug: string; userRole: string; isProvider: boolean }>;
+        user: { id: string; email: string; fullName: string; providerMode: boolean; isAdmin?: boolean; apiKey?: string };
+        workspaces: Array<{ id: string; name: string; slug: string; userRole: string }>;
       }>("/auth/me");
 
       const personalWorkspace: Workspace = {
         id: profile.user.id,
-        name: `${profile.user.username} (Personal)`,
-        slug: profile.user.username,
+        name: `${profile.user.fullName} (Personal)`,
+        slug: profile.user.fullName.toLowerCase().replace(/[^a-z0-9]/g, "-"),
         type: OwnerType.USER,
         role: OrgRole.OWNER,
       };
@@ -163,7 +238,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       // 3. Resolve view mode
       const savedViewMode = getCookie("viewMode") as WalletType | null;
       let activeViewMode: WalletType = WalletType.CONSUMER;
-      const canBeProvider = active.type === OwnerType.ORG || profile.user.isProvider;
+      const canBeProvider = active.type === OwnerType.ORG || profile.user.providerMode;
 
       if (savedViewMode === WalletType.PROVIDER && canBeProvider) {
         activeViewMode = WalletType.PROVIDER;
@@ -186,6 +261,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         viewMode: activeViewMode,
         isProviderModeEnabled: canBeProvider,
         balance: walletRes.balance,
+        isAdmin: !!profile.user.isAdmin,
+        apiKey: profile.user.apiKey || "",
         isLoading: false,
       });
     } catch (err) {
@@ -198,5 +275,36 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     const { getSession } = await import("next-auth/react");
     const session = await getSession();
     await get().fetchWorkspaceDetails(session);
+  },
+
+  rotateApiKey: async () => {
+    try {
+      const res = await smartFetch<{ key: string }>("/users/me/rotate-api-key", {
+        method: "POST",
+      });
+      set({ apiKey: res.key });
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Failed to rotate API Key",
+      };
+    }
+  },
+
+  withdrawFunds: async (amount) => {
+    try {
+      await smartFetch("/wallets/withdraw", {
+        method: "POST",
+        body: JSON.stringify({ amount }),
+      });
+      await get().refreshData();
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Failed to withdraw funds",
+      };
+    }
   },
 }));

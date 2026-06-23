@@ -56,6 +56,19 @@ if postprocess_path and os.path.exists(postprocess_path):
 
 @app.post("/predict")
 async def predict(request: Request):
+    expected_api_key = os.getenv("API_KEY")
+    if expected_api_key:
+        auth_header = request.headers.get("Authorization")
+        api_key = None
+        if auth_header and auth_header.startswith("Bearer "):
+            api_key = auth_header.split(" ")[1]
+        else:
+            api_key = request.headers.get("x-api-key")
+
+        if api_key != expected_api_key:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
+
     data = await request.json()
     
     # Preprocess

@@ -6,6 +6,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Wallet } from '../entities/wallet.entity';
+import { Transaction } from '../entities/transaction.entity';
+import { TransactionType } from '../enums/transaction-type.enum';
+import { TransactionStatus } from '../enums/transaction-status.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 
@@ -17,6 +20,8 @@ export class WalletsService {
   constructor(
     @InjectRepository(Wallet)
     private readonly walletRepository: Repository<Wallet>,
+    @InjectRepository(Transaction)
+    private readonly transactionRepository: Repository<Transaction>,
   ) {}
 
   /**
@@ -151,5 +156,53 @@ export class WalletsService {
 
     wallet.balance = currentBalance - amount;
     return this.walletRepository.save(wallet);
+  }
+
+  /**
+   * Withdraws funds from the wallet and registers a DEBIT transaction.
+   *
+   * @param ownerId - Owner user/org UUID.
+   * @param ownerType - USER or ORG.
+   * @param amount - Capital amount to cash out.
+   * @returns Updated Wallet configuration.
+   */
+  async withdrawFunds(
+    ownerId: string,
+    ownerType: OwnerType,
+    amount: number,
+  ): Promise<Wallet> {
+    if (amount <= 0) {
+      throw new BadRequestException('Amount to withdraw must be positive');
+    }
+
+    const wallet = await this.walletRepository.findOne({
+      where: { ownerId, ownerType, walletType: WalletType.CONSUMER },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    const currentBalance =
+      typeof wallet.balance === 'string'
+        ? parseFloat(wallet.balance)
+        : wallet.balance;
+    if (currentBalance < amount) {
+      throw new BadRequestException('Insufficient wallet balance');
+    }
+
+    wallet.balance = currentBalance - amount;
+    const savedWallet = await this.walletRepository.save(wallet);
+
+    const transaction = this.transactionRepository.create({
+      walletId: wallet.id,
+      type: TransactionType.DEBIT,
+      amount,
+      reference: 'User cash-out withdrawal',
+      status: TransactionStatus.COMPLETED,
+    });
+    await this.transactionRepository.save(transaction);
+
+    return savedWallet;
   }
 }

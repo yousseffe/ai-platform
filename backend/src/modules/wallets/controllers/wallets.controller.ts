@@ -144,17 +144,27 @@ export class WalletsController {
 
     let event;
     try {
-      event = this.stripeService.constructEvent(req.rawBody as Buffer, signature);
+      event = this.stripeService.constructEvent(
+        req.rawBody as Buffer,
+        signature,
+      );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new BadRequestException(`Webhook signature validation failed: ${message}`);
+      throw new BadRequestException(
+        `Webhook signature validation failed: ${message}`,
+      );
     }
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Record<string, any>;
       const metadata = session.metadata;
 
-      if (metadata && metadata.workspaceId && metadata.workspaceType && metadata.amount) {
+      if (
+        metadata &&
+        metadata.workspaceId &&
+        metadata.workspaceType &&
+        metadata.amount
+      ) {
         const depositAmount = parseFloat(metadata.amount);
 
         await this.walletsService.addFunds(
@@ -171,5 +181,34 @@ export class WalletsController {
     }
 
     return { received: true };
+  }
+
+  /**
+   * Withdraws funds from the active workspace's wallet.
+   *
+   * @param req - Request envelope carrying resolved workspace details.
+   * @param body - Post parameters containing the amount to withdraw.
+   * @returns The updated wallet balance config.
+   */
+  @Post('withdraw')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(WorkspaceInterceptor)
+  async withdraw(
+    @Req()
+    req: Record<string, unknown> & {
+      workspaceId: string;
+      workspaceType: OwnerType;
+    },
+    @Body() body: { amount: number },
+  ) {
+    if (!body.amount || body.amount <= 0) {
+      throw new BadRequestException('Amount to withdraw must be positive');
+    }
+
+    return this.walletsService.withdrawFunds(
+      req.workspaceId,
+      req.workspaceType,
+      body.amount,
+    );
   }
 }

@@ -25,9 +25,8 @@ interface CustomRequest extends Request {
  *
  * @param roles - Array of permitted workspace roles (e.g. OWNER, MAINTAINER).
  */
-export const RequireOrgRole = (
-  ...roles: OrgRole[]
-) => SetMetadata(REQUIRE_ORG_ROLE_KEY, roles);
+export const RequireOrgRole = (...roles: OrgRole[]) =>
+  SetMetadata(REQUIRE_ORG_ROLE_KEY, roles);
 
 /**
  * Guard that verifies if the user has the required organization role inside the active organization.
@@ -58,8 +57,13 @@ export class OrgRoleGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<CustomRequest>();
     const user = request.user;
-    const workspaceId = request.workspaceId;
     const workspaceType = request.workspaceType;
+    let workspaceId = request.workspaceId;
+
+    if (!workspaceId && request.params) {
+      const val = request.params.orgId || request.params.slug;
+      workspaceId = Array.isArray(val) ? val[0] : val;
+    }
 
     if (!user || !workspaceId) {
       return false;

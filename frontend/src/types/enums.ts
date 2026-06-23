@@ -68,3 +68,40 @@ export enum PredictionStatus {
   SUCCESS = 'SUCCESS',
   FAILED = 'FAILED',
 }
+
+/**
+ * Enumeration representing the core type classification of an ML model.
+ */
+export enum ModelType {
+  TABULAR = 'TABULAR',
+  NLP = 'NLP',
+  VISION = 'VISION',
+  LLM_GGUF = 'LLM_GGUF',
+}
+
+/**
+ * Enumeration representing the ML framework used by a model.
+ */
+export enum Framework {
+  SKLEARN = 'SKLEARN',
+  PYTORCH = 'PYTORCH',
+  TENSORFLOW = 'TENSORFLOW',
+  ONNX = 'ONNX',
+  LLAMA_CPP = 'LLAMA_CPP',
+  VLLM = 'VLLM',
+  CUSTOM = 'CUSTOM',
+}
+
+/**
+ * Enumeration representing the task category of an ML model.
+ */
+export enum TaskType {
+  CLASSIFICATION = 'CLASSIFICATION',
+  REGRESSION = 'REGRESSION',
+  GENERATION = 'GENERATION',
+  OBJECT_DETECTION = 'OBJECT_DETECTION',
+  SEGMENTATION = 'SEGMENTATION',
+  EMBEDDING = 'EMBEDDING',
+  CHAT = 'CHAT',
+  OTHER = 'OTHER',
+}

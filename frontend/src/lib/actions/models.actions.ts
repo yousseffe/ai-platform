@@ -1,7 +1,8 @@
 "use server";
 
 import * as modelsService from "@/lib/services/models.service";
-import { Model, ModelVersion } from "@/types";
+import * as searchService from "@/lib/services/search.service";
+import { Model, ModelVersion, ModelLog, SearchResult, SearchParams } from "@/types";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -36,20 +37,23 @@ export async function getModel(id: string): Promise<Model | null> {
 }
 
 /**
- * Registers a new ML model container with name and metadata.
+ * Registers a new ML model container with name, metadata, and visibility.
  * Automatically triggers validation path cache updates for Next.js routing.
  *
  * @param name - The name of the machine learning model.
  * @param description - A summary of the model's domain and deployment purpose.
+ * @param isPublic - Visibility flag indicating whether this model is public in the marketplace.
  * @returns A promise resolving to a discriminated union containing either the newly created Model details or the error.
  */
 export async function createModel(
   name: string,
-  description: string
+  description: string,
+  isPublic: boolean = false
 ): Promise<{ success: true; data: Model } | { success: false; error: string }> {
   try {
-    const res = await modelsService.createModel(name, description);
+    const res = await modelsService.createModel(name, description, isPublic);
     revalidatePath("/models");
+    revalidatePath("/marketplace");
     revalidatePath("/");
     return { success: true, data: res };
   } catch (error) {
@@ -57,6 +61,37 @@ export async function createModel(
     return { success: false, error: errorMessage };
   }
 }
+
+/**
+ * Retrieves all public ML models for the marketplace catalog.
+ *
+ * @returns A promise resolving to an array of public Model instances.
+ */
+export async function getPublicModels(): Promise<Model[]> {
+  try {
+    return await modelsService.getPublicModels();
+  } catch (error) {
+    console.error("getPublicModels error:", error);
+    return [];
+  }
+}
+
+/**
+ * Retrieves a single public ML model by ID — no authentication required.
+ * Returns null if the model does not exist or is not public.
+ *
+ * @param id - The unique database ID of the model.
+ * @returns A promise resolving to the Model or null.
+ */
+export async function getPublicModelById(id: string): Promise<Model | null> {
+  try {
+    return await modelsService.getPublicModelById(id);
+  } catch (error) {
+    console.error(`getPublicModelById error for ${id}:`, error);
+    return null;
+  }
+}
+
 
 /**
  * Uploads a raw model weight artifact/file version for an existing model.
@@ -142,5 +177,47 @@ export async function deleteModelVersion(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Failed to delete version";
     return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Executes a smart full-text search against the OpenSearch-backed model catalog.
+ * Supports fuzzy matching, field boosting, exact enum filters, and faceted aggregations.
+ *
+ * @param params - Search parameters including query text, enum filters, and pagination.
+ * @returns A promise resolving to ranked search results with pagination metadata and facets.
+ */
+export async function searchModels(
+  params: SearchParams
+): Promise<SearchResult | null> {
+  try {
+    return await searchService.searchModels(params);
+  } catch (error) {
+    console.error("searchModels error:", error);
+    return null;
+  }
+}
+
+/**
+ * Server action to retrieve recent prediction logs made by the consumer.
+ */
+export async function getConsumerLogs(): Promise<ModelLog[]> {
+  try {
+    return await modelsService.getConsumerLogs();
+  } catch (error) {
+    console.error("getConsumerLogs error:", error);
+    return [];
+  }
+}
+
+/**
+ * Server action to retrieve recent prediction logs served by the provider's models.
+ */
+export async function getProviderLogs(): Promise<ModelLog[]> {
+  try {
+    return await modelsService.getProviderLogs();
+  } catch (error) {
+    console.error("getProviderLogs error:", error);
+    return [];
   }
 }

@@ -80,7 +80,9 @@ export class MinioService implements OnModuleInit {
         fs.mkdirSync(targetDir, { recursive: true });
       }
       fs.copyFileSync(filePath, targetPath);
-      this.logger.log(`[Fallback] Stored ${objectName} locally at ${targetPath}`);
+      this.logger.log(
+        `[Fallback] Stored ${objectName} locally at ${targetPath}`,
+      );
       return objectName;
     }
     await this.minioClient.fPutObject(this.bucketName, objectName, filePath, {
@@ -105,7 +107,9 @@ export class MinioService implements OnModuleInit {
         objectName,
       );
       if (!fs.existsSync(srcPath)) {
-        throw new Error(`[Fallback] File ${objectName} not found at ${srcPath}`);
+        throw new Error(
+          `[Fallback] File ${objectName} not found at ${srcPath}`,
+        );
       }
       const destDir = path.dirname(destPath);
       if (!fs.existsSync(destDir)) {

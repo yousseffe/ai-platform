@@ -42,20 +42,24 @@ export const uploadModelFormSchema = z.object({
     .max(50, "Model name cannot exceed 50 characters")
     .regex(/^[a-zA-Z0-9_-]+$/, "Model name can only contain letters, numbers, hyphens, and underscores"),
   description: z.string().max(500, "Description cannot exceed 500 characters").optional(),
-  
+  isPublic: z.boolean().optional(),
+
   // Artifacts & Files configuration
+  // Using z.any() + a custom refine that only errors when value is explicitly not a File.
+  // This avoids the SSR window-check issue and allows null as the initial default value,
+  // while still blocking submission when no file has been selected.
   modelFile: z
     .any()
     .refine(
-      (val) => typeof window === "undefined" || val instanceof File,
-      { message: "Model bundle file (model.pkl) is required" }
+      (val) => val instanceof File,
+      { message: "Model bundle file (.pkl / .onnx / .h5) is required" }
     ),
   scalerFile: z.any().nullable().optional(),
-  
+
   preprocessMode: z.enum(["file", "code"]),
   preprocessFile: z.any().nullable().optional(),
   preprocessCode: z.string().optional(),
-  
+
   postprocessMode: z.enum(["file", "code"]),
   postprocessFile: z.any().nullable().optional(),
 
@@ -94,4 +98,5 @@ export const uploadModelFormSchema = z.object({
 });
 
 export type UploadModelFormInput = z.infer<typeof uploadModelFormSchema>;
+
 

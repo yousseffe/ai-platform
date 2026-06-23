@@ -16,6 +16,7 @@ import {
   Plus,
   TrendingUp,
   Coins,
+  Shield,
 } from "lucide-react";
 import { useWorkspace, Workspace } from "@/hooks/use-workspace";
 import { OwnerType, WalletType } from "@/types";
@@ -28,11 +29,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 /**
  * Platform navigation Sidebar component.
  * Integrates Shadcn Dropdown switcher for workspaces, dual role layout toggles,
- * and active status details.
+ * active status details, and OTP verification challenge overlays.
  *
  * @returns The React component rendering the sidebar.
  */
@@ -44,9 +55,18 @@ export default function Sidebar() {
     viewMode,
     balance,
     isProviderModeEnabled,
-    setActiveWorkspace,
+    triggerWorkspaceSwitch,
+    confirmWorkspaceSwitch,
+    isOtpModalOpen,
+    setOtpModalOpen,
+    switchingWorkspace,
     setViewMode,
+    isAdmin,
   } = useWorkspace();
+
+  const [otpCode, setOtpCode] = React.useState("");
+  const [otpError, setOtpError] = React.useState("");
+  const [verifyingOtp, setVerifyingOtp] = React.useState(false);
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: "/login" });
@@ -70,11 +90,29 @@ export default function Sidebar() {
     return name.replace(/\(Personal\)/gi, "").trim().substring(0, 2).toUpperCase();
   };
 
+  const handleOtpVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpError("");
+    setVerifyingOtp(true);
+    try {
+      const res = await confirmWorkspaceSwitch(otpCode);
+      if (res.success) {
+        setOtpCode("");
+      } else {
+        setOtpError(res.error || "Verification failed");
+      }
+    } catch {
+      setOtpError("An unexpected error occurred");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
   return (
     <div className="w-64 bg-card border-r border-border flex flex-col h-screen shrink-0 relative z-30">
       {/* Logo Area */}
       <div className="h-16 flex items-center px-6 border-b border-border">
-        <Link href="/" className="flex items-center gap-2.5 text-primary font-bold text-lg tracking-tight">
+        <Link href="/dashboard" className="flex items-center gap-2.5 text-primary font-bold text-lg tracking-tight">
           <div className="w-9 h-9 relative flex items-center justify-center shrink-0">
             <Image
               src="/logo.png"
@@ -118,7 +156,7 @@ export default function Sidebar() {
               {workspaces.map((ws: Workspace) => (
                 <DropdownMenuItem
                   key={ws.id}
-                  onClick={() => setActiveWorkspace(ws)}
+                  onClick={() => triggerWorkspaceSwitch(ws)}
                   className={`w-full flex items-center gap-2.5 p-2 rounded-lg text-left text-xs transition-colors hover:bg-accent cursor-pointer ${
                     activeWorkspace?.id === ws.id ? "bg-primary/10 font-semibold" : ""
                   }`}
@@ -179,10 +217,17 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <div className="flex-1 py-4 px-3 flex flex-col gap-1">
-        <Link href="/" className={linkClass("/")}>
+        <Link href="/dashboard" className={linkClass("/dashboard")}>
           <LayoutGrid className="w-5 h-5" />
           Dashboard
         </Link>
+
+        {isAdmin && (
+          <Link href="/admin" className={linkClass("/admin")}>
+            <Shield className="w-5 h-5" />
+            Admin Console
+          </Link>
+        )}
 
         {viewMode === WalletType.PROVIDER && (
           <Link href="/models" className={linkClass("/models")}>
@@ -236,6 +281,64 @@ export default function Sidebar() {
           Logout
         </button>
       </div>
+
+      {/* Workspace Switch OTP Verification Modal */}
+      <Dialog open={isOtpModalOpen} onOpenChange={(open) => {
+        setOtpModalOpen(open);
+        if (!open) {
+          setOtpCode("");
+          setOtpError("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-[360px] bg-card border border-border text-foreground font-mono text-xs">
+          <DialogHeader className="space-y-1.5">
+            <DialogTitle className="text-sm font-bold text-foreground">Workspace Access Verification</DialogTitle>
+            <DialogDescription className="text-[10px] text-muted-foreground">
+              A 6-digit OTP code has been sent to confirm access to workspace <strong className="text-foreground">{switchingWorkspace?.name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleOtpVerify} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <label htmlFor="access-otp" className="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Verification Code
+              </label>
+              <Input
+                id="access-otp"
+                type="text"
+                placeholder="000000"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                className="h-9 text-center tracking-widest text-sm font-bold bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus-visible:ring-4 focus-visible:ring-primary/15 focus-visible:border-primary"
+                disabled={verifyingOtp}
+              />
+              {otpError && (
+                <p className="text-[10px] text-red-600 dark:text-red-400 mt-1 font-semibold">{otpError}</p>
+              )}
+            </div>
+
+            <DialogFooter className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOtpModalOpen(false)}
+                className="py-1.5 h-8 text-[10px] flex-1 cursor-pointer"
+                disabled={verifyingOtp}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 h-8 text-[10px] flex-1 cursor-pointer font-bold"
+                disabled={verifyingOtp || otpCode.length < 6}
+              >
+                {verifyingOtp ? "Verifying..." : "Confirm Access"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

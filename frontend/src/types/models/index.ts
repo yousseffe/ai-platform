@@ -34,6 +34,10 @@ export interface Model {
   description?: string;
   user?: User;
   versions?: ModelVersion[];
+  tier?: string;
+  costPerRequest?: number;
+  providerSharePercent?: number;
+  isPublic?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,3 +54,64 @@ export interface HistoryItem {
   memory?: string;
 }
 
+/**
+ * A single model document returned from the OpenSearch search index.
+ */
+export interface SearchModelHit {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  taskType: string;
+  framework: string;
+  isPublic: boolean;
+  publisherEmail: string;
+  versionCount: number;
+  hasLiveDeployment: boolean;
+  createdAt: string;
+}
+
+/**
+ * A single aggregation bucket returned by OpenSearch faceted search.
+ */
+export interface FacetBucket {
+  key: string;
+  doc_count: number;
+}
+
+/**
+ * The full response shape returned by the backend search endpoint.
+ */
+export interface SearchResult {
+  hits: SearchModelHit[];
+  total: number;
+  page: number;
+  limit: number;
+  facets: {
+    types: FacetBucket[];
+    frameworks: FacetBucket[];
+    taskTypes: FacetBucket[];
+  };
+}
+
+/**
+ * Parameters accepted by the search service and action.
+ */
+export interface SearchParams {
+  q?: string;
+  type?: string;
+  framework?: string;
+  taskType?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ModelLog {
+  id: string;
+  model: Model;
+  apiKey: string | null;
+  responseTimeMs: number;
+  status: string;
+  statusCode: number;
+  createdAt: string;
+}

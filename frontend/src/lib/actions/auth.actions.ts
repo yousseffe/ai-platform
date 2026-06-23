@@ -6,17 +6,17 @@ import * as authService from "@/lib/services/auth.service";
  * Registers a new user account with the backend service.
  *
  * @param email - The email address for the new user account.
- * @param username - The unique username.
+ * @param full_name - The unique full name.
  * @param password - The raw registration password.
  * @returns A promise resolving to a discriminated union indicating success or a detailed failure message.
  */
 export async function registerUser(
   email: string,
-  username: string,
+  full_name: string,
   password: string
 ): Promise<{ success: true; data: unknown } | { success: false; error: string }> {
   try {
-    const data = await authService.registerUser(email, username, password);
+    const data = await authService.registerUser(email, full_name, password);
     return { success: true, data };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Registration failed";

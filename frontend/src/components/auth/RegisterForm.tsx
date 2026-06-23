@@ -58,25 +58,25 @@ export default function RegisterForm({ onSubmit, loading }: RegisterFormProps) {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="reg-username" className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-          Username
+        <Label htmlFor="reg-full-name" className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+          Full Name
         </Label>
         <div className="relative">
           <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 select-none" />
           <Input
-            id="reg-username"
+            id="reg-full-name"
             type="text"
             className={`pl-10 h-10 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-foreground placeholder-slate-400 dark:placeholder-slate-500 focus-visible:bg-white dark:focus-visible:bg-slate-950/80 focus-visible:ring-4 focus-visible:ring-primary/15 focus-visible:border-primary ${
-              errors.username ? "border-red-500 focus-visible:ring-red-100" : ""
+              errors.full_name ? "border-red-500 focus-visible:ring-red-100" : ""
             }`}
             style={{ paddingLeft: "2.5rem" }}
-            placeholder="john_doe"
-            {...register("username")}
+            placeholder="Ahmed Amr"
+            {...register("full_name")}
             disabled={loading}
           />
         </div>
-        {errors.username && (
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-semibold">{errors.username.message}</p>
+        {errors.full_name && (
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-semibold">{errors.full_name.message}</p>
         )}
       </div>
 

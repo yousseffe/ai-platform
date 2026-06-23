@@ -16,6 +16,7 @@ import { ModelsRepository } from '../repositories/models.repository';
 import { ModelVersionsRepository } from '../repositories/model-versions.repository';
 import { MinioService } from '../../../shared/minio/minio.service';
 import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
+import { ModelsSearchService } from './models-search.service';
 
 /**
  * Service managing model registration, listing, version uploads, MinIO storage sync,
@@ -28,6 +29,7 @@ export class ModelsService {
     private readonly modelVersionsRepository: ModelVersionsRepository,
     @InjectQueue('build-queue') private readonly buildQueue: Queue,
     private readonly minioService: MinioService,
+    private readonly modelsSearchService: ModelsSearchService,
   ) {}
 
   /**
@@ -48,6 +50,7 @@ export class ModelsService {
     taskType: TaskType,
     framework: Framework,
     userId: string,
+    isPublic: boolean = false,
   ): Promise<Model> {
     const model = this.modelsRepository.create({
       name,
@@ -56,8 +59,20 @@ export class ModelsService {
       taskType,
       framework,
       user: { id: userId },
+      isPublic,
     });
-    return this.modelsRepository.save(model);
+    const saved = await this.modelsRepository.save(model);
+
+    // Index in OpenSearch — load with relations so the document is complete
+    const fullModel = await this.modelsRepository.findOne({
+      where: { id: saved.id },
+      relations: ['versions', 'versions.deployments', 'user'],
+    });
+    if (fullModel) {
+      await this.modelsSearchService.indexModel(fullModel);
+    }
+
+    return saved;
   }
 
   /**
@@ -70,6 +85,19 @@ export class ModelsService {
     return this.modelsRepository.find({
       where: { user: { id: userId } },
       relations: ['versions', 'versions.deployments'],
+    });
+  }
+
+  /**
+   * Retrieves all public models in the registry for the marketplace.
+   * Includes their owner user and version history details.
+   *
+   * @returns A promise resolving to an array of public Model entities.
+   */
+  async getPublicModels(): Promise<Model[]> {
+    return this.modelsRepository.find({
+      where: { isPublic: true },
+      relations: ['versions', 'versions.deployments', 'user'],
     });
   }
 
@@ -306,6 +334,9 @@ export class ModelsService {
     for (const version of model.versions) {
       await this.deleteVersion(version.id);
     }
+
+    // Remove from OpenSearch before deleting DB record
+    await this.modelsSearchService.deleteFromIndex(modelId);
 
     // Delete model
     await this.modelsRepository.remove(model);

@@ -137,4 +137,27 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     this.fallbackCache.delete(key);
   }
+
+  /**
+   * Retrieves the remaining time to live of a cache key.
+   *
+   * @param key - Target storage key.
+   * @returns Remaining TTL in seconds, or negative values on cache misses.
+   */
+  async ttl(key: string): Promise<number> {
+    if (!this.isFallbackMode && this.client) {
+      try {
+        return await this.client.ttl(key);
+      } catch (err) {
+        console.warn('Redis ttl failed, switching to memory fallback:', err);
+        this.isFallbackMode = true;
+      }
+    }
+
+    const cached = this.fallbackCache.get(key);
+    if (!cached) return -2;
+
+    const remaining = Math.round((cached.expiresAt - Date.now()) / 1000);
+    return remaining > 0 ? remaining : -2;
+  }
 }

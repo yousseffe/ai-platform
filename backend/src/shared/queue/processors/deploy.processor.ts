@@ -1,10 +1,11 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Deployment } from '../../../modules/deployments/entities/deployment.entity';
 import { DeploymentStatus } from '../../../modules/deployments/enums/deployment-status.enum';
 import { ModelType } from '../../../modules/models/enums/model-type.enum';
+import { ApiKey } from '../../../modules/auth/entities/api-key.entity';
 import * as Docker from 'dockerode';
 import { Logger } from '@nestjs/common';
 import { DeployJobPayload } from '../interfaces/queue.interface';
@@ -21,6 +22,7 @@ export class DeployProcessor extends WorkerHost {
   constructor(
     @InjectRepository(Deployment)
     private readonly deploymentsRepository: Repository<Deployment>,
+    private readonly dataSource: DataSource,
   ) {
     super();
     this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
@@ -89,12 +91,25 @@ export class DeployProcessor extends WorkerHost {
       const containerPort = isLlm ? '8080/tcp' : '8000/tcp';
       const urlPort = isLlm ? 8080 : 8000;
 
+      const ownerId = deployment.modelVersion.model.user?.id;
+      let ownerApiKey = '';
+      if (ownerId) {
+        const apiKeyEntity = await this.dataSource.getRepository(ApiKey).findOne({
+          where: { user: { id: ownerId }, isActive: true },
+        });
+        ownerApiKey = apiKeyEntity?.key || '';
+      }
+
       const container = await this.docker.createContainer({
         name: containerName,
         Image: imageName,
         ExposedPorts: {
           [containerPort]: {},
         },
+        Env: [
+          `MODEL_PATH=/app/model.pkl`,
+          `API_KEY=${ownerApiKey}`,
+        ],
         HostConfig: {
           PortBindings: {
             [containerPort]: [{ HostPort: nextPort.toString() }],

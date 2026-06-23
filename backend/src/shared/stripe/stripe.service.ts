@@ -20,7 +20,9 @@ export class StripeService {
 
     const secretKey = process.env.STRIPE_SECRET_KEY;
     if (!secretKey) {
-      throw new Error('STRIPE_SECRET_KEY is not defined in environment variables');
+      throw new Error(
+        'STRIPE_SECRET_KEY is not defined in environment variables',
+      );
     }
 
     this.stripe = new Stripe(secretKey, {
@@ -87,7 +89,11 @@ export class StripeService {
   constructEvent(rawBody: Buffer, signature: string): Record<string, unknown> {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
     const stripeInstance = this.getStripe();
-    const event = stripeInstance.webhooks.constructEvent(rawBody, signature, webhookSecret);
+    const event = stripeInstance.webhooks.constructEvent(
+      rawBody,
+      signature,
+      webhookSecret,
+    );
     return event as unknown as Record<string, unknown>;
   }
 }

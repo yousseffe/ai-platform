@@ -1,8 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Wallet } from './entities/wallet.entity';
+import { Transaction } from './entities/transaction.entity';
+import { ProcessedWebhook } from './entities/processed-webhook.entity';
+import { SystemConfig } from './entities/system-config.entity';
 import { WalletsService } from './services/wallets.service';
 import { WalletsController } from './controllers/wallets.controller';
+import { PaymentsController } from './controllers/payments.controller';
+import { WalletController } from './controllers/wallet.controller';
 import { StripeModule } from '../../shared/stripe/stripe.module';
 
 /**
@@ -10,11 +15,16 @@ import { StripeModule } from '../../shared/stripe/stripe.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Wallet]),
+    TypeOrmModule.forFeature([
+      Wallet,
+      Transaction,
+      ProcessedWebhook,
+      SystemConfig,
+    ]),
     StripeModule,
   ],
   providers: [WalletsService],
-  controllers: [WalletsController],
-  exports: [WalletsService],
+  controllers: [WalletsController, PaymentsController, WalletController],
+  exports: [WalletsService, TypeOrmModule],
 })
 export class WalletsModule {}

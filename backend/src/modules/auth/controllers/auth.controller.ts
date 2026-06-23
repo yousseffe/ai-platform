@@ -1,39 +1,69 @@
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Req,
+  BadRequestException,
+} from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 import { AuthDto } from '../dto/auth.dto';
 import { RegisterDto } from '../dto/register.dto';
 import { VerifyDto } from '../dto/verify.dto';
 import { RefreshDto } from '../dto/refresh.dto';
+import { ResendVerificationDto } from '../dto/resend-verification.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 /**
  * Controller handling authentication-related HTTP endpoints.
- * Handles user registration, email validation, login, token refresh, and profile retrieval.
+ * Exposes endpoints for user registration, verification, login, token refresh, resending OTP, and logout.
  */
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   /**
-   * Registers a new user account on the platform and issues a mock email OTP code.
+   * Registers a new user account on the platform.
    *
-   * @param body - Registration credentials (email, username, password).
-   * @returns Successful registration notification message.
+   * @param body - Registration credentials (email, full_name, password).
+   * @returns Successful registration notification payload.
    */
   @Post('register')
   async register(@Body() body: RegisterDto) {
-    return this.authService.register(body.email, body.username, body.password);
+    return this.authService.register(body.email, body.full_name, body.password);
   }
 
   /**
    * Verifies registration code to activate user account.
+   * Accepts both user_id/code and email/otp formats.
    *
-   * @param body - Verification payload containing email and code.
+   * @param body - Verification payload containing identifiers and the 6-digit code.
    * @returns Verification confirmation indicator.
    */
   @Post('verify')
   async verify(@Body() body: VerifyDto) {
-    return this.authService.verifyOtp(body.email, body.otp);
+    const emailOrUserId = body.user_id || body.email;
+    const codeOrOtp = body.code || body.otp;
+
+    if (!emailOrUserId || !codeOrOtp) {
+      throw new BadRequestException(
+        'Identify user (user_id/email) and verification (code/otp)',
+      );
+    }
+
+    return this.authService.verifyOtp(emailOrUserId, codeOrOtp);
+  }
+
+  /**
+   * Resends a verification OTP code, rate limited to 3 resends per hour.
+   *
+   * @param body - Payload containing email to verify.
+   * @returns Confirmed resend notification.
+   */
+  @Post('resend-verification')
+  async resend(@Body() body: ResendVerificationDto) {
+    return this.authService.resendVerification(body.email);
   }
 
   /**
@@ -44,12 +74,7 @@ export class AuthController {
    */
   @Post('login')
   async login(@Body() body: AuthDto) {
-    // validateUser will verify email, password, AND if status is ACTIVE
     const user = await this.authService.validateUser(body.email, body.password);
-    if (!user) {
-      // Handled inside AuthService throwing Exception
-      return null;
-    }
     return this.authService.login(user);
   }
 
@@ -60,8 +85,20 @@ export class AuthController {
    * @returns Refreshed token payload.
    */
   @Post('refresh')
-  refresh(@Body() body: RefreshDto) {
+  async refresh(@Body() body: RefreshDto) {
     return this.authService.refreshToken(body.refresh_token);
+  }
+
+  /**
+   * Revokes user session, invalidating access token's JTI.
+   *
+   * @param req - Authenticated request containing user JWT details.
+   * @returns Confirmation status.
+   */
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  async logout(@Req() req: Record<string, unknown> & { user: { id: string } }) {
+    return this.authService.logout(req.user.id);
   }
 
   /**

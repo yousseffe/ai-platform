@@ -1,51 +1,33 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-} from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn } from 'typeorm';
 
 import { OrgRole } from '../../../shared/enums/org-role.enum';
-import { OrgMemberStatus } from '../../../shared/enums/org-member-status.enum';
 
 /**
- * Entity mapping users to organizations with membership roles and status tracking.
+ * Entity mapping users to organizations with membership roles and joined date tracking.
  */
 @Entity('org_members')
 export class OrgMember {
   /**
-   * Unique UUID identifier.
+   * UUID of the parent organization. Composite Primary Key.
    */
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  /**
-   * UUID of the parent organization.
-   */
-  @Column()
+  @PrimaryColumn({ name: 'org_id', type: 'uuid' })
   orgId: string;
 
   /**
-   * UUID of the member user.
+   * UUID of the member user. Composite Primary Key.
    */
-  @Column()
+  @PrimaryColumn({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   /**
-   * Workspace access capability level.
+   * Workspace access capability level (OWNER, MAINTAINER, CONTRIBUTOR, VIEWER).
    */
   @Column({ type: 'varchar', enum: OrgRole })
   role: OrgRole;
 
   /**
-   * Acceptance status of the membership.
+   * Membership creation / joining timestamp.
    */
-  @Column({ type: 'varchar', enum: OrgMemberStatus, default: OrgMemberStatus.PENDING })
-  status: OrgMemberStatus;
-
-  /**
-   * Membership creation timestamp.
-   */
-  @CreateDateColumn()
-  createdAt: Date;
+  @CreateDateColumn({ name: 'joined_at' })
+  joinedAt: Date;
 }

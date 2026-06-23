@@ -49,7 +49,7 @@ export async function smartFetch<T = unknown>(path: string, options: RequestInit
     headers.set("Content-Type", "application/json");
   }
 
-  const url = `${backendUrl}${path.startsWith("/") ? "" : "/"}${path}`;
+  const url = `${backendUrl}/api/v1${path.startsWith("/") ? "" : "/"}${path}`;
 
   const res = await fetch(url, {
     ...options,

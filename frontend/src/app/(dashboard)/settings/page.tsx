@@ -1,5 +1,5 @@
 "use client";
-
+ 
 import React, { useState } from "react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import BecomeProviderCard from "@/components/dashboard/BecomeProviderCard";
 import WalletTopUpCard from "@/components/dashboard/WalletTopUpCard";
+import { useWorkspace } from "@/hooks/use-workspace";
+import { toast } from "react-hot-toast";
 
 /**
  * SettingsPage component for user account configurations,
@@ -21,7 +23,7 @@ import WalletTopUpCard from "@/components/dashboard/WalletTopUpCard";
  */
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const [apiKey, setApiKey] = useState("sk_live_51Ny93KLo8zPxqE6m9A4b8d7c1e3f5g...");
+  const { apiKey, rotateApiKey } = useWorkspace();
   const [copied, setCopied] = useState(false);
   const [rotating, setRotating] = useState(false);
 
@@ -29,23 +31,24 @@ export default function SettingsPage() {
     try {
       await navigator.clipboard.writeText(apiKey);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2500);
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handleRotateKey = () => {
+  const handleRotateKey = async () => {
+    if (!confirm("Are you sure you want to rotate your API key? Previous key will be revoked immediately.")) {
+      return;
+    }
     setRotating(true);
-    setTimeout(() => {
-      const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-      let key = "sk_live_";
-      for (let i = 0; i < 32; i++) {
-        key += chars[Math.floor(Math.random() * chars.length)];
-      }
-      setApiKey(key + "...");
-      setRotating(false);
-    }, 800);
+    const res = await rotateApiKey();
+    if (res.success) {
+      toast.success("API key rotated successfully!");
+    } else {
+      toast.error(res.error || "Failed to rotate API Key");
+    }
+    setRotating(false);
   };
 
   const userEmail = session?.user?.email || "user@mlhub.ai";

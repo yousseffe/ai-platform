@@ -23,38 +23,50 @@ export class Wallet {
   id: string;
 
   /**
-   * The purpose of the wallet (spending credits vs earning revenue).
+   * The purpose of the wallet (spending credits vs earning revenue), corresponding to the owner role.
    */
-  @Column({ type: 'varchar', enum: WalletType })
+  @Column({ name: 'wallet_type', type: 'varchar', enum: WalletType })
   walletType: WalletType;
 
   /**
    * Indicates if the wallet belongs to an individual user or organization workspace.
    */
-  @Column({ type: 'varchar', enum: OwnerType })
+  @Column({ name: 'owner_type', type: 'varchar', enum: OwnerType })
   ownerType: OwnerType;
 
   /**
    * UUID of the owner (user or organization).
    */
-  @Column()
+  @Column({ name: 'owner_id', type: 'uuid' })
   ownerId: string;
 
   /**
    * Current wallet balance ledger credit/revenue count.
    */
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0.0 })
+  @Column({
+    name: 'balance',
+    type: 'decimal',
+    precision: 18,
+    scale: 2,
+    default: 0.0,
+  })
   balance: number;
+
+  /**
+   * The ledger currency type.
+   */
+  @Column({ name: 'currency', default: 'CREDITS' })
+  currency: string;
 
   /**
    * Creation timestamp.
    */
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   /**
    * Modification timestamp.
    */
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

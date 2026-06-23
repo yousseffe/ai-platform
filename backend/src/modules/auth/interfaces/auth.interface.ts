@@ -10,6 +10,26 @@ export interface JwtPayload {
    * Token subject representing the user UUID.
    */
   sub: string;
+  /**
+   * Unique JWT ID.
+   */
+  jti: string;
+  /**
+   * Issued at Unix timestamp.
+   */
+  iat?: number;
+  /**
+   * Expiration Unix timestamp.
+   */
+  exp?: number;
+  /**
+   * Platform RBAC roles list.
+   */
+  roles?: string[];
+  /**
+   * User status at time of login.
+   */
+  status?: string;
 }
 
 /**

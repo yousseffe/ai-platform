@@ -12,11 +12,17 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export const registerSchema = z
   .object({
     email: z.string().min(1, "Email is required").email("Invalid email address"),
-    username: z
+    full_name: z
       .string()
-      .min(3, "Username must be at least 3 characters")
-      .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain alphanumeric characters and underscores"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+      .min(2, "Full name must be at least 2 characters")
+      .max(100, "Full name must be at most 100 characters"),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+        "Password must contain at least one uppercase letter, one number, and one special character"
+      ),
     confirmPassword: z.string().min(1, "Confirm password is required"),
   })
   .refine((data) => data.password === data.confirmPassword, {

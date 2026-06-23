@@ -80,6 +80,36 @@ export class Model {
   versions: ModelVersion[];
 
   /**
+   * Model complexity tier size classification (e.g. SMALL, MEDIUM, LARGE) selected by provider.
+   */
+  @Column({ type: 'varchar', default: 'SMALL' })
+  tier: string;
+
+  /**
+   * The cost in credits charged to the consumer for each prediction request.
+   */
+  @Column({
+    name: 'cost_per_request',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0.0,
+  })
+  costPerRequest: number;
+
+  /**
+   * The percentage of the cost per request that is credited to the provider's wallet.
+   */
+  @Column({ name: 'provider_share_percent', type: 'integer', default: 80 })
+  providerSharePercent: number;
+
+  /**
+   * Visibility flag indicating whether this model is listed in the public marketplace.
+   */
+  @Column({ type: 'boolean', default: false })
+  isPublic: boolean;
+
+  /**
    * Timestamp record indicating when this model template registry was initialized.
    */
   @CreateDateColumn()
