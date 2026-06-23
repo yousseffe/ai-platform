@@ -92,7 +92,7 @@ export default function StepGeneralInfo({ register, errors, isUploading }: StepG
               type="radio"
               value="false"
               className="mt-1.5 shrink-0 accent-primary"
-              {...register("isPublic", { setValueAs: (v) => v === "true" || v === true })}
+              {...register("isPublic")}
               defaultChecked
               disabled={isUploading}
             />
@@ -114,7 +114,7 @@ export default function StepGeneralInfo({ register, errors, isUploading }: StepG
               type="radio"
               value="true"
               className="mt-1.5 shrink-0 accent-primary"
-              {...register("isPublic", { setValueAs: (v) => v === "true" || v === true })}
+              {...register("isPublic")}
               disabled={isUploading}
             />
             <div className="flex gap-3">

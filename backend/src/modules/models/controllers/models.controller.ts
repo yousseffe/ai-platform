@@ -12,6 +12,8 @@ import {
   Res,
   Req,
   BadRequestException,
+  NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ModelsService } from '../services/models.service';
@@ -45,6 +47,9 @@ import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { TransactionType } from '../../wallets/enums/transaction-type.enum';
 import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
+import { Deployment } from '../../deployments/entities/deployment.entity';
+import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
+import { VersionStatus } from '../enums/version-status.enum';
 
 /**
  * Interface representing a NestJS request authenticated with a JWT payload.
@@ -62,6 +67,8 @@ interface RequestWithUser {
  */
 @Controller('models')
 export class ModelsController {
+  private readonly logger = new Logger(ModelsController.name);
+
   constructor(
     private readonly modelsService: ModelsService,
     private readonly deploymentsService: DeploymentsService,
@@ -262,7 +269,50 @@ export class ModelsController {
     });
     const containerApiKey = modelOwnerApiKeyEntity?.key || '';
 
-    const url = await this.deploymentsService.getActiveDeploymentUrl(id);
+    let url: string;
+    try {
+      url = await this.deploymentsService.getActiveDeploymentUrl(id);
+    } catch (err: unknown) {
+      if (err instanceof NotFoundException) {
+        this.logger.log(`No active deployment found for model ${id}. Attempting auto-deployment...`);
+        // Find latest version
+        const latestVersion = model.versions && model.versions.length
+          ? [...model.versions].sort((a, b) => b.versionNumber - a.versionNumber)[0]
+          : null;
+
+        if (!latestVersion) {
+          throw new NotFoundException('No versions available for this model to deploy.');
+        }
+
+        if (latestVersion.status !== VersionStatus.READY) {
+          throw new BadRequestException(
+            `Latest version v${latestVersion.versionNumber} is not ready (status: ${latestVersion.status}). Cannot deploy automatically.`,
+          );
+        }
+
+        // Check if there is already a STARTING deployment
+        let deployment = await this.dataSource.getRepository(Deployment).findOne({
+          where: {
+            modelVersion: { id: latestVersion.id },
+            status: DeploymentStatus.STARTING,
+          },
+          order: { createdAt: 'DESC' },
+        });
+
+        if (!deployment) {
+          this.logger.log(`Triggering new auto-deployment for version ${latestVersion.id}...`);
+          deployment = await this.deploymentsService.deployVersion(latestVersion.id);
+        } else {
+          this.logger.log(`Found already starting deployment ${deployment.id}. Waiting for it...`);
+        }
+
+        // Wait for it to become RUNNING
+        url = await this.waitForDeployment(deployment.id);
+      } else {
+        throw err;
+      }
+    }
+
     const targetEndpoint =
       model.type === ModelType.LLM_GGUF ? '/v1/chat/completions' : '/predict';
 
@@ -452,5 +502,29 @@ export class ModelsController {
   ): Promise<{ success: boolean; message: string }> {
     await this.modelsService.deleteVersion(versionId);
     return { success: true, message: 'Model version deleted successfully' };
+  }
+
+  /**
+   * Helper method that polls deployment state until it becomes RUNNING or FAILED.
+   * Used for on-demand cold starts when a model has no active containers.
+   */
+  private async waitForDeployment(deploymentId: string, timeoutMs = 30000): Promise<string> {
+    const startTime = Date.now();
+    const interval = 500; // check every 500ms
+
+    while (Date.now() - startTime < timeoutMs) {
+      const dep = await this.deploymentsService.getDeployment(deploymentId);
+      if (dep) {
+        if (dep.status === DeploymentStatus.RUNNING && dep.url) {
+          return dep.url;
+        }
+        if (dep.status === DeploymentStatus.FAILED) {
+          throw new BadRequestException(`Auto-deployment failed: ${dep.errorMessage || 'Unknown error'}`);
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+
+    throw new BadRequestException('Auto-deployment timed out. Please try again.');
   }
 }

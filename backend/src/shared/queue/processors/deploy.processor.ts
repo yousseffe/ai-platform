@@ -7,8 +7,10 @@ import { DeploymentStatus } from '../../../modules/deployments/enums/deployment-
 import { ModelType } from '../../../modules/models/enums/model-type.enum';
 import { ApiKey } from '../../../modules/auth/entities/api-key.entity';
 import * as Docker from 'dockerode';
+import * as fs from 'fs';
 import { Logger } from '@nestjs/common';
 import { DeployJobPayload } from '../interfaces/queue.interface';
+import { getDockerOptions } from '../../docker/docker.util';
 
 /**
  * BullMQ processor responsible for scheduling and launching containerized
@@ -25,7 +27,7 @@ export class DeployProcessor extends WorkerHost {
     private readonly dataSource: DataSource,
   ) {
     super();
-    this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
+    this.docker = new Docker(getDockerOptions());
   }
 
   /**
@@ -100,6 +102,14 @@ export class DeployProcessor extends WorkerHost {
         ownerApiKey = apiKeyEntity?.key || '';
       }
 
+      // Ensure the network 'ai-platform_default' exists
+      const networks = await this.docker.listNetworks();
+      const hasNetwork = networks.some((n) => n.Name === 'ai-platform_default');
+      if (!hasNetwork) {
+        this.logger.log('Creating network ai-platform_default...');
+        await this.docker.createNetwork({ Name: 'ai-platform_default' });
+      }
+
       const container = await this.docker.createContainer({
         name: containerName,
         Image: imageName,
@@ -120,9 +130,13 @@ export class DeployProcessor extends WorkerHost {
 
       await container.start();
 
-      // Since both the backend and target container are in the 'ai-platform_default'
-      // docker network, they can directly communicate using container name and target port
-      const url = `http://${containerName}:${urlPort}`;
+      // Since the backend might be running directly on the host (like during dev),
+      // we check if we are running in a docker container to resolve URLs correctly.
+      // If running on host, communicate via hostPort on localhost.
+      const isDocker = fs.existsSync('/.dockerenv');
+      const url = isDocker
+        ? `http://${containerName}:${urlPort}`
+        : `http://127.0.0.1:${nextPort}`;
 
       this.logger.log(
         `Successfully deployed container ${container.id} at ${url} on HostPort ${nextPort}`,

@@ -21,6 +21,7 @@ import { Transaction } from '../../wallets/entities/transaction.entity';
 import { User } from '../entities/user.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
 import * as Docker from 'dockerode';
+import { getDockerOptions } from '../../../shared/docker/docker.util';
 
 /**
  * Controller exposing endpoints for system administration, container resource utilization,
@@ -42,7 +43,7 @@ export class AdminController {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
   ) {
-    this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
+    this.docker = new Docker(getDockerOptions());
   }
 
   /**

@@ -21,14 +21,14 @@ export default function ModelOverview({ model }: ModelOverviewProps) {
     ? [...versions].sort((a, b) => b.versionNumber - a.versionNumber)[0]
     : null;
 
-  const getCurlCode = () => `curl -X POST http://localhost:3000/api/models/${model.id}/predict \\
+  const getCurlCode = () => `curl -X POST http://localhost:3000/api/v1/models/${model.id}/predict \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
   -d '${latestVersion?.examplePayload || '{"features": [1.2, 3.4, 5.6]}'}'`;
 
   const getPythonCode = () => `import requests
 
-url = "http://localhost:3000/api/models/${model.id}/predict"
+url = "http://localhost:3000/api/v1/models/${model.id}/predict"
 headers = {
     "Content-Type": "application/json",
     "Authorization": "Bearer YOUR_JWT_TOKEN"
@@ -38,7 +38,7 @@ payload = ${latestVersion?.examplePayload || '{\n    "features": [1.2, 3.4, 5.6]
 response = requests.post(url, json=payload, headers=headers)
 print(response.json())`;
 
-  const getJsCode = () => `const url = "http://localhost:3000/api/models/${model.id}/predict";
+  const getJsCode = () => `const url = "http://localhost:3000/api/v1/models/${model.id}/predict";
 const payload = ${latestVersion?.examplePayload || '{\n  features: [1.2, 3.4, 5.6]\n}'};
 
 const response = await fetch(url, {

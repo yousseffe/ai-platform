@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import * as Docker from 'dockerode';
+import { getDockerOptions } from '../../../shared/docker/docker.util';
 import { Deployment } from '../entities/deployment.entity';
 import { DeploymentStatus } from '../enums/deployment-status.enum';
 import { DeploymentsRepository } from '../repositories/deployments.repository';
@@ -21,7 +22,7 @@ export class DeploymentsService {
     private readonly modelVersionsRepository: ModelVersionsRepository,
     @InjectQueue('deploy-queue') private readonly deployQueue: Queue,
   ) {
-    this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
+    this.docker = new Docker(getDockerOptions());
   }
 
   /**

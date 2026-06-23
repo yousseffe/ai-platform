@@ -111,7 +111,7 @@ export class ModelsService {
   async getModel(modelId: string): Promise<Model> {
     const model = await this.modelsRepository.findOne({
       where: { id: modelId },
-      relations: ['versions', 'versions.deployments'],
+      relations: ['versions', 'versions.deployments', 'user'],
     });
     if (!model) {
       throw new NotFoundException('Model not found');

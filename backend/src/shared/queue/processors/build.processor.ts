@@ -12,6 +12,7 @@ import * as Docker from 'dockerode';
 import { Logger } from '@nestjs/common';
 import { BuildJobPayload } from '../interfaces/queue.interface';
 import { MinioService } from '../../minio/minio.service';
+import { getDockerOptions } from '../../docker/docker.util';
 
 /**
  * BullMQ processor responsible for packaging uploaded model weights and scripts
@@ -28,7 +29,7 @@ export class BuildProcessor extends WorkerHost {
     private readonly minioService: MinioService,
   ) {
     super();
-    this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
+    this.docker = new Docker(getDockerOptions());
   }
 
   /**

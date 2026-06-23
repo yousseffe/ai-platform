@@ -42,7 +42,10 @@ export const uploadModelFormSchema = z.object({
     .max(50, "Model name cannot exceed 50 characters")
     .regex(/^[a-zA-Z0-9_-]+$/, "Model name can only contain letters, numbers, hyphens, and underscores"),
   description: z.string().max(500, "Description cannot exceed 500 characters").optional(),
-  isPublic: z.boolean().optional(),
+  isPublic: z.any().transform((val) => {
+    if (val === undefined) return undefined;
+    return val === "true" || val === true;
+  }).optional(),
 
   // Artifacts & Files configuration
   // Using z.any() + a custom refine that only errors when value is explicitly not a File.
