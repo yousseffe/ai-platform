@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getSession } from "next-auth/react";
 import { runPrediction } from "@/lib/actions/models.actions";
-import { Model, ModelVersion, HistoryItem, DeploymentStatus, PredictionStatus } from "@/types";
+import { Model, ModelVersion, HistoryItem, DeploymentStatus, PredictionStatus, ModelType } from "@/types";
 
 /**
  * Custom hook to manage real-time prediction state, metrics, query formatting, and execution history.
@@ -10,24 +10,37 @@ import { Model, ModelVersion, HistoryItem, DeploymentStatus, PredictionStatus } 
  * @param model - The active machine learning model entity.
  * @returns State variables, validation statuses, performance metrics, and trigger handlers.
  */
-export function usePrediction(model: Model) {
-  // Find latest version to check for example payload
+export function usePrediction(model: Model, selectedVersionNumber?: number) {
+  // Find active version
   const versions = model.versions || [];
-  const latestVersion = versions.length
-    ? [...versions].sort((a: ModelVersion, b: ModelVersion) => b.versionNumber - a.versionNumber)[0]
+  const activeVersion = selectedVersionNumber
+    ? versions.find((v: ModelVersion) => v.versionNumber === selectedVersionNumber)
+    : (versions.length
+        ? [...versions].sort((a: ModelVersion, b: ModelVersion) => b.versionNumber - a.versionNumber)[0]
+        : null);
+
+  // Retrieve active deployment specifically for activeVersion
+  const activeDeployment = activeVersion
+    ? (activeVersion.deployments || []).find((d) => d.status === DeploymentStatus.RUNNING)
     : null;
 
-  // Retrieve active deployment
-  const activeDeployment = versions
-    .flatMap((v) => v.deployments || [])
-    .find((d) => d.status === DeploymentStatus.RUNNING);
-
-  const fallbackPayload = '{\n  "features": [1.2, 3.4, 5.6]\n}';
-  const initialPayload = latestVersion?.examplePayload || fallbackPayload;
+  const fallbackPayload = model.type === ModelType.DIFFUSION
+    ? '{\n  "prompt": "A cute dog coding in python",\n  "num_inference_steps": 10\n}'
+    : '{\n  "features": [1.2, 3.4, 5.6]\n}';
+  const initialPayload = activeVersion?.examplePayload || fallbackPayload;
 
   const [isRunning, setIsRunning] = useState(false);
   const [payload, setPayload] = useState(initialPayload);
   const [result, setResult] = useState("");
+
+  // Sync payload state if the version's example payload changes
+  useEffect(() => {
+    if (activeVersion?.examplePayload) {
+      setPayload(activeVersion.examplePayload);
+    } else {
+      setPayload(fallbackPayload);
+    }
+  }, [activeVersion?.examplePayload]);
 
   // Derive JSON validation state dynamically from current payload
   const isValidJson = (() => {
@@ -74,7 +87,7 @@ export function usePrediction(model: Model) {
           latency: "14.5ms",
           outcome: "Prediction completed",
           payload: initialPayload,
-          response: latestVersion?.expectedResult || '{\n  "prediction": "Class A",\n  "probability": 0.982\n}',
+          response: activeVersion?.expectedResult || '{\n  "prediction": "Class A",\n  "probability": 0.982\n}',
           confidence: "98.2%",
           memory: "420MB",
         },
@@ -103,8 +116,9 @@ export function usePrediction(model: Model) {
 
       if (isStreaming) {
         const session = await getSession();
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
-        const response = await fetch(`${backendUrl}/models/${model.id}/predict`, {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+        const urlSuffix = selectedVersionNumber ? `/v${selectedVersionNumber}/predict` : `/predict`;
+        const response = await fetch(`${backendUrl}/models/${model.id}${urlSuffix}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -164,7 +178,7 @@ export function usePrediction(model: Model) {
         setHistory(updatedHistory);
         localStorage.setItem(`prediction_history_${model.id}`, JSON.stringify(updatedHistory));
       } else {
-        const res = await runPrediction(model.id, parsedPayload);
+        const res = await runPrediction(model.id, parsedPayload, selectedVersionNumber);
         const endTime = performance.now();
         const latencyMs = (endTime - startTime).toFixed(1);
 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, OnModuleInit } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import * as Docker from 'dockerode';
@@ -13,7 +13,7 @@ import { ModelVersionsRepository } from '../../models/repositories/model-version
  * container instances, and tracking active deployment endpoints.
  */
 @Injectable()
-export class DeploymentsService {
+export class DeploymentsService implements OnModuleInit {
   private readonly docker: Docker;
   private readonly logger = new Logger(DeploymentsService.name);
 
@@ -23,6 +23,23 @@ export class DeploymentsService {
     @InjectQueue('deploy-queue') private readonly deployQueue: Queue,
   ) {
     this.docker = new Docker(getDockerOptions());
+  }
+
+  async onModuleInit() {
+    this.logger.log('Scheduling repeatable check-idle-deployments job...');
+    try {
+      await this.deployQueue.add(
+        'check-idle-deployments',
+        {},
+        {
+          repeat: { pattern: '*/1 * * * *' },
+          jobId: 'check-idle-deployments',
+        },
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Failed to register check-idle-deployments: ${message}`);
+    }
   }
 
   /**
@@ -48,6 +65,37 @@ export class DeploymentsService {
 
     if (deployment.url === null) {
       throw new NotFoundException('Active deployment URL is not set');
+    }
+
+    return deployment.url;
+  }
+
+  /**
+   * Retrieves the endpoint URL of the active running deployment for a given model and version.
+   *
+   * @param modelId - The UUID of the model.
+   * @param versionNumber - The version number to query.
+   * @returns A promise resolving to the deployment endpoint URL.
+   * @throws {NotFoundException} If no active running deployment is found.
+   */
+  async getActiveDeploymentUrlByVersion(modelId: string, versionNumber: number): Promise<string> {
+    const deployment = await this.deploymentsRepository.findOne({
+      where: {
+        modelVersion: { 
+          model: { id: modelId },
+          versionNumber: versionNumber,
+        },
+        status: DeploymentStatus.RUNNING,
+      },
+      relations: ['modelVersion', 'modelVersion.model'],
+    });
+
+    if (!deployment) {
+      throw new NotFoundException(`No active deployment found for version v${versionNumber} of this model`);
+    }
+
+    if (deployment.url === null) {
+      throw new NotFoundException(`Active deployment URL is not set for version v${versionNumber}`);
     }
 
     return deployment.url;

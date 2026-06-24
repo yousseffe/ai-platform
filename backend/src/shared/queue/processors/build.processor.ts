@@ -14,6 +14,19 @@ import { BuildJobPayload } from '../interfaces/queue.interface';
 import { MinioService } from '../../minio/minio.service';
 import { getDockerOptions } from '../../docker/docker.util';
 
+function isZipFile(filePath: string): boolean {
+  if (!fs.existsSync(filePath)) return false;
+  try {
+    const buffer = Buffer.alloc(4);
+    const fd = fs.openSync(filePath, 'r');
+    fs.readSync(fd, buffer, 0, 4, 0);
+    fs.closeSync(fd);
+    return buffer.readUInt32LE(0) === 0x04034b50;
+  } catch (err) {
+    return false;
+  }
+}
+
 /**
  * BullMQ processor responsible for packaging uploaded model weights and scripts
  * into standalone, self-serving Docker container images.
@@ -92,6 +105,58 @@ export class BuildProcessor extends WorkerHost {
         );
       }
 
+      let modelPathEnv = 'model.pkl';
+      const modelLocalPath = path.join(buildDir, 'model.pkl');
+      if (fs.existsSync(modelLocalPath)) {
+        const isZip = isZipFile(modelLocalPath) && version.modelFilePath?.toLowerCase().endsWith('.zip');
+        if (isZip) {
+          this.logger.log(`Detected model weights file is a ZIP archive. Extracting...`);
+          const unzippedDir = path.join(buildDir, 'unzipped_model');
+          fs.mkdirSync(unzippedDir, { recursive: true });
+          try {
+            const { execSync } = require('child_process');
+            execSync(`tar -xf model.pkl -C unzipped_model`, { cwd: buildDir });
+            
+            const contents = fs.readdirSync(unzippedDir);
+            const subdirs = contents.filter((file) =>
+              fs.statSync(path.join(unzippedDir, file)).isDirectory(),
+            );
+            if (contents.length === 1 && subdirs.length === 1) {
+              modelPathEnv = `unzipped_model/${contents[0]}`;
+            } else {
+              modelPathEnv = 'unzipped_model';
+            }
+            fs.unlinkSync(modelLocalPath);
+            this.logger.log(`Extraction complete. MODEL_PATH set to: ${modelPathEnv}`);
+
+            // Auto-fix tokenizer in model_index.json for Stable Diffusion if needed
+            const resolvedModelDir = path.join(buildDir, modelPathEnv);
+            const modelIndexJsonPath = path.join(resolvedModelDir, 'model_index.json');
+            if (fs.existsSync(modelIndexJsonPath)) {
+              try {
+                const indexContent = fs.readFileSync(modelIndexJsonPath, 'utf8');
+                const indexData = JSON.parse(indexContent);
+                if (indexData && indexData.tokenizer && indexData.tokenizer[1] === 'CLIPTokenizer') {
+                  const tokenizerDir = path.join(resolvedModelDir, 'tokenizer');
+                  const vocabExists = fs.existsSync(path.join(tokenizerDir, 'vocab.json'));
+                  const mergesExists = fs.existsSync(path.join(tokenizerDir, 'merges.txt'));
+                  if (!vocabExists || !mergesExists) {
+                    this.logger.log(`vocab.json or merges.txt is missing. Swapping CLIPTokenizer to CLIPTokenizerFast in model_index.json`);
+                    indexData.tokenizer[1] = 'CLIPTokenizerFast';
+                    fs.writeFileSync(modelIndexJsonPath, JSON.stringify(indexData, null, 2), 'utf8');
+                  }
+                }
+              } catch (e: any) {
+                this.logger.warn(`Failed to inspect/auto-fix model_index.json: ${e.message || e}`);
+              }
+            }
+          } catch (err: any) {
+            this.logger.error(`Failed to extract ZIP archive: ${err.message || err}`);
+            throw err;
+          }
+        }
+      }
+
       let dockerfileContent = '';
 
       if (version.model.type === ModelType.LLM_GGUF) {
@@ -109,6 +174,8 @@ ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "
           templateName = 'serve_nlp.py';
         } else if (version.model.type === ModelType.VISION) {
           templateName = 'serve_vision.py';
+        } else if (version.model.type === ModelType.DIFFUSION) {
+          templateName = 'serve_diffusion.py';
         }
 
         // Copy serve.py
@@ -128,12 +195,94 @@ ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "
         const hasPreprocess = !!version.preprocessFilePath;
         const hasPostprocess = !!version.postprocessFilePath;
 
-        dockerfileContent = `FROM python:3.9-slim
+        // Detect if custom scripts require extra python packages not bundled in our base image
+        const extraDependencies: string[] = [];
+        const builtInAndBase = new Set([
+          'os', 'sys', 'json', 'math', 'pickle', 'importlib', 'datetime', 'time', 're', 'collections',
+          'numpy', 'pandas', 'sklearn', 'joblib', 'fastapi', 'uvicorn', 'pydantic', 'typing',
+          'base64', 'io', 'PIL', 'shutil', 'hashlib', 'uuid', 'binascii', 'argparse', 'logging', 'random',
+          'torch', 'torchvision', 'diffusers', 'transformers', 'accelerate'
+        ]);
+
+        const scanImports = (filePath: string) => {
+          if (!fs.existsSync(filePath)) return;
+          try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const lines = content.split('\n');
+            for (const line of lines) {
+              const match = line.match(/^\s*(?:import|from)\s+([a-zA-Z0-9_]+)/);
+              if (match) {
+                const pkg = match[1];
+                if (!builtInAndBase.has(pkg)) {
+                  extraDependencies.push(pkg);
+                }
+              }
+            }
+          } catch (err: unknown) {
+            this.logger.warn(
+              `Failed to scan imports from ${filePath}: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        };
+
+        if (hasPreprocess) {
+          scanImports(path.join(buildDir, 'preprocess.py'));
+        }
+        if (hasPostprocess) {
+          scanImports(path.join(buildDir, 'postprocess.py'));
+        }
+
+        const uniqueExtras = Array.from(new Set(extraDependencies));
+        let extraPipInstall = '';
+        if (uniqueExtras.length > 0) {
+          this.logger.log(
+            `Detected extra script dependencies to install: ${uniqueExtras.join(', ')}`,
+          );
+          extraPipInstall = `\nRUN pip install --no-cache-dir ${uniqueExtras.join(' ')}`;
+        }
+
+        let baseImage = 'python:3.9-slim';
+        let useBaseImage = false;
+
+        if (version.model.type === ModelType.DIFFUSION) {
+          try {
+            await this.docker.getImage('ai-platform-diffusion-base:latest').inspect();
+            baseImage = 'ai-platform-diffusion-base:latest';
+            useBaseImage = true;
+          } catch (e) {
+            this.logger.log('Base image ai-platform-diffusion-base:latest not found. Falling back to python:3.9-slim.');
+          }
+        } else if (version.model.framework === Framework.PYTORCH) {
+          try {
+            await this.docker.getImage('ai-platform-pytorch-base:latest').inspect();
+            baseImage = 'ai-platform-pytorch-base:latest';
+            useBaseImage = true;
+          } catch (e) {
+            this.logger.log('Base image ai-platform-pytorch-base:latest not found. Falling back to python:3.9-slim.');
+          }
+        } else if (
+          version.model.framework === Framework.SKLEARN ||
+          version.model.framework === Framework.CUSTOM
+        ) {
+          try {
+            await this.docker.getImage('ai-platform-sklearn-base:latest').inspect();
+            baseImage = 'ai-platform-sklearn-base:latest';
+            useBaseImage = true;
+          } catch (e) {
+            this.logger.log('Base image ai-platform-sklearn-base:latest not found. Falling back to python:3.9-slim.');
+          }
+        }
+
+        const originalModelName = path.basename(version.modelFilePath || '') || version.model.name;
+
+        if (useBaseImage) {
+          dockerfileContent = `FROM ${baseImage}
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-ENV MODEL_PATH=model.pkl
+COPY . .${extraPipInstall}
+ENV MODEL_PATH=${modelPathEnv}
+ENV MODEL_NAME=${originalModelName}
 ENV SCALER_PATH=${hasScaler ? 'scaler.pkl' : ''}
 ENV PREPROCESS_PATH=${hasPreprocess ? 'preprocess.py' : ''}
 ENV POSTPROCESS_PATH=${hasPostprocess ? 'postprocess.py' : ''}
@@ -142,6 +291,23 @@ ENV TASK_TYPE=${version.model.taskType}
 EXPOSE 8000
 CMD ["python", "serve.py"]
 `;
+        } else {
+          dockerfileContent = `FROM python:3.9-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+ENV MODEL_PATH=${modelPathEnv}
+ENV MODEL_NAME=${originalModelName}
+ENV SCALER_PATH=${hasScaler ? 'scaler.pkl' : ''}
+ENV PREPROCESS_PATH=${hasPreprocess ? 'preprocess.py' : ''}
+ENV POSTPROCESS_PATH=${hasPostprocess ? 'postprocess.py' : ''}
+ENV FRAMEWORK=${version.model.framework}
+ENV TASK_TYPE=${version.model.taskType}
+EXPOSE 8000
+CMD ["python", "serve.py"]
+`;
+        }
 
         let requirementsContent = `fastapi
 uvicorn
@@ -149,10 +315,14 @@ pandas
 numpy
 `;
 
-        if (version.model.framework === Framework.SKLEARN) {
-          requirementsContent += '\nscikit-learn\njoblib';
+        if (version.model.type === ModelType.DIFFUSION) {
+          requirementsContent = `--extra-index-url https://download.pytorch.org/whl/cpu\n` + requirementsContent;
+          requirementsContent += '\ndiffusers\ntransformers\naccelerate\ntorch';
         } else if (version.model.framework === Framework.PYTORCH) {
+          requirementsContent = `--extra-index-url https://download.pytorch.org/whl/cpu\n` + requirementsContent;
           requirementsContent += '\ntorch\ntorchvision';
+        } else if (version.model.framework === Framework.SKLEARN) {
+          requirementsContent += '\nscikit-learn\njoblib';
         } else if (version.model.framework === Framework.TENSORFLOW) {
           requirementsContent += '\ntensorflow';
         } else if (version.model.framework === Framework.ONNX) {
@@ -205,6 +375,16 @@ numpy
       this.logger.log(
         `Successfully built docker image for version: ${versionId}`,
       );
+
+      // Prune dangling/intermediate build images to save disk space
+      try {
+        const { execSync } = require('child_process');
+        execSync('docker image prune -f');
+        this.logger.log('Successfully pruned dangling/intermediate docker images');
+      } catch (err: any) {
+        this.logger.warn(`Failed to prune dangling images: ${err.message || err}`);
+      }
+
       await this.modelVersionsRepository.update(versionId, {
         status: VersionStatus.READY,
         errorMessage: null,

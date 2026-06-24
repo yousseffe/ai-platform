@@ -80,7 +80,7 @@ export default function StepArtifacts({
             <p className={`text-xs font-extrabold ${modelFile ? "text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-200"}`}>
               {modelFile ? `Attached: ${modelFile.name}` : "Drop weights file or click to browse"}
             </p>
-            <p className="text-[10px] text-slate-400 mt-1.5 font-sans font-medium">Pickle (.pkl), ONNX (.onnx), or H5 (.h5) binaries</p>
+            <p className="text-[10px] text-slate-400 mt-1.5 font-sans font-medium">Pickle (.pkl), ONNX (.onnx), H5 (.h5), or ZIP (.zip) archives</p>
           </div>
           {errors.modelFile && (
             <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1">

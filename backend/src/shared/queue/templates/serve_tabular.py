@@ -5,6 +5,44 @@ import importlib.util
 
 app = FastAPI()
 
+# Load scaler if exists
+scaler = None
+scaler_path = os.getenv("SCALER_PATH")
+if scaler_path and os.path.exists(scaler_path):
+    try:
+        import joblib
+        scaler = joblib.load(scaler_path)
+    except Exception as e:
+        print(f"Warning: Failed to load scaler from {scaler_path}: {e}")
+
+# Load preprocess if exists
+preprocess_func = None
+preprocess_module = None
+preprocess_path = os.getenv("PREPROCESS_PATH")
+if preprocess_path and os.path.exists(preprocess_path):
+    try:
+        spec = importlib.util.spec_from_file_location("preprocess", preprocess_path)
+        preprocess_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(preprocess_module)
+        if hasattr(preprocess_module, "preprocess"):
+            preprocess_func = preprocess_module.preprocess
+    except Exception as e:
+        print(f"Warning: Failed to load preprocess script: {e}")
+
+# Load postprocess if exists
+postprocess_func = None
+postprocess_module = None
+postprocess_path = os.getenv("POSTPROCESS_PATH")
+if postprocess_path and os.path.exists(postprocess_path):
+    try:
+        spec = importlib.util.spec_from_file_location("postprocess", postprocess_path)
+        postprocess_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(postprocess_module)
+        if hasattr(postprocess_module, "postprocess"):
+            postprocess_func = postprocess_module.postprocess
+    except Exception as e:
+        print(f"Warning: Failed to load postprocess script: {e}")
+
 # Load model
 model_path = os.getenv("MODEL_PATH", "model.pkl")
 framework = os.getenv("FRAMEWORK", "SKLEARN")
@@ -20,39 +58,20 @@ try:
         model = onnxruntime.InferenceSession(model_path)
     elif framework == "PYTORCH":
         import torch
-        model = torch.load(model_path)
+        loaded = torch.load(model_path, map_location="cpu")
+        if isinstance(loaded, dict) or type(loaded).__name__ == "OrderedDict":
+            if preprocess_module and hasattr(preprocess_module, "load_model"):
+                model = preprocess_module.load_model(model_path)
+            else:
+                raise ValueError("Loaded object is a state_dict (OrderedDict). Please define a 'load_model' function in preprocess.py to instantiate your PyTorch model architecture and load the weights.")
+        else:
+            model = loaded
         model.eval()
     elif framework == "TENSORFLOW":
         import tensorflow as tf
         model = tf.keras.models.load_model(model_path)
 except Exception as e:
     print(f"Error loading {framework} model: {e}")
-
-# Load scaler if exists
-scaler = None
-scaler_path = os.getenv("SCALER_PATH")
-if scaler_path and os.path.exists(scaler_path):
-    scaler = joblib.load(scaler_path)
-
-# Load preprocess if exists
-preprocess_func = None
-preprocess_path = os.getenv("PREPROCESS_PATH")
-if preprocess_path and os.path.exists(preprocess_path):
-    spec = importlib.util.spec_from_file_location("preprocess", preprocess_path)
-    preprocess_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(preprocess_module)
-    if hasattr(preprocess_module, "preprocess"):
-        preprocess_func = preprocess_module.preprocess
-
-# Load postprocess if exists
-postprocess_func = None
-postprocess_path = os.getenv("POSTPROCESS_PATH")
-if postprocess_path and os.path.exists(postprocess_path):
-    spec = importlib.util.spec_from_file_location("postprocess", postprocess_path)
-    postprocess_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(postprocess_module)
-    if hasattr(postprocess_module, "postprocess"):
-        postprocess_func = postprocess_module.postprocess
 
 @app.post("/predict")
 async def predict(request: Request):
@@ -151,7 +170,7 @@ async def predict(request: Request):
     else:
         result = {"prediction": prediction}
         
-    if prediction_proba is not None:
+    if prediction_proba is not None and not postprocess_func:
         result["probabilities"] = prediction_proba
         
     return result

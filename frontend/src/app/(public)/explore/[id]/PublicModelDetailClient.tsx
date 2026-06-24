@@ -58,6 +58,7 @@ function modelTypeColor(type: string): string {
     [ModelType.NLP]: "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800",
     [ModelType.VISION]: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800",
     [ModelType.LLM_GGUF]: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800",
+    [ModelType.DIFFUSION]: "bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/40 dark:text-pink-300 dark:border-pink-800",
   };
   return map[type] ?? "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700";
 }
@@ -74,6 +75,7 @@ function modelTypeLabel(type: string): string {
     [ModelType.NLP]: "Natural Language",
     [ModelType.VISION]: "Computer Vision",
     [ModelType.LLM_GGUF]: "Large Language Model",
+    [ModelType.DIFFUSION]: "Stable Diffusion",
   };
   return map[type] ?? type;
 }

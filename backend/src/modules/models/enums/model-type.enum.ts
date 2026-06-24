@@ -18,4 +18,8 @@ export enum ModelType {
    * Large Language Models in GGUF format.
    */
   LLM_GGUF = 'LLM_GGUF',
+  /**
+   * Generative Image/Diffusion models.
+   */
+  DIFFUSION = 'DIFFUSION',
 }

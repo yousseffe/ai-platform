@@ -48,10 +48,13 @@ export async function getModel(id: string): Promise<Model | null> {
 export async function createModel(
   name: string,
   description: string,
-  isPublic: boolean = false
+  isPublic: boolean = false,
+  type?: string,
+  framework?: string,
+  taskType?: string
 ): Promise<{ success: true; data: Model } | { success: false; error: string }> {
   try {
-    const res = await modelsService.createModel(name, description, isPublic);
+    const res = await modelsService.createModel(name, description, isPublic, type, framework, taskType);
     revalidatePath("/models");
     revalidatePath("/marketplace");
     revalidatePath("/");
@@ -126,10 +129,11 @@ export async function uploadModelVersion(
  */
 export async function runPrediction(
   id: string,
-  parsedPayload: unknown
+  parsedPayload: unknown,
+  versionNumber?: number
 ): Promise<{ success: true; data: Record<string, unknown> } | { success: false; error: string }> {
   try {
-    const res = await modelsService.runPrediction(id, parsedPayload);
+    const res = await modelsService.runPrediction(id, parsedPayload, versionNumber);
     return { success: true, data: res };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Prediction request failed";
@@ -221,3 +225,68 @@ export async function getProviderLogs(): Promise<ModelLog[]> {
     return [];
   }
 }
+
+/**
+ * Triggers the rebuild of a failed model version.
+ *
+ * @param modelId - The parent model UUID.
+ * @param versionId - The model version UUID.
+ * @returns A promise resolving to a success indicator or error message.
+ */
+export async function rebuildModelVersion(
+  modelId: string,
+  versionId: string
+): Promise<{ success: true; data: ModelVersion } | { success: false; error: string }> {
+  try {
+    const res = await modelsService.buildModelVersion(versionId, "", "");
+    revalidatePath(`/models/${modelId}`);
+    revalidatePath("/models");
+    return { success: true, data: res };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to rebuild version";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Deprecates a model version.
+ *
+ * @param modelId - The parent model UUID.
+ * @param versionId - The model version UUID.
+ */
+export async function deprecateModelVersion(
+  modelId: string,
+  versionId: string
+): Promise<{ success: true; data: ModelVersion } | { success: false; error: string }> {
+  try {
+    const res = await modelsService.deprecateModelVersion(versionId);
+    revalidatePath(`/models/${modelId}`);
+    revalidatePath("/models");
+    return { success: true, data: res };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to deprecate version";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Undeprecates (re-enables) a model version.
+ *
+ * @param modelId - The parent model UUID.
+ * @param versionId - The model version UUID.
+ */
+export async function undeprecateModelVersion(
+  modelId: string,
+  versionId: string
+): Promise<{ success: true; data: ModelVersion } | { success: false; error: string }> {
+  try {
+    const res = await modelsService.undeprecateModelVersion(versionId);
+    revalidatePath(`/models/${modelId}`);
+    revalidatePath("/models");
+    return { success: true, data: res };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to activate version";
+    return { success: false, error: errorMessage };
+  }
+}
+

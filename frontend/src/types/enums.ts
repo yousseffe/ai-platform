@@ -16,6 +16,7 @@ export enum VersionStatus {
   BUILDING = 'building',
   READY = 'ready',
   FAILED = 'failed',
+  DEPRECATED = 'deprecated',
 }
 
 /**
@@ -77,6 +78,7 @@ export enum ModelType {
   NLP = 'NLP',
   VISION = 'VISION',
   LLM_GGUF = 'LLM_GGUF',
+  DIFFUSION = 'DIFFUSION',
 }
 
 /**

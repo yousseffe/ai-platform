@@ -45,6 +45,8 @@ export default function UploadModelWizard() {
     handleNextStep,
     onSubmit,
     onInvalidSubmit,
+    isDetectingSchema,
+    handleDetectSchema,
   } = useUploadModel();
 
   const { register, setValue, handleSubmit, trigger, formState: { errors } } = form;
@@ -189,9 +191,30 @@ export default function UploadModelWizard() {
                 register={register}
                 errors={errors}
                 isUploading={isUploading}
-                uploadProgress={uploadProgress}
-                uploadStatus={uploadStatus}
+                isDetectingSchema={isDetectingSchema}
+                handleDetectSchema={handleDetectSchema}
+                hasModelFile={!!modelFile}
               />
+            )}
+
+            {/* Global Stepper Loading & Progress Card */}
+            {isUploading && (
+              <div className="bg-slate-50 dark:bg-slate-900/30 p-6 rounded-2xl border border-border/80 animate-fade-in text-xs space-y-3.5 shadow-sm mt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-primary animate-ping" />
+                    <span className="font-extrabold text-slate-800 dark:text-slate-200">{uploadStatus}</span>
+                  </div>
+                  <span className="font-extrabold text-primary font-mono text-xs bg-primary/10 px-2 py-0.5 rounded-full">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-background border border-border/50 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="bg-primary h-full rounded-full transition-all duration-300 ease-out shadow-sm"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 leading-normal font-sans font-medium text-center">Your weights artifacts are being securely transferred to the containerization build queue.</p>
+              </div>
             )}
           </CardContent>
 

@@ -27,6 +27,7 @@ import { firstValueFrom } from 'rxjs';
 import { Readable } from 'stream';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { RedisService } from '../../../shared/redis/redis.service';
 
 import { CreateModelDto } from '../dto/create-model.dto';
 import { UploadVersionDto } from '../dto/upload-version.dto';
@@ -79,6 +80,7 @@ export class ModelsController {
     private readonly modelLogRepository: Repository<ModelLog>,
     @InjectRepository(ApiKey)
     private readonly apiKeyRepository: Repository<ApiKey>,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
@@ -235,6 +237,7 @@ export class ModelsController {
       files,
       body.examplePayload,
       body.expectedResult,
+      body.triggerBuild,
     );
   }
 
@@ -261,34 +264,22 @@ export class ModelsController {
     @Res() res: Response,
   ): Promise<void> {
     const model = await this.modelsService.getModel(id);
-    const cost =
-      typeof model.costPerRequest === 'string'
-        ? parseFloat(model.costPerRequest)
-        : model.costPerRequest;
-
-    if (cost > 0) {
-      const balance = await this.walletsService.getBalance(
-        req.workspaceId,
-        req.workspaceType,
-        WalletType.CONSUMER,
-      );
-      if (balance < cost) {
-        throw new BadRequestException(
-          'Insufficient credits to perform prediction',
-        );
-      }
-    }
-
-    // Retrieve active API key of the model owner to authorize NestJS proxy call to the container.
-    // The container templates enforce checking the request headers for this API key.
-    const modelOwnerApiKeyEntity = await this.apiKeyRepository.findOne({
-      where: { user: { id: model.user.id }, isActive: true },
-    });
-    const containerApiKey = modelOwnerApiKeyEntity?.key || '';
-
     let url: string;
+    let deploymentId: string | null = null;
     try {
-      url = await this.deploymentsService.getActiveDeploymentUrl(id);
+      const deployment = await this.dataSource.getRepository(Deployment).findOne({
+        where: {
+          modelVersion: { model: { id } },
+          status: DeploymentStatus.RUNNING,
+        },
+        order: { createdAt: 'DESC' },
+        relations: ['modelVersion'],
+      });
+      if (!deployment || deployment.url === null) {
+        throw new NotFoundException('No active deployment found for this model');
+      }
+      url = deployment.url;
+      deploymentId = deployment.id;
     } catch (err: unknown) {
       if (err instanceof NotFoundException) {
         this.logger.log(
@@ -340,11 +331,140 @@ export class ModelsController {
 
         // Wait for it to become RUNNING
         url = await this.waitForDeployment(deployment.id);
+        deploymentId = deployment.id;
       } else {
         throw err;
       }
     }
 
+    await this.handlePredictionProxy(model, url, deploymentId, data, req, res);
+  }
+
+  @UseGuards(ApiKeyOrJwtGuard)
+  @UseInterceptors(WorkspaceInterceptor)
+  @Post(':id/v:versionNum/predict')
+  async predictVersion(
+    @Param('id') id: string,
+    @Param('versionNum') versionNum: string,
+    @Body() data: Record<string, unknown>,
+    @Req()
+    req: Record<string, unknown> & {
+      user: { id: string; email: string; apiKey?: string };
+      workspaceId: string;
+      workspaceType: OwnerType;
+    },
+    @Res() res: Response,
+  ): Promise<void> {
+    const versionNumber = parseInt(versionNum, 10);
+    if (isNaN(versionNumber)) {
+      throw new BadRequestException('Invalid version number');
+    }
+
+    const model = await this.modelsService.getModel(id);
+    let url: string;
+    let deploymentId: string | null = null;
+    try {
+      const deployment = await this.dataSource.getRepository(Deployment).findOne({
+        where: {
+          modelVersion: {
+            model: { id },
+            versionNumber: versionNumber,
+          },
+          status: DeploymentStatus.RUNNING,
+        },
+        relations: ['modelVersion'],
+      });
+      if (!deployment || deployment.url === null) {
+        throw new NotFoundException(`No active deployment found for version v${versionNumber}`);
+      }
+      url = deployment.url;
+      deploymentId = deployment.id;
+    } catch (err: unknown) {
+      if (err instanceof NotFoundException) {
+        this.logger.log(
+          `No active deployment found for model ${id} version v${versionNumber}. Attempting auto-deployment...`,
+        );
+        // Find specific version
+        const targetVersion = model.versions?.find(
+          (v) => v.versionNumber === versionNumber,
+        );
+
+        if (!targetVersion) {
+          throw new NotFoundException(
+            `Version v${versionNumber} is not found for this model.`,
+          );
+        }
+
+        if (targetVersion.status !== VersionStatus.READY) {
+          throw new BadRequestException(
+            `Version v${targetVersion.versionNumber} is not ready (status: ${targetVersion.status}). Cannot deploy automatically.`,
+          );
+        }
+
+        // Check if there is already a STARTING deployment
+        let deployment = await this.dataSource
+          .getRepository(Deployment)
+          .findOne({
+            where: {
+              modelVersion: { id: targetVersion.id },
+              status: DeploymentStatus.STARTING,
+            },
+            order: { createdAt: 'DESC' },
+          });
+
+        if (!deployment) {
+          this.logger.log(
+            `Triggering new auto-deployment for version ${targetVersion.id}...`,
+          );
+          deployment = await this.deploymentsService.deployVersion(
+            targetVersion.id,
+          );
+        }
+
+        // Wait for it to become RUNNING
+        url = await this.waitForDeployment(deployment.id);
+        deploymentId = deployment.id;
+      } else {
+        throw err;
+      }
+    }
+
+    await this.handlePredictionProxy(model, url, deploymentId, data, req, res);
+  }
+
+  private async handlePredictionProxy(
+    model: Model,
+    url: string,
+    deploymentId: string | null,
+    data: Record<string, unknown>,
+    req: any,
+    res: Response,
+  ): Promise<void> {
+    const cost =
+      typeof model.costPerRequest === 'string'
+        ? parseFloat(model.costPerRequest)
+        : model.costPerRequest;
+
+    if (cost > 0) {
+      const balance = await this.walletsService.getBalance(
+        req.workspaceId,
+        req.workspaceType,
+        WalletType.CONSUMER,
+      );
+      if (balance < cost) {
+        throw new BadRequestException(
+          'Insufficient credits to perform prediction',
+        );
+      }
+    }
+
+    // Retrieve active API key of the model owner to authorize NestJS proxy call to the container.
+    // The container templates enforce checking the request headers for this API key.
+    const modelOwnerApiKeyEntity = await this.apiKeyRepository.findOne({
+      where: { user: { id: model.user.id }, isActive: true },
+    });
+    const containerApiKey = modelOwnerApiKeyEntity?.key || '';
+ 
     const targetEndpoint =
       model.type === ModelType.LLM_GGUF ? '/v1/chat/completions' : '/predict';
 
@@ -358,6 +478,13 @@ export class ModelsController {
     };
 
     try {
+      if (deploymentId) {
+        await this.redisService.set(
+          `model:last-active:${deploymentId}`,
+          Date.now().toString(),
+        );
+      }
+
       if (data.stream === true) {
         const response = await firstValueFrom(
           this.httpService.post<Readable>(`${url}${targetEndpoint}`, data, {
@@ -551,6 +678,41 @@ export class ModelsController {
   }
 
   /**
+   * Deprecates a model version, stopping its container if it is running.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('versions/:versionId/deprecate')
+  async deprecateVersion(
+    @Param('versionId') versionId: string,
+  ): Promise<ModelVersion> {
+    const version = await this.dataSource.getRepository(ModelVersion).findOne({
+      where: { id: versionId },
+      relations: ['deployments'],
+    });
+    if (!version) {
+      throw new NotFoundException('Model version not found');
+    }
+    const activeDeployment = version.deployments?.find(
+      (d) => d.status === DeploymentStatus.RUNNING || d.status === DeploymentStatus.STARTING,
+    );
+    if (activeDeployment) {
+      await this.deploymentsService.stopDeployment(activeDeployment.id);
+    }
+    return this.modelsService.deprecateVersion(versionId);
+  }
+
+  /**
+   * Undeprecates a model version, returning it to READY status.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('versions/:versionId/undeprecate')
+  async undeprecateVersion(
+    @Param('versionId') versionId: string,
+  ): Promise<ModelVersion> {
+    return this.modelsService.undeprecateVersion(versionId);
+  }
+
+  /**
    * Helper method that polls deployment state until it becomes RUNNING or FAILED.
    * Used for on-demand cold starts when a model has no active containers.
    */
@@ -565,6 +727,8 @@ export class ModelsController {
       const dep = await this.deploymentsService.getDeployment(deploymentId);
       if (dep) {
         if (dep.status === DeploymentStatus.RUNNING && dep.url) {
+          // Allow 3 seconds for Uvicorn serving process to boot up inside the container
+          await new Promise((resolve) => setTimeout(resolve, 3000));
           return dep.url;
         }
         if (dep.status === DeploymentStatus.FAILED) {

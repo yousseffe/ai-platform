@@ -14,6 +14,10 @@ export function getDockerOptions(): Docker.DockerOptions {
     return {};
   }
 
+  if (process.platform === 'win32') {
+    return { socketPath: '//./pipe/docker_engine' };
+  }
+
   if (fs.existsSync('/var/run/docker.sock')) {
     return { socketPath: '/var/run/docker.sock' };
   }

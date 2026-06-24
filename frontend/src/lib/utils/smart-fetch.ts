@@ -19,8 +19,8 @@ const isServer = typeof window === "undefined";
  */
 export async function smartFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   const backendUrl = isServer
-    ? (process.env.BACKEND_URL || "http://localhost:3000")
-    : (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000");
+    ? (process.env.BACKEND_URL || "http://localhost:5000")
+    : (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000");
 
   let session: Session | null = null;
   let activeWorkspaceId: string | undefined = undefined;
@@ -60,7 +60,7 @@ export async function smartFetch<T = unknown>(path: string, options: RequestInit
     let errorMessage = "An error occurred while fetching the data.";
     try {
       const errorData = await res.json();
-      errorMessage = errorData.message || errorMessage;
+      errorMessage = errorData.message || errorData.error || errorMessage;
     } catch {
       try {
         const text = await res.text();

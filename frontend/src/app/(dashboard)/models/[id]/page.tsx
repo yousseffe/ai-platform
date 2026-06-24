@@ -1,4 +1,3 @@
-import React from "react";
 import { Metadata } from "next";
 import { getModel } from "@/lib/actions/models.actions";
 import { notFound } from "next/navigation";

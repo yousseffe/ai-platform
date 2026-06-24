@@ -3,6 +3,11 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { join } from 'path';
+
+const execPromise = promisify(exec);
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import * as fs from 'fs';
@@ -60,6 +65,7 @@ export class ModelsService {
       framework,
       user: { id: userId },
       isPublic,
+      tier: type === ModelType.DIFFUSION ? 'LARGE' : 'SMALL',
     });
     const saved = await this.modelsRepository.save(model);
 
@@ -161,6 +167,7 @@ export class ModelsService {
     },
     examplePayload?: string,
     expectedResult?: string,
+    triggerBuild?: string,
   ): Promise<ModelVersion> {
     const model = await this.modelsRepository.findOne({
       where: { id: modelId },
@@ -187,6 +194,37 @@ export class ModelsService {
     const sanitizedName = model.name
       .replace(/[^a-zA-Z0-9]/g, '_')
       .toLowerCase();
+
+    // Auto-detect schema prior to uploading and deleting the local file
+    let detectedExamplePayload: string | null = null;
+    let detectedExpectedResult: string | null = null;
+
+    if (files.model?.[0]) {
+      try {
+        const scriptPath = join(
+          process.cwd(),
+          'src',
+          'shared',
+          'utils',
+          'detect_schema.py',
+        );
+        const command = `python "${scriptPath}" "${files.model[0].path}"`;
+        const { stdout } = await execPromise(command);
+        const result = JSON.parse(stdout) as Record<string, unknown>;
+        if (result && !result.error) {
+          if (typeof result.example_payload === 'string') {
+            detectedExamplePayload = result.example_payload;
+          }
+          if (typeof result.expected_result === 'string') {
+            detectedExpectedResult = result.expected_result;
+          }
+        }
+      } catch (err: unknown) {
+        console.warn(
+          `Failed to auto-detect schema during upload: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
 
     const uploadToMinio = async (
       file: Express.Multer.File | undefined,
@@ -236,11 +274,59 @@ export class ModelsService {
         preprocessObjName || prevVersion?.preprocessFilePath || null,
       postprocessFilePath:
         postprocessObjName || prevVersion?.postprocessFilePath || null,
-      examplePayload: examplePayload || prevVersion?.examplePayload || null,
-      expectedResult: expectedResult || prevVersion?.expectedResult || null,
+      examplePayload:
+        examplePayload ||
+        detectedExamplePayload ||
+        prevVersion?.examplePayload ||
+        null,
+      expectedResult:
+        expectedResult ||
+        detectedExpectedResult ||
+        prevVersion?.expectedResult ||
+        null,
     });
 
     const savedVersion = await this.modelVersionsRepository.save(modelVersion);
+
+    if (triggerBuild !== 'false') {
+      // Dispatch job to build queue
+      await this.buildQueue.add('build-model', { versionId: savedVersion.id });
+    }
+
+    return savedVersion;
+  }
+
+  /**
+   * Finalizes the schema configuration for a version and triggers the container building process.
+   *
+   * @param versionId - The model version UUID.
+   * @param examplePayload - Optional updated request payload.
+   * @param expectedResult - Optional updated response output.
+   * @returns A promise resolving to the updated ModelVersion.
+   * @throws {NotFoundException} If the version does not exist.
+   */
+  async startBuild(
+    versionId: string,
+    examplePayload?: string,
+    expectedResult?: string,
+  ): Promise<ModelVersion> {
+    const version = await this.modelVersionsRepository.findOne({
+      where: { id: versionId },
+    });
+
+    if (!version) {
+      throw new NotFoundException(`Model version ${versionId} not found.`);
+    }
+
+    if (examplePayload !== undefined) {
+      version.examplePayload = examplePayload;
+    }
+    if (expectedResult !== undefined) {
+      version.expectedResult = expectedResult;
+    }
+
+    version.status = VersionStatus.BUILDING;
+    const savedVersion = await this.modelVersionsRepository.save(version);
 
     // Dispatch job to build queue
     await this.buildQueue.add('build-model', { versionId: savedVersion.id });
@@ -317,6 +403,13 @@ export class ModelsService {
 
     // Delete DB record
     await this.modelVersionsRepository.remove(version);
+
+    // Delete Docker image
+    try {
+      await execPromise(`docker rmi -f model-version-${versionId}`);
+    } catch (e: any) {
+      console.warn(`Failed to delete Docker image model-version-${versionId}: ${e.message || e}`);
+    }
   }
 
   /**
@@ -358,5 +451,35 @@ export class ModelsService {
 
     // Delete model
     await this.modelsRepository.remove(model);
+  }
+
+  /**
+   * Updates model version status to DEPRECATED.
+   */
+  async deprecateVersion(versionId: string): Promise<ModelVersion> {
+    const version = await this.modelVersionsRepository.findOne({
+      where: { id: versionId },
+    });
+    if (!version) {
+      throw new NotFoundException('Model version not found');
+    }
+    version.status = VersionStatus.DEPRECATED;
+    await this.modelVersionsRepository.save(version);
+    return version;
+  }
+
+  /**
+   * Updates model version status to READY.
+   */
+  async undeprecateVersion(versionId: string): Promise<ModelVersion> {
+    const version = await this.modelVersionsRepository.findOne({
+      where: { id: versionId },
+    });
+    if (!version) {
+      throw new NotFoundException('Model version not found');
+    }
+    version.status = VersionStatus.READY;
+    await this.modelVersionsRepository.save(version);
+    return version;
   }
 }

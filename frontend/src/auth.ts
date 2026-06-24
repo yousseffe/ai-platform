@@ -1,11 +1,10 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { JWT } from "next-auth/jwt";
-import { jwtDecode } from "jwt-decode";
 
 async function refreshAccessToken(token: JWT): Promise<JWT> {
   try {
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
     const response = await fetch(`${backendUrl}/api/v1/auth/refresh`, {
       method: "POST",
       headers: {
@@ -48,7 +47,7 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
+        const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
         try {
           const res = await fetch(`${backendUrl}/api/v1/auth/login`, {
             method: "POST",
@@ -62,15 +61,11 @@ export const authOptions: NextAuthOptions = {
           const data = await res.json();
 
           if (res.ok && data.access_token) {
-            let userId = credentials.email;
-            try {
-              const payload = jwtDecode<{ sub: string }>(data.access_token);
-              if (payload?.sub) {
-                userId = payload.sub;
-              }
-            } catch (e) {
-              console.error("Failed to decode user ID from access token:", e);
-            }
+            // Decode the access token JWT payload to extract user ID (sub)
+            const payloadBase64 = data.access_token.split(".")[1];
+            const payloadJson = Buffer.from(payloadBase64, "base64").toString("utf-8");
+            const payload = JSON.parse(payloadJson);
+            const userId = payload.sub || credentials.email;
 
             return {
               id: userId,
