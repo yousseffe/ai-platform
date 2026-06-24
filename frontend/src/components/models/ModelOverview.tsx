@@ -7,39 +7,46 @@ import { UsageMetricsCard } from "./UsageMetricsCard";
 
 interface ModelOverviewProps {
   model: Model;
+  selectedVersionNumber?: number;
 }
 
 /**
  * ModelOverview component rendering description, weights metadata,
  * and code snippets for Python, Javascript, and cURL prediction endpoint consumption.
  */
-export default function ModelOverview({ model }: ModelOverviewProps) {
+export default function ModelOverview({ model, selectedVersionNumber }: ModelOverviewProps) {
   const [activeLang, setActiveLang] = useState<"curl" | "python" | "js">("curl");
 
   const versions = model.versions || [];
-  const latestVersion = versions.length
-    ? [...versions].sort((a, b) => b.versionNumber - a.versionNumber)[0]
-    : null;
+  const activeVersion = selectedVersionNumber
+    ? versions.find((v) => v.versionNumber === selectedVersionNumber)
+    : (versions.length
+        ? [...versions].sort((a, b) => b.versionNumber - a.versionNumber)[0]
+        : null);
 
-  const getCurlCode = () => `curl -X POST http://localhost:3000/api/v1/models/${model.id}/predict \\
+  const urlPath = selectedVersionNumber
+    ? `http://localhost:5000/api/v1/models/${model.id}/v${selectedVersionNumber}/predict`
+    : `http://localhost:5000/api/v1/models/${model.id}/predict`;
+
+  const getCurlCode = () => `curl -X POST ${urlPath} \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
-  -d '${latestVersion?.examplePayload || '{"features": [1.2, 3.4, 5.6]}'}'`;
+  -d '${activeVersion?.examplePayload || '{"features": [1.2, 3.4, 5.6]}'}'`;
 
   const getPythonCode = () => `import requests
 
-url = "http://localhost:3000/api/v1/models/${model.id}/predict"
+url = "${urlPath}"
 headers = {
     "Content-Type": "application/json",
     "Authorization": "Bearer YOUR_JWT_TOKEN"
 }
-payload = ${latestVersion?.examplePayload || '{\n    "features": [1.2, 3.4, 5.6]\n}'}
+payload = ${activeVersion?.examplePayload || '{\n    "features": [1.2, 3.4, 5.6]\n}'}
 
 response = requests.post(url, json=payload, headers=headers)
 print(response.json())`;
 
-  const getJsCode = () => `const url = "http://localhost:3000/api/v1/models/${model.id}/predict";
-const payload = ${latestVersion?.examplePayload || '{\n  features: [1.2, 3.4, 5.6]\n}'};
+  const getJsCode = () => `const url = "${urlPath}";
+const payload = ${activeVersion?.examplePayload || '{\n  features: [1.2, 3.4, 5.6]\n}'};
 
 const response = await fetch(url, {
   method: "POST",

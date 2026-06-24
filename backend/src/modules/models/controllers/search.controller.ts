@@ -1,5 +1,8 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ModelsSearchService, SearchResult } from '../services/models-search.service';
+import {
+  ModelsSearchService,
+  SearchResult,
+} from '../services/models-search.service';
 import { SearchModelsDto } from '../dto/search-models.dto';
 
 /**

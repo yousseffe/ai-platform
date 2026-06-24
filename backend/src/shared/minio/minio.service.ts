@@ -133,7 +133,7 @@ export class MinioService implements OnModuleInit {
   async getFileUrl(objectName: string): Promise<string> {
     if (this.useLocalFallback) {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-      const backendUrl = frontendUrl.replace('3001', '3000');
+      const backendUrl = frontendUrl.replace('3001', '5000');
       return `${backendUrl}/uploads/local-s3/${this.bucketName}/${objectName}`;
     }
     return this.minioClient.presignedGetObject(

@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import { Logger } from '@nestjs/common';
 import { DeployJobPayload } from '../interfaces/queue.interface';
 import { getDockerOptions } from '../../docker/docker.util';
+import { RedisService } from '../../redis/redis.service';
 
 /**
  * BullMQ processor responsible for scheduling and launching containerized
@@ -25,6 +26,7 @@ export class DeployProcessor extends WorkerHost {
     @InjectRepository(Deployment)
     private readonly deploymentsRepository: Repository<Deployment>,
     private readonly dataSource: DataSource,
+    private readonly redisService: RedisService,
   ) {
     super();
     this.docker = new Docker(getDockerOptions());
@@ -37,7 +39,12 @@ export class DeployProcessor extends WorkerHost {
    * @param job - The background job payload carrying the target deployment ID.
    * @returns A promise that resolves when the container starts running.
    */
-  async process(job: Job<DeployJobPayload, void, string>): Promise<void> {
+  async process(job: Job<any, void, string>): Promise<void> {
+    if (job.name === 'check-idle-deployments') {
+      await this.checkIdleDeployments();
+      return;
+    }
+
     const { deploymentId } = job.data;
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },
@@ -96,9 +103,11 @@ export class DeployProcessor extends WorkerHost {
       const ownerId = deployment.modelVersion.model.user?.id;
       let ownerApiKey = '';
       if (ownerId) {
-        const apiKeyEntity = await this.dataSource.getRepository(ApiKey).findOne({
-          where: { user: { id: ownerId }, isActive: true },
-        });
+        const apiKeyEntity = await this.dataSource
+          .getRepository(ApiKey)
+          .findOne({
+            where: { user: { id: ownerId }, isActive: true },
+          });
         ownerApiKey = apiKeyEntity?.key || '';
       }
 
@@ -110,21 +119,84 @@ export class DeployProcessor extends WorkerHost {
         await this.docker.createNetwork({ Name: 'ai-platform_default' });
       }
 
+      // Memory-based eviction check
+      const TIER_RAM_MAP: Record<string, number> = {
+        SMALL: 512,      // 512 MB
+        MEDIUM: 1024,    // 1 GB
+        LARGE: 2048,     // 2 GB
+      };
+
+      const newModelTier = deployment.modelVersion.model.tier?.toUpperCase() || 'SMALL';
+      const newModelRamMb = TIER_RAM_MAP[newModelTier] || 512;
+      const MAX_SYSTEM_RAM_MB = parseInt(process.env.MAX_SYSTEM_RAM_MB || '3072', 10); // Default: 3 GB (3072 MB)
+
+      this.logger.log(
+        `Checking memory limits for deploying ${deploymentId} (Tier: ${newModelTier}, footprint: ${newModelRamMb}MB)`,
+      );
+
+      // Calculate total RAM used by currently running containers
+      const runningDeployments = await this.deploymentsRepository.find({
+        where: { status: DeploymentStatus.RUNNING },
+        relations: ['modelVersion', 'modelVersion.model'],
+      });
+
+      let currentSystemRamMb = runningDeployments.reduce((sum, dep) => {
+        const tier = dep.modelVersion.model.tier?.toUpperCase() || 'SMALL';
+        return sum + (TIER_RAM_MAP[tier] || 512);
+      }, 0);
+
+      this.logger.log(`Current memory usage: ${currentSystemRamMb}MB / ${MAX_SYSTEM_RAM_MB}MB`);
+
+      if (currentSystemRamMb + newModelRamMb > MAX_SYSTEM_RAM_MB) {
+        this.logger.warn(
+          `Memory threshold exceeded (${currentSystemRamMb + newModelRamMb}MB > ${MAX_SYSTEM_RAM_MB}MB). Starting eviction...`,
+        );
+
+        // Fetch last active times from Redis for all running deployments
+        const runningWithActiveTimes = await Promise.all(
+          runningDeployments.map(async (dep) => {
+            const lastActiveStr = await this.redisService.get(`model:last-active:${dep.id}`);
+            const lastActiveTime = lastActiveStr ? parseInt(lastActiveStr, 10) : dep.createdAt.getTime();
+            return { dep, lastActiveTime };
+          }),
+        );
+
+        // Sort by last active time ascending (oldest/least recently active first)
+        runningWithActiveTimes.sort((a, b) => a.lastActiveTime - b.lastActiveTime);
+
+        for (const item of runningWithActiveTimes) {
+          if (currentSystemRamMb + newModelRamMb <= MAX_SYSTEM_RAM_MB) {
+            break;
+          }
+
+          const depToStop = item.dep;
+          const depTier = depToStop.modelVersion.model.tier?.toUpperCase() || 'SMALL';
+          const depRamMb = TIER_RAM_MAP[depTier] || 512;
+
+          this.logger.warn(
+            `Evicting deployment ${depToStop.id} (Tier: ${depTier}, ${depRamMb}MB) to free up memory. Last active: ${new Date(
+              item.lastActiveTime,
+            ).toISOString()}`,
+          );
+
+          await this.stopDeployment(depToStop.id);
+          currentSystemRamMb -= depRamMb;
+        }
+      }
+
       const container = await this.docker.createContainer({
         name: containerName,
         Image: imageName,
         ExposedPorts: {
           [containerPort]: {},
         },
-        Env: [
-          `MODEL_PATH=/app/model.pkl`,
-          `API_KEY=${ownerApiKey}`,
-        ],
+        Env: [`API_KEY=${ownerApiKey}`],
         HostConfig: {
           PortBindings: {
             [containerPort]: [{ HostPort: nextPort.toString() }],
           },
           NetworkMode: 'ai-platform_default',
+          Memory: newModelRamMb * 1024 * 1024,
         },
       });
 
@@ -161,5 +233,66 @@ export class DeployProcessor extends WorkerHost {
       });
       throw error;
     }
+  }
+
+  private async checkIdleDeployments(): Promise<void> {
+    this.logger.log('Scanning for idle deployments to auto-stop...');
+    try {
+      const runningDeployments = await this.deploymentsRepository.find({
+        where: { status: DeploymentStatus.RUNNING },
+      });
+
+      const IDLE_TIMEOUT_MS = parseInt(process.env.IDLE_TIMEOUT_MS || '300000', 10); // Default: 5 minutes (300000 ms)
+      const now = Date.now();
+
+      for (const deployment of runningDeployments) {
+        const lastActiveStr = await this.redisService.get(`model:last-active:${deployment.id}`);
+        const lastActiveTime = lastActiveStr ? parseInt(lastActiveStr, 10) : deployment.createdAt.getTime();
+
+        if (now - lastActiveTime >= IDLE_TIMEOUT_MS) {
+          this.logger.log(
+            `Auto-stopping idle deployment ${deployment.id} (inactive for ${Math.round((now - lastActiveTime) / 1000)}s)`,
+          );
+          await this.stopDeployment(deployment.id);
+        }
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error checking idle deployments: ${message}`);
+    }
+  }
+
+  private async stopDeployment(deploymentId: string): Promise<void> {
+    const deployment = await this.deploymentsRepository.findOne({
+      where: { id: deploymentId },
+    });
+    if (!deployment) return;
+
+    if (deployment.containerId) {
+      try {
+        const container = this.docker.getContainer(deployment.containerId);
+        try {
+          await container.stop();
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Error stopping container: ${message}`);
+        }
+        try {
+          await container.remove();
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.error(`Error removing container: ${message}`);
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Error interacting with Docker for container ${deployment.containerId}: ${message}`);
+      }
+    }
+
+    await this.deploymentsRepository.update(deploymentId, {
+      status: DeploymentStatus.STOPPED,
+      port: null,
+      url: null,
+    });
   }
 }

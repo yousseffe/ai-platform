@@ -1,4 +1,3 @@
-import React from "react";
 import { Metadata } from "next";
 import { getModel } from "@/lib/actions/models.actions";
 import { notFound } from "next/navigation";
@@ -47,7 +46,7 @@ export default async function ModelDetailsPage({ params }: PageProps) {
     notFound();
   }
 
-  const isOwner = session?.user?.id === model.user?.id;
+  const isOwner = session?.user?.id === model.user?.id || session?.user?.email === model.user?.email;
   const isPublic = !!model.isPublic;
 
   // Protect private models from non-owners

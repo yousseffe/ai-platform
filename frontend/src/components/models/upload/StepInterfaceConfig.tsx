@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertCircle, Terminal } from "lucide-react";
+import { AlertCircle, Terminal, Sparkles, Loader2 } from "lucide-react";
 import { UseFormRegister, FieldErrors } from "react-hook-form";
 
 import { type UploadModelFormInput } from "@/lib/schemas";
@@ -11,8 +11,9 @@ interface StepInterfaceConfigProps {
   register: UseFormRegister<UploadModelFormInput>;
   errors: FieldErrors<UploadModelFormInput>;
   isUploading: boolean;
-  uploadProgress: number;
-  uploadStatus: string;
+  isDetectingSchema: boolean;
+  handleDetectSchema: () => void;
+  hasModelFile: boolean;
 }
 
 /**
@@ -27,12 +28,41 @@ export default function StepInterfaceConfig({
   register,
   errors,
   isUploading,
-  uploadProgress,
-  uploadStatus,
+  isDetectingSchema,
+  handleDetectSchema,
+  hasModelFile,
 }: StepInterfaceConfigProps) {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      
+      {/* Automated Schema Discovery Card */}
+      <div className="flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/20 p-4 rounded-xl border border-border/80">
+        <div className="space-y-0.5">
+          <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Automated Schema Discovery</h4>
+          <p className="text-[10px] text-muted-foreground">Analyze your uploaded weights file to generate payload templates.</p>
+        </div>
+        <button
+          type="button"
+          disabled={!hasModelFile || isDetectingSchema || isUploading}
+          onClick={handleDetectSchema}
+          className="h-8 px-4 text-[10px] font-extrabold tracking-wide uppercase bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
+        >
+          {isDetectingSchema ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Detecting...
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-3.5 h-3.5" />
+              Auto-Detect Schema
+            </>
+          )}
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
         
         {/* Example Payload Code Input */}
         <div className="space-y-2 flex flex-col">
@@ -94,26 +124,6 @@ export default function StepInterfaceConfig({
           )}
         </div>
       </div>
-
-      {/* Submission Loading & Progress Card */}
-      {isUploading && (
-        <div className="bg-slate-50 dark:bg-slate-900/30 p-6 rounded-2xl border border-border/80 animate-fade-in text-xs space-y-3.5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-primary animate-ping" />
-              <span className="font-extrabold text-slate-800 dark:text-slate-200">{uploadStatus}</span>
-            </div>
-            <span className="font-extrabold text-primary font-mono text-xs bg-primary/10 px-2 py-0.5 rounded-full">{uploadProgress}%</span>
-          </div>
-          <div className="w-full bg-background border border-border/50 rounded-full h-2.5 overflow-hidden">
-            <div
-              className="bg-primary h-full rounded-full transition-all duration-300 ease-out shadow-sm"
-              style={{ width: `${uploadProgress}%` }}
-            />
-          </div>
-          <p className="text-[10px] text-slate-400 leading-normal font-sans font-medium text-center">Your weights artifacts are being securely transferred to the containerization build queue.</p>
-        </div>
-      )}
     </div>
   );
 }

@@ -413,7 +413,10 @@ export class AuthService {
         if (tokenIatMs < user.lastLoginAt.getTime()) {
           const timeSinceLastLoginMs = Date.now() - user.lastLoginAt.getTime();
           const gracePeriodMs = 15 * 1000; // 15 seconds grace period for concurrent requests
-          if (timeSinceLastLoginMs < 0 || timeSinceLastLoginMs > gracePeriodMs) {
+          if (
+            timeSinceLastLoginMs < 0 ||
+            timeSinceLastLoginMs > gracePeriodMs
+          ) {
             throw new UnauthorizedException('Token has been revoked');
           }
         }

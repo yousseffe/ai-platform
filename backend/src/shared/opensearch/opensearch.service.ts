@@ -97,7 +97,9 @@ export class OpenSearchService implements OnModuleInit {
       await this.client.delete({ index, id, refresh: 'wait_for' });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Failed to delete document ${id} from ${index}: ${message}`);
+      this.logger.warn(
+        `Failed to delete document ${id} from ${index}: ${message}`,
+      );
     }
   }
 
@@ -113,7 +115,7 @@ export class OpenSearchService implements OnModuleInit {
     body: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     const response = await this.client.search({ index, body });
-    return response.body as Record<string, unknown>;
+    return response.body;
   }
 
   /**

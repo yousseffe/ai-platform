@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { deployVersion, stopDeployment } from "@/lib/actions/deployments.actions";
+import { rebuildModelVersion } from "@/lib/actions/models.actions";
 import { Model, ModelVersion, Deployment, DeploymentStatus, VersionStatus } from "@/types";
 
 /**
@@ -15,15 +16,7 @@ export function useModelDetails(modelId: string, initialModel: Model) {
   const router = useRouter();
   const model = initialModel;
 
-  // New Version Modal states
-  const [showVersionModal, setShowVersionModal] = useState(false);
-  const [modelFile, setModelFile] = useState<File | null>(null);
-  const [scalerFile, setScalerFile] = useState<File | null>(null);
-  const [preprocessFile, setPreprocessFile] = useState<File | null>(null);
-  const [postprocessFile, setPostprocessFile] = useState<File | null>(null);
-  const [examplePayload, setExamplePayload] = useState("");
-  const [expectedResult, setExpectedResult] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
+
 
   /**
    * Initiates deployment server requests for a chosen version ID.
@@ -66,47 +59,26 @@ export function useModelDetails(modelId: string, initialModel: Model) {
   };
 
   /**
-   * Packs artifacts into FormData packages and posts new model versions to backend endpoints.
+   * Re-triggers the container build process for a failed model version.
+   *
+   * @param versionId - Unique database identifier of the model version.
    */
-  const handleUploadVersion = async () => {
-    setIsUploading(true);
+  const handleRebuild = async (versionId: string) => {
     try {
-      const formData = new FormData();
-      if (modelFile) formData.append("model", modelFile);
-      if (scalerFile) formData.append("scaler", scalerFile);
-      if (preprocessFile) formData.append("preprocess", preprocessFile);
-      if (postprocessFile) formData.append("postprocess", postprocessFile);
-      if (examplePayload) formData.append("examplePayload", examplePayload);
-      if (expectedResult) formData.append("expectedResult", expectedResult);
-
-      const res = await fetch(`/api/models/${modelId}/versions`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const resData = await res.json();
-
-      if (!res.ok) {
-        throw new Error(resData.message || "Failed to upload version");
+      const res = await rebuildModelVersion(modelId, versionId);
+      if (res.success) {
+        alert("Rebuild started!");
+        router.refresh();
+      } else {
+        alert(res.error || "Failed to start rebuild");
       }
-
-      setShowVersionModal(false);
-      setModelFile(null);
-      setScalerFile(null);
-      setPreprocessFile(null);
-      setPostprocessFile(null);
-      setExamplePayload("");
-      setExpectedResult("");
-      alert("New version queued for build!");
-      router.refresh();
     } catch (e) {
       console.error(e);
-      const errMsg = e instanceof Error ? e.message : "Failed to upload new version";
-      alert(errMsg);
-    } finally {
-      setIsUploading(false);
+      alert("Failed to start rebuild");
     }
   };
+
+
 
   /**
    * Helper function to check if a model version is in a transient state.
@@ -160,23 +132,8 @@ export function useModelDetails(modelId: string, initialModel: Model) {
     model,
     versions,
     latestVersion,
-    showVersionModal,
-    setShowVersionModal,
-    modelFile,
-    setModelFile,
-    scalerFile,
-    setScalerFile,
-    preprocessFile,
-    setPreprocessFile,
-    postprocessFile,
-    setPostprocessFile,
-    examplePayload,
-    setExamplePayload,
-    expectedResult,
-    setExpectedResult,
-    isUploading,
     handleDeploy,
     handleStop,
-    handleUploadVersion,
+    handleRebuild,
   };
 }

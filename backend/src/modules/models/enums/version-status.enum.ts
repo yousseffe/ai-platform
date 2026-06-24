@@ -6,4 +6,5 @@ export enum VersionStatus {
   BUILDING = 'building',
   READY = 'ready',
   FAILED = 'failed',
+  DEPRECATED = 'deprecated',
 }

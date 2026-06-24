@@ -22,6 +22,7 @@ import {
   User,
   Loader2,
   AlertCircle,
+  Image,
 } from "lucide-react";
 import { DeploymentStatus, ModelType, Framework, TaskType } from "@/types";
 import type { SearchModelHit, FacetBucket, SearchResult } from "@/types";
@@ -34,6 +35,7 @@ const TYPE_META: Record<string, { label: string; color: string; bg: string; bord
   NLP:      { label: "Natural Language",       color: "text-amber-700 dark:text-amber-400",   bg: "bg-amber-50 dark:bg-amber-950/30",     border: "border-amber-200 dark:border-amber-800/40",   icon: Globe },
   VISION:   { label: "Computer Vision",        color: "text-blue-700 dark:text-blue-400",     bg: "bg-blue-50 dark:bg-blue-950/30",       border: "border-blue-200 dark:border-blue-800/40",     icon: Cpu },
   LLM_GGUF: { label: "Generative AI & LLMs",   color: "text-violet-700 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/30",   border: "border-violet-200 dark:border-violet-800/40", icon: Sparkles },
+  DIFFUSION: { label: "Stable Diffusion",      color: "text-pink-700 dark:text-pink-400",     bg: "bg-pink-50 dark:bg-pink-950/30",       border: "border-pink-200 dark:border-pink-800/40",     icon: Image },
 };
 
 const TYPE_ACCENT: Record<string, string> = {
@@ -41,6 +43,7 @@ const TYPE_ACCENT: Record<string, string> = {
   NLP:      "from-amber-500 to-orange-500",
   VISION:   "from-blue-500 to-cyan-500",
   LLM_GGUF: "from-violet-500 to-purple-500",
+  DIFFUSION: "from-pink-500 to-rose-500",
 };
 
 const FRAMEWORK_LABELS: Record<string, string> = {

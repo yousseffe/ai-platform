@@ -175,7 +175,7 @@ export default function SettingsPage() {
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">API Server</span>
               </div>
               <p className="font-bold text-foreground text-xs">NestJS Gateway</p>
-              <p className="text-xs text-primary font-bold mt-1">Port: 3000</p>
+              <p className="text-xs text-primary font-bold mt-1">Port: 5000</p>
             </div>
             <div className="border border-border rounded-lg p-4 bg-background">
               <div className="flex items-center gap-2 mb-2 select-none">

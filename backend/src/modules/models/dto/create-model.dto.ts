@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+} from 'class-validator';
 import { ModelType } from '../enums/model-type.enum';
 import { TaskType } from '../enums/task-type.enum';
 import { Framework } from '../enums/framework.enum';

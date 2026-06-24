@@ -101,17 +101,21 @@ export class ModelsSearchService implements OnModuleInit {
         },
         mappings: {
           properties: {
-            id:                { type: 'keyword' },
-            name:              { type: 'text', analyzer: 'mlhub_analyzer', fields: { keyword: { type: 'keyword' } } },
-            description:       { type: 'text', analyzer: 'mlhub_analyzer' },
-            type:              { type: 'keyword' },
-            taskType:          { type: 'keyword' },
-            framework:         { type: 'keyword' },
-            isPublic:          { type: 'boolean' },
-            publisherEmail:    { type: 'keyword' },
-            versionCount:      { type: 'integer' },
+            id: { type: 'keyword' },
+            name: {
+              type: 'text',
+              analyzer: 'mlhub_analyzer',
+              fields: { keyword: { type: 'keyword' } },
+            },
+            description: { type: 'text', analyzer: 'mlhub_analyzer' },
+            type: { type: 'keyword' },
+            taskType: { type: 'keyword' },
+            framework: { type: 'keyword' },
+            isPublic: { type: 'boolean' },
+            publisherEmail: { type: 'keyword' },
+            versionCount: { type: 'integer' },
             hasLiveDeployment: { type: 'boolean' },
-            createdAt:         { type: 'date' },
+            createdAt: { type: 'date' },
           },
         },
       });
@@ -132,7 +136,11 @@ export class ModelsSearchService implements OnModuleInit {
   async indexModel(model: Model): Promise<void> {
     try {
       const doc = this.buildDocument(model);
-      await this.openSearchService.index(INDEX_NAME, model.id, doc as unknown as Record<string, unknown>);
+      await this.openSearchService.index(
+        INDEX_NAME,
+        model.id,
+        doc as unknown as Record<string, unknown>,
+      );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Failed to index model ${model.id}: ${message}`);
@@ -172,14 +180,7 @@ export class ModelsSearchService implements OnModuleInit {
    * @returns A promise resolving to the ranked search results with facets.
    */
   async search(params: SearchParams): Promise<SearchResult> {
-    const {
-      q,
-      type,
-      framework,
-      taskType,
-      page = 1,
-      limit = 20,
-    } = params;
+    const { q, type, framework, taskType, page = 1, limit = 20 } = params;
 
     const from = (page - 1) * limit;
 
@@ -234,9 +235,7 @@ export class ModelsSearchService implements OnModuleInit {
       from,
       size: limit,
       // Boost recently added models slightly when relevance scores are tied
-      sort: q
-        ? ['_score', { createdAt: 'desc' }]
-        : [{ createdAt: 'desc' }],
+      sort: q ? ['_score', { createdAt: 'desc' }] : [{ createdAt: 'desc' }],
     };
 
     try {
@@ -246,7 +245,13 @@ export class ModelsSearchService implements OnModuleInit {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`OpenSearch query failed: ${message}`);
       // Gracefully degrade — return empty results
-      return { hits: [], total: 0, page, limit, facets: { types: [], frameworks: [], taskTypes: [] } };
+      return {
+        hits: [],
+        total: 0,
+        page,
+        limit,
+        facets: { types: [], frameworks: [], taskTypes: [] },
+      };
     }
   }
 
@@ -257,9 +262,10 @@ export class ModelsSearchService implements OnModuleInit {
    * @returns A flat ModelDocument ready for indexing.
    */
   private buildDocument(model: Model): ModelDocument {
-    const hasLiveDeployment = model.versions?.some((v) =>
-      v.deployments?.some((d) => d.status === 'running'),
-    ) ?? false;
+    const hasLiveDeployment =
+      model.versions?.some((v) =>
+        v.deployments?.some((d) => d.status === 'running'),
+      ) ?? false;
 
     return {
       id: model.id,
@@ -290,9 +296,12 @@ export class ModelsSearchService implements OnModuleInit {
     limit: number,
   ): SearchResult {
     const hitsWrapper = raw['hits'] as OpenSearchHitsWrapper;
-    const aggs = raw['aggregations'] as Record<string, AggregationResult> | undefined;
+    const aggs = raw['aggregations'] as
+      | Record<string, AggregationResult>
+      | undefined;
 
-    const hits: ModelDocument[] = hitsWrapper?.hits?.map((h) => h._source) ?? [];
+    const hits: ModelDocument[] =
+      hitsWrapper?.hits?.map((h) => h._source) ?? [];
     const total: number = hitsWrapper?.total?.value ?? 0;
 
     return {
@@ -301,9 +310,9 @@ export class ModelsSearchService implements OnModuleInit {
       page,
       limit,
       facets: {
-        types:      aggs?.['by_type']?.buckets      ?? [],
+        types: aggs?.['by_type']?.buckets ?? [],
         frameworks: aggs?.['by_framework']?.buckets ?? [],
-        taskTypes:  aggs?.['by_taskType']?.buckets  ?? [],
+        taskTypes: aggs?.['by_taskType']?.buckets ?? [],
       },
     };
   }

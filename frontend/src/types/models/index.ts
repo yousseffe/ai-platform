@@ -1,5 +1,5 @@
 import { User } from "../user";
-import { DeploymentStatus, VersionStatus, PredictionStatus } from "../enums";
+import { DeploymentStatus, VersionStatus, PredictionStatus, ModelType, Framework } from "../enums";
 
 export interface Deployment {
   id: string;
@@ -38,6 +38,9 @@ export interface Model {
   costPerRequest?: number;
   providerSharePercent?: number;
   isPublic?: boolean;
+  type?: ModelType;
+  framework?: Framework;
+  taskType?: string;
   createdAt: string;
   updatedAt: string;
 }

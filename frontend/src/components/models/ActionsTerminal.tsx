@@ -119,6 +119,7 @@ export default function ActionsTerminal({ versionId, versionNumber, status }: Ac
       {/* Terminal Screen output */}
       <div className="p-5 h-72 bg-black/95 text-slate-300 font-mono text-[11px] overflow-y-auto leading-relaxed select-text space-y-1">
         {lines.map((line, idx) => {
+          if (typeof line !== "string") return null;
           const isStep = line.startsWith("Step") || line.startsWith("Run");
           const isSuccess = line.includes("[OK]") || line.includes("SUCCESS") || line.includes("success");
           

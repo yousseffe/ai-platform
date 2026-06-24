@@ -32,10 +32,17 @@ export async function getModel(id: string): Promise<Model> {
  * @param isPublic - Visibility flag indicating whether this model is public in the marketplace.
  * @returns A promise resolving to the created Model object.
  */
-export async function createModel(name: string, description: string, isPublic: boolean = false): Promise<Model> {
+export async function createModel(
+  name: string,
+  description: string,
+  isPublic: boolean = false,
+  type?: string,
+  framework?: string,
+  taskType?: string
+): Promise<Model> {
   return smartFetch<Model>("/models", {
     method: "POST",
-    body: JSON.stringify({ name, description, isPublic }),
+    body: JSON.stringify({ name, description, isPublic, type, framework, taskType }),
   });
 }
 
@@ -86,9 +93,11 @@ export async function uploadModelVersion(id: string, formData: FormData): Promis
  */
 export async function runPrediction(
   id: string,
-  parsedPayload: unknown
+  parsedPayload: unknown,
+  versionNumber?: number
 ): Promise<Record<string, unknown>> {
-  return smartFetch<Record<string, unknown>>(`/models/${id}/predict`, {
+  const url = versionNumber ? `/models/${id}/v${versionNumber}/predict` : `/models/${id}/predict`;
+  return smartFetch<Record<string, unknown>>(url, {
     method: "POST",
     body: JSON.stringify(parsedPayload),
   });
@@ -139,3 +148,70 @@ export async function getProviderLogs(): Promise<ModelLog[]> {
     cache: "no-store",
   });
 }
+
+export interface DetectedSchema {
+  framework: string;
+  task: string;
+  confidence: number;
+  inputs: unknown[];
+  outputs: unknown[];
+  warnings: string[];
+  example_payload: string;
+  expected_result: string;
+}
+
+/**
+ * Sends a model file to the backend to auto-detect its framework, task type, inputs, outputs,
+ * and generate example payloads and expected result templates.
+ *
+ * @param file - The model file binary.
+ * @returns A promise resolving to the detected schema details.
+ */
+export async function detectSchema(file: File): Promise<DetectedSchema> {
+  const formData = new FormData();
+  formData.append("model", file);
+  return smartFetch<DetectedSchema>("/models/detect-schema", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+/**
+ * Triggers the actual container build pipeline for a previously uploaded draft model version,
+ * sending the finalized request/response schema.
+ *
+ * @param versionId - The UUID of the model version.
+ * @param examplePayload - Finalized request payload string.
+ * @param expectedResult - Finalized expected response string.
+ * @returns A promise resolving to the updated ModelVersion.
+ */
+export async function buildModelVersion(
+  versionId: string,
+  examplePayload: string,
+  expectedResult: string,
+): Promise<ModelVersion> {
+  return smartFetch<ModelVersion>(`/models/versions/${versionId}/build`, {
+    method: "POST",
+    body: JSON.stringify({ examplePayload, expectedResult }),
+  });
+}
+
+/**
+ * Deprecates a model version, terminating any container running for it.
+ */
+export async function deprecateModelVersion(versionId: string): Promise<ModelVersion> {
+  return smartFetch<ModelVersion>(`/models/versions/${versionId}/deprecate`, {
+    method: "POST",
+  });
+}
+
+/**
+ * Undeprecates a model version, returning it to ready status.
+ */
+export async function undeprecateModelVersion(versionId: string): Promise<ModelVersion> {
+  return smartFetch<ModelVersion>(`/models/versions/${versionId}/undeprecate`, {
+    method: "POST",
+  });
+}
+
+

@@ -8,4 +8,9 @@ export class UploadVersionDto {
   @IsString()
   @IsOptional()
   expectedResult?: string;
+
+  @IsString()
+  @IsOptional()
+  triggerBuild?: string;
 }
+

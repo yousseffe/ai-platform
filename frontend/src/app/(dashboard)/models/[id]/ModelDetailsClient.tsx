@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { GitBranch, Settings, Layers, Code, PlayCircle, Plus, AlertTriangle, Trash2 } from "lucide-react";
 import { useModelDetails } from "@/hooks/use-model-details";
 import type { Model, ModelVersion } from "@/types";
 import { VersionHistoryTable } from "@/components/models/VersionHistoryTable";
-import { UploadVersionModal } from "@/components/models/UploadVersionModal";
 import ModelOverview from "@/components/models/ModelOverview";
 import ModelPlayground from "@/components/models/ModelPlayground";
 import ActionsTerminal from "@/components/models/ActionsTerminal";
@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { deprecateModelVersion, undeprecateModelVersion } from "@/lib/actions/models.actions";
 
 interface ModelDetailsClientProps {
   initialModel: Model;
@@ -29,28 +30,44 @@ interface ModelDetailsClientProps {
  * and prediction playgrounds using a unified tab system.
  */
 export default function ModelDetailsClient({ initialModel, modelId, isOwner = true }: ModelDetailsClientProps) {
+  const router = useRouter();
   const {
     model,
     versions,
-    showVersionModal,
-    setShowVersionModal,
-    modelFile,
-    setModelFile,
-    scalerFile,
-    setScalerFile,
-    preprocessFile,
-    setPreprocessFile,
-    postprocessFile,
-    setPreprocessFile: setPostprocessFile, // aliased correctly
-    examplePayload,
-    setExamplePayload,
-    expectedResult,
-    setExpectedResult,
-    isUploading,
     handleDeploy,
     handleStop,
-    handleUploadVersion,
+    handleRebuild,
   } = useModelDetails(modelId, initialModel);
+
+  const handleDeprecate = async (versionId: string) => {
+    try {
+      const res = await deprecateModelVersion(modelId, versionId);
+      if (res.success) {
+        alert("Version deprecated successfully!");
+        router.refresh();
+      } else {
+        alert(res.error || "Failed to deprecate version");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to deprecate version");
+    }
+  };
+
+  const handleUndeprecate = async (versionId: string) => {
+    try {
+      const res = await undeprecateModelVersion(modelId, versionId);
+      if (res.success) {
+        alert("Version activated successfully!");
+        router.refresh();
+      } else {
+        alert(res.error || "Failed to activate version");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to activate version");
+    }
+  };
 
   // Track active version in terminal build log viewer
   const [activeVersion, setActiveVersion] = useState<ModelVersion | null>(() => {
@@ -60,6 +77,8 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
     }
     return null;
   });
+
+  const [activeTab, setActiveTab] = useState("overview");
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in text-foreground">
@@ -112,7 +131,7 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
 
           {isOwner && (
             <button
-              onClick={() => setShowVersionModal(true)}
+              onClick={() => router.push(`/models/${model.id}/upload`)}
               className="btn-primary flex items-center gap-1.5 font-bold"
             >
               <Plus className="w-4.5 h-4.5" /> Push Version
@@ -122,7 +141,7 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
       </div>
 
       {/* Tabs Container */}
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList variant="line" className="border-b border-border w-full justify-start rounded-none px-0 mb-6 gap-6 select-none">
           <TabsTrigger value="overview" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
             <Code className="w-3.5 h-3.5 mr-1" /> Overview
@@ -142,7 +161,7 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
 
         {/* Tab 1: Overview README & Code Snippets */}
         <TabsContent value="overview">
-          <ModelOverview model={model} />
+          <ModelOverview model={model} selectedVersionNumber={activeVersion?.versionNumber} />
         </TabsContent>
 
         {/* Tab 2: Version History & Actions Log Terminal */}
@@ -155,8 +174,15 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
               versions={versions}
               onDeploy={handleDeploy}
               onStop={handleStop}
-              onNavigateToTest={() => {}} // Tab is inline, no navigation needed
+              onNavigateToTest={(v) => {
+                setActiveVersion(v);
+                setActiveTab("sandbox");
+              }}
+              onRebuild={handleRebuild}
+              onDeprecate={handleDeprecate}
+              onUndeprecate={handleUndeprecate}
               isOwner={isOwner}
+              modelId={modelId}
             />
           </div>
 
@@ -172,7 +198,7 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
 
         {/* Tab 3: Sandbox Playground */}
         <TabsContent value="sandbox">
-          <ModelPlayground model={model} />
+          <ModelPlayground model={model} selectedVersionNumber={activeVersion?.versionNumber} />
         </TabsContent>
 
         {/* Tab 4: Settings (GitHub Danger Zone Style) */}
@@ -199,25 +225,7 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
         )}
       </Tabs>
 
-      {showVersionModal && (
-        <UploadVersionModal
-          onClose={() => setShowVersionModal(false)}
-          isUploading={isUploading}
-          modelFile={modelFile}
-          setModelFile={setModelFile}
-          scalerFile={scalerFile}
-          setScalerFile={setScalerFile}
-          preprocessFile={preprocessFile}
-          setPreprocessFile={setPreprocessFile}
-          postprocessFile={postprocessFile}
-          setPostprocessFile={setPostprocessFile}
-          examplePayload={examplePayload}
-          setExamplePayload={setExamplePayload}
-          expectedResult={expectedResult}
-          setExpectedResult={setExpectedResult}
-          onUpload={handleUploadVersion}
-        />
-      )}
+
     </div>
   );
 }

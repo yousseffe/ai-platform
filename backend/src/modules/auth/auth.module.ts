@@ -34,8 +34,21 @@ import { getRsaKeys } from './utils/keys';
     OrganizationsModule,
     WalletsModule,
   ],
-  providers: [AuthService, JwtStrategy, OrgRoleGuard, ApiKeyOrJwtGuard, AdminGuard],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    OrgRoleGuard,
+    ApiKeyOrJwtGuard,
+    AdminGuard,
+  ],
   controllers: [AuthController],
-  exports: [AuthService, OrgRoleGuard, ApiKeyOrJwtGuard, AdminGuard, TypeOrmModule, JwtModule],
+  exports: [
+    AuthService,
+    OrgRoleGuard,
+    ApiKeyOrJwtGuard,
+    AdminGuard,
+    TypeOrmModule,
+    JwtModule,
+  ],
 })
 export class AuthModule {}

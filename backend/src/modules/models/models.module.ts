@@ -5,6 +5,7 @@ import { ModelsService } from './services/models.service';
 import { ModelsSearchService } from './services/models-search.service';
 import { ModelsController } from './controllers/models.controller';
 import { SearchController } from './controllers/search.controller';
+import { SchemaController } from './controllers/schema.controller';
 import { Model } from './entities/model.entity';
 import { ModelVersion } from './entities/model-version.entity';
 import { ModelLog } from './entities/model-log.entity';
@@ -34,9 +35,18 @@ import { WalletsModule } from '../wallets/wallets.module';
     UsersModule,
     WalletsModule,
   ],
-  providers: [ModelsService, ModelsSearchService, ModelsRepository, ModelVersionsRepository],
-  controllers: [SearchController, ModelsController],
-  exports: [ModelsService, ModelsSearchService, ModelsRepository, ModelVersionsRepository],
+  providers: [
+    ModelsService,
+    ModelsSearchService,
+    ModelsRepository,
+    ModelVersionsRepository,
+  ],
+  controllers: [SearchController, ModelsController, SchemaController],
+  exports: [
+    ModelsService,
+    ModelsSearchService,
+    ModelsRepository,
+    ModelVersionsRepository,
+  ],
 })
 export class ModelsModule {}
-

@@ -7,8 +7,12 @@ interface VersionHistoryTableProps {
   versions: ModelVersion[];
   onDeploy: (versionId: string) => void;
   onStop: (deploymentId: string) => void;
-  onNavigateToTest: () => void;
+  onNavigateToTest: (v: ModelVersion) => void;
+  onRebuild?: (versionId: string) => void;
+  onDeprecate?: (versionId: string) => void;
+  onUndeprecate?: (versionId: string) => void;
   isOwner?: boolean;
+  modelId: string;
 }
 
 /**
@@ -23,7 +27,11 @@ export function VersionHistoryTable({
   onDeploy,
   onStop,
   onNavigateToTest,
+  onRebuild,
+  onDeprecate,
+  onUndeprecate,
   isOwner = true,
+  modelId,
 }: VersionHistoryTableProps) {
   return (
     <div className="overflow-x-auto">
@@ -38,7 +46,7 @@ export function VersionHistoryTable({
               <th className="px-6 py-4">Version Number</th>
               <th className="px-6 py-4">Status checks</th>
               <th className="px-6 py-4">Pushed</th>
-              <th className="px-6 py-4">Metrics</th>
+              <th className="px-6 py-4">Endpoint URL</th>
               <th className="px-6 py-4 text-right">Actions</th>
             </tr>
           </thead>
@@ -59,17 +67,26 @@ export function VersionHistoryTable({
                   displayStatus = latestDeployment.status === DeploymentStatus.RUNNING ? "deployed" : latestDeployment.status;
                 }
 
+                // If the version is deprecated, force displayStatus to deprecated (since active deployments should have been stopped)
+                if (v.status === VersionStatus.DEPRECATED) {
+                  displayStatus = VersionStatus.DEPRECATED;
+                }
+
                 const hasError = v.status === VersionStatus.FAILED || (latestDeployment && latestDeployment.status === DeploymentStatus.FAILED);
                 const errorMessage = v.errorMessage || (latestDeployment && latestDeployment.errorMessage);
 
                 let badgeClass = "bg-muted text-muted-foreground border-border";
                 if (displayStatus === "deployed" || displayStatus === VersionStatus.READY) {
-                  badgeClass = "bg-emerald-950/40 text-emerald-400 border-emerald-500/20";
+                   badgeClass = "bg-emerald-950/40 text-emerald-400 border-emerald-500/20";
                 } else if (displayStatus === VersionStatus.BUILDING || displayStatus === DeploymentStatus.STARTING) {
                   badgeClass = "bg-blue-950/40 text-blue-400 border-blue-500/20";
+                } else if (displayStatus === VersionStatus.DEPRECATED) {
+                  badgeClass = "bg-amber-950/40 text-amber-450 border-amber-500/20";
                 } else if (hasError) {
                   badgeClass = "bg-red-950/40 text-red-400 border-red-500/20";
                 }
+
+                const endpointUrl = `http://localhost:5000/api/v1/models/${modelId}/v${v.versionNumber}/predict`;
 
                 return (
                   <React.Fragment key={i}>
@@ -86,8 +103,10 @@ export function VersionHistoryTable({
                                 ? "bg-emerald-500 animate-pulse"
                                 : displayStatus === VersionStatus.BUILDING || displayStatus === DeploymentStatus.STARTING
                                 ? "bg-blue-500 animate-spin"
+                                : displayStatus === VersionStatus.DEPRECATED
+                                ? "bg-amber-500"
                                 : hasError
-                                ? "bg-red-500"
+                                ? "bg-red-50"
                                 : "bg-muted-foreground"
                             }`}
                           ></div>
@@ -97,9 +116,37 @@ export function VersionHistoryTable({
                         </div>
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">{new Date(v.createdAt).toLocaleDateString()}</td>
-                      <td className="px-6 py-4 text-muted-foreground">--</td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {displayStatus === "deployed" ? (
+                          <div className="flex items-center gap-2 bg-slate-105 dark:bg-slate-900/60 border border-border px-2.5 py-1 rounded-lg w-fit max-w-[200px] select-none">
+                            <span className="truncate text-[10px] text-muted-foreground select-all font-mono">
+                              /v{v.versionNumber}/predict
+                            </span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(endpointUrl);
+                                alert("Copied full endpoint URL to clipboard!");
+                              }}
+                              className="text-[9px] text-primary hover:text-primary/80 cursor-pointer font-bold shrink-0 font-sans"
+                              title={endpointUrl}
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground/40 font-sans font-medium">--</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
+                          {isOwner && v.status === VersionStatus.FAILED && onRebuild && (
+                            <button
+                              onClick={() => onRebuild(v.id)}
+                              className="btn-outline px-3 py-1 text-[11px] border-blue-900/50 bg-blue-950/20 text-blue-400 hover:bg-blue-950/40 hover:text-blue-300"
+                            >
+                              Rebuild
+                            </button>
+                          )}
                           {isOwner && v.status === VersionStatus.READY && (!latestDeployment || latestDeployment.status !== DeploymentStatus.RUNNING) && (
                             <button
                               onClick={() => onDeploy(v.id)}
@@ -113,11 +160,27 @@ export function VersionHistoryTable({
                               onClick={() => onStop(latestDeployment.id)}
                               className="btn-outline px-3 py-1 text-[11px] border-red-900/50 bg-red-950/20 text-red-400 hover:bg-red-950/40 hover:text-red-300"
                             >
-                              Stop
+                              Stop Container
+                            </button>
+                          )}
+                          {isOwner && v.status === VersionStatus.DEPRECATED && onUndeprecate && (
+                            <button
+                              onClick={() => onUndeprecate(v.id)}
+                              className="btn-outline px-3 py-1 text-[11px] border-emerald-900/50 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300"
+                            >
+                              Activate
+                            </button>
+                          )}
+                          {isOwner && (v.status === VersionStatus.READY || displayStatus === "deployed" || displayStatus === DeploymentStatus.STARTING) && onDeprecate && (
+                            <button
+                              onClick={() => onDeprecate(v.id)}
+                              className="btn-outline px-3 py-1 text-[11px] border-amber-900/50 bg-amber-950/20 text-amber-400 hover:bg-amber-950/40 hover:text-amber-300"
+                            >
+                              Deprecate
                             </button>
                           )}
                           <button
-                            onClick={onNavigateToTest}
+                            onClick={() => onNavigateToTest(v)}
                             disabled={displayStatus !== "deployed"}
                             className={`btn-outline px-3 py-1 text-[11px] ${
                               displayStatus !== "deployed" ? "opacity-30 cursor-not-allowed border-border text-muted-foreground/50 bg-background" : ""

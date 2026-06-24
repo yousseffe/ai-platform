@@ -9,6 +9,8 @@ import { toast } from "react-hot-toast";
 
 import { createModel } from "@/lib/actions/models.actions";
 import { uploadModelFormSchema, type UploadModelFormInput } from "@/lib/schemas";
+import { detectSchema } from "@/lib/services/models.service";
+
 
 /**
  * Custom React hook to coordinate machine learning model upload workflows.
@@ -25,6 +27,8 @@ export function useUploadModel() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [createdModelId, setCreatedModelId] = useState<string | null>(null);
+  const [createdVersionId, setCreatedVersionId] = useState<string | null>(null);
 
   // Initialize React Hook Form
   const form = useForm<UploadModelFormInput>({
@@ -33,6 +37,9 @@ export function useUploadModel() {
     defaultValues: {
       name: "",
       description: "",
+      type: "TABULAR",
+      framework: "CUSTOM",
+      taskType: "OTHER",
       isPublic: false,
       modelFile: null,
       scalerFile: null,
@@ -85,6 +92,61 @@ export function useUploadModel() {
   const postprocessMode = watch("postprocessMode") || "file";
 
   /**
+   * Uploads model artifacts and scripts to the backend in draft mode (triggerBuild=false)
+   * and auto-populates the schema templates returned by the Python introspector.
+   */
+  /**
+   * Statelessly analyzes the uploaded model weights file to auto-detect its framework/inputs/outputs
+   * and auto-populates the schema templates returned by the Python introspector.
+   */
+  const analyzeModelSchema = async () => {
+    setSubmitError("");
+    setIsUploading(true);
+    setUploadStatus("Analyzing model weights and detecting schema...");
+    setUploadProgress(20);
+
+    try {
+      const model = form.getValues("modelFile");
+      if (!model) {
+        throw new Error("Please upload a model weights file first.");
+      }
+
+      setUploadProgress(50);
+      const result = await detectSchema(model);
+      setUploadProgress(90);
+
+      // Auto-populate examplePayload and expectedResult if detected
+      if (result.example_payload) {
+        form.setValue("examplePayload", result.example_payload);
+      }
+      if (result.expected_result) {
+        form.setValue("expectedResult", result.expected_result);
+      }
+
+      setUploadStatus("Analysis complete!");
+      setUploadProgress(100);
+
+      // Brief timeout before transitioning to Step 3
+      setTimeout(() => {
+        setIsUploading(false);
+        setStep(3);
+        setUploadProgress(0);
+        setUploadStatus("");
+      }, 500);
+    } catch (e: unknown) {
+      console.error(e);
+      let errMsg = "Schema detection failed.";
+      if (e instanceof Error) {
+        errMsg = e.message;
+      }
+      setSubmitError(errMsg);
+      setIsUploading(false);
+      setUploadProgress(0);
+      toast.error(errMsg);
+    }
+  };
+
+  /**
    * Validates form parameters for the active step before advancing.
    */
   const handleNextStep = async () => {
@@ -97,7 +159,7 @@ export function useUploadModel() {
     } else if (step === 2) {
       const isValid = await trigger(["modelFile"]);
       if (isValid) {
-        setStep(3);
+        await analyzeModelSchema();
       }
     }
   };
@@ -111,7 +173,8 @@ export function useUploadModel() {
   };
 
   /**
-   * Registers a model and transfers the build files packages to backend storage.
+   * Finalizes the model creation by registering the model in the database, 
+   * uploading the artifacts, saving the schema configs, and starting the build.
    *
    * @param data - The parsed model schema options.
    */
@@ -122,21 +185,27 @@ export function useUploadModel() {
     setUploadProgress(10);
 
     try {
-      // 1. Create model registry entry via Server Action
-      const createRes = await createModel(data.name, data.description || "", data.isPublic || false);
+      // 1. Create model registry entry
+      const isPublicBool = (data.isPublic as unknown) === "true" || data.isPublic === true;
+      const createRes = await createModel(
+        data.name,
+        data.description || "",
+        isPublicBool,
+        data.type,
+        data.framework,
+        data.taskType
+      );
       if (!createRes.success) {
-        setSubmitError(createRes.error || "Model registry creation failed.");
-        setIsUploading(false);
-        setUploadProgress(0);
-        toast.error("Failed to initialize model registry.");
-        return;
+        throw new Error(createRes.error || "Model registry creation failed.");
       }
-
       const modelId = createRes.data.id;
+      setCreatedModelId(modelId);
+      setUploadProgress(30);
+      setUploadStatus("Uploading artifacts & starting compilation...");
 
       // 2. Prepare payload files for version upload
       const formData = new FormData();
-      formData.append("model", data.modelFile);
+      formData.append("model", data.modelFile!);
       if (data.scalerFile) formData.append("scaler", data.scalerFile);
 
       if (data.preprocessMode === "file" && data.preprocessFile) {
@@ -153,39 +222,40 @@ export function useUploadModel() {
         formData.append("postprocess", blob, "postprocess.py");
       }
 
-      if (data.examplePayload) formData.append("examplePayload", data.examplePayload);
-      if (data.expectedResult) formData.append("expectedResult", data.expectedResult);
+      // Add schema configuration and trigger build flag
+      formData.append("examplePayload", data.examplePayload || "");
+      formData.append("expectedResult", data.expectedResult || "");
+      formData.append("triggerBuild", "true");
 
-      setUploadStatus("Transferring artifacts to remote storage...");
-
-      // 3. Upload version files using Axios to track binary upload progress
+      // 3. Upload version files using Axios to track progress
       const response = await axios.post(`/api/models/${modelId}/versions`, formData, {
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
-            const percentCompleted = Math.round((progressEvent.loaded * 80) / progressEvent.total);
-            setUploadProgress(10 + percentCompleted);
+            const percentCompleted = Math.round((progressEvent.loaded * 60) / progressEvent.total);
+            setUploadProgress(30 + percentCompleted);
           }
         },
       });
 
       if (response.status >= 200 && response.status < 300) {
-        setUploadStatus("Artifacts successfully queued for compilation!");
+        const version = response.data;
+        setCreatedVersionId(version.id);
+
+        setUploadStatus("Model successfully uploaded and queued for compilation!");
         setUploadProgress(100);
-        toast.success("Model uploaded successfully!");
+        toast.success("Model uploaded and compilation started!");
+
         setTimeout(() => {
           router.push(`/models/${modelId}`);
           router.refresh();
         }, 800);
       } else {
         const errorMsg = response.data?.message || "Upload failed";
-        setSubmitError(errorMsg);
-        setIsUploading(false);
-        setUploadProgress(0);
-        toast.error("Upload failed.");
+        throw new Error(errorMsg);
       }
     } catch (e: unknown) {
       console.error(e);
-      let errMsg = "An unexpected error occurred.";
+      let errMsg = "An unexpected error occurred during final submission.";
       if (axios.isAxiosError(e)) {
         errMsg = e.response?.data?.message || e.message || errMsg;
       } else if (e instanceof Error) {
@@ -195,6 +265,40 @@ export function useUploadModel() {
       setIsUploading(false);
       setUploadProgress(0);
       toast.error(errMsg);
+    }
+  };
+
+  const [isDetectingSchema, setIsDetectingSchema] = useState(false);
+
+  /**
+   * Triggers the automated model schema detection using the currently attached model file.
+   * On success, updates the form values for examplePayload and expectedResult.
+   */
+  const handleDetectSchema = async () => {
+    const model = form.getValues("modelFile");
+    if (!model) {
+      toast.error("Please upload a model file first in Step 2.");
+      return;
+    }
+
+    setIsDetectingSchema(true);
+    try {
+      const result = await detectSchema(model);
+      
+      // Update form values
+      if (result.example_payload) {
+        form.setValue("examplePayload", result.example_payload);
+      }
+      if (result.expected_result) {
+        form.setValue("expectedResult", result.expected_result);
+      }
+      
+      toast.success("Model schema detected and loaded successfully!");
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      toast.error(`Schema detection failed: ${errMsg}`);
+    } finally {
+      setIsDetectingSchema(false);
     }
   };
 
@@ -216,5 +320,7 @@ export function useUploadModel() {
     handleNextStep,
     onSubmit,
     onInvalidSubmit,
+    isDetectingSchema,
+    handleDetectSchema,
   };
 }

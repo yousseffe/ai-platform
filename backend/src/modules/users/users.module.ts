@@ -17,7 +17,14 @@ import { WalletsModule } from '../wallets/wallets.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuditLog, ApiKey, Model, SystemConfig, Wallet]),
+    TypeOrmModule.forFeature([
+      User,
+      AuditLog,
+      ApiKey,
+      Model,
+      SystemConfig,
+      Wallet,
+    ]),
     WalletsModule,
   ],
   providers: [UsersService, UsersRepository],
