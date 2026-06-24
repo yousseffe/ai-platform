@@ -34,9 +34,18 @@ import { WalletsModule } from '../wallets/wallets.module';
     UsersModule,
     WalletsModule,
   ],
-  providers: [ModelsService, ModelsSearchService, ModelsRepository, ModelVersionsRepository],
+  providers: [
+    ModelsService,
+    ModelsSearchService,
+    ModelsRepository,
+    ModelVersionsRepository,
+  ],
   controllers: [SearchController, ModelsController],
-  exports: [ModelsService, ModelsSearchService, ModelsRepository, ModelVersionsRepository],
+  exports: [
+    ModelsService,
+    ModelsSearchService,
+    ModelsRepository,
+    ModelVersionsRepository,
+  ],
 })
 export class ModelsModule {}
-

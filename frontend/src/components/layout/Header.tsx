@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, Bell, HelpCircle, Coins, TrendingUp, Sun, Moon } from "lucide-react";
+import { Bell, HelpCircle, Coins, TrendingUp, Sun, Moon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Session } from "next-auth";
 import Image from "next/image";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { WalletType } from "@/types";
 
@@ -25,13 +24,16 @@ interface HeaderProps {
 export default function Header({ session }: HeaderProps) {
   const pathname = usePathname();
   const { activeWorkspace, viewMode, balance } = useWorkspace();
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-      return savedTheme || "dark";
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
     }
-    return "dark";
-  });
+  }, []);
 
   useEffect(() => {
     if (theme === "dark") {
@@ -70,18 +72,6 @@ export default function Header({ session }: HeaderProps) {
         {getBreadcrumb()}
       </div>
 
-      {/* Global developer search */}
-      <div className="flex-1 flex justify-center max-w-md px-4 mx-auto">
-        <div className="relative w-full">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search models, tasks, or API logs..."
-            className="w-full pl-8 pr-3 py-1.5 h-8 bg-background border-border text-foreground text-xs focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:border-primary transition-all rounded-lg"
-          />
-        </div>
-      </div>
-
       {/* Header Actions */}
       <div className="flex items-center gap-3">
         {/* Wallet stats badge */}
@@ -111,9 +101,9 @@ export default function Header({ session }: HeaderProps) {
           size="icon" 
           onClick={toggleTheme}
           className="text-muted-foreground hover:text-foreground cursor-pointer h-8 w-8 hover:bg-secondary rounded-lg transition-colors"
-          title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          title={!mounted || theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
         >
-          {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          {!mounted || theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
         </Button>
 
         {/* Notifications and help shortcuts */}

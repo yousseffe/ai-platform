@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import NextAuthSessionProvider from "@/components/providers/SessionProvider";
 import { Toaster } from "react-hot-toast";
+import ThemeScript from "@/components/ThemeScript";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,6 +9,15 @@ export const metadata: Metadata = {
   description: "Enterprise model registry, version control, and containerized deployment infrastructure.",
 };
 
+/**
+ * Root layout component for the application.
+ * Injects global CSS styles, initializes the theme based on local storage to prevent flickering,
+ * and sets up global providers like SessionProvider and Toaster.
+ *
+ * @param props - The props object.
+ * @param props.children - The children React nodes to render.
+ * @returns The HTML structure wrapping the application.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -16,22 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="font-sans" suppressHydrationWarning>
       <body>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  const savedTheme = localStorage.getItem('theme') || 'dark';
-                  if (savedTheme === 'dark') {
-                    document.documentElement.classList.add('dark');
-                  } else {
-                    document.documentElement.classList.remove('dark');
-                  }
-                } catch (e) {}
-              })()
-            `,
-          }}
-        />
+        <ThemeScript />
         <NextAuthSessionProvider>
           <Toaster 
             position="top-right" 

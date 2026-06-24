@@ -194,7 +194,9 @@ export default function StepArtifacts({
                 <p className={`text-xs font-bold ${preprocessFile ? "text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-200"}`}>
                   {preprocessFile ? `Attached: ${preprocessFile.name}` : "Upload preprocess.py script"}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-1 font-sans font-medium">Define feature transformation rules.</p>
+                <p className="text-[9.5px] text-muted-foreground/80 mt-1 font-sans font-medium">
+                  Must implement <code className="bg-secondary dark:bg-slate-800 px-1.5 py-0.5 rounded text-[8.5px] text-primary">preprocess(data: dict) -&gt; list/dict</code>.
+                </p>
               </div>
               <div className="w-7 h-7 rounded-full border border-slate-200 dark:border-border flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                 <Plus className="w-3.5 h-3.5" />
@@ -203,7 +205,7 @@ export default function StepArtifacts({
           ) : (
             <textarea
               className="w-full bg-slate-950 text-emerald-400 font-mono text-[11px] p-5 h-[140px] resize-none focus:outline-none border-0 leading-relaxed"
-              placeholder="def preprocess(data):&#10;    # Input features processing&#10;    # return dict / lists&#10;    return data"
+              placeholder="def preprocess(data: dict) -> dict:&#10;    # Input features processing&#10;    # return dict or numpy array&#10;    return data"
               {...register("preprocessCode")}
               disabled={isUploading}
             />
@@ -270,7 +272,9 @@ export default function StepArtifacts({
                 <p className={`text-xs font-bold ${postprocessFile ? "text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-200"}`}>
                   {postprocessFile ? `Attached: ${postprocessFile.name}` : "Upload postprocess.py script"}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-1 font-sans font-medium">Format raw model prediction values.</p>
+                <p className="text-[9.5px] text-muted-foreground/80 mt-1 font-sans font-medium">
+                  Must implement <code className="bg-secondary dark:bg-slate-800 px-1.5 py-0.5 rounded text-[8.5px] text-primary">postprocess(prediction: any) -&gt; dict</code>.
+                </p>
               </div>
               <div className="w-7 h-7 rounded-full border border-slate-200 dark:border-border flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                 <Plus className="w-3.5 h-3.5" />
@@ -278,8 +282,8 @@ export default function StepArtifacts({
             </div>
           ) : (
             <textarea
-              className="w-full bg-slate-950 text-emerald-400 font-mono text-[11px] p-5 h-[140px] resize-none focus:outline-none border-0 leading-relaxed"
-              placeholder="def postprocess(prediction):&#10;    # Format output dictionary&#10;    # return dict&#10;    return prediction"
+              className="w-full bg-slate-950 text-emerald-405 font-mono text-[11px] p-5 h-[140px] resize-none focus:outline-none border-0 leading-relaxed"
+              placeholder="def postprocess(prediction) -> dict:&#10;    # Format output dictionary&#10;    # return JSON serializable dict&#10;    return {'prediction': prediction}"
               {...register("postprocessCode")}
               disabled={isUploading}
             />

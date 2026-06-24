@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { deployVersion, stopDeployment } from "@/lib/actions/deployments.actions";
+import { deleteModel } from "@/lib/actions/models.actions";
 import { Model, ModelVersion, Deployment, DeploymentStatus, VersionStatus } from "@/types";
 
 /**
@@ -109,6 +110,28 @@ export function useModelDetails(modelId: string, initialModel: Model) {
   };
 
   /**
+   * Triggers the deletion of this model repository.
+   * Refreshes dashboard navigation on success.
+   */
+  const handleDeleteModel = async () => {
+    if (!confirm(`Are you sure you want to delete the model "${model.name}"? This action is irreversible.`)) {
+      return;
+    }
+    try {
+      const res = await deleteModel(modelId);
+      if (res.success) {
+        alert("Model deleted successfully.");
+        router.push("/models");
+      } else {
+        alert(res.error || "Failed to delete model");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete model");
+    }
+  };
+
+  /**
    * Helper function to check if a model version is in a transient state.
    * A version is transient if it is currently uploading, building,
    * or has a running deployment starting up.
@@ -178,5 +201,6 @@ export function useModelDetails(modelId: string, initialModel: Model) {
     handleDeploy,
     handleStop,
     handleUploadVersion,
+    handleDeleteModel,
   };
 }

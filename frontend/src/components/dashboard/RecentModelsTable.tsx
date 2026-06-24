@@ -3,7 +3,6 @@ import { Server, RefreshCw, CheckCircle2, AlertCircle, HelpCircle } from "lucide
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 
 export interface RecentModelItem {
   id: string;
@@ -75,15 +74,14 @@ export function RecentModelsTable({ recentModels }: RecentModelsTableProps) {
             </TableHeader>
             <TableBody className="divide-y divide-border text-xs text-foreground">
               {recentModels.map((m, i) => {
-                const badgeVariant: "default" | "secondary" | "destructive" | "outline" = "outline";
-                let badgeClass = "bg-muted text-muted-foreground border-border";
+                let badgeClass = "badge-neutral";
 
-                if (m.status === "LIVE") {
-                  badgeClass = "bg-emerald-950/40 text-emerald-400 border-emerald-500/20";
-                } else if (m.status === "READY") {
-                  badgeClass = "bg-blue-950/40 text-blue-400 border-blue-500/20";
+                if (m.status === "LIVE" || m.status === "READY") {
+                  badgeClass = "badge-success";
                 } else if (m.status === "BUILDING") {
-                  badgeClass = "bg-amber-950/40 text-amber-400 border-amber-500/20";
+                  badgeClass = "badge-info";
+                } else if (m.status === "FAILED") {
+                  badgeClass = "badge-danger";
                 }
 
                 return (
@@ -112,9 +110,9 @@ export function RecentModelsTable({ recentModels }: RecentModelsTableProps) {
                     <TableCell className="px-5 py-4">
                       <div className="flex items-center gap-2 select-none">
                         {getStatusIcon(m.status)}
-                        <Badge variant={badgeVariant} className={`text-[9px] font-bold tracking-wider py-0.5 px-2 uppercase rounded border ${badgeClass}`}>
+                        <span className={`badge ${badgeClass} text-[9px] font-bold tracking-wider uppercase font-mono`}>
                           {m.status}
-                        </Badge>
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="px-5 py-4 text-muted-foreground font-mono">{m.time}</TableCell>

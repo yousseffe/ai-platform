@@ -60,7 +60,7 @@ export default function StepInterfaceConfig({
               {errors.examplePayload.message}
             </p>
           ) : (
-            <p className="text-[10px] text-slate-400 leading-relaxed font-sans font-medium">Provide a sample request structure to help users understand the API interface.</p>
+            <p className="text-[10px] text-slate-400 leading-relaxed font-sans font-medium">Provide a sample request payload. The system performs a dry-run execution with this data inside the compiled container before deploying the active endpoint.</p>
           )}
         </div>
 
@@ -90,7 +90,7 @@ export default function StepInterfaceConfig({
               {errors.expectedResult.message}
             </p>
           ) : (
-            <p className="text-[10px] text-slate-400 leading-relaxed font-sans font-medium">Define the schema for successful model inference responses.</p>
+            <p className="text-[10px] text-slate-400 leading-relaxed font-sans font-medium">Provide the expected response JSON structure. Used to auto-generate the prediction schema and build interactive playground sandboxes.</p>
           )}
         </div>
       </div>

@@ -69,7 +69,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto space-y-6 font-sans">
+      <div className="w-full space-y-6 font-sans">
         {/* Shimmer Header */}
         <div className="border-b border-border pb-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-2 text-left">

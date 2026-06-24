@@ -38,6 +38,9 @@ export interface Model {
   costPerRequest?: number;
   providerSharePercent?: number;
   isPublic?: boolean;
+  type?: string;
+  taskType?: string;
+  framework?: string;
   createdAt: string;
   updatedAt: string;
 }

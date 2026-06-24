@@ -47,7 +47,7 @@ export default async function ModelDetailsPage({ params }: PageProps) {
     notFound();
   }
 
-  const isOwner = session?.user?.id === model.user?.id;
+  const isOwner = session?.user?.id === model.user?.id || session?.user?.email === model.user?.email;
   const isPublic = !!model.isPublic;
 
   // Protect private models from non-owners

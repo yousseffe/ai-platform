@@ -18,6 +18,9 @@ import {
   Coins,
   Shield,
   CreditCard,
+  User,
+  Key,
+  Activity,
 } from "lucide-react";
 import { useWorkspace, Workspace } from "@/hooks/use-workspace";
 import { OwnerType, WalletType } from "@/types";
@@ -40,12 +43,44 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+
+/**
+ * Helper component rendering a sidebar link with a left-indicator line.
+ */
+interface SidebarLinkProps {
+  href: string;
+  active: boolean;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}
+
+function SidebarLink({ href, active, icon, children }: SidebarLinkProps) {
+  return (
+    <Link
+      href={href}
+      className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium transition-all text-xs select-none ${
+        active
+          ? "bg-primary/[0.06] text-primary font-semibold shadow-xs"
+          : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+      }`}
+    >
+      {active && (
+        <span className="absolute left-1 top-2.5 bottom-2.5 w-0.75 rounded-full bg-primary" />
+      )}
+      <span className={`transition-colors ${active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}>
+        {icon}
+      </span>
+      {children}
+    </Link>
+  );
+}
 
 /**
  * Platform navigation Sidebar component.
  * Integrates Shadcn Dropdown switcher for workspaces, dual role layout toggles,
  * active status details, and OTP verification challenge overlays.
- * Styled in the premium Expo Go console theme.
+ * Refactored to include a collapsible Settings menu for sub-routing settings tabs.
  *
  * @returns The React component rendering the sidebar.
  */
@@ -70,6 +105,19 @@ export default function Sidebar() {
   const [otpError, setOtpError] = React.useState("");
   const [verifyingOtp, setVerifyingOtp] = React.useState(false);
 
+  // Collapsible Settings menu state
+  const isSettingsActive = pathname.startsWith("/settings");
+  const [settingsOpen, setSettingsOpen] = React.useState(isSettingsActive);
+
+  // Keep menu expanded if settings page route is loaded directly
+  const [prevPathname, setPrevPathname] = React.useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    if (isSettingsActive) {
+      setSettingsOpen(true);
+    }
+  }
+
   const handleLogout = async () => {
     await signOut({ callbackUrl: "/login" });
   };
@@ -80,13 +128,6 @@ export default function Sidebar() {
     }
     return pathname.startsWith(path);
   };
-
-  const linkClass = (path: string) =>
-    `flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-all text-xs ${
-      isActive(path)
-        ? "bg-primary/10 text-primary font-semibold shadow-sm"
-        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-    }`;
 
   const getWorkspaceInitials = (name: string) => {
     return name.replace(/\(Personal\)/gi, "").trim().substring(0, 2).toUpperCase();
@@ -114,7 +155,7 @@ export default function Sidebar() {
     <div className="w-60 bg-card border-r border-border flex flex-col h-screen shrink-0 relative z-30 font-sans">
       {/* Logo Area */}
       <div className="h-14 flex items-center px-6 border-b border-border">
-        <Link href="/dashboard" className="flex items-center gap-2 text-primary font-bold text-sm tracking-tight">
+        <Link href="/dashboard" className="flex items-center gap-2 text-primary font-bold text-sm tracking-tight hover:opacity-90 transition-opacity">
           <div className="w-7 h-7 relative flex items-center justify-center shrink-0">
             <Image
               src="/logo.png"
@@ -132,56 +173,58 @@ export default function Sidebar() {
       {/* Workspace Switcher */}
       <div className="px-3 py-3 border-b border-border">
         <DropdownMenu>
-          <DropdownMenuTrigger className="w-full flex items-center justify-between p-2 h-9 rounded-lg border border-border bg-background hover:bg-secondary hover:text-foreground transition-all cursor-pointer text-left focus:outline-none text-[11px] font-sans">
-            <div className="flex items-center gap-2 overflow-hidden">
-              <div className="w-6 h-6 rounded bg-primary text-primary-foreground font-bold text-[10px] flex items-center justify-center shrink-0">
+          <DropdownMenuTrigger className="w-full flex items-center justify-between px-2.5 py-1.5 h-10 rounded-lg border border-border bg-background/50 hover:bg-secondary/80 hover:border-border transition-all cursor-pointer text-left focus:outline-none text-[11px] font-sans shadow-xs font-normal">
+            <div className="flex items-center gap-2.5 overflow-hidden text-left">
+              <div className="w-6 h-6 rounded bg-gradient-to-br from-primary to-primary-600 text-primary-foreground font-bold text-[10px] flex items-center justify-center shrink-0 shadow-sm">
                 {activeWorkspace ? getWorkspaceInitials(activeWorkspace.name) : "ML"}
               </div>
               <div className="flex flex-col overflow-hidden">
                 <span className="text-[11px] font-semibold text-foreground truncate leading-none">
                   {activeWorkspace ? activeWorkspace.name : "Loading..."}
                 </span>
-                <span className="text-[8px] text-muted-foreground font-medium tracking-wide mt-0.5 uppercase">
+                <span className="text-[8px] text-muted-foreground font-semibold tracking-wider mt-1 uppercase">
                   {activeWorkspace?.type === OwnerType.USER ? "Personal" : `Org • ${activeWorkspace?.role}`}
                 </span>
               </div>
             </div>
-            <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0 ml-auto" />
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0 opacity-60 transition-opacity ml-auto" strokeWidth={1.5} />
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent className="w-[216px] mt-1 bg-card border border-border shadow-xl rounded-lg p-1 flex flex-col gap-0.5 max-h-[240px] overflow-y-auto z-40 text-foreground font-sans">
+          <DropdownMenuContent className="w-[216px] mt-1 bg-card border border-border shadow-lg rounded-xl p-1.5 flex flex-col gap-0.5 max-h-[280px] overflow-y-auto z-40 text-foreground font-sans">
             <DropdownMenuGroup>
-              <DropdownMenuLabel className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider px-2 py-1">
+              <DropdownMenuLabel className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-2.5 py-1.5">
                 Organizations
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-border my-0.5" />
+              <DropdownMenuSeparator className="bg-border/60 my-1" />
               {workspaces.map((ws: Workspace) => (
                 <DropdownMenuItem
                   key={ws.id}
                   onClick={() => triggerWorkspaceSwitch(ws)}
-                  className={`w-full flex items-center gap-2 p-1.5 rounded-md text-left text-xs transition-colors hover:bg-secondary cursor-pointer ${
-                    activeWorkspace?.id === ws.id ? "bg-primary/5 font-semibold text-primary" : ""
+                  className={`w-full flex items-center gap-2.5 p-2 rounded-lg text-left text-xs transition-colors cursor-pointer outline-none ${
+                    activeWorkspace?.id === ws.id 
+                      ? "bg-primary/10 font-semibold text-primary" 
+                      : "hover:bg-secondary focus:bg-secondary text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <div className="w-5 h-5 rounded bg-muted text-muted-foreground font-bold text-[9px] flex items-center justify-center shrink-0">
+                  <div className="w-5.5 h-5.5 rounded bg-muted text-muted-foreground font-bold text-[9px] flex items-center justify-center shrink-0">
                     {getWorkspaceInitials(ws.name)}
                   </div>
                   <div className="flex flex-col truncate">
-                    <span className="text-foreground text-xs truncate leading-none">{ws.name}</span>
-                    <span className="text-[7px] text-muted-foreground uppercase font-bold tracking-wider mt-0.5">
+                    <span className="text-foreground text-xs truncate leading-none font-medium">{ws.name}</span>
+                    <span className="text-[7.5px] text-muted-foreground uppercase font-bold tracking-wider mt-0.5">
                       {ws.type === OwnerType.USER ? "Personal" : ws.role}
                     </span>
                   </div>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>
-            <DropdownMenuSeparator className="bg-border my-1" />
+            <DropdownMenuSeparator className="bg-border/60 my-1" />
             <DropdownMenuItem className="p-0">
               <Link
                 href="/workspaces/create"
-                className="w-full flex items-center gap-2 p-1.5 rounded-md text-left text-xs font-semibold text-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 p-2 rounded-lg text-left text-xs font-semibold text-primary hover:bg-primary/5 focus:bg-primary/5 transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" /> Create Organization
+                <Plus className="w-3.5 h-3.5" strokeWidth={2} /> Create Organization
               </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -190,103 +233,181 @@ export default function Sidebar() {
 
       {/* Role view toggle (Consumer Mode vs Provider Mode) */}
       {isProviderModeEnabled && (
-        <div className="px-3 py-2 border-b border-border bg-secondary/30 flex flex-col gap-1.5">
-          <div className="flex bg-muted rounded-md p-0.5 border border-border/50">
-            <button
+        <div className="px-3 py-2.5 border-b border-border bg-secondary/15 flex flex-col gap-1.5">
+          <div className="flex bg-muted/65 rounded-lg p-1 border border-border/70">
+            <Button
+              variant={viewMode === WalletType.CONSUMER ? "secondary" : "ghost"}
+              size="sm"
               onClick={() => setViewMode(WalletType.CONSUMER)}
-              className={`flex-1 py-1 rounded text-[10px] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`flex-1 text-[10px] font-semibold h-7 cursor-pointer ${
                 viewMode === WalletType.CONSUMER
-                  ? "bg-card text-primary shadow-sm border border-border/60"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-card text-primary shadow-sm border border-border"
+                  : "text-muted-foreground hover:text-foreground hover:bg-card/30"
               }`}
             >
-              <Coins className="w-3 h-3" /> Consumer
-            </button>
-            <button
+              <Coins className="w-3.5 h-3.5" strokeWidth={1.5} /> Consumer
+            </Button>
+            <Button
+              variant={viewMode === WalletType.PROVIDER ? "default" : "ghost"}
+              size="sm"
               onClick={() => setViewMode(WalletType.PROVIDER)}
-              className={`flex-1 py-1 rounded text-[10px] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`flex-1 text-[10px] font-semibold h-7 cursor-pointer ${
                 viewMode === WalletType.PROVIDER
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/95"
+                  : "text-muted-foreground hover:text-foreground hover:bg-card/30"
               }`}
             >
-              <TrendingUp className="w-3 h-3" /> Provider
-            </button>
+              <TrendingUp className="w-3.5 h-3.5" strokeWidth={1.5} /> Provider
+            </Button>
           </div>
         </div>
       )}
 
       {/* Navigation */}
       <div className="flex-1 py-3 px-2 flex flex-col gap-0.5 overflow-y-auto">
-        <Link href="/dashboard" className={linkClass("/dashboard")}>
-          <LayoutGrid className="w-4 h-4" />
+        <SidebarLink href="/dashboard" active={isActive("/dashboard")} icon={<LayoutGrid className="w-4 h-4" strokeWidth={1.5} />}>
           Dashboard Overview
-        </Link>
+        </SidebarLink>
 
         {isAdmin && (
-          <Link href="/admin" className={linkClass("/admin")}>
-            <Shield className="w-4 h-4" />
+          <SidebarLink href="/admin" active={isActive("/admin")} icon={<Shield className="w-4 h-4" strokeWidth={1.5} />}>
             Admin Console
-          </Link>
+          </SidebarLink>
         )}
 
         {viewMode === WalletType.PROVIDER && (
-          <Link href="/models" className={linkClass("/models")}>
-            <Layers className="w-4 h-4" />
+          <SidebarLink href="/models" active={isActive("/models")} icon={<Layers className="w-4 h-4" strokeWidth={1.5} />}>
             Models Registry
-          </Link>
+          </SidebarLink>
         )}
 
-        <Link href="/settings" className={linkClass("/settings")}>
-          <Settings className="w-4 h-4" />
-          Workspace Settings
-        </Link>
+        {/* Collapsible settings button link */}
+        <div className="flex flex-col">
+          <button
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            className={`group relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg font-medium transition-all text-xs cursor-pointer text-left focus:outline-none select-none ${
+              isSettingsActive
+                ? "bg-primary/[0.06] text-primary font-semibold"
+                : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+            }`}
+          >
+            {isSettingsActive && (
+              <span className="absolute left-1 top-2.5 bottom-2.5 w-0.75 rounded-full bg-primary" />
+            )}
+            <div className="flex items-center gap-3">
+              <Settings className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+              Settings
+            </div>
+            <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-all duration-200 ${settingsOpen ? "rotate-180" : ""}`} strokeWidth={1.5} />
+          </button>
+
+          {settingsOpen && (
+            <div className="pl-3 flex flex-col gap-1 mt-1 border-l border-border/70 ml-5.5 py-0.5 select-none">
+              <Link
+                href="/settings/profile"
+                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                  pathname === "/settings/profile"
+                    ? "text-primary font-semibold bg-primary/[0.04]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+                }`}
+              >
+                <User className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+                Profile & Role
+              </Link>
+              <Link
+                href="/settings/billing"
+                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                  pathname === "/settings/billing"
+                    ? "text-primary font-semibold bg-primary/[0.04]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+                }`}
+              >
+                <Coins className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+                Billing & Wallet
+              </Link>
+              <Link
+                href="/settings/api"
+                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                  pathname === "/settings/api"
+                    ? "text-primary font-semibold bg-primary/[0.04]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+                }`}
+              >
+                <Key className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+                API Credentials
+              </Link>
+              <Link
+                href="/settings/diagnostics"
+                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                  pathname === "/settings/diagnostics"
+                    ? "text-primary font-semibold bg-primary/[0.04]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+                }`}
+              >
+                <Activity className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+                Diagnostics
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Ledger widget */}
       <div className="px-3 pb-3">
         {viewMode === WalletType.PROVIDER ? (
-          <Link href="/models/upload" className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-primary hover:bg-primary/95 text-primary-foreground rounded-lg font-semibold transition-all w-full shadow-sm text-xs cursor-pointer">
-            + Publish Model
+          <Link
+            href="/models/upload"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-primary-foreground shadow-sm hover:shadow-md active:translate-y-0.5 cursor-pointer h-8 text-xs font-semibold gap-1.5 px-2.5"
+          >
+            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} /> Publish Model
           </Link>
         ) : (
-          <div className="border border-border rounded-lg p-2.5 bg-secondary/20 flex flex-col gap-2">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-wider">Credits Balance</p>
-                <p className="text-sm font-bold text-foreground mt-0.5">${balance.toFixed(2)}</p>
+          <Card size="sm" className="border border-border bg-gradient-to-br from-secondary/50 via-card to-secondary/15 shadow-xs">
+            <CardContent className="flex flex-col gap-2.5 p-0">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Credits Balance</p>
+                  <p className="text-base font-extrabold text-foreground mt-1">${balance.toFixed(2)}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-primary/10 text-primary shadow-xs">
+                  <CreditCard className="w-4 h-4" strokeWidth={1.5} />
+                </div>
               </div>
-              <div className="p-1.5 rounded-md bg-primary/10 text-primary">
-                <CreditCard className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <Link
-              href="/settings"
-              className="inline-flex items-center justify-center py-1 bg-background hover:bg-secondary border border-border text-foreground rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-sm"
-            >
-              Top Up Credits
-            </Link>
-          </div>
+              <Link
+                href="/settings/billing"
+                className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 dark:border-input dark:bg-input/30 dark:hover:bg-input/50 w-full text-foreground hover:text-primary border-border shadow-xs hover:border-primary/30 cursor-pointer h-7 text-[10px] font-bold gap-1 px-2.5"
+              >
+                Top Up Credits
+              </Link>
+            </CardContent>
+          </Card>
         )}
       </div>
 
       {/* Footer Links */}
-      <div className="p-2 border-t border-border flex flex-col gap-0.5 bg-secondary/10">
-        <button className="flex items-center gap-2.5 px-3 py-1.5 rounded-md font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors w-full text-left cursor-pointer text-xs">
-          <BookOpen className="w-4 h-4" />
-          Documentation
-        </button>
-        <button className="flex items-center gap-2.5 px-3 py-1.5 rounded-md font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors w-full text-left cursor-pointer text-xs">
-          <HelpCircle className="w-4 h-4" />
-          Support
-        </button>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2.5 px-3 py-1.5 rounded-md font-medium text-red-500 hover:bg-red-500/10 dark:hover:bg-red-950/20 transition-colors w-full text-left mt-1 cursor-pointer text-xs"
+      <div className="p-2 border-t border-border flex flex-col gap-0.5 bg-secondary/5">
+        <Button
+          variant="ghost"
+          className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-muted-foreground hover:bg-secondary/70 hover:text-foreground text-xs cursor-pointer select-none font-medium"
         >
-          <LogOut className="w-4 h-4" />
+          <BookOpen className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+          Documentation
+        </Button>
+        <Button
+          variant="ghost"
+          className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-muted-foreground hover:bg-secondary/70 hover:text-foreground text-xs cursor-pointer select-none font-medium"
+        >
+          <HelpCircle className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+          Support
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={handleLogout}
+          className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-red-500 hover:bg-red-500/10 dark:hover:bg-red-950/20 text-xs mt-1 cursor-pointer select-none font-medium"
+        >
+          <LogOut className="w-4 h-4 text-red-500 transition-colors" strokeWidth={1.5} />
           Logout
-        </button>
+        </Button>
       </div>
 
       {/* Workspace Switch OTP Verification Modal */}

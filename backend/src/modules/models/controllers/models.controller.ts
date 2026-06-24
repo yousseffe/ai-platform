@@ -252,7 +252,8 @@ export class ModelsController {
   async predict(
     @Param('id') id: string,
     @Body() data: Record<string, unknown>,
-    @Req() req: Record<string, unknown> & {
+    @Req()
+    req: Record<string, unknown> & {
       user: { id: string; email: string; apiKey?: string };
       workspaceId: string;
       workspaceType: OwnerType;
@@ -260,7 +261,10 @@ export class ModelsController {
     @Res() res: Response,
   ): Promise<void> {
     const model = await this.modelsService.getModel(id);
-    const cost = typeof model.costPerRequest === 'string' ? parseFloat(model.costPerRequest) : model.costPerRequest;
+    const cost =
+      typeof model.costPerRequest === 'string'
+        ? parseFloat(model.costPerRequest)
+        : model.costPerRequest;
 
     if (cost > 0) {
       const balance = await this.walletsService.getBalance(
@@ -269,7 +273,9 @@ export class ModelsController {
         WalletType.CONSUMER,
       );
       if (balance < cost) {
-        throw new BadRequestException('Insufficient credits to perform prediction');
+        throw new BadRequestException(
+          'Insufficient credits to perform prediction',
+        );
       }
     }
 
@@ -285,14 +291,21 @@ export class ModelsController {
       url = await this.deploymentsService.getActiveDeploymentUrl(id);
     } catch (err: unknown) {
       if (err instanceof NotFoundException) {
-        this.logger.log(`No active deployment found for model ${id}. Attempting auto-deployment...`);
+        this.logger.log(
+          `No active deployment found for model ${id}. Attempting auto-deployment...`,
+        );
         // Find latest version
-        const latestVersion = model.versions && model.versions.length
-          ? [...model.versions].sort((a, b) => b.versionNumber - a.versionNumber)[0]
-          : null;
+        const latestVersion =
+          model.versions && model.versions.length
+            ? [...model.versions].sort(
+                (a, b) => b.versionNumber - a.versionNumber,
+              )[0]
+            : null;
 
         if (!latestVersion) {
-          throw new NotFoundException('No versions available for this model to deploy.');
+          throw new NotFoundException(
+            'No versions available for this model to deploy.',
+          );
         }
 
         if (latestVersion.status !== VersionStatus.READY) {
@@ -302,19 +315,27 @@ export class ModelsController {
         }
 
         // Check if there is already a STARTING deployment
-        let deployment = await this.dataSource.getRepository(Deployment).findOne({
-          where: {
-            modelVersion: { id: latestVersion.id },
-            status: DeploymentStatus.STARTING,
-          },
-          order: { createdAt: 'DESC' },
-        });
+        let deployment = await this.dataSource
+          .getRepository(Deployment)
+          .findOne({
+            where: {
+              modelVersion: { id: latestVersion.id },
+              status: DeploymentStatus.STARTING,
+            },
+            order: { createdAt: 'DESC' },
+          });
 
         if (!deployment) {
-          this.logger.log(`Triggering new auto-deployment for version ${latestVersion.id}...`);
-          deployment = await this.deploymentsService.deployVersion(latestVersion.id);
+          this.logger.log(
+            `Triggering new auto-deployment for version ${latestVersion.id}...`,
+          );
+          deployment = await this.deploymentsService.deployVersion(
+            latestVersion.id,
+          );
         } else {
-          this.logger.log(`Found already starting deployment ${deployment.id}. Waiting for it...`);
+          this.logger.log(
+            `Found already starting deployment ${deployment.id}. Waiting for it...`,
+          );
         }
 
         // Wait for it to become RUNNING
@@ -332,7 +353,7 @@ export class ModelsController {
     let executionStatus = 'SUCCESS';
 
     const headers = {
-      'Authorization': `Bearer ${containerApiKey}`,
+      Authorization: `Bearer ${containerApiKey}`,
       'x-api-key': containerApiKey,
     };
 
@@ -383,7 +404,11 @@ export class ModelsController {
 
           // Get consumer wallet ID to write transaction
           const consumerWallet = await queryRunner.manager.findOne(Wallet, {
-            where: { ownerId: req.workspaceId, ownerType: req.workspaceType, walletType: WalletType.CONSUMER },
+            where: {
+              ownerId: req.workspaceId,
+              ownerType: req.workspaceType,
+              walletType: WalletType.CONSUMER,
+            },
           });
 
           if (consumerWallet) {
@@ -408,7 +433,11 @@ export class ModelsController {
 
           // Get provider wallet
           const providerWallet = await queryRunner.manager.findOne(Wallet, {
-            where: { ownerId: model.user.id, ownerType: OwnerType.USER, walletType: WalletType.CONSUMER },
+            where: {
+              ownerId: model.user.id,
+              ownerType: OwnerType.USER,
+              walletType: WalletType.CONSUMER,
+            },
           });
 
           if (providerWallet) {
@@ -426,10 +455,14 @@ export class ModelsController {
           const platformShare = cost - providerShare;
           if (platformShare > 0) {
             const systemOwnerId = '00000000-0000-0000-0000-000000000000';
-            
+
             // Check if system wallet exists, if not create
             let systemWallet = await queryRunner.manager.findOne(Wallet, {
-              where: { ownerId: systemOwnerId, ownerType: OwnerType.USER, walletType: WalletType.CONSUMER },
+              where: {
+                ownerId: systemOwnerId,
+                ownerType: OwnerType.USER,
+                walletType: WalletType.CONSUMER,
+              },
             });
 
             if (!systemWallet) {
@@ -469,7 +502,9 @@ export class ModelsController {
 
       // Save execution details to ModelLog
       try {
-        const callerUser = await this.dataSource.getRepository(User).findOneBy({ id: req.user.id });
+        const callerUser = await this.dataSource
+          .getRepository(User)
+          .findOneBy({ id: req.user.id });
         const logEntry = this.modelLogRepository.create({
           model,
           user: callerUser!,
@@ -519,7 +554,10 @@ export class ModelsController {
    * Helper method that polls deployment state until it becomes RUNNING or FAILED.
    * Used for on-demand cold starts when a model has no active containers.
    */
-  private async waitForDeployment(deploymentId: string, timeoutMs = 30000): Promise<string> {
+  private async waitForDeployment(
+    deploymentId: string,
+    timeoutMs = 30000,
+  ): Promise<string> {
     const startTime = Date.now();
     const interval = 500; // check every 500ms
 
@@ -530,12 +568,16 @@ export class ModelsController {
           return dep.url;
         }
         if (dep.status === DeploymentStatus.FAILED) {
-          throw new BadRequestException(`Auto-deployment failed: ${dep.errorMessage || 'Unknown error'}`);
+          throw new BadRequestException(
+            `Auto-deployment failed: ${dep.errorMessage || 'Unknown error'}`,
+          );
         }
       }
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
 
-    throw new BadRequestException('Auto-deployment timed out. Please try again.');
+    throw new BadRequestException(
+      'Auto-deployment timed out. Please try again.',
+    );
   }
 }

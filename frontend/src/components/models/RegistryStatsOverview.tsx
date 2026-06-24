@@ -1,5 +1,4 @@
 import React from "react";
-import { Badge } from "@/components/ui/badge";
 
 interface RegistryStatsOverviewProps {
   totalModels: number;
@@ -29,9 +28,9 @@ export function RegistryStatsOverview({
           <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
             <span className="font-bold text-lg select-none">⌬</span>
           </div>
-          <Badge className="bg-emerald-950/40 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold tracking-wider rounded-full">
+          <span className="badge badge-success text-[10px] select-none">
             +12%
-          </Badge>
+          </span>
         </div>
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Models</p>
         <h2 className="text-2xl font-extrabold text-foreground">{totalModels}</h2>
@@ -39,7 +38,7 @@ export function RegistryStatsOverview({
 
       {/* Production Ready */}
       <div className="border border-border rounded-xl bg-card p-5 shadow-sm">
-        <div className="w-8 h-8 rounded bg-emerald-950/40 flex items-center justify-center text-emerald-400 border border-emerald-500/20 mb-2">
+        <div className="w-8 h-8 rounded bg-emerald-50 text-emerald-600 border border-emerald-500/10 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/20 flex items-center justify-center mb-2">
           <span className="font-bold select-none">✓</span>
         </div>
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Production Ready</p>
@@ -48,7 +47,7 @@ export function RegistryStatsOverview({
 
       {/* Building */}
       <div className="border border-border rounded-xl bg-card p-5 shadow-sm">
-        <div className="w-8 h-8 rounded bg-amber-950/40 flex items-center justify-center text-amber-400 border border-amber-500/20 mb-2">
+        <div className="w-8 h-8 rounded bg-amber-50 text-amber-600 border border-amber-500/10 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-500/20 flex items-center justify-center mb-2">
           <span className="font-bold select-none animate-pulse">...</span>
         </div>
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Building</p>
@@ -57,7 +56,7 @@ export function RegistryStatsOverview({
 
       {/* Failed Runs */}
       <div className="border border-border rounded-xl bg-card p-5 shadow-sm">
-        <div className="w-8 h-8 rounded bg-red-950/40 flex items-center justify-center text-red-400 border border-red-500/20 mb-2">
+        <div className="w-8 h-8 rounded bg-red-50 text-red-600 border border-red-500/10 dark:bg-red-950/40 dark:text-red-400 dark:border-red-500/20 flex items-center justify-center mb-2">
           <span className="font-bold select-none">!</span>
         </div>
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Failed Runs</p>

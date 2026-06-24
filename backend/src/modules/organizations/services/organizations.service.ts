@@ -87,21 +87,32 @@ export class OrganizationsService {
       const configEntity = await queryRunner.manager.findOne(SystemConfig, {
         where: { key: 'org_creation_fee' },
       });
-      const orgCreationFee = configEntity ? parseFloat(configEntity.value) : 50.00;
+      const orgCreationFee = configEntity
+        ? parseFloat(configEntity.value)
+        : 50.0;
 
       // 1. Get creator consumer wallet
       const creatorWallet = await queryRunner.manager.findOne(Wallet, {
-        where: { ownerId: ownerUserId, ownerType: OwnerType.USER, walletType: WalletType.CONSUMER },
+        where: {
+          ownerId: ownerUserId,
+          ownerType: OwnerType.USER,
+          walletType: WalletType.CONSUMER,
+        },
       });
 
       if (!creatorWallet) {
         throw new BadRequestException('Creator wallet not initialized');
       }
 
-      const balance = typeof creatorWallet.balance === 'string' ? parseFloat(creatorWallet.balance) : creatorWallet.balance;
+      const balance =
+        typeof creatorWallet.balance === 'string'
+          ? parseFloat(creatorWallet.balance)
+          : creatorWallet.balance;
 
       if (balance < orgCreationFee) {
-        throw new BadRequestException(`Insufficient balance to create organization. Fee is ${orgCreationFee} credits.`);
+        throw new BadRequestException(
+          `Insufficient balance to create organization. Fee is ${orgCreationFee} credits.`,
+        );
       }
 
       // 2. Deduct fee from creator consumer wallet
@@ -121,7 +132,11 @@ export class OrganizationsService {
       // 3. Pay Platform Admin
       const systemOwnerId = '00000000-0000-0000-0000-000000000000';
       let systemWallet = await queryRunner.manager.findOne(Wallet, {
-        where: { ownerId: systemOwnerId, ownerType: OwnerType.USER, walletType: WalletType.CONSUMER },
+        where: {
+          ownerId: systemOwnerId,
+          ownerType: OwnerType.USER,
+          walletType: WalletType.CONSUMER,
+        },
       });
 
       if (!systemWallet) {
@@ -135,7 +150,10 @@ export class OrganizationsService {
         await queryRunner.manager.save(Wallet, systemWallet);
       }
 
-      const systemBalance = typeof systemWallet.balance === 'string' ? parseFloat(systemWallet.balance) : systemWallet.balance;
+      const systemBalance =
+        typeof systemWallet.balance === 'string'
+          ? parseFloat(systemWallet.balance)
+          : systemWallet.balance;
       systemWallet.balance = systemBalance + orgCreationFee;
       await queryRunner.manager.save(Wallet, systemWallet);
 
@@ -157,7 +175,7 @@ export class OrganizationsService {
       const savedOrg = await queryRunner.manager.save(Organization, org);
 
       const wallet = queryRunner.manager.create(Wallet, {
-        walletType: WalletType.PROVIDER,
+        walletType: WalletType.CONSUMER,
         ownerType: OwnerType.ORG,
         ownerId: savedOrg.id,
         balance: 0.0,
@@ -237,10 +255,12 @@ export class OrganizationsService {
    * @returns The fee configuration.
    */
   async getOrgCreationFee(): Promise<number> {
-    const configEntity = await this.dataSource.getRepository(SystemConfig).findOne({
-      where: { key: 'org_creation_fee' },
-    });
-    return configEntity ? parseFloat(configEntity.value) : 50.00;
+    const configEntity = await this.dataSource
+      .getRepository(SystemConfig)
+      .findOne({
+        where: { key: 'org_creation_fee' },
+      });
+    return configEntity ? parseFloat(configEntity.value) : 50.0;
   }
 
   /**

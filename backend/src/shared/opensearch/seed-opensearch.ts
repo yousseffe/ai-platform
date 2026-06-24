@@ -40,8 +40,17 @@ async function seed(): Promise<void> {
     password: process.env.DB_PASSWORD || 'password',
     database: process.env.DB_NAME || 'aidb',
     entities: [
-      User, AuditLog, Model, ModelVersion, Deployment,
-      Wallet, Transaction, ProcessedWebhook, Organization, OrgMember, VerificationCode,
+      User,
+      AuditLog,
+      Model,
+      ModelVersion,
+      Deployment,
+      Wallet,
+      Transaction,
+      ProcessedWebhook,
+      Organization,
+      OrgMember,
+      VerificationCode,
     ],
     synchronize: false,
   });
@@ -64,7 +73,9 @@ async function seed(): Promise<void> {
     await client.indices.delete({ index: OPENSEARCH_INDEX });
     console.log(`✓ Deleted existing index: ${OPENSEARCH_INDEX}`);
   } catch {
-    console.log(`  Index ${OPENSEARCH_INDEX} did not exist yet — creating fresh.`);
+    console.log(
+      `  Index ${OPENSEARCH_INDEX} did not exist yet — creating fresh.`,
+    );
   }
 
   await client.indices.create({
@@ -83,17 +94,21 @@ async function seed(): Promise<void> {
       },
       mappings: {
         properties: {
-          id:                { type: 'keyword' },
-          name:              { type: 'text', analyzer: 'mlhub_analyzer', fields: { keyword: { type: 'keyword' } } },
-          description:       { type: 'text', analyzer: 'mlhub_analyzer' },
-          type:              { type: 'keyword' },
-          taskType:          { type: 'keyword' },
-          framework:         { type: 'keyword' },
-          isPublic:          { type: 'boolean' },
-          publisherEmail:    { type: 'keyword' },
-          versionCount:      { type: 'integer' },
+          id: { type: 'keyword' },
+          name: {
+            type: 'text',
+            analyzer: 'mlhub_analyzer',
+            fields: { keyword: { type: 'keyword' } },
+          },
+          description: { type: 'text', analyzer: 'mlhub_analyzer' },
+          type: { type: 'keyword' },
+          taskType: { type: 'keyword' },
+          framework: { type: 'keyword' },
+          isPublic: { type: 'boolean' },
+          publisherEmail: { type: 'keyword' },
+          versionCount: { type: 'integer' },
           hasLiveDeployment: { type: 'boolean' },
-          createdAt:         { type: 'date' },
+          createdAt: { type: 'date' },
         },
       },
     },
@@ -117,9 +132,10 @@ async function seed(): Promise<void> {
 
   // --- Build bulk body ---
   const bulkBody = models.flatMap((model) => {
-    const hasLiveDeployment = model.versions?.some((v) =>
-      v.deployments?.some((d) => d.status === 'running'),
-    ) ?? false;
+    const hasLiveDeployment =
+      model.versions?.some((v) =>
+        v.deployments?.some((d) => d.status === 'running'),
+      ) ?? false;
 
     const doc = {
       id: model.id,
@@ -135,18 +151,20 @@ async function seed(): Promise<void> {
       createdAt: model.createdAt?.toISOString?.() ?? new Date().toISOString(),
     };
 
-    return [
-      { index: { _index: OPENSEARCH_INDEX, _id: model.id } },
-      doc,
-    ];
+    return [{ index: { _index: OPENSEARCH_INDEX, _id: model.id } }, doc];
   });
 
   const response = await client.bulk({ body: bulkBody, refresh: 'wait_for' });
 
   if (response.body.errors) {
-    console.error('  Some documents failed to index:', JSON.stringify(response.body.items, null, 2));
+    console.error(
+      '  Some documents failed to index:',
+      JSON.stringify(response.body.items, null, 2),
+    );
   } else {
-    console.log(`✓ Successfully indexed ${models.length} models into ${OPENSEARCH_INDEX}`);
+    console.log(
+      `✓ Successfully indexed ${models.length} models into ${OPENSEARCH_INDEX}`,
+    );
   }
 
   await dataSource.destroy();

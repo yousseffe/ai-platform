@@ -96,9 +96,11 @@ export class DeployProcessor extends WorkerHost {
       const ownerId = deployment.modelVersion.model.user?.id;
       let ownerApiKey = '';
       if (ownerId) {
-        const apiKeyEntity = await this.dataSource.getRepository(ApiKey).findOne({
-          where: { user: { id: ownerId }, isActive: true },
-        });
+        const apiKeyEntity = await this.dataSource
+          .getRepository(ApiKey)
+          .findOne({
+            where: { user: { id: ownerId }, isActive: true },
+          });
         ownerApiKey = apiKeyEntity?.key || '';
       }
 
@@ -116,10 +118,7 @@ export class DeployProcessor extends WorkerHost {
         ExposedPorts: {
           [containerPort]: {},
         },
-        Env: [
-          `MODEL_PATH=/app/model.pkl`,
-          `API_KEY=${ownerApiKey}`,
-        ],
+        Env: [`MODEL_PATH=/app/model.pkl`, `API_KEY=${ownerApiKey}`],
         HostConfig: {
           PortBindings: {
             [containerPort]: [{ HostPort: nextPort.toString() }],

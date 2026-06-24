@@ -15,7 +15,9 @@ export class SearchModelsDto {
    */
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   q?: string;
 
   /**

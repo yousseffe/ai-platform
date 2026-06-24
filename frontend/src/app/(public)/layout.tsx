@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Sparkles } from "lucide-react";
+import PublicHeader from "@/components/layout/PublicHeader";
 
 export default async function PublicLayout({
   children,
@@ -13,70 +13,7 @@ export default async function PublicLayout({
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <header className="h-16 bg-card/90 backdrop-blur-md border-b border-border flex items-center justify-between px-6 md:px-12 shrink-0 sticky top-0 z-30 shadow-sm relative">
-        {/* Glowing bottom line decoration */}
-        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/45 to-transparent"></div>
-
-        {/* Brand Logo and Text */}
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2.5 text-primary font-bold text-lg tracking-tight hover:opacity-90 transition-opacity">
-            <div className="w-8 h-8 relative flex items-center justify-center shrink-0">
-              <Image
-                src="/logo.png"
-                alt="MLHub Logo"
-                width={30}
-                height={30}
-                className="object-contain"
-              />
-            </div>
-            <span className="font-mono text-base font-extrabold text-foreground tracking-tight">MLHub</span>
-          </Link>
-
-          {/* AI platform status pill */}
-          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-slate-50 dark:bg-slate-900/60 border border-border rounded-full text-[9px] font-bold text-muted-foreground select-none font-mono tracking-wider">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>GATEWAY API: ACTIVE</span>
-          </div>
-        </div>
-
-        {/* Center navigation links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground select-none">
-          <Link href="/explore" className="hover:text-foreground transition-colors flex items-center gap-1">
-            Models <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
-          </Link>
-          <a href="/CLAUDE.md" className="hover:text-foreground transition-colors">Docs</a>
-          <span className="hover:text-foreground cursor-pointer transition-colors">Pricing</span>
-        </nav>
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-3">
-          {session ? (
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard" className="px-3.5 py-1.5 border border-border text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg text-sm font-semibold transition-all cursor-pointer">
-                Dashboard
-              </Link>
-              <Link href="/dashboard" className="w-8 h-8 rounded-full bg-muted overflow-hidden border border-border cursor-pointer block relative hover:opacity-85 transition-opacity" title={session.user?.email || "User"}>
-                <Image
-                  src={session.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(session.user?.email || "User")}&background=2f81f7&color=fff`}
-                  alt="User avatar"
-                  width={32}
-                  height={32}
-                  className="object-cover"
-                />
-              </Link>
-            </div>
-          ) : (
-            <>
-              <Link href="/login" className="px-3.5 py-1.5 border border-border text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg text-xs font-semibold transition-all cursor-pointer">
-                Sign In
-              </Link>
-              <Link href="/register" className="relative group overflow-hidden bg-gradient-to-r from-primary to-indigo-600 text-white py-1.5 px-4 text-xs font-bold rounded-lg flex items-center gap-1.5 hover:shadow-lg hover:shadow-primary/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-sm cursor-pointer">
-                Get Started <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </>
-          )}
-        </div>
-      </header>
+      <PublicHeader session={session} />
       <main className="flex-1 overflow-y-auto w-full flex flex-col justify-between">
         <div className="w-full">
           {children}

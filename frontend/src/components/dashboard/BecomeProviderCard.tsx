@@ -63,7 +63,7 @@ export default function BecomeProviderCard() {
   }
 
   return (
-    <Card className="border border-border bg-card shadow-sm overflow-hidden relative font-sans">
+    <Card className="border border-primary/20 bg-gradient-to-br from-primary/[0.03] via-card to-card shadow-sm overflow-hidden relative font-sans rounded-xl border-l-4 border-l-primary">
       <CardContent className="p-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="flex-1 space-y-2">
@@ -73,7 +73,7 @@ export default function BecomeProviderCard() {
               </Badge>
               <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
             </div>
-            <CardTitle className="font-bold text-foreground text-xs">Publish Models & Earn Revenue</CardTitle>
+            <CardTitle className="font-bold text-foreground text-xs uppercase tracking-wider">Publish Models & Earn Revenue</CardTitle>
             <CardDescription className="text-xs text-muted-foreground leading-relaxed max-w-xl">
               Register individual model container weights, serve API calls on optimized GPU servers, and get paid withdrawable earnings in real-time.
             </CardDescription>
@@ -94,7 +94,7 @@ export default function BecomeProviderCard() {
               <Button
                 onClick={handleEnroll}
                 disabled={loading}
-                className="btn-primary w-full md:w-auto rounded-lg text-xs py-1.5 px-3.5"
+                className="bg-primary hover:bg-primary/95 text-primary-foreground font-bold rounded-lg text-xs py-2 px-4 shadow-md hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer"
               >
                 {loading ? "Activating..." : "Enable Provider Mode"}{" "}
                 <ArrowRight className="w-3.5 h-3.5" />

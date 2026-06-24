@@ -4,7 +4,7 @@ import * as path from 'path';
 
 /**
  * Resolves the Docker configuration options by dynamically checking for the environment.
- * Prioritizes DOCKER_HOST environment variables, falls back to standard socket files, 
+ * Prioritizes DOCKER_HOST environment variables, falls back to standard socket files,
  * and automatically detects macOS Colima socket paths if Docker Desktop isn't running.
  *
  * @returns Docker options configured with the correct socket path or connection settings.
@@ -20,7 +20,12 @@ export function getDockerOptions(): Docker.DockerOptions {
 
   const homeDir = process.env.HOME || process.env.USERPROFILE;
   if (homeDir) {
-    const colimaSocket = path.join(homeDir, '.colima', 'default', 'docker.sock');
+    const colimaSocket = path.join(
+      homeDir,
+      '.colima',
+      'default',
+      'docker.sock',
+    );
     if (fs.existsSync(colimaSocket)) {
       return { socketPath: colimaSocket };
     }

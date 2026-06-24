@@ -87,7 +87,9 @@ export class AdminController {
 
         if (runningDeployment.containerId) {
           try {
-            const container = this.docker.getContainer(runningDeployment.containerId);
+            const container = this.docker.getContainer(
+              runningDeployment.containerId,
+            );
             const stats = await container.stats({ stream: false });
             const cpuDelta =
               stats.cpu_stats.cpu_usage.total_usage -
@@ -161,10 +163,7 @@ export class AdminController {
     }
 
     if (body.providerSharePercent !== undefined) {
-      if (
-        body.providerSharePercent < 0 ||
-        body.providerSharePercent > 100
-      ) {
+      if (body.providerSharePercent < 0 || body.providerSharePercent > 100) {
         throw new BadRequestException(
           'Provider share percentage must be between 0 and 100',
         );

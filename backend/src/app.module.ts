@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { UsersModule } from './modules/users/users.module';
@@ -28,6 +28,7 @@ import { SystemConfig } from './modules/wallets/entities/system-config.entity';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { OpenSearchModule } from './shared/opensearch/opensearch.module';
+import { LoggerMiddleware } from './shared/middleware/logger.middleware';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -83,4 +84,10 @@ import { OpenSearchModule } from './shared/opensearch/opensearch.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(LoggerMiddleware)
+      .forRoutes('*');
+  }
+}

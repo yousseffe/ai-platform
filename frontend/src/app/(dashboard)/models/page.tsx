@@ -63,7 +63,7 @@ export default async function ModelsRegistryPage() {
   const failedCount = models.filter((m) => m.status === VersionStatus.FAILED || m.status === DeploymentStatus.FAILED).length;
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full">
       {/* Title & Action Buttons Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>

@@ -68,6 +68,13 @@ export class StripeService {
       mode: 'payment',
       success_url: successUrl,
       cancel_url: cancelUrl,
+      payment_intent_data: {
+        metadata: {
+          workspaceId,
+          workspaceType,
+          amount: amount.toString(),
+        },
+      },
       metadata: {
         workspaceId,
         workspaceType,

@@ -203,7 +203,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 text-foreground font-mono text-xs animate-fade-in">
+    <div className="w-full space-y-6 text-foreground font-mono text-xs animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border pb-5">
         <div className="text-left">

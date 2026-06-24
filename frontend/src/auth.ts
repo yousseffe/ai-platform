@@ -1,6 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { JWT } from "next-auth/jwt";
+import { jwtDecode } from "jwt-decode";
 
 async function refreshAccessToken(token: JWT): Promise<JWT> {
   try {
@@ -61,8 +62,18 @@ export const authOptions: NextAuthOptions = {
           const data = await res.json();
 
           if (res.ok && data.access_token) {
+            let userId = credentials.email;
+            try {
+              const payload = jwtDecode<{ sub: string }>(data.access_token);
+              if (payload?.sub) {
+                userId = payload.sub;
+              }
+            } catch (e) {
+              console.error("Failed to decode user ID from access token:", e);
+            }
+
             return {
-              id: credentials.email,
+              id: userId,
               email: credentials.email,
               accessToken: data.access_token,
               refreshToken: data.refresh_token,
