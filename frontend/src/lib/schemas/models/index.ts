@@ -42,9 +42,9 @@ export const uploadModelFormSchema = z.object({
     .max(50, "Model name cannot exceed 50 characters")
     .regex(/^[a-zA-Z0-9_-]+$/, "Model name can only contain letters, numbers, hyphens, and underscores"),
   description: z.string().max(500, "Description cannot exceed 500 characters").optional(),
-  type: z.string().default("TABULAR"),
-  framework: z.string().default("CUSTOM"),
-  taskType: z.string().default("OTHER"),
+  type: z.string(),
+  framework: z.string(),
+  taskType: z.string(),
   isPublic: z.any().transform((val) => {
     if (val === undefined) return undefined;
     return val === "true" || val === true;

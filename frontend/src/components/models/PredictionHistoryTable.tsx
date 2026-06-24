@@ -65,16 +65,10 @@ export function PredictionHistoryTable({
                     <td className="px-6 py-4 select-none">
                       <span
                         className={`badge ${
-                          r.status === "SUCCESS"
-                            ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/30"
-                            : "bg-red-950/40 text-red-400 border-red-500/30"
+                          r.status === "SUCCESS" ? "badge-success" : "badge-danger"
                         }`}
                       >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            r.status === "SUCCESS" ? "bg-emerald-400" : "bg-red-400"
-                          }`}
-                        ></span>
+                        <span className="badge-dot" />
                         {r.status}
                       </span>
                     </td>

@@ -97,7 +97,7 @@ export class UsersService {
     await this.walletsService.createWallet(
       userId,
       OwnerType.USER,
-      WalletType.PROVIDER,
+      WalletType.CONSUMER,
       0.0,
     );
 

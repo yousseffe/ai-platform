@@ -1,7 +1,6 @@
 import React from "react";
 import type { ModelVersion, Deployment } from "@/types";
 import { DeploymentStatus, VersionStatus } from "@/types";
-import { Badge } from "@/components/ui/badge";
 
 interface VersionHistoryTableProps {
   versions: ModelVersion[];
@@ -75,7 +74,7 @@ export function VersionHistoryTable({
                 const hasError = v.status === VersionStatus.FAILED || (latestDeployment && latestDeployment.status === DeploymentStatus.FAILED);
                 const errorMessage = v.errorMessage || (latestDeployment && latestDeployment.errorMessage);
 
-                let badgeClass = "bg-muted text-muted-foreground border-border";
+                let badgeClass = "badge-neutral";
                 if (displayStatus === "deployed" || displayStatus === VersionStatus.READY) {
                    badgeClass = "bg-emerald-950/40 text-emerald-400 border-emerald-500/20";
                 } else if (displayStatus === VersionStatus.BUILDING || displayStatus === DeploymentStatus.STARTING) {
@@ -83,7 +82,7 @@ export function VersionHistoryTable({
                 } else if (displayStatus === VersionStatus.DEPRECATED) {
                   badgeClass = "bg-amber-950/40 text-amber-450 border-amber-500/20";
                 } else if (hasError) {
-                  badgeClass = "bg-red-950/40 text-red-400 border-red-500/20";
+                  badgeClass = "badge-danger";
                 }
 
                 const endpointUrl = `http://localhost:5000/api/v1/models/${modelId}/v${v.versionNumber}/predict`;
@@ -110,9 +109,9 @@ export function VersionHistoryTable({
                                 : "bg-muted-foreground"
                             }`}
                           ></div>
-                          <Badge className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase border ${badgeClass}`}>
+                          <span className={`badge ${badgeClass} text-[9px] font-bold tracking-wider uppercase font-mono`}>
                             {displayStatus}
-                          </Badge>
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">{new Date(v.createdAt).toLocaleDateString()}</td>

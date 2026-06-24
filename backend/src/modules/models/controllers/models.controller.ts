@@ -464,7 +464,7 @@ export class ModelsController {
       where: { user: { id: model.user.id }, isActive: true },
     });
     const containerApiKey = modelOwnerApiKeyEntity?.key || '';
-
+ 
     const targetEndpoint =
       model.type === ModelType.LLM_GGUF ? '/v1/chat/completions' : '/predict';
 

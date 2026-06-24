@@ -11,9 +11,10 @@ import {
   UseGuards,
   RawBodyRequest,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { StripeService } from '../../../shared/stripe/stripe.service';
 import { WalletsService } from '../services/wallets.service';
@@ -21,11 +22,7 @@ import { RedisService } from '../../../shared/redis/redis.service';
 import { Request } from 'express';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
-import { ProcessedWebhook } from '../entities/processed-webhook.entity';
-import { Transaction } from '../entities/transaction.entity';
 import { Wallet } from '../entities/wallet.entity';
-import { TransactionType } from '../enums/transaction-type.enum';
-import { TransactionStatus } from '../enums/transaction-status.enum';
 
 const PACKAGES: Record<string, { credits: number; price: number }> = {
   pkg_starter: { credits: 100, price: 10.0 },
@@ -38,15 +35,12 @@ const PACKAGES: Record<string, { credits: number; price: number }> = {
  */
 @Controller('payments')
 export class PaymentsController {
+  private readonly logger = new Logger(PaymentsController.name);
+
   constructor(
     private readonly walletsService: WalletsService,
     private readonly stripeService: StripeService,
     private readonly redisService: RedisService,
-    private readonly dataSource: DataSource,
-    @InjectRepository(ProcessedWebhook)
-    private readonly processedWebhookRepository: Repository<ProcessedWebhook>,
-    @InjectRepository(Transaction)
-    private readonly transactionRepository: Repository<Transaction>,
     @InjectRepository(Wallet)
     private readonly walletRepository: Repository<Wallet>,
   ) {}
@@ -139,7 +133,7 @@ export class PaymentsController {
 
   /**
    * Stripe Webhook consumption endpoint.
-   * Processes payment status events asynchronously with HMAC signature validation and database idempotency locks.
+   * Processes payment status events asynchronously with HMAC signature validation.
    *
    * @param signature - Signature from Stripe-Signature header.
    * @param req - Express raw body request wrapper.
@@ -163,126 +157,27 @@ export class PaymentsController {
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Webhook signature validation failed: ${message}`);
       throw new BadRequestException(
         `Webhook signature validation failed: ${message}`,
       );
     }
 
-    const stripeEventId = event.id;
+    this.logger.log(`[Stripe Payments Webhook Received] Event Type: ${event.type}`);
 
-    // Idempotency: verify if event was already processed
-    const alreadyProcessed = await this.processedWebhookRepository.findOneBy({
-      stripeEventId,
-    });
-    if (alreadyProcessed) {
-      return { received: true, duplicate: true };
-    }
-
-    // Handle payment_intent.succeeded or checkout.session.completed
-    if (
-      event.type === 'checkout.session.completed' ||
-      event.type === 'payment_intent.succeeded'
-    ) {
-      let metadata: any = null;
-      let referenceId = '';
-
-      if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
-        metadata = session.metadata;
-        referenceId = session.payment_intent || session.id;
+    try {
+      const processed = await this.walletsService.processStripeWebhook(event);
+      if (processed) {
+        this.logger.log(`[Stripe Payments Webhook Success] Processed event ID: ${event.id}`);
       } else {
-        const intent = event.data.object;
-        metadata = intent.metadata;
-        referenceId = intent.id;
+        this.logger.log(`[Stripe Payments Webhook Skipped/Duplicate] Event ID: ${event.id}`);
       }
-
-      if (metadata && metadata.walletId && metadata.credits) {
-        const walletId = metadata.walletId;
-        const credits = parseFloat(metadata.credits);
-
-        const wallet = await this.walletRepository.findOneBy({ id: walletId });
-        if (!wallet) {
-          throw new InternalServerErrorException(
-            'Target wallet does not exist',
-          );
-        }
-
-        const queryRunner = this.dataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
-
-        try {
-          // 1. Insert ProcessedWebhook first (guarantees db transaction uniqueness)
-          const processed = queryRunner.manager.create(ProcessedWebhook, {
-            stripeEventId,
-            walletId,
-          });
-          await queryRunner.manager.save(ProcessedWebhook, processed);
-
-          // 2. Perform atomic increment balance update
-          await queryRunner.manager.query(
-            `UPDATE wallets SET balance = balance + $1 WHERE id = $2`,
-            [credits, walletId],
-          );
-
-          // 3. Save completed transaction record
-          const transaction = queryRunner.manager.create(Transaction, {
-            walletId,
-            type: TransactionType.CREDIT,
-            amount: credits,
-            stripeEventId,
-            reference: referenceId,
-            status: TransactionStatus.COMPLETED,
-          });
-          await queryRunner.manager.save(Transaction, transaction);
-
-          await queryRunner.commitTransaction();
-
-          console.log(
-            `[Webhook Success] Credited ${credits} credits to wallet ID: ${walletId}`,
-          );
-        } catch (error) {
-          await queryRunner.rollbackTransaction();
-          console.error('[Webhook DB Error] Rollback transaction:', error);
-
-          // Log failed transaction status in non-transactional way
-          try {
-            const failedTx = this.transactionRepository.create({
-              walletId,
-              type: TransactionType.CREDIT,
-              amount: credits,
-              stripeEventId,
-              reference: referenceId,
-              status: TransactionStatus.FAILED,
-            });
-            await this.transactionRepository.save(failedTx);
-          } catch {}
-
-          throw new InternalServerErrorException(
-            'Wallet credit update database execution failed',
-          );
-        } finally {
-          await queryRunner.release();
-        }
-      }
-    } else if (event.type === 'payment_intent.payment_failed') {
-      const intent = event.data.object;
-      const metadata = intent.metadata;
-
-      if (metadata && metadata.walletId && metadata.credits) {
-        const transaction = this.transactionRepository.create({
-          walletId: metadata.walletId,
-          type: TransactionType.CREDIT,
-          amount: parseFloat(metadata.credits),
-          stripeEventId,
-          reference: intent.id,
-          status: TransactionStatus.FAILED,
-        });
-        await this.transactionRepository.save(transaction);
-        console.log(
-          `[Webhook Payment Intent Failed] Logged transaction failure for wallet: ${metadata.walletId}`,
-        );
-      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[Stripe Payments Webhook Error] Failed to process event ${event.id}: ${message}`);
+      throw new InternalServerErrorException(
+        `Failed to process Stripe webhook: ${message}`,
+      );
     }
 
     return { received: true };

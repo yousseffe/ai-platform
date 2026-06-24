@@ -12,6 +12,8 @@ import {
   RawBodyRequest,
   HttpCode,
   HttpStatus,
+  Logger,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { WorkspaceInterceptor } from '../../auth/guards/workspace.interceptor';
@@ -27,6 +29,8 @@ import { WalletType } from '../../../shared/enums/wallet-type.enum';
  */
 @Controller('wallets')
 export class WalletsController {
+  private readonly logger = new Logger(WalletsController.name);
+
   constructor(
     private readonly walletsService: WalletsService,
     private readonly stripeService: StripeService,
@@ -150,34 +154,27 @@ export class WalletsController {
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Webhook signature validation failed: ${message}`);
       throw new BadRequestException(
         `Webhook signature validation failed: ${message}`,
       );
     }
 
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Record<string, any>;
-      const metadata = session.metadata;
+    this.logger.log(`[Stripe Webhook Received] Event Type: ${event.type}`);
 
-      if (
-        metadata &&
-        metadata.workspaceId &&
-        metadata.workspaceType &&
-        metadata.amount
-      ) {
-        const depositAmount = parseFloat(metadata.amount);
-
-        await this.walletsService.addFunds(
-          metadata.workspaceId,
-          metadata.workspaceType as OwnerType,
-          WalletType.CONSUMER,
-          depositAmount,
-        );
-
-        console.log(
-          `[Webhook Success] Credited $${depositAmount} to Workspace ID: ${metadata.workspaceId}`,
-        );
+    try {
+      const processed = await this.walletsService.processStripeWebhook(event);
+      if (processed) {
+        this.logger.log(`[Stripe Webhook Success] Processed event ID: ${event.id}`);
+      } else {
+        this.logger.log(`[Stripe Webhook Skipped/Duplicate] Event ID: ${event.id}`);
       }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[Stripe Webhook Error] Failed to process event ${event.id}: ${message}`);
+      throw new InternalServerErrorException(
+        `Failed to process Stripe webhook: ${message}`,
+      );
     }
 
     return { received: true };
@@ -209,6 +206,41 @@ export class WalletsController {
       req.workspaceId,
       req.workspaceType,
       body.amount,
+    );
+  }
+
+  /**
+   * Retrieves the transaction history for the active workspace's wallet.
+   *
+   * @param req - Request envelope carrying resolved workspace details.
+   * @param type - Query parameter specifying CONSUMER or PROVIDER wallet lookups.
+   * @param page - Query page index selector.
+   * @param limit - Count of items per page.
+   * @returns Paginated transactions list.
+   */
+  @Get('transactions')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(WorkspaceInterceptor)
+  async getTransactions(
+    @Req()
+    req: Record<string, unknown> & {
+      workspaceId: string;
+      workspaceType: OwnerType;
+    },
+    @Query('type') type: WalletType = WalletType.CONSUMER,
+    @Query('page') page = 1,
+    @Query('limit') limit = 20,
+  ) {
+    if (type !== WalletType.CONSUMER && type !== WalletType.PROVIDER) {
+      throw new BadRequestException('Invalid wallet type');
+    }
+
+    return this.walletsService.getTransactions(
+      req.workspaceId,
+      req.workspaceType,
+      type,
+      page,
+      limit,
     );
   }
 }

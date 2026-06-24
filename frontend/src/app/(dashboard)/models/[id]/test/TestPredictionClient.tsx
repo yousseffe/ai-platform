@@ -53,7 +53,7 @@ export default function TestPredictionClient({ model }: TestPredictionClientProp
   } = usePrediction(model);
 
   return (
-    <div className="animate-fade-in max-w-6xl mx-auto pb-12">
+    <div className="animate-fade-in w-full pb-12">
       {/* Back Button */}
       <button
         onClick={() => router.push(`/models/${model.id}`)}

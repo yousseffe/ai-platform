@@ -2,14 +2,28 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GitBranch, Settings, Layers, Code, PlayCircle, Plus, AlertTriangle, Trash2 } from "lucide-react";
+import { 
+  GitBranch, 
+  Settings, 
+  Layers, 
+  Code, 
+  PlayCircle, 
+  Plus, 
+  AlertTriangle, 
+  Trash2, 
+  Cpu, 
+  Coins, 
+  Server
+} from "lucide-react";
 import { useModelDetails } from "@/hooks/use-model-details";
 import type { Model, ModelVersion } from "@/types";
+import { DeploymentStatus, VersionStatus } from "@/types";
 import { VersionHistoryTable } from "@/components/models/VersionHistoryTable";
 import ModelOverview from "@/components/models/ModelOverview";
 import ModelPlayground from "@/components/models/ModelPlayground";
 import ActionsTerminal from "@/components/models/ActionsTerminal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +39,7 @@ interface ModelDetailsClientProps {
 }
 
 /**
- * Client-side layout view for Model Details page.
+ * Client-side layout view for Model Details page in the console.
  * Orchestrates modal controls, deployment actions, version history logs,
  * and prediction playgrounds using a unified tab system.
  */
@@ -37,6 +51,7 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
     handleDeploy,
     handleStop,
     handleRebuild,
+    handleDeleteModel,
   } = useModelDetails(modelId, initialModel);
 
   const handleDeprecate = async (versionId: string) => {
@@ -79,82 +94,187 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
   });
 
   const [activeTab, setActiveTab] = useState("overview");
+  const totalReleases = versions.length;
+  const readyVersionsCount = versions.filter(
+    (v) => v.status === VersionStatus.READY
+  ).length;
+
+  const activeDeploymentsCount = versions.reduce((acc, v) => {
+    const running = v.deployments?.filter((d) => d.status === DeploymentStatus.RUNNING).length || 0;
+    return acc + running;
+  }, 0);
+
+  const formattedDate = new Date(model.createdAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in text-foreground">
-      {/* Repository Style Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-border gap-4">
-        <div className="flex flex-col md:flex-row md:items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Layers className="w-5 h-5 text-muted-foreground" />
-            <span className="text-primary font-mono text-sm hover:underline cursor-pointer">
-              {model.name.toLowerCase().replace(/\s+/g, "-")}
-            </span>
+    <div className="w-full space-y-6 animate-fade-in text-foreground font-sans">
+      {/* Premium Hero Banner */}
+      <div className="relative overflow-hidden border border-border bg-card rounded-2xl p-6 sm:p-8 shadow-sm">
+        {/* Glow decoration */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 blur-[120px] rounded-full pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/2.5 blur-[80px] rounded-full pointer-events-none"></div>
+
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-3">
+            {/* Tag Badges */}
+            <div className="flex items-center gap-2 select-none text-[10px] font-bold tracking-wider uppercase font-mono">
+              <span className={`px-2.5 py-0.5 rounded-md border ${
+                model.isPublic 
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" 
+                  : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+              }`}>
+                {model.isPublic ? "public marketplace" : "private registry"}
+              </span>
+              <span className="px-2.5 py-0.5 rounded-md border border-border bg-secondary text-muted-foreground">
+                stable
+              </span>
+            </div>
+
+            {/* Model Name */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 shadow-sm">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-foreground">
+                  {model.name}
+                </h1>
+                <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                  ID: {model.id}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2 select-none">
-            <span className="px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-950/40 text-emerald-400 text-[9px] font-bold tracking-wider uppercase font-mono">
-              public
-            </span>
-            <span className="px-2 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary text-[9px] font-bold tracking-wider uppercase font-mono">
-              stable
-            </span>
+
+          {/* Action triggers */}
+          <div className="flex flex-wrap items-center gap-3 font-mono text-xs select-none">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="h-9 group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-border/80 hover:border-primary/40 bg-secondary/30 hover:bg-secondary/60 text-foreground cursor-pointer transition-all outline-none select-none px-4 font-bold font-mono text-[11px] gap-2 shadow-sm font-sans">
+                <GitBranch className="w-3.5 h-3.5 text-primary" />
+                <span>Tag: v{activeVersion ? activeVersion.versionNumber : "latest"}</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-card border border-border shadow-xl rounded-lg p-1.5 w-44 text-foreground">
+                {versions.length === 0 ? (
+                  <span className="text-[10px] text-muted-foreground p-2 block">No version tags</span>
+                ) : (
+                  [...versions]
+                    .sort((a, b) => b.versionNumber - a.versionNumber)
+                    .map((v) => (
+                      <DropdownMenuItem
+                        key={v.id}
+                        onClick={() => {
+                          setActiveVersion(v);
+                        }}
+                        className={`text-xs hover:bg-accent p-2 rounded cursor-pointer ${
+                          activeVersion?.id === v.id ? "bg-primary/10 font-bold text-primary" : ""
+                        }`}
+                      >
+                        v{v.versionNumber} ({v.id.substring(0, 8)})
+                      </DropdownMenuItem>
+                    ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {isOwner && (
+              <Button
+                onClick={() => router.push(`/models/${modelId}/upload`)}
+                className="h-9 px-4 font-bold gap-1.5 shadow-md bg-primary hover:bg-primary/95 text-white rounded-lg transition-all active:scale-95 animate-fade-in text-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" /> Push Version
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Branch / Version Swapper select dropdown */}
-        <div className="flex items-center gap-3 font-mono text-xs select-none">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-accent text-foreground cursor-pointer transition-colors focus:outline-none text-[11px] font-bold">
-              <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />
-              <span>tag: v{activeVersion ? activeVersion.versionNumber : "latest"}</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-card border border-border shadow-xl rounded-lg p-1.5 w-44 text-foreground">
-              {versions.length === 0 ? (
-                <span className="text-[10px] text-muted-foreground p-2 block">No version tags</span>
-              ) : (
-                [...versions]
-                  .sort((a, b) => b.versionNumber - a.versionNumber)
-                  .map((v) => (
-                    <DropdownMenuItem
-                      key={v.id}
-                      onClick={() => setActiveVersion(v)}
-                      className={`text-xs hover:bg-accent p-2 rounded cursor-pointer ${
-                        activeVersion?.id === v.id ? "bg-primary/10 font-bold" : ""
-                      }`}
-                    >
-                      v{v.versionNumber} ({v.id.substring(0, 8)})
-                    </DropdownMenuItem>
-                  ))
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {/* Quick-Stats Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border/50">
+          <div className="p-4 rounded-xl border border-border/60 bg-secondary/20 border-l-4 border-l-blue-500 shadow-sm">
+            <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
+              <Cpu className="w-3.5 h-3.5 text-blue-500" /> Engine Spec
+            </div>
+            <span className="block text-foreground font-bold mt-1.5 text-sm">
+              {model.framework || "Custom"}
+            </span>
+            <span className="block text-muted-foreground text-[10px] mt-0.5 capitalize">
+              {model.tier?.toLowerCase() || "Standard"} Serving
+            </span>
+          </div>
 
-          {isOwner && (
-            <button
-              onClick={() => router.push(`/models/${model.id}/upload`)}
-              className="btn-primary flex items-center gap-1.5 font-bold"
-            >
-              <Plus className="w-4.5 h-4.5" /> Push Version
-            </button>
-          )}
+          <div className="p-4 rounded-xl border border-border/60 bg-secondary/20 border-l-4 border-l-violet-500 shadow-sm">
+            <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
+              <GitBranch className="w-3.5 h-3.5 text-violet-500" /> Release Count
+            </div>
+            <span className="block text-foreground font-bold mt-1.5 text-sm">
+              {totalReleases} {totalReleases === 1 ? "Version" : "Versions"}
+            </span>
+            <span className="block text-muted-foreground text-[10px] mt-0.5">
+              {readyVersionsCount} Active / Build Ready
+            </span>
+          </div>
+
+          <div className="p-4 rounded-xl border border-border/60 bg-secondary/20 border-l-4 border-l-amber-500 shadow-sm">
+            <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
+              <Coins className="w-3.5 h-3.5 text-amber-500" /> Prediction cost
+            </div>
+            <span className="block text-foreground font-bold mt-1.5 text-sm">
+              ${Number(model.costPerRequest || 0).toFixed(4)}
+            </span>
+            <span className="block text-muted-foreground text-[10px] mt-0.5">
+              per single REST request
+            </span>
+          </div>
+
+          <div className="p-4 rounded-xl border border-border/60 bg-secondary/20 border-l-4 border-l-emerald-500 shadow-sm">
+            <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
+              <Server className="w-3.5 h-3.5 text-emerald-500" /> Deployments
+            </div>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className={`w-2 h-2 rounded-full ${
+                activeDeploymentsCount > 0 ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-muted"
+              }`}></span>
+              <span className="text-foreground font-bold text-sm">
+                {activeDeploymentsCount} Running
+              </span>
+            </div>
+            <span className="block text-muted-foreground text-[10px] mt-0.5">
+              Created: {formattedDate}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Tabs Container */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList variant="line" className="border-b border-border w-full justify-start rounded-none px-0 mb-6 gap-6 select-none">
-          <TabsTrigger value="overview" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
-            <Code className="w-3.5 h-3.5 mr-1" /> Overview
+        <TabsList className="!h-10 bg-secondary/60 border border-border p-1 rounded-xl mb-6 gap-1.5 select-none flex flex-row w-fit shadow-sm items-center">
+          <TabsTrigger 
+            value="overview" 
+            className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+          >
+            <Code className="w-3.5 h-3.5 mr-1.5" /> Overview
           </TabsTrigger>
-          <TabsTrigger value="versions" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
-            <GitBranch className="w-3.5 h-3.5 mr-1" /> Version Registry
+          <TabsTrigger 
+            value="versions" 
+            className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+          >
+            <GitBranch className="w-3.5 h-3.5 mr-1.5" /> Version Registry
           </TabsTrigger>
-          <TabsTrigger value="sandbox" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
-            <PlayCircle className="w-3.5 h-3.5 mr-1" /> Playground
+          <TabsTrigger 
+            value="sandbox" 
+            className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+          >
+            <PlayCircle className="w-3.5 h-3.5 mr-1.5" /> Playground
           </TabsTrigger>
           {isOwner && (
-            <TabsTrigger value="settings" className="pb-2 text-xs font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-active:after:hidden">
-              <Settings className="w-3.5 h-3.5 mr-1" /> Settings
+            <TabsTrigger 
+              value="settings" 
+              className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+            >
+              <Settings className="w-3.5 h-3.5 mr-1.5" /> Settings
             </TabsTrigger>
           )}
         </TabsList>
@@ -201,24 +321,35 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
           <ModelPlayground model={model} selectedVersionNumber={activeVersion?.versionNumber} />
         </TabsContent>
 
-        {/* Tab 4: Settings (GitHub Danger Zone Style) */}
+        {/* Tab 4: Settings (Danger Zone Card) */}
         {isOwner && (
-          <TabsContent value="settings" className="font-mono text-xs text-foreground space-y-6">
-            <div className="border border-red-500/30 bg-red-950/10 rounded-xl p-6 space-y-4">
-              <div className="flex items-center gap-2 text-red-400 font-bold text-sm select-none">
-                <AlertTriangle className="w-4.5 h-4.5 text-red-500" /> Danger Zone
-              </div>
-              <div className="w-full h-px bg-red-500/20" />
-              <div className="flex items-center justify-between gap-6 leading-relaxed">
+          <TabsContent value="settings" className="space-y-6">
+            <div className="border border-red-500/20 bg-red-500/5 rounded-2xl p-6 space-y-6 shadow-sm">
+              <div className="flex items-center gap-3 text-red-500 font-bold text-sm select-none">
+                <AlertTriangle className="w-5 h-5" />
                 <div>
-                  <h4 className="font-bold text-foreground text-xs">Delete this Model</h4>
-                  <p className="text-muted-foreground text-[11px] mt-1">
-                    Once deleted, the weights, version logs, and API execution endpoints cannot be recovered.
+                  <h3 className="font-sans font-bold text-sm text-foreground">Danger Zone</h3>
+                  <p className="text-muted-foreground text-[11px] font-sans font-normal mt-0.5">
+                    Critical operations that can cause permanent data loss.
                   </p>
                 </div>
-                <button className="btn-outline border-red-500/30 text-red-400 hover:bg-red-950/30 flex items-center gap-1.5 shrink-0 font-bold select-none cursor-pointer">
-                  <Trash2 className="w-4 h-4" /> Delete Repository
-                </button>
+              </div>
+              <div className="w-full h-px bg-red-500/10" />
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 leading-relaxed font-sans">
+                <div className="space-y-1">
+                  <h4 className="font-bold text-foreground text-xs">Delete this Model Repository</h4>
+                  <p className="text-muted-foreground text-[11px] max-w-xl font-normal leading-relaxed">
+                    This action will permanently delete the model repository, all version histories, weight checkpoints stored in MinIO, and terminate any active serverless deployments.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleDeleteModel}
+                  variant="outline"
+                  className="border-red-500/30 hover:border-red-500 text-red-500 hover:bg-red-500/10 flex items-center gap-1.5 shrink-0 font-bold text-xs cursor-pointer shadow-sm rounded-lg"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete Repository
+                </Button>
               </div>
             </div>
           </TabsContent>

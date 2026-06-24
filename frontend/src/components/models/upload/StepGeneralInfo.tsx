@@ -39,11 +39,13 @@ export default function StepGeneralInfo({ register, errors, isUploading }: StepG
             placeholder="e.g. demand-forecast-v1"
             disabled={isUploading}
           />
-          {errors.name && (
+          {errors.name ? (
             <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               {errors.name.message}
             </p>
+          ) : (
+            <p className="text-[9.5px] text-muted-foreground font-sans mt-1">Must be lowercase alphanumeric characters and hyphens only.</p>
           )}
         </div>
 

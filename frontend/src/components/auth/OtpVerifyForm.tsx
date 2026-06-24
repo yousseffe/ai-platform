@@ -18,7 +18,7 @@ interface OtpVerifyFormProps {
 /**
  * OTP Code Verification form component.
  * Features 6 distinct numeric boxes with automatic cursor focus shifting.
- * Migrated to Shadcn UI styles.
+ * Redesigned in the premium Expo Go console theme.
  *
  * @param props - Component properties containing state refs and change triggers.
  * @returns The React component rendering the verification code input sequence.
@@ -34,21 +34,21 @@ export default function OtpVerifyForm({
   otpRefs,
 }: OtpVerifyFormProps) {
   return (
-    <div className="animate-slide-up">
+    <div className="animate-slide-up font-sans">
       <div className="flex flex-col items-center text-center mb-6">
-        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3">
-          <KeyRound className="w-6 h-6" />
+        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-3">
+          <KeyRound className="w-5 h-5" />
         </div>
-        <h1 className="text-2xl font-bold text-foreground mb-1 select-none">Verify your email</h1>
-        <p className="text-muted-foreground text-sm max-w-sm select-none">
+        <h1 className="text-base font-bold text-foreground mb-1 select-none">Verify your email</h1>
+        <p className="text-muted-foreground text-xs max-w-xs select-none">
           We sent a 6-digit verification code to <span className="font-semibold text-foreground">{registeredEmail}</span>.
         </p>
-        <p className="text-xs text-muted-foreground/80 mt-2 bg-muted/50 border border-border/60 px-3 py-1.5 rounded-lg font-mono">
+        <p className="text-[10px] text-muted-foreground mt-2 bg-secondary border border-border px-2.5 py-1.5 rounded-md font-mono select-all">
           Hint: Copy code from backend logs terminal.
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-6">
+      <form onSubmit={onSubmit} className="space-y-5">
         <div className="flex justify-center gap-2">
           {otpValues.map((digit, idx) => (
             <input
@@ -63,7 +63,7 @@ export default function OtpVerifyForm({
               value={digit}
               onChange={(e) => onOtpChange(idx, e.target.value)}
               onKeyDown={(e) => onOtpKeyDown(idx, e)}
-              className="w-12 h-14 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-foreground font-semibold text-lg text-center rounded-xl focus:outline-none focus:ring-4 focus:ring-primary/15 focus:border-primary focus:bg-white dark:focus:bg-slate-950 transition-all font-mono shadow-sm"
+              className="w-10 h-12 bg-background border border-border text-foreground font-semibold text-base text-center rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-mono shadow-sm"
               disabled={loading}
               autoFocus={idx === 0}
             />
@@ -73,19 +73,19 @@ export default function OtpVerifyForm({
         <Button
           type="submit"
           disabled={loading}
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-10 flex justify-center cursor-pointer rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm"
+          className="btn-primary w-full py-2 flex justify-center cursor-pointer rounded-lg text-xs font-semibold shadow-sm h-9"
         >
           {loading ? "Verifying..." : "Verify & Onboard"}{" "}
-          <ArrowRight className="w-4 h-4 ml-2" />
+          <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
         </Button>
 
         <button
           type="button"
           onClick={onGoBack}
-          className="text-xs text-muted-foreground hover:text-primary font-semibold w-full text-center hover:underline cursor-pointer block"
+          className="text-xs text-muted-foreground hover:text-primary font-semibold w-full text-center hover:underline cursor-pointer block mt-1 transition-all"
           disabled={loading}
         >
-          Go back to Registration
+          Go back to registration
         </button>
       </form>
     </div>

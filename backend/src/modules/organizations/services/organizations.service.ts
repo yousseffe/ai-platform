@@ -175,7 +175,7 @@ export class OrganizationsService {
       const savedOrg = await queryRunner.manager.save(Organization, org);
 
       const wallet = queryRunner.manager.create(Wallet, {
-        walletType: WalletType.PROVIDER,
+        walletType: WalletType.CONSUMER,
         ownerType: OwnerType.ORG,
         ownerId: savedOrg.id,
         balance: 0.0,

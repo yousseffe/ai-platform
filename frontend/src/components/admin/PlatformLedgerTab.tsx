@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { PlatformStats } from "@/types";
 
 interface PlatformLedgerTabProps {
@@ -80,13 +79,13 @@ export default function PlatformLedgerTab({ stats, loading }: PlatformLedgerTabP
           </CardContent>
         </Card>
 
-        <Card className="border border-border bg-emerald-950/20 border-emerald-500/20 p-0 shadow-sm relative overflow-hidden">
+        <Card className="border border-emerald-200/60 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-500/20 p-0 shadow-sm relative overflow-hidden">
           <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-emerald-500/10">
+            <div className="absolute right-3 top-3 text-emerald-500/20 dark:text-emerald-500/10">
               <Coins className="w-10 h-10" />
             </div>
-            <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider mb-0.5">System Admin Wallet</p>
-            <CardTitle className="text-2xl font-extrabold text-emerald-400 border-none p-0 h-auto">
+            <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-0.5 font-mono">System Admin Wallet</p>
+            <CardTitle className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 border-none p-0 h-auto font-mono">
               ${stats.platformBalance.toFixed(2)}
             </CardTitle>
           </CardContent>
@@ -124,14 +123,12 @@ export default function PlatformLedgerTab({ stats, loading }: PlatformLedgerTabP
                           {tx.reference}
                         </TableCell>
                         <TableCell className="px-5 py-3">
-                          <Badge
-                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold border tracking-wider ${
-                              isCredit
-                                ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/30"
-                                : "bg-red-950/40 text-red-400 border-red-500/30"
+                          <span
+                            className={`badge ${
+                              isCredit ? "badge-success" : "badge-danger"
                             }`}
                           >
-                            <span className="flex items-center gap-1">
+                            <span className="flex items-center gap-1 font-mono">
                               {isCredit ? (
                                 <ArrowDownLeft className="w-2.5 h-2.5" />
                               ) : (
@@ -139,9 +136,9 @@ export default function PlatformLedgerTab({ stats, loading }: PlatformLedgerTabP
                               )}
                               {tx.type}
                             </span>
-                          </Badge>
+                          </span>
                         </TableCell>
-                        <TableCell className={`px-5 py-3 font-bold ${isCredit ? "text-emerald-400" : "text-red-400"}`}>
+                        <TableCell className={`px-5 py-3 font-bold ${isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                           {isCredit ? "+" : "-"}${valFloat.toFixed(2)}
                         </TableCell>
                         <TableCell className="px-5 py-3 text-muted-foreground select-all">

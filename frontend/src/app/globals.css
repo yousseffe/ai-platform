@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 @import "../../node_modules/tw-animate-css/dist/tw-animate.css";
 @import "shadcn/tailwind.css";
@@ -6,14 +6,14 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-primary-50: #161b22;
-  --color-primary-100: #21262d;
-  --color-primary-500: #2f81f7;
-  --color-primary-600: #2188ff;
-  --color-primary-700: #0366d6;
-  --color-sidebar: #161b22;
-  --color-main: #0d1117;
-  --font-sans: "Plus Jakarta Sans", "Inter", sans-serif;
+  --color-primary-50: #f4f3ff;
+  --color-primary-100: #e8e6ff;
+  --color-primary-500: #4630eb;
+  --color-primary-600: #3b24db;
+  --color-primary-700: #2c14c7;
+  --color-sidebar: #ffffff;
+  --color-main: #fafafa;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 }
 
@@ -26,7 +26,7 @@ body {
 }
 
 .btn-primary {
-  @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm;
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm;
 }
 
 .btn-outline {
@@ -62,7 +62,7 @@ body {
 }
 
 .code-block {
-  @apply bg-black/40 text-slate-200 p-6 rounded-xl font-mono text-sm overflow-x-auto leading-relaxed border border-border;
+  @apply bg-black/45 text-slate-200 p-6 rounded-xl font-mono text-sm overflow-x-auto leading-relaxed border border-border;
 }
 
 @keyframes fadeIn {
@@ -81,8 +81,8 @@ body {
 }
 
 @theme inline {
-  --font-heading: "Plus Jakarta Sans", "Inter", sans-serif;
-  --font-sans: "Plus Jakarta Sans", "Inter", sans-serif;
+  --font-heading: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -125,62 +125,62 @@ body {
 }
 
 :root {
-  --background: oklch(1 0 0); /* GitHub Light Background #ffffff */
-  --foreground: oklch(0.2 0.01 250); /* Dark grey text #24292f */
-  --card: oklch(1 0 0); /* White card */
-  --card-foreground: oklch(0.2 0.01 250);
+  --background: oklch(0.985 0.003 240); /* Soft off-white Slate bg */
+  --foreground: oklch(0.22 0.015 240); /* Slate-900 for high quality readability */
+  --card: oklch(1 0 0); /* Pure White Card */
+  --card-foreground: oklch(0.22 0.015 240);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.01 250);
-  --primary: oklch(0.48 0.18 250); /* GitHub Blue #0969da */
-  --primary-foreground: oklch(1 0 0); /* White */
-  --secondary: oklch(0.98 0.005 250); /* Light grey bg #f6f8fa */
-  --secondary-foreground: oklch(0.2 0.01 250);
-  --muted: oklch(0.96 0.005 250); /* Slightly darker grey #f3f4f6 */
-  --muted-foreground: oklch(0.45 0.01 250); /* Muted text #57606a */
-  --accent: oklch(0.94 0.005 250); /* Accent highlight */
-  --accent-foreground: oklch(0.2 0.01 250);
-  --destructive: oklch(0.48 0.18 20); /* Red #cf222e */
-  --border: oklch(0.88 0.01 250); /* Light border #d0d7de */
-  --input: oklch(1 0 0); /* input background */
-  --ring: oklch(0.48 0.18 250);
-  --radius: 0.375rem;
-  --sidebar: oklch(0.98 0.005 250); /* Light grey sidebar */
-  --sidebar-foreground: oklch(0.2 0.01 250);
-  --sidebar-primary: oklch(0.48 0.18 250);
+  --popover-foreground: oklch(0.22 0.015 240);
+  --primary: oklch(0.48 0.19 275); /* Modern professional deep indigo/purple */
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.965 0.005 240); /* Soft slate-100 bg */
+  --secondary-foreground: oklch(0.22 0.015 240);
+  --muted: oklch(0.955 0.005 240); /* Soft muted slate */
+  --muted-foreground: oklch(0.52 0.015 240); /* Sleek Slate-500 */
+  --accent: oklch(0.95 0.005 240); /* Soft hover/accent */
+  --accent-foreground: oklch(0.22 0.015 240);
+  --destructive: oklch(0.55 0.18 25); /* Refined crimson red */
+  --border: oklch(0.93 0.006 240); /* Elegant soft gray border */
+  --input: oklch(1 0 0);
+  --ring: oklch(0.48 0.19 275);
+  --radius: 0.5rem;
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.22 0.015 240);
+  --sidebar-primary: oklch(0.48 0.19 275);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.94 0.005 250);
-  --sidebar-accent-foreground: oklch(0.2 0.01 250);
-  --sidebar-border: oklch(0.88 0.01 250);
-  --sidebar-ring: oklch(0.48 0.18 250);
+  --sidebar-accent: oklch(0.965 0.005 240);
+  --sidebar-accent-foreground: oklch(0.22 0.015 240);
+  --sidebar-border: oklch(0.93 0.006 240);
+  --sidebar-ring: oklch(0.48 0.19 275);
 }
 
 .dark {
-  --background: oklch(0.141 0.01 247.96); /* GitHub Dark Background #0d1117 */
-  --foreground: oklch(0.93 0.005 247.96); /* Off-white #e6edf3 */
-  --card: oklch(0.18 0.01 247.96); /* GitHub Dark Card #161b22 */
-  --card-foreground: oklch(0.93 0.005 247.96);
-  --popover: oklch(0.18 0.01 247.96);
-  --popover-foreground: oklch(0.93 0.005 247.96);
-  --primary: oklch(0.58 0.16 250); /* GitHub Dark Blue #2f81f7 */
+  --background: oklch(0.12 0.004 240); /* Expo Dark Background #0b0c0e */
+  --foreground: oklch(0.95 0.003 240); /* Off-white #ededed */
+  --card: oklch(0.15 0.006 240); /* Deep grey card #131417 */
+  --card-foreground: oklch(0.95 0.003 240);
+  --popover: oklch(0.15 0.006 240);
+  --popover-foreground: oklch(0.95 0.003 240);
+  --primary: oklch(0.58 0.22 281.3); /* Expo Light Purple #7e6aff */
   --primary-foreground: oklch(1 0 0); /* White */
-  --secondary: oklch(0.22 0.01 247.96); /* Lighter grey #21262d */
-  --secondary-foreground: oklch(0.93 0.005 247.96);
-  --muted: oklch(0.20 0.01 247.96);
-  --muted-foreground: oklch(0.68 0.008 247.96); /* Muted text #8b949e */
-  --accent: oklch(0.22 0.01 247.96);
-  --accent-foreground: oklch(0.93 0.005 247.96);
-  --destructive: oklch(0.52 0.19 25.5); /* red #da3633 */
-  --border: oklch(0.28 0.01 247.96); /* GitHub Border #30363d */
-  --input: oklch(0.141 0.01 247.96); /* input background */
-  --ring: oklch(0.58 0.16 250);
-  --sidebar: oklch(0.18 0.01 247.96);
-  --sidebar-foreground: oklch(0.93 0.005 247.96);
-  --sidebar-primary: oklch(0.58 0.16 250);
+  --secondary: oklch(0.18 0.006 240); /* Grey #18191d */
+  --secondary-foreground: oklch(0.95 0.003 240);
+  --muted: oklch(0.16 0.006 240); /* #16171b */
+  --muted-foreground: oklch(0.65 0.01 240); /* Muted text #8c8c8c */
+  --accent: oklch(0.18 0.006 240);
+  --accent-foreground: oklch(0.95 0.003 240);
+  --destructive: oklch(0.54 0.21 25.5); /* Red #f87171 */
+  --border: oklch(0.22 0.008 240); /* Subtle border #222326 */
+  --input: oklch(0.12 0.004 240);
+  --ring: oklch(0.58 0.22 281.3);
+  --sidebar: oklch(0.13 0.004 240); /* Deep sidebar #0e0f11 */
+  --sidebar-foreground: oklch(0.95 0.003 240);
+  --sidebar-primary: oklch(0.58 0.22 281.3);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.22 0.01 247.96);
-  --sidebar-accent-foreground: oklch(0.93 0.005 247.96);
-  --sidebar-border: oklch(0.28 0.01 247.96);
-  --sidebar-ring: oklch(0.58 0.16 250);
+  --sidebar-accent: oklch(0.18 0.006 240);
+  --sidebar-accent-foreground: oklch(0.95 0.003 240);
+  --sidebar-border: oklch(0.22 0.008 240);
+  --sidebar-ring: oklch(0.58 0.22 281.3);
 }
 
 @layer base {
@@ -188,10 +188,10 @@ body {
     @apply border-border outline-ring/50;
   }
   html {
-    font-family: "Plus Jakarta Sans", "Inter", sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
   body {
     @apply bg-background text-foreground;
-    font-family: "Plus Jakarta Sans", "Inter", sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 }

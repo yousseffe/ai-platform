@@ -1,7 +1,6 @@
 import React from "react";
 import { Activity, ArrowUpRight, Layers } from "lucide-react";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 interface StatsOverviewProps {
   totalModels: number;
@@ -25,9 +24,9 @@ export function StatsOverview({ totalModels, activeDeploymentsCount }: StatsOver
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
               <Layers className="w-5 h-5" />
             </div>
-            <Badge className="bg-emerald-950/40 text-emerald-400 border-emerald-500/20 hover:bg-emerald-950/50 flex items-center gap-0.5 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+            <span className="badge badge-success flex items-center gap-0.5 text-xs font-semibold px-2.5 py-0.5 rounded-full">
               <ArrowUpRight className="w-3 h-3" /> +{totalModels}
-            </Badge>
+            </span>
           </div>
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 font-mono">Total Models</p>
           <CardTitle className="text-3xl font-extrabold text-foreground border-none p-0 h-auto font-mono">{totalModels}</CardTitle>
@@ -38,7 +37,7 @@ export function StatsOverview({ totalModels, activeDeploymentsCount }: StatsOver
       <Card className="border border-border bg-card p-0">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-lg bg-emerald-950/35 flex items-center justify-center text-emerald-400">
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-650 dark:bg-emerald-950/40 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/10 dark:border-emerald-500/25">
               <Activity className="w-5 h-5" />
             </div>
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-mono select-none">

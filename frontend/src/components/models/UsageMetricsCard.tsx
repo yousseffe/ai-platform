@@ -1,29 +1,65 @@
 import React from "react";
+import { Model } from "@/types";
+import { Activity, Coins, Layers } from "lucide-react";
+
+interface UsageMetricsCardProps {
+  model: Model;
+}
 
 /**
- * Renders the Usage Metrics card showing api calls count and p95 latencies.
+ * Renders dynamic stats for a model, including cost, versions, and deployment status.
  *
- * @returns The React component layout for usage metrics.
+ * @param props - The component properties.
+ * @param props.model - The Model object details.
+ * @returns The React component displaying model stats.
  */
-export function UsageMetricsCard() {
+export function UsageMetricsCard({ model }: UsageMetricsCardProps) {
+  const versions = model.versions || [];
+  const liveVersion = versions.find(v => v.deployments?.some(d => d.status === "running"));
+
   return (
-    <div className="w-full lg:w-72 font-mono text-xs">
-      <div className="card h-full">
-        <h3 className="font-bold text-foreground mb-4 text-sm">Usage Metrics</h3>
-        <div className="mb-4">
-          <div className="flex justify-between mb-1">
-            <span className="text-muted-foreground">API Calls (24h)</span>
-            <span className="text-foreground font-bold">42.8k</span>
+    <div className="w-full font-sans text-xs">
+      <div className="card h-full space-y-4">
+        <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5 border-b border-border pb-3">
+          <Activity className="w-4 h-4 text-primary" /> Model Stats
+        </h3>
+        
+        <div className="space-y-3.5">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-muted-foreground flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5 text-muted-foreground" /> Cost / Request
+            </span>
+            <span className="text-foreground font-semibold font-mono bg-secondary px-2 py-0.5 rounded border border-border">
+              ${(() => {
+                const costVal = typeof model.costPerRequest === "string" ? parseFloat(model.costPerRequest) : model.costPerRequest;
+                return typeof costVal === "number" && !isNaN(costVal) ? costVal.toFixed(4) : "0.0000";
+              })()}
+            </span>
           </div>
-          <div className="w-full bg-background border border-border rounded-full h-2 mt-2">
-            <div className="bg-primary h-full rounded-full" style={{ width: "85%" }}></div>
+
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-muted-foreground flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-muted-foreground" /> Version Releases
+            </span>
+            <span className="text-foreground font-semibold font-mono bg-secondary px-2 py-0.5 rounded border border-border">
+              {versions.length} {versions.length === 1 ? "release" : "releases"}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-muted-foreground">Status</span>
+            {liveVersion ? (
+              <span className="badge badge-success font-mono text-[10px]">
+                <span className="badge-dot animate-pulse" />
+                Live sandbox
+              </span>
+            ) : (
+              <span className="badge badge-neutral font-mono text-[10px]">
+                inactive
+              </span>
+            )}
           </div>
         </div>
-        <div className="mb-6 flex justify-between items-center">
-          <span className="text-muted-foreground">Latency (p95)</span>
-          <span className="text-foreground font-bold">124ms</span>
-        </div>
-        <button className="btn-outline w-full cursor-pointer">View Analytics</button>
       </div>
     </div>
   );

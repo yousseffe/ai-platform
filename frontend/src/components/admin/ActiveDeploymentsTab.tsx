@@ -4,7 +4,6 @@ import React from "react";
 import { Cpu, Edit2, Loader2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AdminModel } from "@/types";
 
@@ -87,15 +86,14 @@ export default function ActiveDeploymentsTab({
                           </div>
                         </TableCell>
                         <TableCell className="px-5 py-3.5">
-                          <Badge
-                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
-                              isActive
-                                ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/30"
-                                : "bg-slate-900/60 text-slate-400 border-slate-700/50"
+                          <span
+                            className={`badge ${
+                              isActive ? "badge-success" : "badge-neutral"
                             }`}
                           >
+                            <span className="badge-dot" />
                             {model.status}
-                          </Badge>
+                          </span>
                         </TableCell>
                         <TableCell className="px-5 py-3.5 font-bold text-primary">
                           {model.port ? `:${model.port}` : "—"}

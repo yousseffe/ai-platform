@@ -14,10 +14,11 @@ const PRESET_AMOUNTS = [10, 25, 50, 100];
 /**
  * Premium payment & withdrawal card enabling users to top up credits or cash out balance.
  * Integrates Stripe Checkout for deposits and mock bank transactions for withdrawals.
+ * Re-styled for settings dashboard tab layout integration.
  *
  * @returns The React component rendering the credit ledger management card.
  */
-export default function WalletTopUpCard() {
+export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactionSuccess?: () => void }) {
   const { balance, withdrawFunds } = useWorkspace();
   
   // Tab state
@@ -75,6 +76,7 @@ export default function WalletTopUpCard() {
       if (res.success) {
         toast.success(`Successfully withdrew $${finalAmount.toFixed(2)} to your bank account!`);
         setWithdrawAmount("");
+        onTransactionSuccess?.();
       } else {
         toast.error(res.error || "Withdrawal failed");
       }
@@ -84,6 +86,7 @@ export default function WalletTopUpCard() {
       setWithdrawLoading(false);
     }
   };
+
 
   /**
    * Handles preset selection updates.
@@ -108,29 +111,29 @@ export default function WalletTopUpCard() {
   const activeAmount = selectedPreset !== null ? selectedPreset : parseFloat(customAmount) || 0;
 
   return (
-    <Card className="border border-border bg-card shadow-sm overflow-hidden font-mono text-xs text-foreground">
-      <CardHeader className="flex flex-row items-start gap-4 pb-5 border-b border-border">
-        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20">
-          <Coins className="w-5 h-5" />
+    <Card className="border border-border bg-card shadow-sm overflow-hidden font-sans text-xs text-foreground rounded-xl">
+      <CardHeader className="flex flex-row items-center gap-3.5 pb-4 border-b border-border bg-secondary/10">
+        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20">
+          <Coins className="w-4.5 h-4.5" />
         </div>
-        <div className="flex-1">
-          <CardTitle className="text-sm font-bold text-foreground">Workspace Credits Ledger</CardTitle>
-          <CardDescription className="text-xs text-muted-foreground">
-            Current withdrawable balance: <span className="font-bold text-foreground text-xs">${balance.toFixed(2)}</span>
+        <div className="flex-1 text-left">
+          <CardTitle className="text-xs font-bold text-foreground">Workspace Credits Ledger</CardTitle>
+          <CardDescription className="text-[11px] text-muted-foreground mt-0.5">
+            Current withdrawable balance: <span className="font-mono font-bold text-foreground">${balance.toFixed(2)}</span>
           </CardDescription>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-6 space-y-6">
+      <CardContent className="p-5 space-y-5 text-left">
         {/* Tab Selection */}
-        <div className="flex border-b border-border/60">
+        <div className="flex border-b border-border bg-secondary/20 rounded-lg p-0.5 border-border/50 select-none">
           <button
             type="button"
             onClick={() => setActiveTab("deposit")}
-            className={`flex-1 pb-2.5 font-bold border-b-2 text-center transition-all cursor-pointer ${
+            className={`flex-1 py-1 px-3 rounded-md text-[10px] font-bold tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               activeTab === "deposit"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                ? "bg-card text-primary shadow-sm border border-border/60"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Deposit Credits
@@ -138,10 +141,10 @@ export default function WalletTopUpCard() {
           <button
             type="button"
             onClick={() => setActiveTab("withdraw")}
-            className={`flex-1 pb-2.5 font-bold border-b-2 text-center transition-all cursor-pointer ${
+            className={`flex-1 py-1 px-3 rounded-md text-[10px] font-bold tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               activeTab === "withdraw"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                ? "bg-card text-primary shadow-sm border border-border/60"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Withdraw Balance
@@ -150,23 +153,23 @@ export default function WalletTopUpCard() {
 
         {/* Tab Contents: DEPOSIT */}
         {activeTab === "deposit" ? (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-5 animate-fade-in">
             {/* Preset Amounts Grid */}
-            <div className="space-y-2">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider select-none">
                 Select Package Amount
               </label>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-4 gap-2.5">
                 {PRESET_AMOUNTS.map((amt) => (
                   <Button
                     key={amt}
                     type="button"
                     variant={selectedPreset === amt ? "default" : "outline"}
                     onClick={() => selectPreset(amt)}
-                    className={`py-2 text-xs font-bold transition-all cursor-pointer rounded-lg border ${
+                    className={`py-1.5 h-8 text-[11px] font-bold transition-all cursor-pointer rounded-lg border ${
                       selectedPreset === amt
                         ? "bg-primary hover:bg-primary/95 text-primary-foreground border-primary"
-                        : "border-border hover:bg-accent text-foreground hover:text-foreground"
+                        : "border-border hover:bg-secondary text-foreground hover:text-foreground"
                     }`}
                   >
                     ${amt}
@@ -176,12 +179,12 @@ export default function WalletTopUpCard() {
             </div>
 
             {/* Custom Amount Form */}
-            <div className="space-y-2">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider select-none">
                 Custom Deposit (USD)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-semibold select-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-semibold select-none">
                   $
                 </span>
                 <Input
@@ -191,16 +194,16 @@ export default function WalletTopUpCard() {
                   value={customAmount}
                   onChange={(e) => handleCustomChange(e.target.value)}
                   placeholder="Enter custom amount"
-                  className="pl-7 bg-input border-border text-foreground font-medium text-sm focus-visible:ring-primary/20 focus-visible:border-primary rounded-lg"
+                  className="pl-7 h-9 bg-background border-border text-foreground font-semibold text-xs focus-visible:ring-primary/20 focus-visible:border-primary rounded-lg"
                 />
               </div>
             </div>
 
             {/* Info Alert */}
-            <div className="flex gap-2.5 items-start bg-background border border-border p-3 rounded-xl text-xs text-muted-foreground leading-relaxed">
-              <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <div className="flex gap-2 items-start bg-secondary/35 border border-border p-3 rounded-lg text-[11px] text-muted-foreground leading-normal font-sans">
+              <Info className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold text-foreground">Simulation Mode:</span> You will be redirected to a Stripe-hosted payment interface. Use any test card (e.g. <span className="font-mono text-primary font-semibold">4242 4242 4242 4242</span>) to complete.
+                <span className="font-semibold text-foreground">Simulation Mode:</span> Redirects to Stripe Sandbox Checkout. Use test card <span className="font-mono text-primary font-semibold select-all">4242 4242 4242 4242</span> to verify payouts.
               </div>
             </div>
 
@@ -208,31 +211,31 @@ export default function WalletTopUpCard() {
             <Button
               onClick={handleTopUp}
               disabled={loading || activeAmount < 5}
-              className="w-full btn-primary font-bold py-3 text-xs flex items-center justify-center gap-2 shadow-sm rounded-lg"
+              className="w-full btn-primary font-bold py-2 text-xs flex items-center justify-center gap-1.5 shadow-sm rounded-lg h-9"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Opening Checkout...
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Opening Stripe Sandbox...
                 </>
               ) : (
                 <>
                   Purchase ${activeAmount.toFixed(2)} Credits
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
             </Button>
           </div>
         ) : (
           /* Tab Contents: WITHDRAWAL */
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-5 animate-fade-in">
             {/* Amount Form */}
-            <div className="space-y-2">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider select-none">
                 Withdrawal Amount (USD)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-semibold select-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-semibold select-none">
                   $
                 </span>
                 <Input
@@ -242,16 +245,16 @@ export default function WalletTopUpCard() {
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
                   placeholder="Enter cash out amount"
-                  className="pl-7 bg-input border-border text-foreground font-medium text-sm focus-visible:ring-primary/20 focus-visible:border-primary rounded-lg"
+                  className="pl-7 h-9 bg-background border-border text-foreground font-semibold text-xs focus-visible:ring-primary/20 focus-visible:border-primary rounded-lg"
                 />
               </div>
             </div>
 
             {/* Bank Info Alert */}
-            <div className="flex gap-2.5 items-start bg-background border border-border p-3 rounded-xl text-xs text-muted-foreground leading-relaxed">
-              <HelpCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="flex gap-2 items-start bg-secondary/35 border border-border p-3 rounded-lg text-[11px] text-muted-foreground leading-normal font-sans">
+              <HelpCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold text-foreground">Instant Cash Out:</span> Withdrawals deduct credits instantly from your ledger wallet and transfer to your registered bank account payout route.
+                <span className="font-semibold text-foreground">Instant Transfer:</span> Earnings withdraw instantly from ledger balance into your payouts bank account context.
               </div>
             </div>
 
@@ -259,17 +262,17 @@ export default function WalletTopUpCard() {
             <Button
               onClick={handleWithdraw}
               disabled={withdrawLoading || !withdrawAmount || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > balance}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 text-xs flex items-center justify-center gap-2 shadow-sm rounded-lg border-none"
+              className="w-full bg-emerald-600 hover:bg-emerald-600/95 text-white font-bold py-2 text-xs flex items-center justify-center gap-1.5 shadow-sm rounded-lg border-none h-9"
             >
               {withdrawLoading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   Processing Payout...
                 </>
               ) : (
                 <>
                   Withdraw ${(parseFloat(withdrawAmount) || 0).toFixed(2)} Credits
-                  <ArrowUpRight className="w-4 h-4" />
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </>
               )}
             </Button>
