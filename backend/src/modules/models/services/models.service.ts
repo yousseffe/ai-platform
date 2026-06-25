@@ -339,10 +339,10 @@ export class ModelsService {
       throw new NotFoundException(`Model version ${versionId} not found.`);
     }
 
-    if (examplePayload !== undefined) {
+    if (examplePayload) {
       version.examplePayload = examplePayload;
     }
-    if (expectedResult !== undefined) {
+    if (expectedResult) {
       version.expectedResult = expectedResult;
     }
 

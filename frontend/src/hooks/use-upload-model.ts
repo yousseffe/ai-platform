@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { toast } from "react-hot-toast";
+import { getSession } from "next-auth/react";
 
 import { createModel } from "@/lib/actions/models.actions";
 import { uploadModelFormSchema, type UploadModelFormInput } from "@/lib/schemas";
@@ -112,7 +113,7 @@ export function useUploadModel() {
       }
 
       setUploadProgress(50);
-      const result = await detectSchema(model);
+      const result = await detectSchema(model, form.getValues("type"));
       setUploadProgress(90);
 
       // Auto-populate examplePayload and expectedResult if detected
@@ -228,7 +229,17 @@ export function useUploadModel() {
       formData.append("triggerBuild", "true");
 
       // 3. Upload version files using Axios to track progress
-      const response = await axios.post(`/api/models/${modelId}/versions`, formData, {
+      const session = await getSession();
+      const token = session?.accessToken;
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await axios.post(`${backendUrl}/api/v1/models/${modelId}/versions`, formData, {
+        headers,
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 60) / progressEvent.total);
@@ -283,7 +294,7 @@ export function useUploadModel() {
 
     setIsDetectingSchema(true);
     try {
-      const result = await detectSchema(model);
+      const result = await detectSchema(model, form.getValues("type"));
       
       // Update form values
       if (result.example_payload) {

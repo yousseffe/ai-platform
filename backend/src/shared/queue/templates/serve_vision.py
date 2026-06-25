@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 import os
+import sys
 import uvicorn
 import importlib.util
 import numpy as np
@@ -14,6 +15,7 @@ if preprocess_path and os.path.exists(preprocess_path):
     try:
         spec = importlib.util.spec_from_file_location("preprocess", preprocess_path)
         preprocess_module = importlib.util.module_from_spec(spec)
+        sys.modules["preprocess"] = preprocess_module
         spec.loader.exec_module(preprocess_module)
         if hasattr(preprocess_module, "preprocess"):
             preprocess_func = preprocess_module.preprocess
@@ -28,6 +30,7 @@ if postprocess_path and os.path.exists(postprocess_path):
     try:
         spec = importlib.util.spec_from_file_location("postprocess", postprocess_path)
         postprocess_module = importlib.util.module_from_spec(spec)
+        sys.modules["postprocess"] = postprocess_module
         spec.loader.exec_module(postprocess_module)
         if hasattr(postprocess_module, "postprocess"):
             postprocess_func = postprocess_module.postprocess
@@ -114,9 +117,28 @@ try:
         model.eval()
     elif framework == "TENSORFLOW":
         import tensorflow as tf
-        model = tf.keras.models.load_model(model_path)
+        # Patch Keras 3.x Layer base class to accept and ignore quantization_config
+        try:
+            from keras.src.layers.layer import Layer as _KerasLayer
+            _orig_layer_init = _KerasLayer.__init__
+            def _patched_layer_init(self, *args, **kwargs):
+                kwargs.pop("quantization_config", None)
+                return _orig_layer_init(self, *args, **kwargs)
+            _KerasLayer.__init__ = _patched_layer_init
+        except Exception:
+            pass
+        try:
+            model = tf.keras.models.load_model(model_path)
+        except Exception:
+            import joblib
+            model = joblib.load(model_path)
 except Exception as e:
     print(f"Error loading {framework} model: {e}")
+
+# Load output schema for response formatting
+from schema_utils import load_output_schema, apply_schema
+output_schema = load_output_schema()
+
 
 @app.post("/predict")
 async def predict(request: Request):
@@ -190,7 +212,8 @@ async def predict(request: Request):
         
     if prediction_proba is not None and hasattr(prediction_proba, "tolist"):
         prediction_proba = prediction_proba.tolist()
-        
+
+    # Build default result
     if isinstance(prediction, dict):
         result = prediction
     else:
@@ -198,7 +221,12 @@ async def predict(request: Request):
         
     if prediction_proba is not None and not postprocess_func:
         result["probabilities"] = prediction_proba
-        
+
+    # Apply output schema enforcement if defined
+    schema_result = apply_schema(result, output_schema)
+    if schema_result is not None:
+        return schema_result
+
     return result
 
 if __name__ == "__main__":

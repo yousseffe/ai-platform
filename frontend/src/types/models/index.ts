@@ -23,6 +23,7 @@ export interface ModelVersion {
   examplePayload?: string;
   expectedResult?: string;
   errorMessage?: string;
+  buildProgress?: number;
   deployments?: Deployment[];
   createdAt: string;
   updatedAt: string;

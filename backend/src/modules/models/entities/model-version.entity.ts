@@ -88,6 +88,12 @@ export class ModelVersion {
   errorMessage: string | null;
 
   /**
+   * Build progress percentage (0-100) updated during the containerization pipeline.
+   */
+  @Column({ type: 'int', default: 0 })
+  buildProgress: number;
+
+  /**
    * Collection of deployments spawned using this version container.
    */
   @OneToMany(() => Deployment, (deployment) => deployment.modelVersion)

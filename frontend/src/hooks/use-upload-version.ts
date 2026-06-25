@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { toast } from "react-hot-toast";
+import { getSession } from "next-auth/react";
 import { detectSchema } from "@/lib/services/models.service";
 
 /**
@@ -14,7 +15,7 @@ import { detectSchema } from "@/lib/services/models.service";
  * @param modelId - The unique UUID identifier of the parent model.
  * @returns An object containing form variables, progress trackers, and event handlers.
  */
-export function useUploadVersion(modelId: string) {
+export function useUploadVersion(modelId: string, modelType?: string) {
   const router = useRouter();
 
   // File Upload states
@@ -50,7 +51,7 @@ export function useUploadVersion(modelId: string) {
 
     setIsDetectingSchema(true);
     try {
-      const result = await detectSchema(modelFile);
+      const result = await detectSchema(modelFile, modelType);
       if (result.example_payload) {
         setExamplePayload(result.example_payload);
       }
@@ -101,7 +102,17 @@ export function useUploadVersion(modelId: string) {
       setUploadStatus("Uploading artifacts to registry...");
       setUploadProgress(20);
 
-      const response = await axios.post(`/api/models/${modelId}/versions`, formData, {
+      const session = await getSession();
+      const token = session?.accessToken;
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await axios.post(`${backendUrl}/api/v1/models/${modelId}/versions`, formData, {
+        headers,
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 80) / progressEvent.total);

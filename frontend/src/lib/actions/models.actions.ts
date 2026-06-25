@@ -238,7 +238,7 @@ export async function rebuildModelVersion(
   versionId: string
 ): Promise<{ success: true; data: ModelVersion } | { success: false; error: string }> {
   try {
-    const res = await modelsService.buildModelVersion(versionId, "", "");
+    const res = await modelsService.buildModelVersion(versionId);
     revalidatePath(`/models/${modelId}`);
     revalidatePath("/models");
     return { success: true, data: res };

@@ -54,6 +54,7 @@ export class SchemaController {
   )
   async detectSchema(
     @UploadedFile() file?: Express.Multer.File,
+    @Body() body?: { modelType?: string; originalFilename?: string },
   ): Promise<Record<string, unknown>> {
     if (!file) {
       throw new BadRequestException('No model file uploaded.');

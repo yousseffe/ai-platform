@@ -3,7 +3,9 @@ import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ModelVersion } from '../../../modules/models/entities/model-version.entity';
+import { Deployment } from '../../../modules/deployments/entities/deployment.entity';
 import { VersionStatus } from '../../../modules/models/enums/version-status.enum';
+import { DeploymentStatus } from '../../../modules/deployments/enums/deployment-status.enum';
 import { ModelType } from '../../../modules/models/enums/model-type.enum';
 import { Framework } from '../../../modules/models/enums/framework.enum';
 import * as fs from 'fs';
@@ -39,6 +41,8 @@ export class BuildProcessor extends WorkerHost {
   constructor(
     @InjectRepository(ModelVersion)
     private readonly modelVersionsRepository: Repository<ModelVersion>,
+    @InjectRepository(Deployment)
+    private readonly deploymentsRepository: Repository<Deployment>,
     private readonly minioService: MinioService,
   ) {
     super();
@@ -52,12 +56,20 @@ export class BuildProcessor extends WorkerHost {
    * @param job - The background job containing the model version ID payload.
    * @returns A promise that resolves when the build is complete.
    */
+  /**
+   * Helper to persist build progress percentage (0-100) for real-time UI updates.
+   */
+  private async updateProgress(versionId: string, progress: number): Promise<void> {
+    await this.modelVersionsRepository.update(versionId, { buildProgress: progress });
+  }
+
   async process(job: Job<BuildJobPayload, void, string>): Promise<void> {
     const { versionId } = job.data;
     this.logger.log(`Starting build process for version: ${versionId}`);
 
     await this.modelVersionsRepository.update(versionId, {
       status: VersionStatus.BUILDING,
+      buildProgress: 0,
     });
     const version = await this.modelVersionsRepository.findOne({
       where: { id: versionId },
@@ -70,6 +82,36 @@ export class BuildProcessor extends WorkerHost {
     }
 
     try {
+      // Phase 0: Stop active deployments for this version before rebuilding
+      const activeDeployments = await this.deploymentsRepository.find({
+        where: {
+          modelVersion: { id: versionId },
+          status: DeploymentStatus.RUNNING,
+        },
+      });
+
+      for (const deployment of activeDeployments) {
+        if (deployment.containerId) {
+          try {
+            const container = this.docker.getContainer(deployment.containerId);
+            await container.stop();
+            await container.remove();
+            this.logger.log(
+              `Stopped container ${deployment.containerId} for rebuild`,
+            );
+          } catch (stopErr: unknown) {
+            const stopMsg =
+              stopErr instanceof Error ? stopErr.message : String(stopErr);
+            this.logger.warn(
+              `Could not stop container ${deployment.containerId}: ${stopMsg}`,
+            );
+          }
+        }
+        await this.deploymentsRepository.update(deployment.id, {
+          status: DeploymentStatus.STOPPED,
+        });
+      }
+
       const buildDir = path.join(
         process.cwd(),
         'uploads',
@@ -79,31 +121,37 @@ export class BuildProcessor extends WorkerHost {
         fs.mkdirSync(buildDir, { recursive: true });
       }
 
-      // Download model files from MinIO
+      // Phase 1: Download model files from MinIO in parallel (5% → 15%)
+      await this.updateProgress(versionId, 5);
+      const downloads: Promise<void>[] = [];
       if (version.modelFilePath) {
-        await this.minioService.downloadFile(
+        downloads.push(this.minioService.downloadFile(
           version.modelFilePath,
           path.join(buildDir, 'model.pkl'),
-        );
+        ));
       }
       if (version.scalerFilePath) {
-        await this.minioService.downloadFile(
+        downloads.push(this.minioService.downloadFile(
           version.scalerFilePath,
           path.join(buildDir, 'scaler.pkl'),
-        );
+        ));
       }
       if (version.preprocessFilePath) {
-        await this.minioService.downloadFile(
+        downloads.push(this.minioService.downloadFile(
           version.preprocessFilePath,
           path.join(buildDir, 'preprocess.py'),
-        );
+        ));
       }
       if (version.postprocessFilePath) {
-        await this.minioService.downloadFile(
+        downloads.push(this.minioService.downloadFile(
           version.postprocessFilePath,
           path.join(buildDir, 'postprocess.py'),
-        );
+        ));
       }
+      await Promise.all(downloads);
+
+      // Phase 2: Prepare build context (15% → 30%)
+      await this.updateProgress(versionId, 15);
 
       let modelPathEnv = 'model.pkl';
       const modelLocalPath = path.join(buildDir, 'model.pkl');
@@ -157,6 +205,17 @@ export class BuildProcessor extends WorkerHost {
         }
       }
 
+      // Phase 3: Generate Dockerfile (30% → 50%)
+      await this.updateProgress(versionId, 30);
+
+      // Write output schema file if the version has an expectedResult defined
+      if (version.expectedResult) {
+        fs.writeFileSync(
+          path.join(buildDir, 'output_schema.json'),
+          version.expectedResult,
+        );
+      }
+
       let dockerfileContent = '';
 
       if (version.model.type === ModelType.LLM_GGUF) {
@@ -191,6 +250,19 @@ ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "
           path.join(buildDir, 'serve.py'),
         );
 
+        // Copy shared schema enforcement utilities
+        fs.copyFileSync(
+          path.join(
+            process.cwd(),
+            'src',
+            'shared',
+            'queue',
+            'templates',
+            'schema_utils.py',
+          ),
+          path.join(buildDir, 'schema_utils.py'),
+        );
+
         const hasScaler = !!version.scalerFilePath;
         const hasPreprocess = !!version.preprocessFilePath;
         const hasPostprocess = !!version.postprocessFilePath;
@@ -201,7 +273,16 @@ ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "
           'os', 'sys', 'json', 'math', 'pickle', 'importlib', 'datetime', 'time', 're', 'collections',
           'numpy', 'pandas', 'sklearn', 'joblib', 'fastapi', 'uvicorn', 'pydantic', 'typing',
           'base64', 'io', 'PIL', 'shutil', 'hashlib', 'uuid', 'binascii', 'argparse', 'logging', 'random',
-          'torch', 'torchvision', 'diffusers', 'transformers', 'accelerate'
+          'torch', 'torchvision', 'diffusers', 'transformers', 'accelerate',
+          // Python stdlib modules commonly used in preprocess/postprocess scripts
+          'urllib', 'dataclasses', '__future__', 'abc', 'enum', 'functools', 'itertools', 'operator',
+          'string', 'struct', 'textwrap', 'copy', 'pathlib', 'tempfile', 'glob', 'csv', 'configparser',
+          'warnings', 'traceback', 'contextlib', 'decimal', 'fractions', 'statistics', 'array',
+          'bisect', 'heapq', 'queue', 'threading', 'multiprocessing', 'subprocess', 'signal',
+          'socket', 'http', 'email', 'html', 'xml', 'codecs', 'unicodedata', 'locale',
+          'pprint', 'inspect', 'dis', 'ast', 'token', 'keyword', 'tokenize',
+          'unittest', 'doctest', 'types', 'weakref', 'gc', 'platform', 'ctypes',
+          'gzip', 'bz2', 'lzma', 'zipfile', 'tarfile',
         ]);
 
         const scanImports = (filePath: string) => {
@@ -243,7 +324,7 @@ ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "
           extraPipInstall = `\nRUN pip install --no-cache-dir ${uniqueExtras.join(' ')}`;
         }
 
-        let baseImage = 'python:3.9-slim';
+        let baseImage = 'python:3.11-slim';
         let useBaseImage = false;
 
         if (version.model.type === ModelType.DIFFUSION) {
@@ -262,9 +343,28 @@ ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "
           } catch (e) {
             this.logger.log('Base image ai-platform-pytorch-base:latest not found. Falling back to python:3.9-slim.');
           }
+        } else if (version.model.framework === Framework.TENSORFLOW) {
+          try {
+            await this.docker.getImage('ai-platform-tensorflow-base:latest').inspect();
+            baseImage = 'ai-platform-tensorflow-base:latest';
+            useBaseImage = true;
+          } catch (e) {
+            this.logger.log('Base image ai-platform-tensorflow-base:latest not found. Trying sklearn base with extra tensorflow install.');
+            // Fallback: use sklearn base + extra tensorflow install
+            try {
+              await this.docker.getImage('ai-platform-sklearn-base:latest').inspect();
+              baseImage = 'ai-platform-sklearn-base:latest';
+              useBaseImage = true;
+              extraPipInstall += '\nRUN pip install --no-cache-dir tensorflow';
+            } catch (e2) {
+              this.logger.log('No base images found. Falling back to python:3.9-slim.');
+            }
+          }
         } else if (
           version.model.framework === Framework.SKLEARN ||
-          version.model.framework === Framework.CUSTOM
+          version.model.framework === Framework.CUSTOM ||
+          version.model.type === ModelType.NLP ||
+          version.model.type === ModelType.TABULAR
         ) {
           try {
             await this.docker.getImage('ai-platform-sklearn-base:latest').inspect();
@@ -288,11 +388,12 @@ ENV PREPROCESS_PATH=${hasPreprocess ? 'preprocess.py' : ''}
 ENV POSTPROCESS_PATH=${hasPostprocess ? 'postprocess.py' : ''}
 ENV FRAMEWORK=${version.model.framework}
 ENV TASK_TYPE=${version.model.taskType}
+ENV OUTPUT_SCHEMA_PATH=${version.expectedResult ? 'output_schema.json' : ''}
 EXPOSE 8000
 CMD ["python", "serve.py"]
 `;
         } else {
-          dockerfileContent = `FROM python:3.9-slim
+          dockerfileContent = `FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
@@ -304,6 +405,7 @@ ENV PREPROCESS_PATH=${hasPreprocess ? 'preprocess.py' : ''}
 ENV POSTPROCESS_PATH=${hasPostprocess ? 'postprocess.py' : ''}
 ENV FRAMEWORK=${version.model.framework}
 ENV TASK_TYPE=${version.model.taskType}
+ENV OUTPUT_SCHEMA_PATH=${version.expectedResult ? 'output_schema.json' : ''}
 EXPOSE 8000
 CMD ["python", "serve.py"]
 `;
@@ -324,7 +426,7 @@ numpy
         } else if (version.model.framework === Framework.SKLEARN) {
           requirementsContent += '\nscikit-learn\njoblib';
         } else if (version.model.framework === Framework.TENSORFLOW) {
-          requirementsContent += '\ntensorflow';
+          requirementsContent += '\ntensorflow\nscikit-learn\njoblib';
         } else if (version.model.framework === Framework.ONNX) {
           requirementsContent += '\nonnxruntime';
         } else {
@@ -340,6 +442,9 @@ numpy
 
       fs.writeFileSync(path.join(buildDir, 'Dockerfile'), dockerfileContent);
 
+      // Phase 4: Docker build (50% → 90%)
+      await this.updateProgress(versionId, 50);
+
       const pack = await this.docker.buildImage(
         {
           context: buildDir,
@@ -349,6 +454,7 @@ numpy
       );
 
       await new Promise<void>((resolve, reject) => {
+        let stepCount = 0;
         this.docker.modem.followProgress(
           pack,
           (err: Error | null, res: unknown[] | undefined) => {
@@ -369,6 +475,15 @@ numpy
             }
             resolve();
           },
+          (event: { stream?: string }) => {
+            // Track Docker build steps to update progress (50% → 90%)
+            if (event?.stream?.startsWith('Step ')) {
+              stepCount++;
+              // Estimate progress: each step advances from 50% toward 90%
+              const buildProgress = Math.min(90, 50 + stepCount * 5);
+              this.updateProgress(versionId, buildProgress).catch(() => {});
+            }
+          },
         );
       });
 
@@ -376,18 +491,23 @@ numpy
         `Successfully built docker image for version: ${versionId}`,
       );
 
-      // Prune dangling/intermediate build images to save disk space
+      // Phase 5: Cleanup (90% → 95%)
+      await this.updateProgress(versionId, 90);
+
+      // Prune dangling/intermediate build images synchronously
       try {
         const { execSync } = require('child_process');
-        execSync('docker image prune -f');
+        execSync('docker image prune -f', { timeout: 30000 });
         this.logger.log('Successfully pruned dangling/intermediate docker images');
-      } catch (err: any) {
-        this.logger.warn(`Failed to prune dangling images: ${err.message || err}`);
+      } catch (pruneError: unknown) {
+        const pruneMsg = pruneError instanceof Error ? pruneError.message : String(pruneError);
+        this.logger.warn(`Failed to prune dangling images: ${pruneMsg}`);
       }
 
       await this.modelVersionsRepository.update(versionId, {
         status: VersionStatus.READY,
         errorMessage: null,
+        buildProgress: 100,
       });
 
       // Cleanup local build files
