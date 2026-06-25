@@ -14,7 +14,6 @@ import {
   UserCheck,
   UserX,
   Trash2,
-  DollarSign,
   Sparkles,
   Coins,
   RefreshCw,
@@ -342,7 +341,7 @@ export default function AdminUserDetailsPage({ params }: { params: Promise<{ id:
           <Card className="border border-border bg-card shadow-xs overflow-hidden">
             <CardHeader className="border-b border-border bg-muted/15 p-4 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-emerald-500" />
+                <Coins className="w-4 h-4 text-emerald-500" />
                 Wallet Registry
               </CardTitle>
               <Button
@@ -367,15 +366,15 @@ export default function AdminUserDetailsPage({ params }: { params: Promise<{ id:
                 </div>
               </div>
 
-              {/* Provider Wallet (USD) */}
+              {/* Provider Wallet (EGP) */}
               <div className="p-3 border border-emerald-500/20 bg-emerald-500/[0.01] rounded-lg text-left relative overflow-hidden">
                 <div className="absolute right-3 top-3 text-emerald-500/10">
-                  <DollarSign className="w-8 h-8" />
+                  <Coins className="w-8 h-8" />
                 </div>
                 <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase block tracking-wider mb-1">Provider Balance</span>
                 <div className="flex items-baseline gap-0.5">
-                  <span className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">${userDetails.providerBalance.toFixed(2)}</span>
-                  <span className="text-[10px] text-muted-foreground font-sans">USD</span>
+                  <span className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{userDetails.providerBalance.toFixed(2)}</span>
+                  <span className="text-[10px] text-muted-foreground font-sans">EGP</span>
                 </div>
               </div>
             </CardContent>

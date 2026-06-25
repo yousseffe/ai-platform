@@ -57,10 +57,10 @@ export default function BillingSettingsPage() {
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider font-mono">
-                {isConsumer ? "Credits Balance" : "USD Revenue Balance"}
+                {isConsumer ? "Credits Balance" : "EGP Revenue Balance"}
               </p>
               <p className="text-2xl font-extrabold text-foreground mt-1.5 font-mono">
-                {isConsumer ? `${Math.round(balance)} Credits` : `$${balance.toFixed(2)}`}
+                {isConsumer ? `${Math.round(balance)} Credits` : `${balance.toFixed(2)} EGP`}
               </p>
             </div>
             <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/15 shadow-xs">
@@ -88,7 +88,7 @@ export default function BillingSettingsPage() {
             <div>
               <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Platform Currency</p>
               <p className="text-2xl font-extrabold text-foreground mt-1.5 font-mono">
-                {isConsumer ? "Credits" : "USD"}
+                {isConsumer ? "Credits" : "EGP"}
               </p>
             </div>
             <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/15 shadow-xs">

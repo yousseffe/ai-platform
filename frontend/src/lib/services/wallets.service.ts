@@ -65,12 +65,12 @@ export async function getTransactions(
 }
 
 /**
- * Fetches the global configuration for the credits-to-USD conversion multiplier.
+ * Fetches the global configuration for the credits-to-EGP conversion multiplier.
  *
- * @returns A promise resolving to the credits per USD multiplier coefficient.
+ * @returns A promise resolving to the credits per EGP multiplier coefficient.
  */
-export async function getCreditsPerUsd(): Promise<number> {
-  const res = await smartFetch<{ credits_per_usd: number }>("/wallets/config/credits-per-usd");
-  return res.credits_per_usd;
+export async function getCreditsPerEgp(): Promise<number> {
+  const res = await smartFetch<{ credits_per_egp: number }>("/wallets/config/credits-per-egp");
+  return res.credits_per_egp;
 }
 

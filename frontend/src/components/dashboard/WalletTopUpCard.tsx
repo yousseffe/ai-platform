@@ -9,7 +9,7 @@ import { toast } from "react-hot-toast";
 import { redirectToCheckout } from "@/lib/services/stripe.service";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { WalletType } from "@/types";
-import { getCreditsPerUsd } from "@/lib/services/wallets.service";
+import { getCreditsPerEgp } from "@/lib/services/wallets.service";
 
 const PRESET_AMOUNTS = [10, 25, 50, 100];
 
@@ -25,13 +25,13 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
   const isConsumer = viewMode === WalletType.CONSUMER;
   
   // Conversion state
-  const [creditsPerUsd, setCreditsPerUsd] = useState<number>(10);
+  const [creditsPerEgp, setCreditsPerEgp] = useState<number>(10);
 
   // Load credits conversion rate on mount
   useEffect(() => {
     if (isConsumer) {
-      getCreditsPerUsd()
-        .then((rate) => setCreditsPerUsd(rate))
+      getCreditsPerEgp()
+        .then((rate) => setCreditsPerEgp(rate))
         .catch((err: unknown) => console.error("Failed to load credits rate config:", err));
     }
   }, [isConsumer]);
@@ -53,7 +53,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
     const finalAmount = selectedPreset !== null ? selectedPreset : parseFloat(customAmount);
 
     if (isNaN(finalAmount) || finalAmount < 5.0) {
-      toast.error("Minimum deposit is $5.00");
+      toast.error("Minimum deposit is 5.00 EGP");
       return;
     }
 
@@ -79,7 +79,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
     }
 
     if (finalAmount > balance) {
-      toast.error(`Insufficient balance. You only have $${balance.toFixed(2)} USD.`);
+      toast.error(`Insufficient balance. You only have ${balance.toFixed(2)} EGP.`);
       return;
     }
 
@@ -87,7 +87,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
     try {
       const res = await withdrawFunds(finalAmount);
       if (res.success) {
-        toast.success(`Successfully withdrew $${finalAmount.toFixed(2)} USD to your bank account!`);
+        toast.success(`Successfully withdrew ${finalAmount.toFixed(2)} EGP to your bank account!`);
         setWithdrawAmount("");
         onTransactionSuccess?.();
       } else {
@@ -135,7 +135,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
             {isConsumer ? (
               <>Current credits balance: <span className="font-mono font-bold text-foreground">{Math.round(balance)} Credits</span></>
             ) : (
-              <>Current withdrawable balance: <span className="font-mono font-bold text-foreground">${balance.toFixed(2)} USD</span></>
+              <>Current withdrawable balance: <span className="font-mono font-bold text-foreground">{balance.toFixed(2)} EGP</span></>
             )}
           </CardDescription>
         </div>
@@ -153,7 +153,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
               <div className="grid grid-cols-2 gap-3.5">
                 {PRESET_AMOUNTS.map((amt) => {
                   const isSelected = selectedPreset === amt;
-                  const creditsCount = amt * creditsPerUsd;
+                  const creditsCount = amt * creditsPerEgp;
                   return (
                     <button
                       key={amt}
@@ -182,10 +182,10 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                       </span>
                       <div className="mt-4 flex items-baseline gap-1 font-mono">
                         <span className={`text-xs font-extrabold ${isSelected ? "text-primary" : "text-foreground"}`}>
-                          ${amt}
+                          {amt}
                         </span>
                         <span className="text-[9.5px] text-muted-foreground font-medium font-sans">
-                          USD
+                          EGP
                         </span>
                       </div>
                       {isSelected && (
@@ -218,8 +218,8 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
               </div>
               
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold select-none font-mono">
-                  $
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px] font-bold select-none font-sans">
+                  EGP
                 </span>
                 <Input
                   type="number"
@@ -228,10 +228,10 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                   value={customAmount}
                   onChange={(e) => handleCustomChange(e.target.value)}
                   placeholder="Enter custom amount"
-                  className="pl-8 pr-12 h-10 bg-background border-border text-foreground font-bold text-xs focus-visible:ring-primary/20 focus-visible:border-primary rounded-xl font-mono"
+                  className="pl-12 pr-12 h-10 bg-background border-border text-foreground font-bold text-xs focus-visible:ring-primary/20 focus-visible:border-primary rounded-xl font-mono"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold select-none uppercase tracking-wider font-mono">
-                  USD
+                  EGP
                 </span>
               </div>
               
@@ -239,7 +239,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                 <div className="p-3.5 bg-secondary/15 rounded-xl border border-border flex items-center justify-between gap-3 font-sans">
                   <div className="text-left">
                     <span className="text-[8px] font-bold text-muted-foreground/60 uppercase block font-mono">You Pay</span>
-                    <span className="text-sm font-extrabold text-foreground font-mono">${activeAmount.toFixed(2)} USD</span>
+                    <span className="text-sm font-extrabold text-foreground font-mono">{activeAmount.toFixed(2)} EGP</span>
                   </div>
                   <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
                     <ArrowRight className="w-4 h-4" />
@@ -248,7 +248,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                     <span className="text-[8px] font-bold text-muted-foreground/60 uppercase block font-mono">You Receive</span>
                     <span className="text-sm font-extrabold text-primary flex items-center justify-end gap-1 font-mono">
                       <Coins className="w-3.5 h-3.5 text-primary" />
-                      {Math.round(activeAmount * creditsPerUsd).toLocaleString()} Credits
+                      {Math.round(activeAmount * creditsPerEgp).toLocaleString()} Credits
                     </span>
                   </div>
                 </div>
@@ -276,7 +276,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                 </>
               ) : (
                 <>
-                  Deposit ${activeAmount.toFixed(2)} USD for {Math.round(activeAmount * creditsPerUsd).toLocaleString()} Credits
+                  Deposit {activeAmount.toFixed(2)} EGP for {Math.round(activeAmount * creditsPerEgp).toLocaleString()} Credits
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -288,11 +288,11 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
             {/* Amount Form */}
             <div className="space-y-1.5">
               <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider select-none">
-                Withdrawal Amount (USD)
+                Withdrawal Amount (EGP)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-semibold select-none">
-                  $
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px] font-semibold select-none">
+                  EGP
                 </span>
                 <Input
                   type="number"
@@ -301,7 +301,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
                   placeholder="Enter cash out amount"
-                  className="pl-7 h-9 bg-background border-border text-foreground font-semibold text-xs focus-visible:ring-primary/20 focus-visible:border-primary rounded-lg"
+                  className="pl-12 h-9 bg-background border-border text-foreground font-semibold text-xs focus-visible:ring-primary/20 focus-visible:border-primary rounded-lg"
                 />
               </div>
             </div>
@@ -327,7 +327,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                 </>
               ) : (
                 <>
-                  Withdraw ${ (parseFloat(withdrawAmount) || 0).toFixed(2) } USD
+                  Withdraw { (parseFloat(withdrawAmount) || 0).toFixed(2) } EGP
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </>
               )}

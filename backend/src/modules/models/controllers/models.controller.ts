@@ -682,20 +682,25 @@ export class ModelsController {
             await queryRunner.manager.save(Transaction, consumerTx);
           }
 
-          // Load system config for credits_per_usd
-          const config = await queryRunner.manager.findOne(SystemConfig, {
-            where: { key: 'credits_per_usd' },
+          // Load system config for credits_per_egp
+          let config = await queryRunner.manager.findOne(SystemConfig, {
+            where: { key: 'credits_per_egp' },
           });
-          const creditsPerUsd = config ? parseInt(config.value, 10) || 10 : 10;
-          const costInUsd = cost / creditsPerUsd;
+          if (!config) {
+            config = await queryRunner.manager.findOne(SystemConfig, {
+              where: { key: 'credits_per_usd' },
+            });
+          }
+          const creditsPerEgp = config ? parseInt(config.value, 10) || 10 : 10;
+          const costInEgp = cost / creditsPerEgp;
 
-          // 2. Pay Provider (model owner) in USD
-          const providerShareUsd = costInUsd * (providerSharePercent / 100);
+          // 2. Pay Provider (model owner) in EGP
+          const providerShareEgp = costInEgp * (providerSharePercent / 100);
 
           // Update model's total earnings in database
           await queryRunner.manager.query(
             `UPDATE models SET total_earnings = total_earnings + $1 WHERE id = $2`,
-            [providerShareUsd, model.id],
+            [providerShareEgp, model.id],
           );
 
           let providerWallet = await queryRunner.manager.findOne(Wallet, {
@@ -712,7 +717,7 @@ export class ModelsController {
               ownerType: OwnerType.USER,
               walletType: WalletType.PROVIDER,
               balance: 0.0,
-              currency: 'USD',
+              currency: 'EGP',
             });
             providerWallet = await queryRunner.manager.save(Wallet, providerWallet);
           }
@@ -721,21 +726,21 @@ export class ModelsController {
             typeof providerWallet.balance === 'string'
               ? parseFloat(providerWallet.balance)
               : providerWallet.balance;
-          providerWallet.balance = currentProviderBalance + providerShareUsd;
+          providerWallet.balance = currentProviderBalance + providerShareEgp;
           await queryRunner.manager.save(Wallet, providerWallet);
 
           const providerTx = queryRunner.manager.create(Transaction, {
             walletId: providerWallet.id,
             type: TransactionType.CREDIT,
-            amount: providerShareUsd,
-            reference: `Inference credit share for model: ${model.name} by user ${callerEmail} (USD ${providerShareUsd.toFixed(4)})`,
+            amount: providerShareEgp,
+            reference: `Inference credit share for model: ${model.name} by user ${callerEmail} (EGP ${providerShareEgp.toFixed(4)})`,
             status: TransactionStatus.COMPLETED,
           });
           await queryRunner.manager.save(Transaction, providerTx);
 
-          // 3. Pay Platform Admin in USD
-          const platformShareUsd = costInUsd - providerShareUsd;
-          if (platformShareUsd > 0) {
+          // 3. Pay Platform Admin in EGP
+          const platformShareEgp = costInEgp - providerShareEgp;
+          if (platformShareEgp > 0) {
             const systemOwnerId = '00000000-0000-0000-0000-000000000000';
 
             // Check if system wallet exists, if not create
@@ -753,7 +758,7 @@ export class ModelsController {
                 ownerType: OwnerType.USER,
                 ownerId: systemOwnerId,
                 balance: 0.0,
-                currency: 'USD',
+                currency: 'EGP',
               });
               await queryRunner.manager.save(Wallet, systemWallet);
             }
@@ -762,14 +767,14 @@ export class ModelsController {
               typeof systemWallet.balance === 'string'
                 ? parseFloat(systemWallet.balance)
                 : systemWallet.balance;
-            systemWallet.balance = currentSystemBalance + platformShareUsd;
+            systemWallet.balance = currentSystemBalance + platformShareEgp;
             await queryRunner.manager.save(Wallet, systemWallet);
 
             const platformTx = queryRunner.manager.create(Transaction, {
               walletId: systemWallet.id,
               type: TransactionType.CREDIT,
-              amount: platformShareUsd,
-              reference: `Platform commission for model: ${model.name} from call by user ${callerEmail} (USD ${platformShareUsd.toFixed(4)})`,
+              amount: platformShareEgp,
+              reference: `Platform commission for model: ${model.name} from call by user ${callerEmail} (EGP ${platformShareEgp.toFixed(4)})`,
               status: TransactionStatus.COMPLETED,
             });
             await queryRunner.manager.save(Transaction, platformTx);

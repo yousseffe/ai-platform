@@ -248,7 +248,11 @@ export class AdminController {
       price_diffusion: configMap.has('price_diffusion') ? parseFloat(configMap.get('price_diffusion')!) : 1.0,
       default_provider_share_percent: configMap.has('default_provider_share_percent') ? parseInt(configMap.get('default_provider_share_percent')!, 10) : 80,
       playground_trial_limit: configMap.has('playground_trial_limit') ? parseInt(configMap.get('playground_trial_limit')!, 10) : 50,
-      credits_per_usd: configMap.has('credits_per_usd') ? parseInt(configMap.get('credits_per_usd')!, 10) : 10,
+      credits_per_egp: configMap.has('credits_per_egp')
+        ? parseInt(configMap.get('credits_per_egp')!, 10)
+        : configMap.has('credits_per_usd')
+        ? parseInt(configMap.get('credits_per_usd')!, 10)
+        : 10,
     };
   }
 
@@ -269,7 +273,7 @@ export class AdminController {
       price_diffusion?: number;
       default_provider_share_percent?: number;
       playground_trial_limit?: number;
-      credits_per_usd?: number;
+      credits_per_egp?: number;
     },
   ) {
     const keys = Object.keys(body);
@@ -717,7 +721,7 @@ export class AdminController {
         ownerType: OwnerType.USER,
         walletType,
         balance: 0.0,
-        currency: walletType === WalletType.CONSUMER ? 'CREDITS' : 'USD',
+        currency: walletType === WalletType.CONSUMER ? 'CREDITS' : 'EGP',
       });
       wallet = await this.walletRepository.save(wallet);
     }

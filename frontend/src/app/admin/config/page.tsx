@@ -135,7 +135,7 @@ export default function AdminConfigPage() {
             </div>
             <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Workspace Setup Dues</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-foreground">${orgFee.toFixed(2)}</span>
+              <span className="text-2xl font-extrabold text-foreground">{orgFee.toFixed(2)}</span>
               <span className="text-[10px] text-muted-foreground">Charge per organization setup</span>
             </div>
           </CardContent>
@@ -150,7 +150,7 @@ export default function AdminConfigPage() {
             <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Exchange Rates Coefficient</p>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-extrabold text-foreground">10.0</span>
-              <span className="text-[10px] text-muted-foreground">Credits per 1.00 USD</span>
+              <span className="text-[10px] text-muted-foreground">Credits per 1.00 EGP</span>
             </div>
           </CardContent>
         </Card>

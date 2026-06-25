@@ -132,13 +132,18 @@ export class WalletsService {
     let finalAmount = amount;
     let finalReference = reference;
     if (walletType === WalletType.CONSUMER) {
-      // Input is USD amount, convert to credits
-      const config = await this.systemConfigRepository.findOne({
-        where: { key: 'credits_per_usd' },
+      // Input is EGP amount, convert to credits
+      let config = await this.systemConfigRepository.findOne({
+        where: { key: 'credits_per_egp' },
       });
-      const creditsPerUsd = config ? parseInt(config.value, 10) || 10 : 10;
-      finalAmount = amount * creditsPerUsd;
-      finalReference = `${reference} (${finalAmount} credits purchased at ${creditsPerUsd} credits/USD)`;
+      if (!config) {
+        config = await this.systemConfigRepository.findOne({
+          where: { key: 'credits_per_usd' },
+        });
+      }
+      const creditsPerEgp = config ? parseInt(config.value, 10) || 10 : 10;
+      finalAmount = amount * creditsPerEgp;
+      finalReference = `${reference} (${finalAmount} credits purchased at ${creditsPerEgp} credits/EGP)`;
     }
 
     const currentBalance =
@@ -383,10 +388,15 @@ export class WalletsService {
       return false;
     }
 
-    const config = await this.systemConfigRepository.findOne({
-      where: { key: 'credits_per_usd' },
+    let config = await this.systemConfigRepository.findOne({
+      where: { key: 'credits_per_egp' },
     });
-    const creditsPerUsd = config ? parseInt(config.value, 10) || 10 : 10;
+    if (!config) {
+      config = await this.systemConfigRepository.findOne({
+        where: { key: 'credits_per_usd' },
+      });
+    }
+    const creditsPerEgp = config ? parseInt(config.value, 10) || 10 : 10;
 
     // 2. Handle Payment Intent Failures
     if (event.type === 'payment_intent.payment_failed') {
@@ -407,8 +417,8 @@ export class WalletsService {
         if (wallet) {
           walletId = wallet.id;
         }
-        const usdAmount = parseFloat(metadata.amount);
-        credits = usdAmount * creditsPerUsd;
+        const egpAmount = parseFloat(metadata.amount);
+        credits = egpAmount * creditsPerEgp;
         reference = `Stripe checkout deposit failure: ${sessionOrIntent.id}`;
       }
 
@@ -453,9 +463,9 @@ export class WalletsService {
       ownerId = metadata.workspaceId;
       ownerType = metadata.workspaceType as OwnerType;
       walletType = WalletType.CONSUMER; // Top-ups are deposited to consumer wallet
-      const usdAmount = parseFloat(metadata.amount);
-      credits = usdAmount * creditsPerUsd;
-      reference = `Stripe checkout deposit: ${sessionOrIntent.payment_intent || sessionOrIntent.id} (${credits} credits purchased at ${creditsPerUsd} credits/USD)`;
+      const egpAmount = parseFloat(metadata.amount);
+      credits = egpAmount * creditsPerEgp;
+      reference = `Stripe checkout deposit: ${sessionOrIntent.payment_intent || sessionOrIntent.id} (${credits} credits purchased at ${creditsPerEgp} credits/EGP)`;
     } else {
       // Unknown metadata format or missing crucial fields
       return false;
@@ -520,14 +530,19 @@ export class WalletsService {
   }
 
   /**
-   * Retrieves the conversion rate of credits per one USD from system config database.
+   * Retrieves the conversion rate of credits per one EGP from system config database.
    *
-   * @returns A promise resolving to the credits per USD multiplier.
+   * @returns A promise resolving to the credits per EGP multiplier.
    */
-  async getCreditsPerUsd(): Promise<number> {
-    const config = await this.systemConfigRepository.findOne({
-      where: { key: 'credits_per_usd' },
+  async getCreditsPerEgp(): Promise<number> {
+    let config = await this.systemConfigRepository.findOne({
+      where: { key: 'credits_per_egp' },
     });
+    if (!config) {
+      config = await this.systemConfigRepository.findOne({
+        where: { key: 'credits_per_usd' },
+      });
+    }
     return config ? parseInt(config.value, 10) || 10 : 10;
   }
 }

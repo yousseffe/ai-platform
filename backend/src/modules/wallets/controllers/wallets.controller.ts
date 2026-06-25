@@ -257,15 +257,15 @@ export class WalletsController {
   }
 
   /**
-   * Retrieves the current system configuration parameter for credits per USD.
+   * Retrieves the current system configuration parameter for credits per EGP.
    *
-   * @returns An object containing the credits per USD multiplier.
+   * @returns An object containing the credits per EGP multiplier.
    */
-  @Get('config/credits-per-usd')
+  @Get('config/credits-per-egp')
   @UseGuards(JwtAuthGuard)
-  async getCreditsPerUsd() {
-    const rate = await this.walletsService.getCreditsPerUsd();
-    return { credits_per_usd: rate };
+  async getCreditsPerEgp() {
+    const rate = await this.walletsService.getCreditsPerEgp();
+    return { credits_per_egp: rate };
   }
 }
 

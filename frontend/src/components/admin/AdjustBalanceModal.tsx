@@ -22,7 +22,7 @@ interface AdjustBalanceModalProps {
 
 /**
  * Modal to let platform administrators manually credit/debit balances
- * from a user's consumer (credits) or provider (USD) wallet.
+ * from a user's consumer (credits) or provider (EGP) wallet.
  *
  * @param props - Component properties containing user target and callbacks.
  * @returns The React component rendering the adjust balance modal.
@@ -77,7 +77,7 @@ export default function AdjustBalanceModal({
   };
 
   const currentBalance = walletType === "CONSUMER" ? user.consumerBalance : user.providerBalance;
-  const currencySymbol = walletType === "CONSUMER" ? "Credits" : "USD";
+  const currencySymbol = walletType === "CONSUMER" ? "Credits" : "EGP";
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -114,11 +114,11 @@ export default function AdjustBalanceModal({
                     : "border-border bg-background text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Provider (USD)
+                Provider (EGP)
               </button>
             </div>
             <p className="text-[9px] text-muted-foreground mt-1.5 font-sans">
-              Current balance: <span className="font-bold text-foreground">${currentBalance.toFixed(2)}</span> {currencySymbol}
+              Current balance: <span className="font-bold text-foreground">{currentBalance.toFixed(2)}</span> {currencySymbol}
             </p>
           </div>
 

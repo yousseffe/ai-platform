@@ -324,7 +324,7 @@ export default function AdminUsersPage() {
                         {Math.round(user.consumerBalance)} Credits
                       </TableCell>
                       <TableCell className="px-5 py-3.5 text-left font-bold text-emerald-600 dark:text-emerald-400">
-                        ${user.providerBalance.toFixed(2)} USD
+                        {user.providerBalance.toFixed(2)} EGP
                       </TableCell>
                       <TableCell className="px-5 py-3.5 text-left text-muted-foreground">
                         {new Date(user.createdAt).toLocaleDateString()}

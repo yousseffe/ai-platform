@@ -236,10 +236,10 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
                 <Coins className="w-3.5 h-3.5 text-emerald-600" /> Total Earnings
               </div>
               <span className="block text-foreground font-bold mt-1.5 text-sm">
-                ${Number(model.totalEarnings || 0).toFixed(4)}
+                {Number(model.totalEarnings || 0).toFixed(4)} EGP
               </span>
               <span className="block text-muted-foreground text-[10px] mt-0.5">
-                provider USD revenue share
+                provider EGP revenue share
               </span>
             </div>
           )}

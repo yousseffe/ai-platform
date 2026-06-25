@@ -335,8 +335,8 @@ export default function AdminOverviewPage() {
                       {transactions.map((tx) => {
                         const isCredit = tx.type === "CREDIT";
                         const valFloat = typeof tx.amount === "string" ? parseFloat(tx.amount) : tx.amount;
-                        // Format display balance: if system revenue contains "commission" and not "usd", it represents consumer credits
-                        const isCreditsWallet = tx.reference?.toLowerCase().includes("commission") && !tx.reference?.toLowerCase().includes("usd");
+                        // Format display balance: if system revenue contains "commission" and not "usd"/"egp", it represents consumer credits
+                        const isCreditsWallet = tx.reference?.toLowerCase().includes("commission") && !tx.reference?.toLowerCase().includes("usd") && !tx.reference?.toLowerCase().includes("egp");
                         return (
                           <TableRow key={tx.id} className="hover:bg-muted/30 border-b border-border">
                             <TableCell className="px-5 py-3 font-bold text-foreground max-w-xs truncate">
@@ -359,7 +359,7 @@ export default function AdminOverviewPage() {
                               </span>
                             </TableCell>
                             <TableCell className={`px-5 py-3 font-bold ${isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                              {isCredit ? "+" : "-"}{isCreditsWallet ? `${Math.round(valFloat)} Credits` : `$${valFloat.toFixed(2)} USD`}
+                              {isCredit ? "+" : "-"}{isCreditsWallet ? `${Math.round(valFloat)} Credits` : `${valFloat.toFixed(2)} EGP`}
                             </TableCell>
                             <TableCell className="px-5 py-3 text-muted-foreground select-all text-[10px]">
                               {tx.id}

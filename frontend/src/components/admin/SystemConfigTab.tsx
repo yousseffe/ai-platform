@@ -48,7 +48,7 @@ export default function SystemConfigTab({
     price_diffusion: 1.0,
     default_provider_share_percent: 80,
     playground_trial_limit: 50,
-    credits_per_usd: 10,
+    credits_per_egp: 10,
   });
   const [loadingDefaults, setLoadingDefaults] = useState(true);
   const [savingDefaults, setSavingDefaults] = useState(false);
@@ -122,12 +122,12 @@ export default function SystemConfigTab({
               <CardContent className="p-5 space-y-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                    Fee Rate (USD Equivalents)
+                    Fee Rate (EGP Equivalents)
                   </label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs select-none">
-                        $
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-[9px] select-none">
+                        EGP
                       </span>
                       <Input
                         type="number"
@@ -135,7 +135,7 @@ export default function SystemConfigTab({
                         step="0.01"
                         value={feeInput}
                         onChange={(e) => onFeeInputChange(e.target.value)}
-                        className="pl-7 bg-background border-border text-foreground font-bold rounded-lg h-9 text-xs focus-visible:ring-primary/20"
+                        className="pl-11 bg-background border-border text-foreground font-bold rounded-lg h-9 text-xs focus-visible:ring-primary/20"
                       />
                     </div>
                     <Button
@@ -153,7 +153,7 @@ export default function SystemConfigTab({
                   <div className="flex gap-2 p-3 bg-secondary/35 rounded-xl border border-border mt-3 text-muted-foreground leading-relaxed font-sans text-[10px]">
                     <Info className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
                     <p>
-                      Charged directly to the user&apos;s personal Consumer wallet upon initializing organization hubs. Current rate: <span className="font-bold text-foreground font-mono">${orgFee.toFixed(2)} Credits</span>.
+                      Charged directly to the user&apos;s personal Consumer wallet upon initializing organization hubs. Current rate: <span className="font-bold text-foreground font-mono">{orgFee.toFixed(2)} Credits</span>.
                     </p>
                   </div>
                 </div>
@@ -169,29 +169,29 @@ export default function SystemConfigTab({
                   Credits Conversion Rate
                 </CardTitle>
                 <CardDescription className="text-[10px] text-muted-foreground mt-0.5 font-sans">
-                  Token exchange coefficients representing credit balances per 1 USD deposit.
+                  Token exchange coefficients representing credit balances per 1 EGP deposit.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-5 space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                    Credits / USD Coefficient
+                    Credits / EGP Coefficient
                   </label>
                   <div className="relative">
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-[9px] select-none uppercase">
-                      Credits per $1
+                      Credits per EGP 1
                     </span>
                     <Input
                       type="number"
                       min="1"
-                      value={pricingDefaults.credits_per_usd}
-                      onChange={(e) => handleInputChange("credits_per_usd", e.target.value)}
+                      value={pricingDefaults.credits_per_egp}
+                      onChange={(e) => handleInputChange("credits_per_egp", e.target.value)}
                       className="bg-background border-border text-foreground font-bold rounded-lg h-9 text-xs pr-24"
                       required
                     />
                   </div>
                   <p className="text-[9px] text-muted-foreground leading-normal font-sans pt-1">
-                    Defines the amount of Consumer credit points generated for each dollar paid. **10.0 credits/$1.00** represents standard pricing.
+                    Defines the amount of Consumer credit points generated for each EGP paid. **10.0 credits/1.00 EGP** represents standard pricing.
                   </p>
                 </div>
               </CardContent>

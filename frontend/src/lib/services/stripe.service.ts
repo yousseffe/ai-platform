@@ -8,7 +8,7 @@ interface CheckoutSessionResponse {
  * Creates a Stripe Checkout Session for wallet deposit.
  * Automatically fetches the checkout URL and redirects the user's browser to Stripe.
  *
- * @param amount - The target deposit amount in USD.
+ * @param amount - The target deposit amount in EGP.
  * @returns A promise resolving to void once redirection starts.
  * @throws {Error} If session URL generation or redirect fails.
  */

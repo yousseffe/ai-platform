@@ -102,7 +102,7 @@ export class PaymentsController {
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'egp',
             product_data: {
               name: `MLHub ${body.package_id.replace('pkg_', '').toUpperCase()} Credit Package`,
               description: `Purchase of ${pack.credits} credits.`,
