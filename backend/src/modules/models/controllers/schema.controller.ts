@@ -70,7 +70,7 @@ export class SchemaController {
 
     try {
       // Execute the python schema generator
-      const command = `python "${scriptPath}" "${tempFilePath}"`;
+      const command = `python3 "${scriptPath}" "${tempFilePath}"`;
       const { stdout, stderr } = await execPromise(command);
 
       if (stderr) {

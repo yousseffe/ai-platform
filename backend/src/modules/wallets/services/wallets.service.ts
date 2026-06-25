@@ -4,10 +4,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between, MoreThanOrEqual, LessThanOrEqual, ILike } from 'typeorm';
 import { Wallet } from '../entities/wallet.entity';
 import { Transaction } from '../entities/transaction.entity';
 import { ProcessedWebhook } from '../entities/processed-webhook.entity';
+import { SystemConfig } from '../entities/system-config.entity';
 import { TransactionType } from '../enums/transaction-type.enum';
 import { TransactionStatus } from '../enums/transaction-status.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
@@ -25,6 +26,8 @@ export class WalletsService {
     private readonly transactionRepository: Repository<Transaction>,
     @InjectRepository(ProcessedWebhook)
     private readonly processedWebhookRepository: Repository<ProcessedWebhook>,
+    @InjectRepository(SystemConfig)
+    private readonly systemConfigRepository: Repository<SystemConfig>,
   ) {}
 
   /**
@@ -42,7 +45,6 @@ export class WalletsService {
     walletType: WalletType,
     initialBalance = 0.0,
   ): Promise<Wallet> {
-    walletType = WalletType.CONSUMER; // Force unified wallet
     const existing = await this.walletRepository.findOne({
       where: { ownerId, ownerType, walletType },
     });
@@ -74,7 +76,6 @@ export class WalletsService {
     ownerType: OwnerType,
     walletType: WalletType,
   ): Promise<number> {
-    walletType = WalletType.CONSUMER; // Force unified wallet
     const wallet = await this.walletRepository.findOne({
       where: { ownerId, ownerType, walletType },
     });
@@ -106,7 +107,6 @@ export class WalletsService {
     reference = 'Credit top-up deposit',
     stripeEventId?: string,
   ): Promise<Wallet> {
-    walletType = WalletType.CONSUMER; // Force unified wallet
     if (amount <= 0) {
       throw new BadRequestException('Amount to add must be positive');
     }
@@ -129,19 +129,31 @@ export class WalletsService {
       }
     }
 
+    let finalAmount = amount;
+    let finalReference = reference;
+    if (walletType === WalletType.CONSUMER) {
+      // Input is USD amount, convert to credits
+      const config = await this.systemConfigRepository.findOne({
+        where: { key: 'credits_per_usd' },
+      });
+      const creditsPerUsd = config ? parseInt(config.value, 10) || 10 : 10;
+      finalAmount = amount * creditsPerUsd;
+      finalReference = `${reference} (${finalAmount} credits purchased at ${creditsPerUsd} credits/USD)`;
+    }
+
     const currentBalance =
       typeof wallet.balance === 'string'
         ? parseFloat(wallet.balance)
         : wallet.balance;
-    wallet.balance = currentBalance + amount;
+    wallet.balance = currentBalance + finalAmount;
     const savedWallet = await this.walletRepository.save(wallet);
 
     // Save completed transaction record
     const transaction = this.transactionRepository.create({
       walletId: wallet.id,
       type: TransactionType.CREDIT,
-      amount,
-      reference,
+      amount: finalAmount,
+      reference: finalReference,
       stripeEventId,
       status: TransactionStatus.COMPLETED,
     });
@@ -165,7 +177,6 @@ export class WalletsService {
     walletType: WalletType,
     amount: number,
   ): Promise<Wallet> {
-    walletType = WalletType.CONSUMER; // Force unified wallet
     if (amount <= 0) {
       throw new BadRequestException('Amount to deduct must be positive');
     }
@@ -208,7 +219,7 @@ export class WalletsService {
     }
 
     const wallet = await this.walletRepository.findOne({
-      where: { ownerId, ownerType, walletType: WalletType.CONSUMER },
+      where: { ownerId, ownerType, walletType: WalletType.PROVIDER },
     });
 
     if (!wallet) {
@@ -254,6 +265,13 @@ export class WalletsService {
     walletType: WalletType,
     page = 1,
     limit = 20,
+    filters?: {
+      type?: string;
+      status?: string;
+      startDate?: string;
+      endDate?: string;
+      search?: string;
+    },
   ): Promise<{
     success: boolean;
     data: Transaction[];
@@ -261,7 +279,6 @@ export class WalletsService {
     page: number;
     limit: number;
   }> {
-    walletType = WalletType.CONSUMER; // Force unified wallet
     const wallet = await this.walletRepository.findOne({
       where: { ownerId, ownerType, walletType },
     });
@@ -281,9 +298,34 @@ export class WalletsService {
     const limitNum =
       typeof limit === 'string' ? parseInt(limit, 10) : Number(limit) || 20;
 
+    const where: any = { walletId: wallet.id };
+    if (filters?.type) {
+      where.type = filters.type;
+    }
+    if (filters?.status) {
+      where.status = filters.status;
+    }
+    if (filters?.startDate || filters?.endDate) {
+      if (filters.startDate && filters.endDate) {
+        const start = new Date(filters.startDate);
+        const end = new Date(filters.endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt = Between(start, end);
+      } else if (filters.startDate) {
+        where.createdAt = MoreThanOrEqual(new Date(filters.startDate));
+      } else if (filters.endDate) {
+        const end = new Date(filters.endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt = LessThanOrEqual(end);
+      }
+    }
+    if (filters?.search) {
+      where.reference = ILike(`%${filters.search}%`);
+    }
+
     const [transactions, total] = await this.transactionRepository.findAndCount(
       {
-        where: { walletId: wallet.id },
+        where,
         order: { createdAt: 'DESC' },
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
@@ -341,6 +383,11 @@ export class WalletsService {
       return false;
     }
 
+    const config = await this.systemConfigRepository.findOne({
+      where: { key: 'credits_per_usd' },
+    });
+    const creditsPerUsd = config ? parseInt(config.value, 10) || 10 : 10;
+
     // 2. Handle Payment Intent Failures
     if (event.type === 'payment_intent.payment_failed') {
       let walletId = '';
@@ -360,7 +407,8 @@ export class WalletsService {
         if (wallet) {
           walletId = wallet.id;
         }
-        credits = parseFloat(metadata.amount);
+        const usdAmount = parseFloat(metadata.amount);
+        credits = usdAmount * creditsPerUsd;
         reference = `Stripe checkout deposit failure: ${sessionOrIntent.id}`;
       }
 
@@ -398,15 +446,16 @@ export class WalletsService {
       }
       ownerId = wallet.ownerId;
       ownerType = wallet.ownerType;
-      walletType = WalletType.CONSUMER; // Force unified CONSUMER wallet
+      walletType = WalletType.CONSUMER;
     }
     // Handle custom top-up checkout (Format A)
     else if (metadata.workspaceId && metadata.workspaceType && metadata.amount) {
       ownerId = metadata.workspaceId;
       ownerType = metadata.workspaceType as OwnerType;
       walletType = WalletType.CONSUMER; // Top-ups are deposited to consumer wallet
-      credits = parseFloat(metadata.amount);
-      reference = `Stripe checkout deposit: ${sessionOrIntent.payment_intent || sessionOrIntent.id}`;
+      const usdAmount = parseFloat(metadata.amount);
+      credits = usdAmount * creditsPerUsd;
+      reference = `Stripe checkout deposit: ${sessionOrIntent.payment_intent || sessionOrIntent.id} (${credits} credits purchased at ${creditsPerUsd} credits/USD)`;
     } else {
       // Unknown metadata format or missing crucial fields
       return false;
@@ -469,4 +518,17 @@ export class WalletsService {
       await queryRunner.release();
     }
   }
+
+  /**
+   * Retrieves the conversion rate of credits per one USD from system config database.
+   *
+   * @returns A promise resolving to the credits per USD multiplier.
+   */
+  async getCreditsPerUsd(): Promise<number> {
+    const config = await this.systemConfigRepository.findOne({
+      where: { key: 'credits_per_usd' },
+    });
+    return config ? parseInt(config.value, 10) || 10 : 10;
+  }
 }
+

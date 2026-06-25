@@ -13,7 +13,8 @@ import {
   Trash2, 
   Cpu, 
   Coins, 
-  Server
+  Server,
+  Users
 } from "lucide-react";
 import { useModelDetails } from "@/hooks/use-model-details";
 import type { Model, ModelVersion } from "@/types";
@@ -192,7 +193,7 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
         </div>
 
         {/* Quick-Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border/50">
+        <div className={`grid grid-cols-2 sm:grid-cols-3 ${isOwner ? "lg:grid-cols-6" : "lg:grid-cols-5"} gap-4 mt-8 pt-6 border-t border-border/50`}>
           <div className="p-4 rounded-xl border border-border/60 bg-secondary/20 border-l-4 border-l-blue-500 shadow-sm">
             <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
               <Cpu className="w-3.5 h-3.5 text-blue-500" /> Engine Spec
@@ -226,6 +227,32 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
             </span>
             <span className="block text-muted-foreground text-[10px] mt-0.5">
               per single REST request
+            </span>
+          </div>
+
+          {isOwner && (
+            <div className="p-4 rounded-xl border border-border/60 bg-secondary/20 border-l-4 border-l-emerald-600 shadow-sm">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
+                <Coins className="w-3.5 h-3.5 text-emerald-600" /> Total Earnings
+              </div>
+              <span className="block text-foreground font-bold mt-1.5 text-sm">
+                ${Number(model.totalEarnings || 0).toFixed(4)}
+              </span>
+              <span className="block text-muted-foreground text-[10px] mt-0.5">
+                provider USD revenue share
+              </span>
+            </div>
+          )}
+
+          <div className="p-4 rounded-xl border border-border/60 bg-secondary/20 border-l-4 border-l-rose-500 shadow-sm">
+            <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
+              <Users className="w-3.5 h-3.5 text-rose-500" /> Active Consumers
+            </div>
+            <span className="block text-foreground font-bold mt-1.5 text-sm">
+              {model.uniqueUsersCount !== undefined ? model.uniqueUsersCount : 0}
+            </span>
+            <span className="block text-muted-foreground text-[10px] mt-0.5 font-sans">
+              unique users invoking model
             </span>
           </div>
 

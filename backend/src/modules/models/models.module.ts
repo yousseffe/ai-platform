@@ -9,6 +9,7 @@ import { SchemaController } from './controllers/schema.controller';
 import { Model } from './entities/model.entity';
 import { ModelVersion } from './entities/model-version.entity';
 import { ModelLog } from './entities/model-log.entity';
+import { SystemConfig } from '../wallets/entities/system-config.entity';
 import { DeploymentsModule } from '../deployments/deployments.module';
 import { HttpModule } from '@nestjs/axios';
 import { MinioModule } from '../../shared/minio/minio.module';
@@ -24,7 +25,7 @@ import { WalletsModule } from '../wallets/wallets.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Model, ModelVersion, ModelLog]),
+    TypeOrmModule.forFeature([Model, ModelVersion, ModelLog, SystemConfig]),
     BullModule.registerQueue({
       name: 'build-queue',
     }),

@@ -37,6 +37,9 @@ export interface Model {
   tier?: string;
   costPerRequest?: number;
   providerSharePercent?: number;
+  hasCustomPricing?: boolean;
+  totalEarnings?: number;
+  uniqueUsersCount?: number;
   isPublic?: boolean;
   type?: ModelType;
   framework?: Framework;

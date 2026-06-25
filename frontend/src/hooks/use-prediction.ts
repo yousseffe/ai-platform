@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { getSession } from "next-auth/react";
 import { runPrediction } from "@/lib/actions/models.actions";
+import { smartFetch } from "@/lib/utils/smart-fetch";
 import { Model, ModelVersion, HistoryItem, DeploymentStatus, PredictionStatus, ModelType } from "@/types";
 
 /**
@@ -32,6 +33,20 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
   const [isRunning, setIsRunning] = useState(false);
   const [payload, setPayload] = useState(initialPayload);
   const [result, setResult] = useState("");
+  const [trialApiKey, setTrialApiKey] = useState<string | null>(null);
+
+  // Fetch sandbox trial key for playground predictions
+  useEffect(() => {
+    const fetchTrialKey = async () => {
+      try {
+        const res = await smartFetch<{ key: string }>(`/models/${model.id}/playground-key`);
+        setTrialApiKey(res.key);
+      } catch (err) {
+        console.warn("Failed to retrieve playground trial API key:", err);
+      }
+    };
+    fetchTrialKey();
+  }, [model.id]);
 
   // Sync payload state if the version's example payload changes
   useEffect(() => {
@@ -115,21 +130,34 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
       const isStreaming = parsedPayload.stream === true;
 
       if (isStreaming) {
-        const session = await getSession();
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
         const urlSuffix = selectedVersionNumber ? `/v${selectedVersionNumber}/predict` : `/predict`;
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (trialApiKey) {
+          headers["Authorization"] = `Bearer ${trialApiKey}`;
+        } else {
+          const session = await getSession();
+          if (session?.accessToken) {
+            headers["Authorization"] = `Bearer ${session.accessToken}`;
+          }
+        }
+
         const response = await fetch(`${backendUrl}/models/${model.id}${urlSuffix}`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(session?.accessToken ? { "Authorization": `Bearer ${session.accessToken}` } : {}),
-          },
+          headers,
           body: JSON.stringify(parsedPayload),
         });
 
         if (!response.ok) {
           const text = await response.text();
-          throw new Error(text || "Streaming request failed");
+          let parsedErr = text;
+          try {
+            const parsed = JSON.parse(text);
+            parsedErr = parsed.error || parsed.message || text;
+          } catch {}
+          throw new Error(parsedErr || "Streaming request failed");
         }
 
         if (!response.body) {
@@ -178,7 +206,38 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
         setHistory(updatedHistory);
         localStorage.setItem(`prediction_history_${model.id}`, JSON.stringify(updatedHistory));
       } else {
-        const res = await runPrediction(model.id, parsedPayload, selectedVersionNumber);
+        let res: { success: boolean; data?: Record<string, unknown>; error?: string };
+        if (trialApiKey) {
+          try {
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+            const urlSuffix = selectedVersionNumber ? `/v${selectedVersionNumber}/predict` : `/predict`;
+            const response = await fetch(`${backendUrl}/models/${model.id}${urlSuffix}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${trialApiKey}`,
+              },
+              body: JSON.stringify(parsedPayload),
+            });
+
+            if (!response.ok) {
+              const text = await response.text();
+              let parsedErr = text;
+              try {
+                const parsed = JSON.parse(text);
+                parsedErr = parsed.error || parsed.message || text;
+              } catch {}
+              throw new Error(parsedErr || "Prediction request failed");
+            }
+
+            const data = await response.json();
+            res = { success: true, data };
+          } catch (err) {
+            res = { success: false, error: err instanceof Error ? err.message : String(err) };
+          }
+        } else {
+          res = await runPrediction(model.id, parsedPayload, selectedVersionNumber);
+        }
         const endTime = performance.now();
         const latencyMs = (endTime - startTime).toFixed(1);
 

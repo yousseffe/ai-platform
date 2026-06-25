@@ -17,6 +17,13 @@ export function useTransactions(limit = 10) {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
 
+  // Filters State
+  const [search, setSearch] = useState("");
+  const [txType, setTxType] = useState("");
+  const [status, setStatus] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   // Render-time state reset to synchronize page parameter on context switches
   const [prevWorkspaceId, setPrevWorkspaceId] = useState<string | undefined>(activeWorkspace?.id);
   const [prevViewMode, setPrevViewMode] = useState(viewMode);
@@ -34,7 +41,13 @@ export function useTransactions(limit = 10) {
     if (!activeWorkspace) return;
     setLoading(true);
     try {
-      const res = await getTransactions(activeWorkspace.id, viewMode, page, limit);
+      const res = await getTransactions(activeWorkspace.id, viewMode, page, limit, {
+        search: search.trim() || undefined,
+        txType: txType || undefined,
+        status: status || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      });
       if (res.success) {
         setTransactions(res.data);
         setTotal(res.total);
@@ -44,7 +57,7 @@ export function useTransactions(limit = 10) {
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspace, viewMode, page, limit]);
+  }, [activeWorkspace, viewMode, page, limit, search, txType, status, startDate, endDate]);
 
   useEffect(() => {
     if (!activeWorkspace) return;
@@ -56,7 +69,13 @@ export function useTransactions(limit = 10) {
       if (active) setLoading(true);
     });
 
-    getTransactions(activeWorkspace.id, viewMode, page, limit)
+    getTransactions(activeWorkspace.id, viewMode, page, limit, {
+      search: search.trim() || undefined,
+      txType: txType || undefined,
+      status: status || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+    })
       .then((res) => {
         if (active && res.success) {
           setTransactions(res.data);
@@ -73,7 +92,12 @@ export function useTransactions(limit = 10) {
     return () => {
       active = false;
     };
-  }, [activeWorkspace, viewMode, page, limit]);
+  }, [activeWorkspace, viewMode, page, limit, search, txType, status, startDate, endDate]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, txType, status, startDate, endDate]);
 
   return {
     transactions,
@@ -82,5 +106,16 @@ export function useTransactions(limit = 10) {
     setPage,
     loading,
     refetch,
+    // Filters and Setters
+    search,
+    setSearch,
+    txType,
+    setTxType,
+    status,
+    setStatus,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
   };
 }

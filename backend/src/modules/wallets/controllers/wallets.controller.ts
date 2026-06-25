@@ -230,6 +230,11 @@ export class WalletsController {
     @Query('type') type: WalletType = WalletType.CONSUMER,
     @Query('page') page = 1,
     @Query('limit') limit = 20,
+    @Query('txType') txType?: string,
+    @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('search') search?: string,
   ) {
     if (type !== WalletType.CONSUMER && type !== WalletType.PROVIDER) {
       throw new BadRequestException('Invalid wallet type');
@@ -241,6 +246,26 @@ export class WalletsController {
       type,
       page,
       limit,
+      {
+        type: txType,
+        status,
+        startDate,
+        endDate,
+        search,
+      },
     );
   }
+
+  /**
+   * Retrieves the current system configuration parameter for credits per USD.
+   *
+   * @returns An object containing the credits per USD multiplier.
+   */
+  @Get('config/credits-per-usd')
+  @UseGuards(JwtAuthGuard)
+  async getCreditsPerUsd() {
+    const rate = await this.walletsService.getCreditsPerUsd();
+    return { credits_per_usd: rate };
+  }
 }
+

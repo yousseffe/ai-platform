@@ -22,6 +22,7 @@ import { Transaction } from '../../wallets/entities/transaction.entity';
 import { TransactionType } from '../../wallets/enums/transaction-type.enum';
 import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
 import { RedisService } from '../../../shared/redis/redis.service';
+import { MailService } from '../../../shared/mail/mail.service';
 
 /**
  * Service managing workspaces / organizations creation, collaborator enrollment,
@@ -40,6 +41,7 @@ export class OrganizationsService {
     private readonly auditLogRepository: Repository<AuditLog>,
     private readonly redisService: RedisService,
     private readonly dataSource: DataSource,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -577,14 +579,14 @@ export class OrganizationsService {
     const redisKey = `org_otp:${userId}:${orgId}`;
     await this.redisService.set(redisKey, code, 300); // 5 minutes expiration
 
-    console.log('\n----------------------------------------');
-    console.log(
-      `[Workspace-Access-Mock] OTP sent to User ID: ${userId} (${user.email})`,
-    );
-    console.log(
-      `[Workspace-Access-Mock] Access Verification Code (OTP): ${code}`,
-    );
-    console.log('----------------------------------------\n');
+    const org = await this.orgRepository.findOneBy({ id: orgId });
+    const orgName = org ? org.name : 'Unknown Workspace';
+
+    // Trigger workspace access email asynchronously
+    this.mailService.sendWorkspaceAccessOtp(user.email, orgName, code).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Deferred workspace access email send failed: ${msg}`);
+    });
 
     return { success: true };
   }

@@ -59,7 +59,7 @@ function SidebarLink({ href, active, icon, children }: SidebarLinkProps) {
   return (
     <Link
       href={href}
-      className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium transition-all text-xs select-none ${
+      className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium transition-all text-sm select-none ${
         active
           ? "bg-primary/[0.06] text-primary font-semibold shadow-xs"
           : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
@@ -285,7 +285,7 @@ export default function Sidebar() {
         <div className="flex flex-col">
           <button
             onClick={() => setSettingsOpen(!settingsOpen)}
-            className={`group relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg font-medium transition-all text-xs cursor-pointer text-left focus:outline-none select-none ${
+            className={`group relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg font-medium transition-all text-sm cursor-pointer text-left focus:outline-none select-none ${
               isSettingsActive
                 ? "bg-primary/[0.06] text-primary font-semibold"
                 : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
@@ -305,7 +305,7 @@ export default function Sidebar() {
             <div className="pl-3 flex flex-col gap-1 mt-1 border-l border-border/70 ml-5.5 py-0.5 select-none">
               <Link
                 href="/settings/profile"
-                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   pathname === "/settings/profile"
                     ? "text-primary font-semibold bg-primary/[0.04]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
@@ -316,7 +316,7 @@ export default function Sidebar() {
               </Link>
               <Link
                 href="/settings/billing"
-                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   pathname === "/settings/billing"
                     ? "text-primary font-semibold bg-primary/[0.04]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
@@ -327,7 +327,7 @@ export default function Sidebar() {
               </Link>
               <Link
                 href="/settings/api"
-                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   pathname === "/settings/api"
                     ? "text-primary font-semibold bg-primary/[0.04]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
@@ -338,7 +338,7 @@ export default function Sidebar() {
               </Link>
               <Link
                 href="/settings/diagnostics"
-                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   pathname === "/settings/diagnostics"
                     ? "text-primary font-semibold bg-primary/[0.04]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
@@ -367,7 +367,7 @@ export default function Sidebar() {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Credits Balance</p>
-                  <p className="text-base font-extrabold text-foreground mt-1">${balance.toFixed(2)}</p>
+                  <p className="text-base font-extrabold text-foreground mt-1">{Math.round(balance)}</p>
                 </div>
                 <div className="p-2 rounded-lg bg-primary/10 text-primary shadow-xs">
                   <CreditCard className="w-4 h-4" strokeWidth={1.5} />
@@ -388,14 +388,14 @@ export default function Sidebar() {
       <div className="p-2 border-t border-border flex flex-col gap-0.5 bg-secondary/5">
         <Button
           variant="ghost"
-          className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-muted-foreground hover:bg-secondary/70 hover:text-foreground text-xs cursor-pointer select-none font-medium"
+          className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-muted-foreground hover:bg-secondary/70 hover:text-foreground text-sm cursor-pointer select-none font-medium"
         >
           <BookOpen className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
           Documentation
         </Button>
         <Button
           variant="ghost"
-          className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-muted-foreground hover:bg-secondary/70 hover:text-foreground text-xs cursor-pointer select-none font-medium"
+          className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-muted-foreground hover:bg-secondary/70 hover:text-foreground text-sm cursor-pointer select-none font-medium"
         >
           <HelpCircle className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
           Support
@@ -403,7 +403,7 @@ export default function Sidebar() {
         <Button
           variant="ghost"
           onClick={handleLogout}
-          className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-red-500 hover:bg-red-500/10 dark:hover:bg-red-950/20 text-xs mt-1 cursor-pointer select-none font-medium"
+          className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-red-500 hover:bg-red-500/10 dark:hover:bg-red-950/20 text-sm mt-1 cursor-pointer select-none font-medium"
         >
           <LogOut className="w-4 h-4 text-red-500 transition-colors" strokeWidth={1.5} />
           Logout
