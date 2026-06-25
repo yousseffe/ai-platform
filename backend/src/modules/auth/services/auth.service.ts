@@ -26,6 +26,7 @@ import { UserStatus } from '../../../shared/enums/user-status.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { getRsaKeys } from '../utils/keys';
+import { MailService } from '../../../shared/mail/mail.service';
 
 /**
  * Service governing password encryption, credential matching, verification OTP issuance,
@@ -46,6 +47,7 @@ export class AuthService {
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
     private readonly dataSource: DataSource,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -96,15 +98,6 @@ export class AuthService {
       });
       await queryRunner.manager.save(Wallet, wallet);
 
-      const apiKeyVal = 'ml_sk_live_' + crypto.randomBytes(24).toString('hex');
-      const apiKey = queryRunner.manager.create(ApiKey, {
-        key: apiKeyVal,
-        user: savedUser,
-        name: 'Default Key',
-        isActive: true,
-      });
-      await queryRunner.manager.save(ApiKey, apiKey);
-
       const codeStr = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
       const verificationCode = queryRunner.manager.create(VerificationCode, {
@@ -118,10 +111,11 @@ export class AuthService {
 
       await queryRunner.commitTransaction();
 
-      console.log('\n----------------------------------------');
-      console.log(`[Mailer-Mock] Email sent to: ${email}`);
-      console.log(`[Mailer-Mock] Verification Code (OTP): ${codeStr}`);
-      console.log('----------------------------------------\n');
+      // Trigger verification email asynchronously
+      this.mailService.sendOtpVerification(email, fullName, codeStr).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`Deferred email send failed on register: ${msg}`);
+      });
 
       return {
         success: true,
@@ -274,10 +268,11 @@ export class AuthService {
       ttl > 0 ? ttl : 3600,
     );
 
-    console.log('\n----------------------------------------');
-    console.log(`[Mailer-Mock] Resend OTP - Email sent to: ${email}`);
-    console.log(`[Mailer-Mock] Verification Code (OTP): ${codeStr}`);
-    console.log('----------------------------------------\n');
+    // Trigger verification email asynchronously
+    this.mailService.sendOtpVerification(email, user.fullName, codeStr).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Deferred email send failed on resendOtp: ${msg}`);
+    });
 
     return {
       success: true,
@@ -476,20 +471,9 @@ export class AuthService {
         )
       : 0.0;
 
-    let apiKeyEntity = await this.apiKeyRepository.findOne({
+    const apiKeyEntity = await this.apiKeyRepository.findOne({
       where: { user: { id: userId }, isActive: true },
     });
-
-    if (!apiKeyEntity) {
-      const apiKeyVal = 'ml_sk_live_' + crypto.randomBytes(24).toString('hex');
-      apiKeyEntity = this.apiKeyRepository.create({
-        key: apiKeyVal,
-        user: user,
-        name: 'Default Key',
-        isActive: true,
-      });
-      await this.apiKeyRepository.save(apiKeyEntity);
-    }
 
     return {
       user: {
@@ -499,7 +483,7 @@ export class AuthService {
         providerMode: user.providerMode,
         status: user.status,
         isAdmin: user.isAdmin || user.email.toLowerCase().includes('admin'),
-        apiKey: apiKeyEntity.key,
+        apiKey: apiKeyEntity ? apiKeyEntity.key : null,
       },
       wallets: {
         consumer: consumerBalance,

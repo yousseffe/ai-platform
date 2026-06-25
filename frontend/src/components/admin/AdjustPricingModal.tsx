@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, Coins } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -59,16 +59,14 @@ export default function AdjustPricingModal({
               Cost Per Request (Credits)
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold">
-                $
-              </span>
+              <Coins className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 w-3.5 h-3.5" />
               <Input
                 type="number"
                 min="0"
                 step="0.01"
                 value={costInput}
                 onChange={(e) => onCostInputChange(e.target.value)}
-                className="pl-7 bg-input border-border text-foreground font-medium rounded-lg h-9 text-xs"
+                className="pl-9 bg-input border-border text-foreground font-medium rounded-lg h-9 text-xs"
               />
             </div>
             <p className="text-[9px] text-muted-foreground leading-normal mt-1">

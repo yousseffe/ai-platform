@@ -477,7 +477,7 @@ export default function CreateWorkspaceWizard() {
                         <CreditCard className="w-3.5 h-3.5" />
                         <span className="text-[10px] font-bold uppercase tracking-wider">Free Credits</span>
                       </div>
-                      <p className="text-xl font-bold text-slate-800 dark:text-slate-100">$100.00</p>
+                      <p className="text-xl font-bold text-slate-800 dark:text-slate-100">100 Credits</p>
                       <p className="text-[9px] text-slate-500 dark:text-slate-400 mt-1">Consumer wallet start credit</p>
                     </CardContent>
                   </Card>
@@ -497,22 +497,22 @@ export default function CreateWorkspaceWizard() {
                 <div className="border border-border rounded-xl p-4 bg-background max-w-sm mx-auto text-left space-y-3 font-mono">
                   <div className="flex justify-between text-xs border-b border-border/60 pb-2">
                     <span className="text-muted-foreground font-semibold">Creation Fee:</span>
-                    <span className="font-bold text-foreground">${orgFee.toFixed(2)} Credits</span>
+                    <span className="font-bold text-foreground">{Math.round(orgFee)} Credits</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground font-semibold">Personal Wallet Balance:</span>
                     <span className={`font-bold ${personalBalance < orgFee ? "text-red-400" : "text-emerald-400"}`}>
-                      ${personalBalance.toFixed(2)} Credits
+                      {Math.round(personalBalance)} Credits
                     </span>
                   </div>
                   
                   {personalBalance < orgFee ? (
                     <div className="mt-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-500/20 text-[10px] text-red-750 dark:text-red-450 leading-normal">
-                      ⚠️ <strong>Insufficient Balance:</strong> You need at least ${orgFee.toFixed(2)} credits in your personal wallet to create an organization workspace. Please top up your wallet in Settings.
+                      ⚠️ <strong>Insufficient Balance:</strong> You need at least {Math.round(orgFee)} credits in your personal wallet to create an organization workspace. Please top up your wallet in Settings.
                     </div>
                   ) : (
                     <div className="mt-3 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/20 text-[10px] text-emerald-700 dark:text-emerald-450 leading-normal">
-                      ✓ Wallet balance verified. ${orgFee.toFixed(2)} credits will be charged upon creation.
+                      ✓ Wallet balance verified. {Math.round(orgFee)} credits will be charged upon creation.
                     </div>
                   )}
                 </div>

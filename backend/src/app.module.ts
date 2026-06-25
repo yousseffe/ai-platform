@@ -29,6 +29,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { OpenSearchModule } from './shared/opensearch/opensearch.module';
 import { LoggerMiddleware } from './shared/middleware/logger.middleware';
+import { MailModule } from './shared/mail/mail.module';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -80,6 +81,7 @@ import { LoggerMiddleware } from './shared/middleware/logger.middleware';
     WalletsModule,
     OrganizationsModule,
     OpenSearchModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

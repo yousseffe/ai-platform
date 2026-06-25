@@ -24,6 +24,8 @@ export interface AdminModel {
   ram: string;
   /** Owner user email address */
   owner: string;
+  /** Marketplace visibility */
+  isPublic: boolean;
 }
 
 /**

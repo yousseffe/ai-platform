@@ -51,6 +51,9 @@ import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
 import { Deployment } from '../../deployments/entities/deployment.entity';
 import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import { VersionStatus } from '../enums/version-status.enum';
+import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
+import { SystemConfig } from '../../wallets/entities/system-config.entity';
+import * as crypto from 'crypto';
 
 /**
  * Interface representing a NestJS request authenticated with a JWT payload.
@@ -158,10 +161,47 @@ export class ModelsController {
   }
 
   /**
+   * Retrieves summary usage statistics (call count and credits spent) per model for the consumer.
+   *
+   * @param req - Authenticated user request context.
+   * @returns An array of stats per model.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('logs/consumer/stats')
+  async getConsumerStats(@Request() req: RequestWithUser) {
+    const stats = await this.modelLogRepository
+      .createQueryBuilder('log')
+      .innerJoinAndSelect('log.model', 'model')
+      .select('model.id', 'modelId')
+      .addSelect('model.name', 'modelName')
+      .addSelect('model.type', 'modelType')
+      .addSelect('model.framework', 'modelFramework')
+      .addSelect('model.cost_per_request', 'costPerRequest')
+      .addSelect('COUNT(log.id)', 'callCount')
+      .addSelect('SUM(CASE WHEN log.status = \'SUCCESS\' THEN model.cost_per_request ELSE 0 END)', 'totalSpent')
+      .where('log.user_id = :userId', { userId: req.user.id })
+      .groupBy('model.id')
+      .addGroupBy('model.name')
+      .addGroupBy('model.type')
+      .addGroupBy('model.framework')
+      .addGroupBy('model.cost_per_request')
+      .getRawMany();
+
+    return stats.map(s => ({
+      modelId: s.modelId,
+      modelName: s.modelName,
+      modelType: s.modelType,
+      modelFramework: s.modelFramework,
+      costPerRequest: parseFloat(s.costPerRequest || '0'),
+      callCount: parseInt(s.callCount || '0', 10),
+      totalSpent: parseFloat(s.totalSpent || '0'),
+    }));
+  }
+
+  /**
    * Retrieves prediction logs received on models owned by the authenticated user (Provider).
    *
    * @param req - Authenticated user request context.
-   * @returns A list of model execution logs.
    */
   @UseGuards(JwtAuthGuard)
   @Get('logs/provider')
@@ -182,8 +222,76 @@ export class ModelsController {
    */
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async getModel(@Param('id') id: string): Promise<Model> {
-    return this.modelsService.getModel(id);
+  async getModel(@Param('id') id: string): Promise<Model & { uniqueUsersCount?: number }> {
+    const model = await this.modelsService.getModel(id);
+
+    const result = await this.modelLogRepository
+      .createQueryBuilder('log')
+      .select('COUNT(DISTINCT log.user_id)', 'count')
+      .where('log.model_id = :modelId', { modelId: id })
+      .getRawOne();
+
+    const count = result ? parseInt(result.count || '0', 10) : 0;
+
+    return {
+      ...model,
+      uniqueUsersCount: count,
+    };
+  }
+
+  /**
+   * Retrieves or generates the sandbox trial API key for the authenticated user and model.
+   *
+   * @param id - Model UUID.
+   * @param req - Authenticated user request envelope.
+   * @returns Object containing the trial API key and trial call limits details.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/playground-key')
+  async getPlaygroundKey(
+    @Param('id') id: string,
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+  ) {
+    const userId = req.user.id;
+    const model = await this.modelsService.getModel(id);
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+
+    let apiKeyEntity = await this.apiKeyRepository.findOne({
+      where: {
+        user: { id: userId },
+        model: { id },
+        type: ApiKeyType.TRIAL,
+        isActive: true,
+      },
+    });
+
+    const limitConfig = await this.dataSource.getRepository(SystemConfig).findOne({
+      where: { key: 'playground_trial_limit' },
+    });
+    const limit = limitConfig ? parseInt(limitConfig.value, 10) : 50;
+
+    if (!apiKeyEntity) {
+      const user = await this.dataSource.getRepository(User).findOneBy({ id: userId });
+      const trialKey = 'ml_sk_trial_' + crypto.randomBytes(24).toString('hex');
+      apiKeyEntity = this.apiKeyRepository.create({
+        key: trialKey,
+        user: user!,
+        model,
+        name: 'Playground Trial Key',
+        type: ApiKeyType.TRIAL,
+        isActive: true,
+        callsCount: 0,
+      });
+      apiKeyEntity = await this.apiKeyRepository.save(apiKeyEntity);
+    }
+
+    return {
+      key: apiKeyEntity.key,
+      callsCount: apiKeyEntity.callsCount,
+      limit,
+    };
   }
 
   /**
@@ -440,10 +548,30 @@ export class ModelsController {
     req: any,
     res: Response,
   ): Promise<void> {
-    const cost =
-      typeof model.costPerRequest === 'string'
-        ? parseFloat(model.costPerRequest)
-        : model.costPerRequest;
+    const isTrial = req.user?.apiKeyType === ApiKeyType.TRIAL;
+
+    let cost = 0;
+    let providerSharePercent = model.providerSharePercent || 80;
+
+    if (!isTrial) {
+      if (!model.hasCustomPricing) {
+        const configKey = 'price_' + model.type.toLowerCase();
+        const priceConfig = await this.dataSource.getRepository(SystemConfig).findOne({
+          where: { key: configKey },
+        });
+        cost = priceConfig ? parseFloat(priceConfig.value) : 0.1;
+
+        const shareConfig = await this.dataSource.getRepository(SystemConfig).findOne({
+          where: { key: 'default_provider_share_percent' },
+        });
+        providerSharePercent = shareConfig ? parseInt(shareConfig.value, 10) : 80;
+      } else {
+        cost =
+          typeof model.costPerRequest === 'string'
+            ? parseFloat(model.costPerRequest)
+            : model.costPerRequest;
+      }
+    }
 
     if (cost > 0) {
       const balance = await this.walletsService.getBalance(
@@ -480,8 +608,8 @@ export class ModelsController {
     try {
       if (deploymentId) {
         await this.redisService.set(
-          `model:last-active:${deploymentId}`,
-          Date.now().toString(),
+            `model:last-active:${deploymentId}`,
+            Date.now().toString(),
         );
       }
 
@@ -523,6 +651,11 @@ export class ModelsController {
         await queryRunner.startTransaction();
 
         try {
+          const callerUser = await queryRunner.manager.findOne(User, {
+            where: { id: req.user.id },
+          });
+          const callerEmail = callerUser?.email || 'Unknown User';
+
           // 1. Deduct cost from consumer wallet
           await queryRunner.manager.query(
             `UPDATE wallets SET balance = balance - $1 WHERE owner_id = $2 AND owner_type = $3 AND wallet_type = $4`,
@@ -549,38 +682,65 @@ export class ModelsController {
             await queryRunner.manager.save(Transaction, consumerTx);
           }
 
-          // 2. Pay Provider (model owner)
-          const providerSharePercent = model.providerSharePercent || 80;
-          const providerShare = cost * (providerSharePercent / 100);
+          // Load system config for credits_per_egp
+          let config = await queryRunner.manager.findOne(SystemConfig, {
+            where: { key: 'credits_per_egp' },
+          });
+          if (!config) {
+            config = await queryRunner.manager.findOne(SystemConfig, {
+              where: { key: 'credits_per_usd' },
+            });
+          }
+          const creditsPerEgp = config ? parseInt(config.value, 10) || 10 : 10;
+          const costInEgp = cost / creditsPerEgp;
 
+          // 2. Pay Provider (model owner) in EGP
+          const providerShareEgp = costInEgp * (providerSharePercent / 100);
+
+          // Update model's total earnings in database
           await queryRunner.manager.query(
-            `UPDATE wallets SET balance = balance + $1 WHERE owner_id = $2 AND owner_type = $3 AND wallet_type = $4`,
-            [providerShare, model.user.id, OwnerType.USER, WalletType.CONSUMER],
+            `UPDATE models SET total_earnings = total_earnings + $1 WHERE id = $2`,
+            [providerShareEgp, model.id],
           );
 
-          // Get provider wallet
-          const providerWallet = await queryRunner.manager.findOne(Wallet, {
+          let providerWallet = await queryRunner.manager.findOne(Wallet, {
             where: {
               ownerId: model.user.id,
               ownerType: OwnerType.USER,
-              walletType: WalletType.CONSUMER,
+              walletType: WalletType.PROVIDER,
             },
           });
 
-          if (providerWallet) {
-            const providerTx = queryRunner.manager.create(Transaction, {
-              walletId: providerWallet.id,
-              type: TransactionType.CREDIT,
-              amount: providerShare,
-              reference: `Inference credit share for model: ${model.name}`,
-              status: TransactionStatus.COMPLETED,
+          if (!providerWallet) {
+            providerWallet = queryRunner.manager.create(Wallet, {
+              ownerId: model.user.id,
+              ownerType: OwnerType.USER,
+              walletType: WalletType.PROVIDER,
+              balance: 0.0,
+              currency: 'EGP',
             });
-            await queryRunner.manager.save(Transaction, providerTx);
+            providerWallet = await queryRunner.manager.save(Wallet, providerWallet);
           }
 
-          // 3. Pay Platform Admin
-          const platformShare = cost - providerShare;
-          if (platformShare > 0) {
+          const currentProviderBalance =
+            typeof providerWallet.balance === 'string'
+              ? parseFloat(providerWallet.balance)
+              : providerWallet.balance;
+          providerWallet.balance = currentProviderBalance + providerShareEgp;
+          await queryRunner.manager.save(Wallet, providerWallet);
+
+          const providerTx = queryRunner.manager.create(Transaction, {
+            walletId: providerWallet.id,
+            type: TransactionType.CREDIT,
+            amount: providerShareEgp,
+            reference: `Inference credit share for model: ${model.name} by user ${callerEmail} (EGP ${providerShareEgp.toFixed(4)})`,
+            status: TransactionStatus.COMPLETED,
+          });
+          await queryRunner.manager.save(Transaction, providerTx);
+
+          // 3. Pay Platform Admin in EGP
+          const platformShareEgp = costInEgp - providerShareEgp;
+          if (platformShareEgp > 0) {
             const systemOwnerId = '00000000-0000-0000-0000-000000000000';
 
             // Check if system wallet exists, if not create
@@ -588,31 +748,33 @@ export class ModelsController {
               where: {
                 ownerId: systemOwnerId,
                 ownerType: OwnerType.USER,
-                walletType: WalletType.CONSUMER,
+                walletType: WalletType.PROVIDER,
               },
             });
 
             if (!systemWallet) {
               systemWallet = queryRunner.manager.create(Wallet, {
-                walletType: WalletType.CONSUMER,
+                walletType: WalletType.PROVIDER,
                 ownerType: OwnerType.USER,
                 ownerId: systemOwnerId,
                 balance: 0.0,
-                currency: 'CREDITS',
+                currency: 'EGP',
               });
               await queryRunner.manager.save(Wallet, systemWallet);
             }
 
-            await queryRunner.manager.query(
-              `UPDATE wallets SET balance = balance + $1 WHERE id = $2`,
-              [platformShare, systemWallet.id],
-            );
+            const currentSystemBalance =
+              typeof systemWallet.balance === 'string'
+                ? parseFloat(systemWallet.balance)
+                : systemWallet.balance;
+            systemWallet.balance = currentSystemBalance + platformShareEgp;
+            await queryRunner.manager.save(Wallet, systemWallet);
 
             const platformTx = queryRunner.manager.create(Transaction, {
               walletId: systemWallet.id,
               type: TransactionType.CREDIT,
-              amount: platformShare,
-              reference: `Platform commission for model: ${model.name}`,
+              amount: platformShareEgp,
+              reference: `Platform commission for model: ${model.name} from call by user ${callerEmail} (EGP ${platformShareEgp.toFixed(4)})`,
               status: TransactionStatus.COMPLETED,
             });
             await queryRunner.manager.save(Transaction, platformTx);

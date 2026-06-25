@@ -8,6 +8,8 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { Model } from '../../models/entities/model.entity';
+import { ApiKeyType } from '../enums/api-key-type.enum';
 
 /**
  * Entity representing an API secret key used for programmatically authenticating model predictions.
@@ -38,6 +40,29 @@ export class ApiKey {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  /**
+   * The specific Model this API credential authorizes access to.
+   */
+  @ManyToOne(() => Model, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'model_id' })
+  model: Model | null;
+
+  /**
+   * The classification of key (LIVE for production, TRIAL for sandbox playground).
+   */
+  @Column({
+    type: 'varchar',
+    enum: ApiKeyType,
+    default: ApiKeyType.LIVE,
+  })
+  type: ApiKeyType;
+
+  /**
+   * Usage limit counter tracking executions on sandbox trial keys.
+   */
+  @Column({ name: 'calls_count', type: 'integer', default: 0 })
+  callsCount: number;
 
   /**
    * Activation status. Toggled off if revoked.

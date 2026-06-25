@@ -10,20 +10,36 @@ import {
   ChevronLeft,
   ChevronRight,
   Receipt,
+  Search,
+  RotateCcw,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Transaction } from "@/lib/services/wallets.service";
+import { WalletType } from "@/types";
 
 interface TransactionsTableProps {
+  viewMode?: WalletType;
   transactions: Transaction[];
   total: number;
   page: number;
   limit: number;
   onPageChange: (page: number) => void;
   loading: boolean;
+  // Filters properties
+  search?: string;
+  onSearchChange?: (val: string) => void;
+  txType?: string;
+  onTxTypeChange?: (val: string) => void;
+  status?: string;
+  onStatusChange?: (val: string) => void;
+  startDate?: string;
+  onStartDateChange?: (val: string) => void;
+  endDate?: string;
+  onEndDateChange?: (val: string) => void;
 }
 
 /**
@@ -33,12 +49,23 @@ interface TransactionsTableProps {
  * @returns The React component rendering the transactions table context.
  */
 export default function TransactionsTable({
+  viewMode,
   transactions,
   total,
   page,
   limit,
   onPageChange,
   loading,
+  search,
+  onSearchChange,
+  txType,
+  onTxTypeChange,
+  status,
+  onStatusChange,
+  startDate,
+  onStartDateChange,
+  endDate,
+  onEndDateChange,
 }: TransactionsTableProps) {
   const totalPages = Math.ceil(total / limit) || 1;
 
@@ -57,6 +84,8 @@ export default function TransactionsTable({
     }
   };
 
+  const isConsumer = viewMode === WalletType.CONSUMER;
+
   return (
     <Card className="overflow-hidden flex flex-col border border-border bg-card shadow-sm hover:shadow-md hover:border-border/80 transition-all duration-300 rounded-xl text-left font-sans h-full">
       <CardHeader className="p-4.5 border-b border-border bg-secondary/5 flex flex-row items-center justify-between space-y-0 select-none">
@@ -73,6 +102,110 @@ export default function TransactionsTable({
           {total} total
         </span>
       </CardHeader>
+
+      {/* Filters Bar */}
+      <div className="p-4 border-b border-border bg-secondary/15 flex flex-col gap-3 font-sans text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 items-end">
+          {/* Search box */}
+          <div className="space-y-1.5 md:col-span-4">
+            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+              Search Reference
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-muted-foreground">
+                <Search className="w-3.5 h-3.5" />
+              </span>
+              <input
+                type="text"
+                placeholder="e.g. Inference debit"
+                value={search || ""}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-mono focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
+              />
+            </div>
+          </div>
+
+          {/* Type filter */}
+          <div className="space-y-1.5 md:col-span-2">
+            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+              Type
+            </label>
+            <select
+              value={txType || ""}
+              onChange={(e) => onTxTypeChange?.(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+            >
+              <option value="">All Types</option>
+              <option value="CREDIT">CREDIT</option>
+              <option value="DEBIT">DEBIT</option>
+            </select>
+          </div>
+
+          {/* Status filter */}
+          <div className="space-y-1.5 md:col-span-2">
+            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+              Status
+            </label>
+            <select
+              value={status || ""}
+              onChange={(e) => onStatusChange?.(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+            >
+              <option value="">All Statuses</option>
+              <option value="COMPLETED">COMPLETED</option>
+              <option value="PENDING">PENDING</option>
+              <option value="FAILED">FAILED</option>
+            </select>
+          </div>
+
+          {/* Date range filter: From */}
+          <div className="space-y-1.5 md:col-span-2">
+            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+              From Date
+            </label>
+            <input
+              type="date"
+              value={startDate || ""}
+              onChange={(e) => onStartDateChange?.(e.target.value)}
+              className="w-full px-2.5 py-1 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-sans focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer font-medium"
+            />
+          </div>
+
+          {/* Date range filter: To */}
+          <div className="space-y-1.5 md:col-span-2">
+            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+              To Date
+            </label>
+            <input
+              type="date"
+              value={endDate || ""}
+              onChange={(e) => onEndDateChange?.(e.target.value)}
+              className="w-full px-2.5 py-1 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-sans focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer font-medium"
+            />
+          </div>
+        </div>
+
+        {/* Clear Filters indicator if filters active */}
+        {(search || txType || status || startDate || endDate) && (
+          <div className="flex items-center justify-between pt-1 pb-0.5 border-t border-border/40 select-none">
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium font-sans">
+              <Filter className="w-3.5 h-3.5 text-primary animate-pulse" /> Active filters applied
+            </span>
+            <button
+              onClick={() => {
+                onSearchChange?.("");
+                onTxTypeChange?.("");
+                onStatusChange?.("");
+                onStartDateChange?.("");
+                onEndDateChange?.("");
+              }}
+              className="flex items-center gap-1 text-[10px] font-bold text-primary hover:text-primary-600 transition-colors font-mono cursor-pointer bg-transparent border-none outline-none"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
+            </button>
+          </div>
+        )}
+      </div>
 
       <CardContent className="p-0 flex-1 flex flex-col justify-between">
         <div className="overflow-x-auto w-full">
@@ -136,7 +269,8 @@ export default function TransactionsTable({
 
                       {/* Amount Column */}
                       <TableCell className={isCredit ? "px-4.5 py-3 font-bold text-emerald-600 dark:text-emerald-400 font-mono text-[11px]" : "px-4.5 py-3 font-bold text-red-500 dark:text-red-400 font-mono text-[11px]"}>
-                        {isCredit ? "+" : "-"}${Number(tx.amount).toFixed(2)}
+                        {isCredit ? "+" : "-"}
+                        {isConsumer ? `${Math.round(Number(tx.amount))} Credits` : `$${Number(tx.amount).toFixed(2)}`}
                       </TableCell>
 
                       {/* Reference Column */}

@@ -39,14 +39,38 @@ export async function getTransactions(
   workspaceId: string,
   walletType: WalletType,
   page = 1,
-  limit = 20
+  limit = 20,
+  filters?: {
+    txType?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }
 ): Promise<PaginatedTransactions> {
-  return smartFetch<PaginatedTransactions>(
-    `/wallets/transactions?type=${walletType}&page=${page}&limit=${limit}`,
-    {
-      headers: {
-        "X-Workspace-Id": workspaceId,
-      },
-    }
-  );
+  let url = `/wallets/transactions?type=${walletType}&page=${page}&limit=${limit}`;
+  if (filters) {
+    if (filters.txType) url += `&txType=${encodeURIComponent(filters.txType)}`;
+    if (filters.status) url += `&status=${encodeURIComponent(filters.status)}`;
+    if (filters.startDate) url += `&startDate=${encodeURIComponent(filters.startDate)}`;
+    if (filters.endDate) url += `&endDate=${encodeURIComponent(filters.endDate)}`;
+    if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`;
+  }
+
+  return smartFetch<PaginatedTransactions>(url, {
+    headers: {
+      "X-Workspace-Id": workspaceId,
+    },
+  });
 }
+
+/**
+ * Fetches the global configuration for the credits-to-EGP conversion multiplier.
+ *
+ * @returns A promise resolving to the credits per EGP multiplier coefficient.
+ */
+export async function getCreditsPerEgp(): Promise<number> {
+  const res = await smartFetch<{ credits_per_egp: number }>("/wallets/config/credits-per-egp");
+  return res.credits_per_egp;
+}
+

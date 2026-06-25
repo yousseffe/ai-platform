@@ -1,7 +1,9 @@
 import {
   Controller,
   Post,
+  Get,
   Patch,
+  Param,
   Body,
   UseGuards,
   Req,
@@ -105,5 +107,53 @@ export class UsersController {
   ) {
     const newApiKey = await this.usersService.rotateApiKey(req.user.id);
     return { key: newApiKey.key };
+  }
+
+  /**
+   * Retrieves all active LIVE API keys for the authenticated user.
+   *
+   * @param req - Request containing user context.
+   * @returns Array of active API keys with model metadata.
+   */
+  @Get('me/api-keys')
+  async getMyApiKeys(
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+  ) {
+    return this.usersService.getUserApiKeys(req.user.id);
+  }
+
+  /**
+   * Generates a new named LIVE API key for a specific model.
+   *
+   * @param req - Request containing user context.
+   * @param body - Specs (modelId, name).
+   * @returns Newly generated API key details.
+   */
+  @Post('me/api-keys')
+  async createMyApiKey(
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+    @Body() body: { modelId: string; name?: string },
+  ) {
+    return this.usersService.generateUserApiKey(
+      req.user.id,
+      body.modelId,
+      body.name || '',
+    );
+  }
+
+  /**
+   * Revokes (deactivates) a specific API key.
+   *
+   * @param req - Request containing user context.
+   * @param id - API Key ID parameter.
+   * @returns Status receipt.
+   */
+  @Post('me/api-keys/:id/revoke')
+  async revokeMyApiKey(
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    await this.usersService.revokeUserApiKey(req.user.id, id);
+    return { success: true };
   }
 }

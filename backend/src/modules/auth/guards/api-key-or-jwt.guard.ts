@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiKey } from '../entities/api-key.entity';
 import { getRsaKeys } from '../utils/keys';
+import { SystemConfig } from '../../wallets/entities/system-config.entity';
 
 /**
  * Guard that permits request execution if a valid API Key OR a valid JWT token
@@ -44,10 +45,10 @@ export class ApiKeyOrJwtGuard implements CanActivate {
     }
 
     // Check if it's an API Key
-    if (token.startsWith('ml_sk_live_')) {
+    if (token.startsWith('ml_sk_live_') || token.startsWith('ml_sk_trial_')) {
       const apiKeyEntity = await this.apiKeyRepository.findOne({
         where: { key: token, isActive: true },
-        relations: ['user'],
+        relations: ['user', 'model'],
       });
 
       if (!apiKeyEntity) {
@@ -61,11 +62,37 @@ export class ApiKeyOrJwtGuard implements CanActivate {
         throw new UnauthorizedException('API Key has expired');
       }
 
+      // Verify key belongs to the model requested in parameter ID
+      const modelId = request.params.id;
+      if (!modelId) {
+        throw new UnauthorizedException('Target model ID parameter missing from request');
+      }
+
+      if (!apiKeyEntity.model || apiKeyEntity.model.id !== modelId) {
+        throw new UnauthorizedException('API Key does not authorize access to this model');
+      }
+
+      // If it is a trial key, verify call limits
+      if (token.startsWith('ml_sk_trial_')) {
+        const limitConfig = await this.apiKeyRepository.manager.getRepository(SystemConfig).findOne({
+          where: { key: 'playground_trial_limit' },
+        });
+        const limit = limitConfig ? parseInt(limitConfig.value, 10) : 50;
+
+        if (apiKeyEntity.callsCount >= limit) {
+          throw new UnauthorizedException('Playground trial call limit reached. Please generate a live API Key.');
+        }
+
+        apiKeyEntity.callsCount += 1;
+        await this.apiKeyRepository.save(apiKeyEntity);
+      }
+
       // Populate request user
       request.user = {
         id: apiKeyEntity.user.id,
         email: apiKeyEntity.user.email,
         apiKey: apiKeyEntity.key,
+        apiKeyType: apiKeyEntity.type,
       };
       return true;
     }

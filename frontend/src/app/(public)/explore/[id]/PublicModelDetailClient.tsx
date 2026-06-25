@@ -32,7 +32,14 @@ import {
   Sliders,
   Maximize,
   Wrench,
+  Key,
+  Eye,
+  EyeOff,
+  Loader2
 } from "lucide-react";
+import { smartFetch } from "@/lib/utils/smart-fetch";
+import { toast } from "react-hot-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Model, ModelVersion } from "@/types";
 import { DeploymentStatus, Framework, ModelType, TaskType, VersionStatus } from "@/types/enums";
 import ModelPlayground from "@/components/models/ModelPlayground";
@@ -236,6 +243,44 @@ export default function PublicModelDetailClient({ model, isAuthenticated }: Publ
   const latestVersion = versions[versions.length - 1];
   const isLive = hasLiveDeployment(versions);
 
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
+  const [generatedKey, setGeneratedKey] = useState("");
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+
+  const handleSubscribeAndGenerate = async () => {
+    setIsGeneratingKey(true);
+    try {
+      const res = await smartFetch<{ key: string }>("/users/me/api-keys", {
+        method: "POST",
+        body: JSON.stringify({
+          modelId: model.id,
+          name: `${model.name} Marketplace Key`,
+        }),
+      });
+      setGeneratedKey(res.key);
+      setIsKeyModalOpen(true);
+      toast.success("Subscribed and generated API Key!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to subscribe and generate API key";
+      toast.error(msg);
+    } finally {
+      setIsGeneratingKey(false);
+    }
+  };
+
+  const handleCopyKey = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedKey);
+      setIsCopied(true);
+      toast.success("API key copied to clipboard");
+      setTimeout(() => setIsCopied(false), 2500);
+    } catch {
+      toast.error("Failed to copy API key");
+    }
+  };
+
   // Build a sample curl snippet using the latest version's example payload
   const examplePayload = latestVersion?.examplePayload
     ? latestVersion.examplePayload
@@ -353,9 +398,25 @@ console.log(data);`;
                 </span>
               </div>
 
-              <h1 className="text-3xl md:text-4xl font-extrabold text-foreground tracking-tight font-mono">
-                {model.name}
-              </h1>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/20 pb-4">
+                <h1 className="text-3xl md:text-4xl font-extrabold text-foreground tracking-tight font-mono">
+                  {model.name}
+                </h1>
+                {isAuthenticated && (
+                  <button
+                    onClick={handleSubscribeAndGenerate}
+                    disabled={isGeneratingKey}
+                    className="btn-primary h-9 px-4 font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md select-none rounded-lg active:scale-95 transition-all text-white border-none shrink-0"
+                  >
+                    {isGeneratingKey ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Key className="w-3.5 h-3.5" />
+                    )}
+                    <span>Subscribe & Generate API Key</span>
+                  </button>
+                )}
+              </div>
 
               {model.description && (
                 <p className="text-base text-muted-foreground leading-relaxed max-w-4xl">
@@ -754,6 +815,59 @@ console.log(data);`;
           </div>
         )}
       </div>
+
+      {/* Dialog for displaying the generated API key */}
+      <Dialog open={isKeyModalOpen} onOpenChange={setIsKeyModalOpen}>
+        <DialogContent className="sm:max-w-[420px] bg-card border border-border text-foreground font-mono text-xs">
+          <DialogHeader className="space-y-1.5 text-left">
+            <DialogTitle className="text-sm font-bold text-foreground">API Key Generated successfully</DialogTitle>
+            <DialogDescription className="text-[10px] text-muted-foreground">
+              Copy this API Key now. For security reasons, you will not be able to see it again.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3 text-left">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                Secret Token Key
+              </label>
+              <div className="relative">
+                <input
+                  type={showKey ? "text" : "password"}
+                  className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-xs text-foreground pr-20 outline-none font-mono font-medium"
+                  value={generatedKey}
+                  readOnly
+                />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                  <button
+                    onClick={() => setShowKey(!showKey)}
+                    className="text-muted-foreground hover:text-foreground cursor-pointer p-1 rounded hover:bg-secondary transition-colors border-none bg-transparent"
+                    type="button"
+                  >
+                    {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                  <button
+                    onClick={handleCopyKey}
+                    className="text-muted-foreground hover:text-foreground cursor-pointer p-1 rounded hover:bg-secondary transition-colors border-none bg-transparent"
+                    type="button"
+                  >
+                    {isCopied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <button
+              onClick={() => setIsKeyModalOpen(false)}
+              className="btn-primary py-1.5 h-9 text-[10px] flex-1 cursor-pointer font-bold rounded-lg border-none"
+            >
+              Done
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

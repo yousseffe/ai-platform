@@ -10,6 +10,8 @@ import * as crypto from 'crypto';
 import { User } from '../entities/user.entity';
 import { AuditLog } from '../entities/audit-log.entity';
 import { ApiKey } from '../../auth/entities/api-key.entity';
+import { Model } from '../../models/entities/model.entity';
+import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
 import { UsersRepository } from '../repositories/users.repository';
 import { WalletsService } from '../../wallets/services/wallets.service';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
@@ -27,6 +29,8 @@ export class UsersService {
     private readonly auditLogRepository: Repository<AuditLog>,
     @InjectRepository(ApiKey)
     private readonly apiKeyRepository: Repository<ApiKey>,
+    @InjectRepository(Model)
+    private readonly modelRepository: Repository<Model>,
   ) {}
 
   /**
@@ -214,5 +218,72 @@ export class UsersService {
     });
 
     return this.apiKeyRepository.save(newApiKey);
+  }
+
+  /**
+   * Retrieves all active LIVE API keys for the specified user.
+   *
+   * @param userId - User UUID.
+   * @returns Active API keys array.
+   */
+  async getUserApiKeys(userId: string): Promise<ApiKey[]> {
+    return this.apiKeyRepository.find({
+      where: { user: { id: userId }, type: ApiKeyType.LIVE, isActive: true },
+      relations: ['model'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Generates a new active LIVE API key for a user and model.
+   *
+   * @param userId - User UUID.
+   * @param modelId - Model UUID.
+   * @param name - Custom nickname for the key.
+   * @returns Created API Key record.
+   */
+  async generateUserApiKey(
+    userId: string,
+    modelId: string,
+    name: string,
+  ): Promise<ApiKey> {
+    const user = await this.usersRepository.findOneBy({ id: userId });
+    if (!user) {
+      throw new NotFoundException('User profile not found');
+    }
+
+    const model = await this.modelRepository.findOneBy({ id: modelId });
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+
+    const apiKeyVal = 'ml_sk_live_' + crypto.randomBytes(24).toString('hex');
+    const newApiKey = this.apiKeyRepository.create({
+      key: apiKeyVal,
+      user,
+      model,
+      name: name || 'Default Key',
+      type: ApiKeyType.LIVE,
+      isActive: true,
+    });
+
+    return this.apiKeyRepository.save(newApiKey);
+  }
+
+  /**
+   * Revokes (deactivates) a specific API key for the user.
+   *
+   * @param userId - User UUID.
+   * @param keyId - API Key UUID.
+   */
+  async revokeUserApiKey(userId: string, keyId: string): Promise<void> {
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { id: keyId, user: { id: userId } },
+    });
+    if (!apiKey) {
+      throw new NotFoundException('API Key not found or access denied');
+    }
+    apiKey.isActive = false;
+    await this.apiKeyRepository.save(apiKey);
   }
 }

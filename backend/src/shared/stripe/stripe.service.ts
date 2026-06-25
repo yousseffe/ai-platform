@@ -35,7 +35,7 @@ export class StripeService {
   /**
    * Generates a Stripe Checkout Session for a credit top-up purchase.
    *
-   * @param amount - The wallet credit count to purchase (in USD).
+   * @param amount - The wallet credit count to purchase (in EGP).
    * @param workspaceId - The target workspace UUID to credit.
    * @param workspaceType - The workspace type: USER or ORG.
    * @returns A promise resolving to the created Stripe Session object as a record.
@@ -55,7 +55,7 @@ export class StripeService {
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'egp',
             product_data: {
               name: 'ModelOps AI Credit Deposit',
               description: `Workspace ID: ${workspaceId}`,
@@ -88,7 +88,7 @@ export class StripeService {
   /**
    * Generates a Stripe Checkout Session for organization creation fee payment.
    *
-   * @param amount - The organization creation fee amount (in USD).
+   * @param amount - The organization creation fee amount (in EGP).
    * @param pendingId - The pending organization reference UUID.
    * @param ownerUserId - The owner user UUID.
    * @returns A promise resolving to the created Stripe Session object as a record.
@@ -108,7 +108,7 @@ export class StripeService {
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'egp',
             product_data: {
               name: 'ModelOps AI Organization Creation Fee',
               description: `Pending Org ID: ${pendingId}`,

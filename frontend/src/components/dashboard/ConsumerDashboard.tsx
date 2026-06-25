@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { Terminal, Copy, Check, ArrowRight, Coins, Zap, RefreshCw, Key, ArrowUpRight } from "lucide-react";
+import React from "react";
+import { Terminal, ArrowRight, Coins, Zap, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -17,46 +17,11 @@ interface ConsumerDashboardProps {
 /**
  * Consumer Dashboard View.
  * Tailored explicitly to API Consumers: displays active spend balance, request volume logs,
- * credential management inputs (with inline copy and rotation triggers), and inference queries histories.
+ * and inference queries histories.
  * Refactored for clean Expo Go console aesthetics.
  */
 export default function ConsumerDashboard({ logs }: ConsumerDashboardProps) {
-  const { balance, apiKey, rotateApiKey } = useWorkspace();
-  const [copied, setCopied] = useState(false);
-  const [rotating, setRotating] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(apiKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      toast.success("API key copied to clipboard");
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to copy API key");
-    }
-  };
-
-  const handleRotateKey = async () => {
-    const confirmation = window.confirm(
-      "Are you sure you want to rotate your API key? The previous token will be immediately revoked."
-    );
-    if (!confirmation) return;
-
-    setRotating(true);
-    try {
-      const res = await rotateApiKey();
-      if (res.success) {
-        toast.success("API Key rotated successfully!");
-      } else {
-        toast.error(res.error || "Failed to rotate API Key");
-      }
-    } catch {
-      toast.error("Failed to rotate API Key");
-    } finally {
-      setRotating(false);
-    }
-  };
+  const { balance } = useWorkspace();
 
   return (
     <div className="w-full space-y-5 animate-fade-in text-foreground font-sans">
@@ -95,7 +60,7 @@ export default function ConsumerDashboard({ logs }: ConsumerDashboardProps) {
       <BecomeProviderCard />
 
       {/* Consumer Stats Summary Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Spend Wallet Balance */}
         <Card className="border border-border bg-card border-l-4 border-l-primary shadow-sm hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden text-left rounded-xl">
           <CardContent className="p-5 flex flex-col justify-between h-full min-h-[115px]">
@@ -131,40 +96,6 @@ export default function ConsumerDashboard({ logs }: ConsumerDashboardProps) {
             <div className="mt-4 pt-3 border-t border-border/40">
               <p className="text-[10px] text-muted-foreground font-mono">Total queries processed in recent history</p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* API Credentials Token */}
-        <Card className="border border-border bg-card border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md hover:border-emerald-500/30 hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden text-left rounded-xl">
-          <CardContent className="p-5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Key className="w-3.5 h-3.5 text-emerald-500" strokeWidth={2} /> Secret API Key
-              </span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={handleCopy}
-                  className="text-muted-foreground hover:text-foreground cursor-pointer p-1 rounded-md hover:bg-secondary border border-transparent hover:border-border transition-all"
-                  title="Copy API Key"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-                <button
-                  onClick={handleRotateKey}
-                  disabled={rotating}
-                  className="text-muted-foreground hover:text-foreground cursor-pointer p-1 rounded-md hover:bg-secondary border border-transparent hover:border-border transition-all"
-                  title="Rotate API Key"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${rotating ? "animate-spin" : ""}`} />
-                </button>
-              </div>
-            </div>
-            <div className="bg-secondary border border-border px-3 py-2 rounded-lg text-foreground truncate font-mono text-[11px] select-all select-none font-bold">
-              {apiKey ? `${apiKey.substring(0, 14)}...${apiKey.substring(apiKey.length - 8)}` : "No key generated"}
-            </div>
-            <p className="text-[9px] text-destructive leading-snug font-medium">
-              Authenticate requests with this token via `Authorization: Bearer YOUR_TOKEN` HTTP header.
-            </p>
           </CardContent>
         </Card>
       </div>

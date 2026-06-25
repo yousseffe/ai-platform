@@ -10,6 +10,8 @@ import { join } from 'path';
 const execPromise = promisify(exec);
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import * as fs from 'fs';
 import { Model } from '../entities/model.entity';
 import { ModelVersion } from '../entities/model-version.entity';
@@ -22,6 +24,7 @@ import { ModelVersionsRepository } from '../repositories/model-versions.reposito
 import { MinioService } from '../../../shared/minio/minio.service';
 import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import { ModelsSearchService } from './models-search.service';
+import { SystemConfig } from '../../wallets/entities/system-config.entity';
 
 /**
  * Service managing model registration, listing, version uploads, MinIO storage sync,
@@ -35,6 +38,8 @@ export class ModelsService {
     @InjectQueue('build-queue') private readonly buildQueue: Queue,
     private readonly minioService: MinioService,
     private readonly modelsSearchService: ModelsSearchService,
+    @InjectRepository(SystemConfig)
+    private readonly systemConfigRepository: Repository<SystemConfig>,
   ) {}
 
   /**
@@ -57,6 +62,19 @@ export class ModelsService {
     userId: string,
     isPublic: boolean = false,
   ): Promise<Model> {
+    // Retrieve global type price default
+    const configKey = 'price_' + type.toLowerCase();
+    const priceConfig = await this.systemConfigRepository.findOne({
+      where: { key: configKey },
+    });
+    const defaultCost = priceConfig ? parseFloat(priceConfig.value) : 0.1;
+
+    // Retrieve default provider share default
+    const shareConfig = await this.systemConfigRepository.findOne({
+      where: { key: 'default_provider_share_percent' },
+    });
+    const defaultShare = shareConfig ? parseInt(shareConfig.value, 10) : 80;
+
     const model = this.modelsRepository.create({
       name,
       description,
@@ -66,6 +84,9 @@ export class ModelsService {
       user: { id: userId },
       isPublic,
       tier: type === ModelType.DIFFUSION ? 'LARGE' : 'SMALL',
+      costPerRequest: defaultCost,
+      providerSharePercent: defaultShare,
+      hasCustomPricing: false,
     });
     const saved = await this.modelsRepository.save(model);
 
@@ -208,13 +229,7 @@ export class ModelsService {
           'utils',
           'detect_schema.py',
         );
-        let command = `python "${scriptPath}" "${files.model[0].path}"`;
-        if (model.type) {
-          command += ` --model-type "${model.type}"`;
-        }
-        if (files.model[0].originalname) {
-          command += ` --filename "${files.model[0].originalname}"`;
-        }
+        const command = `python3 "${scriptPath}" "${files.model[0].path}"`;
         const { stdout } = await execPromise(command);
         const result = JSON.parse(stdout) as Record<string, unknown>;
         if (result && !result.error) {

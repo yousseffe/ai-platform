@@ -89,7 +89,7 @@ export default function Header({ session }: HeaderProps) {
             ) : (
               <>
                 <Coins className="w-3 h-3" />
-                <span>Credits: ${balance.toFixed(2)}</span>
+                <span>Credits: {Math.round(balance)}</span>
               </>
             )}
           </div>
