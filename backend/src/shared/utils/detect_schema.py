@@ -45,7 +45,19 @@ class UnifiedSchema:
                 is_vision = True
                 break
 
-        if "text_classification" in task or "sequence_classification" in task:
+        if "llm_gguf" in task or "chat" in task:
+            payload = {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Hello, how are you?"
+                    }
+                ],
+                "temperature": 0.7,
+                "max_tokens": 128,
+                "stream": False
+            }
+        elif "text_classification" in task or "sequence_classification" in task:
             payload = {"text": "This is a sample input text for the model."}
         elif "text_generation" in task or "causal_lm" in task:
             payload = {"prompt": "Once upon a time"}
@@ -84,7 +96,20 @@ class UnifiedSchema:
                 is_vision = True
                 break
 
-        if "text_classification" in task or "sequence_classification" in task:
+        if "llm_gguf" in task or "chat" in task:
+            result = {
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": "Hello! I am an AI assistant. How can I help you today?"
+                        },
+                        "finish_reason": "stop"
+                    }
+                ]
+            }
+        elif "text_classification" in task or "sequence_classification" in task:
             labels = []
             for x in self.outputs:
                 if x.labels:
@@ -219,6 +244,7 @@ def detect_model_type(path: str):
     if ext == '.onnx': return "onnx"
     if ext in ('.h5', '.hdf5', '.pb'): return "tensorflow"
     if ext in ('.pt', '.pth'): return "pytorch"
+    if ext == '.gguf': return "gguf"
     if ext in ('.pkl', '.joblib'):
         try:
             with open(path, 'rb') as f:
@@ -946,10 +972,33 @@ class DiffusersIntrospector:
             return schema        
 
 
+class GgufIntrospector:
+    def introspect(self, path):
+        schema = UnifiedSchema(
+            framework="gguf",
+            confidence=1.0
+        )
+        schema.task_type = "llm_gguf"
+        
+        schema.inputs.append(
+            SchemaField(
+                name="messages",
+                type="array"
+            )
+        )
+        schema.outputs.append(
+            SchemaField(
+                name="choices",
+                type="array"
+            )
+        )
+        return schema
+
+
 def scan_directory_for_models(models_dir: str) -> List[str]:
     model_files = []
     # Files
-    extensions = [ "*.pkl", "*.joblib", "*.pt", "*.pth", "*.onnx", "*.h5", "*.hdf5" ]
+    extensions = [ "*.pkl", "*.joblib", "*.pt", "*.pth", "*.onnx", "*.h5", "*.hdf5", "*.gguf" ]
     for ext in extensions:
         model_files.extend(glob.glob(os.path.join(models_dir, ext)))
 
@@ -965,6 +1014,10 @@ def scan_directory_for_models(models_dir: str) -> List[str]:
 
 
 def generate_schema(path: str, model_type_hint: str = "", original_filename: str = ""):
+    is_gguf = path.lower().endswith('.gguf') or original_filename.lower().endswith('.gguf') or model_type_hint.upper() == "LLM_GGUF"
+    if is_gguf:
+        return GgufIntrospector().introspect(path)
+
     framework = detect_model_type(path)
     if framework == "sklearn" or path.endswith('.pkl'): return SklearnIntrospector().introspect(path, model_type_hint, original_filename)
     elif framework == "pytorch": return PyTorchIntrospector().introspect(path)
@@ -972,6 +1025,7 @@ def generate_schema(path: str, model_type_hint: str = "", original_filename: str
     elif framework == "tensorflow": return TensorFlowIntrospector().introspect(path)
     elif framework == "onnx": return OnnxIntrospector().introspect(path)
     elif framework == "diffusers": return DiffusersIntrospector().introspect(path)
+    elif framework == "gguf": return GgufIntrospector().introspect(path)
     return None
 
 
