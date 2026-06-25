@@ -208,7 +208,13 @@ export class ModelsService {
           'utils',
           'detect_schema.py',
         );
-        const command = `python "${scriptPath}" "${files.model[0].path}"`;
+        let command = `python "${scriptPath}" "${files.model[0].path}"`;
+        if (model.type) {
+          command += ` --model-type "${model.type}"`;
+        }
+        if (files.model[0].originalname) {
+          command += ` --filename "${files.model[0].originalname}"`;
+        }
         const { stdout } = await execPromise(command);
         const result = JSON.parse(stdout) as Record<string, unknown>;
         if (result && !result.error) {
@@ -318,10 +324,10 @@ export class ModelsService {
       throw new NotFoundException(`Model version ${versionId} not found.`);
     }
 
-    if (examplePayload !== undefined) {
+    if (examplePayload) {
       version.examplePayload = examplePayload;
     }
-    if (expectedResult !== undefined) {
+    if (expectedResult) {
       version.expectedResult = expectedResult;
     }
 

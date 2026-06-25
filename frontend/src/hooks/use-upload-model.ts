@@ -112,7 +112,7 @@ export function useUploadModel() {
       }
 
       setUploadProgress(50);
-      const result = await detectSchema(model);
+      const result = await detectSchema(model, form.getValues("type"));
       setUploadProgress(90);
 
       // Auto-populate examplePayload and expectedResult if detected
@@ -283,7 +283,7 @@ export function useUploadModel() {
 
     setIsDetectingSchema(true);
     try {
-      const result = await detectSchema(model);
+      const result = await detectSchema(model, form.getValues("type"));
       
       // Update form values
       if (result.example_payload) {

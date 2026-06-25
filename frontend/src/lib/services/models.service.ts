@@ -167,9 +167,14 @@ export interface DetectedSchema {
  * @param file - The model file binary.
  * @returns A promise resolving to the detected schema details.
  */
-export async function detectSchema(file: File): Promise<DetectedSchema> {
+export async function detectSchema(file: File, modelType?: string): Promise<DetectedSchema> {
   const formData = new FormData();
   formData.append("model", file);
+  if (modelType) {
+    formData.append("modelType", modelType);
+  }
+  // Always pass the original filename so the Python script can use filename heuristics
+  formData.append("originalFilename", file.name);
   return smartFetch<DetectedSchema>("/models/detect-schema", {
     method: "POST",
     body: formData,
@@ -187,12 +192,15 @@ export async function detectSchema(file: File): Promise<DetectedSchema> {
  */
 export async function buildModelVersion(
   versionId: string,
-  examplePayload: string,
-  expectedResult: string,
+  examplePayload?: string,
+  expectedResult?: string,
 ): Promise<ModelVersion> {
+  const body: Record<string, string> = {};
+  if (examplePayload !== undefined) body.examplePayload = examplePayload;
+  if (expectedResult !== undefined) body.expectedResult = expectedResult;
   return smartFetch<ModelVersion>(`/models/versions/${versionId}/build`, {
     method: "POST",
-    body: JSON.stringify({ examplePayload, expectedResult }),
+    body: JSON.stringify(body),
   });
 }
 

@@ -84,7 +84,23 @@ class UnifiedSchema:
                 is_vision = True
                 break
 
-        if "classification" in task or is_vision:
+        if "text_classification" in task or "sequence_classification" in task:
+            labels = []
+            for x in self.outputs:
+                if x.labels:
+                    labels = x.labels
+                    break
+            pred_label = labels[0] if labels else "POSITIVE"
+            result = {
+                "text": "This is a sample input text for the model.",
+                "raw_score": 0.85,
+                "label": pred_label,
+                "confidence": 85.0,
+                "positive_pct": 85.0,
+                "negative_pct": 15.0,
+                "intensity": "strong"
+            }
+        elif "classification" in task or is_vision:
             labels = []
             for x in self.outputs:
                 if x.labels:
@@ -352,10 +368,11 @@ class SklearnIntrospector:
             return "text"
         return "tabular"
 
-    def introspect(self, path: str) -> UnifiedSchema:
+    def introspect(self, path: str, model_type_hint: str = "", original_filename: str = "") -> UnifiedSchema:
         import joblib
         schema = UnifiedSchema(framework="sklearn")
-        filename = os.path.basename(path)
+        # Use the original filename for heuristics if provided, otherwise fall back to the temp path basename
+        filename = original_filename if original_filename else os.path.basename(path)
         
         # HEURISTIC: Guess type based on filename context
         inferred_type = self._infer_type_from_name(filename)
@@ -364,6 +381,13 @@ class SklearnIntrospector:
             model = joblib.load(path)
         except Exception as e:
             schema.warnings.append(f"Could not fully load model due to missing custom code: {str(e)[:100]}")
+            # If the user explicitly chose NLP or filename suggests NLP, produce a text schema even on load failure
+            if model_type_hint.upper() == "NLP" or inferred_type == "text":
+                schema.task_type = "text_classification"
+                schema.confidence = 0.7
+                schema.inputs.append(SchemaField(name="text", type="string", dtype="string"))
+                schema.outputs.append(SchemaField(name="prediction", type="string"))
+                return schema
             schema.inputs.append(SchemaField(name="features", type=inferred_type, dtype="float64", shape=[None, 5]))
             schema.outputs.append(SchemaField(name="prediction", type="continuous"))
             return schema
@@ -372,6 +396,10 @@ class SklearnIntrospector:
         schema.task_type = "classification" if hasattr(actual, 'classes_') else "regression"
 
         is_nlp = self.detect_nlp_task(model)
+
+        # Also treat as NLP if the user explicitly selected NLP model type or filename strongly suggests it
+        if not is_nlp and (model_type_hint.upper() == "NLP" or inferred_type == "text"):
+            is_nlp = True
 
         if is_nlp:
 
@@ -936,9 +964,9 @@ def scan_directory_for_models(models_dir: str) -> List[str]:
     return model_files
 
 
-def generate_schema(path: str):
+def generate_schema(path: str, model_type_hint: str = "", original_filename: str = ""):
     framework = detect_model_type(path)
-    if framework == "sklearn" or path.endswith('.pkl'): return SklearnIntrospector().introspect(path)
+    if framework == "sklearn" or path.endswith('.pkl'): return SklearnIntrospector().introspect(path, model_type_hint, original_filename)
     elif framework == "pytorch": return PyTorchIntrospector().introspect(path)
     elif framework == "huggingface": return HuggingFaceIntrospector().introspect(path)
     elif framework == "tensorflow": return TensorFlowIntrospector().introspect(path)
@@ -948,11 +976,16 @@ def generate_schema(path: str):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "No model path provided"}))
-        sys.exit(1)
-    
-    model_path = sys.argv[1]
+    import argparse
+    parser = argparse.ArgumentParser(description="Auto-detect model schema")
+    parser.add_argument("model_path", help="Path to the model file or directory")
+    parser.add_argument("--model-type", dest="model_type", default="", help="Model type hint (e.g. NLP, TABULAR, VISION, DIFFUSION)")
+    parser.add_argument("--filename", dest="filename", default="", help="Original filename of the uploaded model")
+    args = parser.parse_args()
+
+    model_path = args.model_path
+    model_type_hint = args.model_type
+    original_filename = args.filename
     temp_dir = None
     
     try:
@@ -985,7 +1018,7 @@ if __name__ == '__main__':
             results = []
             for mp in paths:
                 try:
-                    schema = generate_schema(mp)
+                    schema = generate_schema(mp, model_type_hint, original_filename)
                     if schema:
                         results.append({
                             "path": mp,
@@ -1001,7 +1034,7 @@ if __name__ == '__main__':
             print(json.dumps({"directory": model_path, "models": results}, indent=2))
         else:
             # Single model file/directory
-            schema = generate_schema(model_path)
+            schema = generate_schema(model_path, model_type_hint, original_filename)
             if schema:
                 print(schema.to_json())
             else:

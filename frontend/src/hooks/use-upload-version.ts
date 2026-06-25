@@ -14,7 +14,7 @@ import { detectSchema } from "@/lib/services/models.service";
  * @param modelId - The unique UUID identifier of the parent model.
  * @returns An object containing form variables, progress trackers, and event handlers.
  */
-export function useUploadVersion(modelId: string) {
+export function useUploadVersion(modelId: string, modelType?: string) {
   const router = useRouter();
 
   // File Upload states
@@ -50,7 +50,7 @@ export function useUploadVersion(modelId: string) {
 
     setIsDetectingSchema(true);
     try {
-      const result = await detectSchema(modelFile);
+      const result = await detectSchema(modelFile, modelType);
       if (result.example_payload) {
         setExamplePayload(result.example_payload);
       }

@@ -54,6 +54,7 @@ export class SchemaController {
   )
   async detectSchema(
     @UploadedFile() file?: Express.Multer.File,
+    @Body() body?: { modelType?: string; originalFilename?: string },
   ): Promise<Record<string, unknown>> {
     if (!file) {
       throw new BadRequestException('No model file uploaded.');
@@ -69,8 +70,14 @@ export class SchemaController {
     );
 
     try {
-      // Execute the python schema generator
-      const command = `python "${scriptPath}" "${tempFilePath}"`;
+      // Build the command with optional model type and original filename hints
+      let command = `python "${scriptPath}" "${tempFilePath}"`;
+      if (body?.modelType) {
+        command += ` --model-type "${body.modelType}"`;
+      }
+      if (body?.originalFilename) {
+        command += ` --filename "${body.originalFilename}"`;
+      }
       const { stdout, stderr } = await execPromise(command);
 
       if (stderr) {

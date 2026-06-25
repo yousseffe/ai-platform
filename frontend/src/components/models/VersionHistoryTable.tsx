@@ -62,7 +62,7 @@ export function VersionHistoryTable({
                     : null;
 
                 let displayStatus = v.status as string;
-                if (latestDeployment) {
+                if (latestDeployment && v.status !== VersionStatus.BUILDING && v.status !== VersionStatus.UPLOADED) {
                   displayStatus = latestDeployment.status === DeploymentStatus.RUNNING ? "deployed" : latestDeployment.status;
                 }
 
@@ -71,8 +71,9 @@ export function VersionHistoryTable({
                   displayStatus = VersionStatus.DEPRECATED;
                 }
 
-                const hasError = v.status === VersionStatus.FAILED || (latestDeployment && latestDeployment.status === DeploymentStatus.FAILED);
-                const errorMessage = v.errorMessage || (latestDeployment && latestDeployment.errorMessage);
+                const isBuilding = v.status === VersionStatus.BUILDING || v.status === VersionStatus.UPLOADED;
+                const hasError = v.status === VersionStatus.FAILED || (!isBuilding && latestDeployment && latestDeployment.status === DeploymentStatus.FAILED);
+                const errorMessage = v.errorMessage || (!isBuilding && latestDeployment && latestDeployment.errorMessage);
 
                 let badgeClass = "badge-neutral";
                 if (displayStatus === "deployed" || displayStatus === VersionStatus.READY) {
@@ -95,24 +96,67 @@ export function VersionHistoryTable({
                         <span className="text-muted-foreground text-[10px]">({v.id.substring(0, 8)})</span>
                       </td>
                       <td className="px-6 py-4 select-none">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`w-2 h-2 rounded-full ${
-                              displayStatus === VersionStatus.READY || displayStatus === "deployed"
-                                ? "bg-emerald-500 animate-pulse"
-                                : displayStatus === VersionStatus.BUILDING || displayStatus === DeploymentStatus.STARTING
-                                ? "bg-blue-500 animate-spin"
-                                : displayStatus === VersionStatus.DEPRECATED
-                                ? "bg-amber-500"
-                                : hasError
-                                ? "bg-red-50"
-                                : "bg-muted-foreground"
-                            }`}
-                          ></div>
-                          <span className={`badge ${badgeClass} text-[9px] font-bold tracking-wider uppercase font-mono`}>
-                            {displayStatus}
-                          </span>
-                        </div>
+                        {(displayStatus === VersionStatus.BUILDING || displayStatus === DeploymentStatus.STARTING) ? (
+                          <div className="flex items-center gap-3">
+                            {/* Circular progress gauge */}
+                            <div className="relative w-7 h-7 shrink-0">
+                              <svg className="w-7 h-7 -rotate-90" viewBox="0 0 28 28">
+                                <circle
+                                  cx="14" cy="14" r="11"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  className="text-blue-950/40"
+                                />
+                                <circle
+                                  cx="14" cy="14" r="11"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeDasharray={`${2 * Math.PI * 11}`}
+                                  strokeDashoffset={`${2 * Math.PI * 11 * (1 - (v.buildProgress || 0) / 100)}`}
+                                  className="text-blue-400 transition-all duration-700 ease-out"
+                                />
+                              </svg>
+                              <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold text-blue-400 font-mono">
+                                {v.buildProgress || 0}
+                              </span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[9px] font-bold tracking-wider uppercase font-mono text-blue-400">
+                                Building
+                              </span>
+                              {/* Linear progress bar */}
+                              <div className="w-20 h-1 bg-blue-950/40 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-blue-400 rounded-full transition-all duration-700 ease-out"
+                                  style={{ width: `${v.buildProgress || 0}%` }}
+                                />
+                              </div>
+                              <span className="text-[8px] text-blue-400/60 font-mono">
+                                {v.buildProgress || 0}% complete
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                displayStatus === VersionStatus.READY || displayStatus === "deployed"
+                                  ? "bg-emerald-500 animate-pulse"
+                                  : displayStatus === VersionStatus.DEPRECATED
+                                  ? "bg-amber-500"
+                                  : hasError
+                                  ? "bg-red-50"
+                                  : "bg-muted-foreground"
+                              }`}
+                            ></div>
+                            <span className={`badge ${badgeClass} text-[9px] font-bold tracking-wider uppercase font-mono`}>
+                              {displayStatus}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">{new Date(v.createdAt).toLocaleDateString()}</td>
                       <td className="px-6 py-4 text-muted-foreground">
@@ -138,7 +182,7 @@ export function VersionHistoryTable({
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          {isOwner && v.status === VersionStatus.FAILED && onRebuild && (
+                          {isOwner && (v.status === VersionStatus.FAILED || v.status === VersionStatus.READY) && onRebuild && (
                             <button
                               onClick={() => onRebuild(v.id)}
                               className="btn-outline px-3 py-1 text-[11px] border-blue-900/50 bg-blue-950/20 text-blue-400 hover:bg-blue-950/40 hover:text-blue-300"

@@ -39,9 +39,11 @@ export default async function ModelsRegistryPage() {
     let status = "Draft";
     if (latestVersion) {
       status = latestVersion.status === VersionStatus.READY ? "Ready" : latestVersion.status;
-      const activeDeployment = latestVersion.deployments?.find((d) => d.status === DeploymentStatus.RUNNING);
-      if (activeDeployment) {
-        status = "Deployed";
+      if (latestVersion.status !== VersionStatus.BUILDING && latestVersion.status !== VersionStatus.UPLOADED) {
+        const activeDeployment = latestVersion.deployments?.find((d) => d.status === DeploymentStatus.RUNNING);
+        if (activeDeployment) {
+          status = "Deployed";
+        }
       }
     }
 

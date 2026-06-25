@@ -45,7 +45,7 @@ export default function PushVersionClient({ model }: PushVersionClientProps) {
     isDetectingSchema,
     handleDetectSchema,
     handleUploadVersion,
-  } = useUploadVersion(model.id);
+  } = useUploadVersion(model.id, model.type);
 
   const handleCancel = () => {
     router.push(`/models/${model.id}`);

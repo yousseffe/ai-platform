@@ -93,8 +93,12 @@ export function ModelsTable({ models }: ModelsTableProps) {
                         className={`w-2 h-2 rounded-full ${
                           m.status.toLowerCase() === "deployed" || m.status.toLowerCase() === "ready"
                             ? "bg-emerald-500 animate-pulse"
-                            : m.status.toLowerCase() === "building"
-                            ? "bg-blue-500 animate-spin"
+                            : m.status.toLowerCase() === "building" || m.status.toLowerCase() === "uploaded"
+                            ? "bg-blue-500 animate-pulse"
+                            : m.status.toLowerCase() === "draft"
+                            ? "bg-muted-foreground"
+                            : m.status.toLowerCase() === "deprecated"
+                            ? "bg-amber-500"
                             : "bg-red-500"
                         }`}
                       ></div>
