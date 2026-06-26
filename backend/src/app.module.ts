@@ -30,6 +30,8 @@ import { AppService } from './app.service';
 import { OpenSearchModule } from './shared/opensearch/opensearch.module';
 import { LoggerMiddleware } from './shared/middleware/logger.middleware';
 import { MailModule } from './shared/mail/mail.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { Alert } from './modules/analytics/entities/alert.entity';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -59,8 +61,10 @@ import { MailModule } from './shared/mail/mail.module';
         ApiKey,
         ModelLog,
         SystemConfig,
+        Alert,
       ],
       synchronize: true, // For MVP only
+      logging: ['query', 'error', 'schema', 'warn'],
     }),
     BullModule.forRoot({
       connection: {
@@ -82,6 +86,7 @@ import { MailModule } from './shared/mail/mail.module';
     OrganizationsModule,
     OpenSearchModule,
     MailModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

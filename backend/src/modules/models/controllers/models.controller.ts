@@ -13,6 +13,7 @@ import {
   Req,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
@@ -438,7 +439,9 @@ export class ModelsController {
         }
 
         // Wait for it to become RUNNING
-        url = await this.waitForDeployment(deployment.id);
+        const isLlm = model.type === ModelType.LLM_GGUF;
+        const waitTimeout = isLlm ? 300000 : 30000;
+        url = await this.waitForDeployment(deployment.id, waitTimeout);
         deploymentId = deployment.id;
       } else {
         throw err;
@@ -530,7 +533,9 @@ export class ModelsController {
         }
 
         // Wait for it to become RUNNING
-        url = await this.waitForDeployment(deployment.id);
+        const isLlm = model.type === ModelType.LLM_GGUF;
+        const waitTimeout = isLlm ? 300000 : 30000;
+        url = await this.waitForDeployment(deployment.id, waitTimeout);
         deploymentId = deployment.id;
       } else {
         throw err;
@@ -589,7 +594,7 @@ export class ModelsController {
     // Retrieve active API key of the model owner to authorize NestJS proxy call to the container.
     // The container templates enforce checking the request headers for this API key.
     const modelOwnerApiKeyEntity = await this.apiKeyRepository.findOne({
-      where: { user: { id: model.user.id }, isActive: true },
+      where: { user: { id: model.user.id }, type: ApiKeyType.LIVE, isActive: true },
     });
     const containerApiKey = modelOwnerApiKeyEntity?.key || '';
  
@@ -872,6 +877,35 @@ export class ModelsController {
     @Param('versionId') versionId: string,
   ): Promise<ModelVersion> {
     return this.modelsService.undeprecateVersion(versionId);
+  }
+
+  /**
+   * Retrieves build/compilation logs for a specific model version iteration.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/versions/:versionId/build-logs')
+  async getBuildLogs(
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+    @Req() req: any,
+  ): Promise<{ buildLogs: string | null }> {
+    const model = await this.modelsService.getModel(id);
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+    // Check ownership
+    if (model.user?.id !== req.user.id && !req.user.isAdmin) {
+      throw new ForbiddenException('You do not have access to this model');
+    }
+
+    const version = await this.dataSource.getRepository(ModelVersion).findOne({
+      where: { id: versionId, model: { id } },
+    });
+    if (!version) {
+      throw new NotFoundException('Model version not found');
+    }
+
+    return { buildLogs: version.buildLogs };
   }
 
   /**

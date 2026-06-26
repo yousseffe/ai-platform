@@ -98,7 +98,7 @@ export default function TestPredictionClient({ model }: TestPredictionClientProp
             <RotateCcw className="w-4 h-4" /> Reset
           </button>
           <button
-            onClick={handleRun}
+            onClick={() => handleRun()}
             className="btn-primary text-sm font-semibold shadow-sm shadow-primary-500/20"
             disabled={isRunning || !isValidJson}
           >
@@ -110,7 +110,7 @@ export default function TestPredictionClient({ model }: TestPredictionClientProp
       {/* Editor & Output Container */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Payload Input */}
-        <div className="card p-0 overflow-hidden flex flex-col h-[500px] border border-slate-200 shadow-sm">
+        <div className="card p-0 overflow-hidden flex flex-col h-125 border border-slate-200 shadow-sm">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
             <div className="flex items-center gap-2 font-semibold text-slate-700 text-sm">
               <FileCode className="w-4 h-4 text-primary-500" /> Payload JSON
@@ -143,7 +143,7 @@ export default function TestPredictionClient({ model }: TestPredictionClientProp
         </div>
 
         {/* Prediction Result */}
-        <div className="card p-0 overflow-hidden flex flex-col h-[500px] border border-slate-200 shadow-sm">
+        <div className="card p-0 overflow-hidden flex flex-col h-125 border border-slate-200 shadow-sm">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
             <div className="flex items-center gap-2 font-semibold text-slate-700 text-sm">
               <Sparkles className="w-4 h-4 text-indigo-500" /> Response Output

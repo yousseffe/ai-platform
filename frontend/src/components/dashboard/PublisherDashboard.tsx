@@ -43,6 +43,17 @@ export default function PublisherDashboard({
   const endIndex = startIndex + MODELS_PAGE_SIZE;
   const currentModels = models.slice(startIndex, endIndex);
 
+  // Compute dynamic performance metrics from active log telemetry
+  const totalQueries = logs.length;
+  const successfulQueries = logs.filter((l) => l.statusCode >= 200 && l.statusCode < 400).length;
+  const failedQueries = logs.filter((l) => l.statusCode >= 400).length;
+  
+  const successPercent = totalQueries > 0 ? (successfulQueries / totalQueries) * 100 : 100;
+  const failurePercent = totalQueries > 0 ? (failedQueries / totalQueries) * 100 : 0;
+  const averageLatency = totalQueries > 0 
+    ? logs.reduce((sum, log) => sum + (log.responseTimeMs || 0), 0) / totalQueries 
+    : 0;
+
   return (
     <div className="w-full space-y-5 animate-fade-in text-foreground font-sans">
       {/* Header */}
@@ -60,7 +71,7 @@ export default function PublisherDashboard({
           href="/models/upload"
           className={cn(
             buttonVariants({ variant: "default" }),
-            "bg-gradient-to-r from-primary via-primary-600 to-primary-700 hover:opacity-95 text-primary-foreground font-semibold px-4 h-9 rounded-lg text-xs shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer shrink-0 self-start sm:self-auto gap-1.5"
+            "bg-linear-to-r from-primary via-primary-600 to-primary-700 hover:opacity-95 text-primary-foreground font-semibold px-4 h-9 rounded-lg text-xs shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer shrink-0 self-start sm:self-auto gap-1.5"
           )}
         >
           <Upload className="w-3.5 h-3.5" strokeWidth={2} />
@@ -69,7 +80,7 @@ export default function PublisherDashboard({
       </div>
 
       {/* Mode indicator banner */}
-      <div className="p-3.5 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.06] border border-emerald-500/20 dark:border-emerald-500/35 rounded-xl text-left flex items-center gap-3.5 text-xs shadow-sm">
+      <div className="p-3.5 bg-emerald-500/4 dark:bg-emerald-500/6 border border-emerald-500/20 dark:border-emerald-500/35 rounded-xl text-left flex items-center gap-3.5 text-xs shadow-sm">
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 shrink-0 border border-emerald-500/20">
           <Server className="w-4 h-4" strokeWidth={2} />
         </div>
@@ -84,7 +95,7 @@ export default function PublisherDashboard({
       {/* Provider Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <Card className="border border-border bg-card border-l-4 border-l-blue-500 relative overflow-hidden shadow-sm hover:shadow-md hover:border-blue-500/30 hover:-translate-y-0.5 transition-all duration-300 text-left rounded-xl">
-          <CardContent className="p-5 flex flex-col justify-between h-full min-h-[115px]">
+          <CardContent className="p-5 flex flex-col justify-between h-full min-h-28.75">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Published Models</p>
@@ -102,7 +113,7 @@ export default function PublisherDashboard({
         </Card>
 
         <Card className="border border-border bg-card border-l-4 border-l-emerald-500 relative overflow-hidden shadow-sm hover:shadow-md hover:border-emerald-500/30 hover:-translate-y-0.5 transition-all duration-300 text-left rounded-xl">
-          <CardContent className="p-5 flex flex-col justify-between h-full min-h-[115px]">
+          <CardContent className="p-5 flex flex-col justify-between h-full min-h-28.75">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Served Requests</p>
@@ -120,7 +131,7 @@ export default function PublisherDashboard({
         </Card>
 
         <Card className="border border-border bg-card border-l-4 border-l-amber-500 relative overflow-hidden shadow-sm hover:shadow-md hover:border-amber-500/30 hover:-translate-y-0.5 transition-all duration-300 text-left rounded-xl">
-          <CardContent className="p-5 flex flex-col justify-between h-full min-h-[115px]">
+          <CardContent className="p-5 flex flex-col justify-between h-full min-h-28.75">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Earned Revenue</p>
@@ -261,25 +272,29 @@ export default function PublisherDashboard({
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-[11px] font-semibold text-muted-foreground">
                     <span>Successful queries</span>
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">99.8%</span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{successPercent.toFixed(1)}%</span>
                   </div>
                   <div className="w-full bg-secondary border border-border/50 h-2 rounded-full overflow-hidden">
-                    <div className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full w-[99.8%] rounded-full"></div>
+                    <div className="bg-linear-to-r from-emerald-400 to-emerald-600 h-full rounded-full" style={{ width: `${successPercent}%` }}></div>
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-[11px] font-semibold text-muted-foreground">
                     <span>Failed queries</span>
-                    <span className="font-mono text-red-500 dark:text-red-400 font-bold">0.2%</span>
+                    <span className="font-mono text-rose-500 dark:text-rose-400 font-bold">{failurePercent.toFixed(1)}%</span>
                   </div>
                   <div className="w-full bg-secondary border border-border/50 h-2 rounded-full overflow-hidden">
-                    <div className="bg-gradient-to-r from-rose-500 to-red-650 h-full w-[0.2%] rounded-full"></div>
+                    <div className="bg-linear-to-r from-rose-500 to-red-650 h-full rounded-full" style={{ width: `${failurePercent}%` }}></div>
                   </div>
+                </div>
+                <div className="pt-2 flex justify-between items-center text-[11px] font-semibold text-muted-foreground border-t border-border/40 mt-2 font-sans">
+                  <span>Average Latency</span>
+                  <span className="font-mono text-primary font-bold">{averageLatency.toFixed(1)} ms</span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 p-3.5 bg-gradient-to-br from-primary/15 via-primary/[0.03] to-transparent border border-primary/25 rounded-xl relative overflow-hidden shadow-2xs">
+            <div className="mt-8 p-3.5 bg-linear-to-br from-primary/15 via-primary/3 to-transparent border border-primary/25 rounded-xl relative overflow-hidden shadow-2xs">
               <div className="absolute right-2 bottom-2 opacity-5 dark:opacity-10">
                 <Sparkles className="w-16 h-16 text-primary" />
               </div>

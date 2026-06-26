@@ -27,6 +27,7 @@ import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { getRsaKeys } from '../utils/keys';
 import { MailService } from '../../../shared/mail/mail.service';
+import { ApiKeyType } from '../enums/api-key-type.enum';
 
 /**
  * Service governing password encryption, credential matching, verification OTP issuance,
@@ -472,7 +473,7 @@ export class AuthService {
       : 0.0;
 
     const apiKeyEntity = await this.apiKeyRepository.findOne({
-      where: { user: { id: userId }, isActive: true },
+      where: { user: { id: userId }, type: ApiKeyType.LIVE, isActive: true },
     });
 
     return {

@@ -6,11 +6,24 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import * as express from 'express';
 import { join } from 'path';
+import { WinstonModule } from 'nest-winston';
+import * as winston from 'winston';
 
 import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: WinstonModule.createLogger({
+      transports: [
+        new winston.transports.Console({
+          format: winston.format.combine(
+            winston.format.timestamp(),
+            winston.format.json(),
+          ),
+        }),
+      ],
+    }),
+  });
   app.setGlobalPrefix('api/v1');
   app.enableCors({
     origin: 'http://localhost:3001',

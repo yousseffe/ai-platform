@@ -13,6 +13,9 @@ import {
   ArrowUpRight,
   Calendar,
   RefreshCw,
+  Cpu,
+  HardDrive,
+  Activity,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -21,6 +24,7 @@ import { toast } from "react-hot-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlatformStats } from "@/types";
+import { AlertsPanel } from "@/components/admin/AlertsPanel";
 
 /**
  * Premium Admin Overview Dashboard.
@@ -37,6 +41,10 @@ export default function AdminOverviewPage() {
   // Stats data
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Infrastructure metrics state
+  const [infraMetrics, setInfraMetrics] = useState<any>(null);
+  const [loadingInfra, setLoadingInfra] = useState(false);
 
   // Filters & Ledger state
   const [searchTerm, setSearchTerm] = useState("");
@@ -80,6 +88,20 @@ export default function AdminOverviewPage() {
     }
   };
 
+  const loadInfraMetrics = async () => {
+    setLoadingInfra(true);
+    try {
+      const res = await smartFetch<any>("/analytics/admin/metrics");
+      if (res) {
+        setInfraMetrics(res);
+      }
+    } catch (err) {
+      console.error("Failed to load infrastructure metrics:", err);
+    } finally {
+      setLoadingInfra(false);
+    }
+  };
+
   const loadTransactions = async (pageTarget = 1) => {
     setTxLoading(true);
     try {
@@ -108,12 +130,13 @@ export default function AdminOverviewPage() {
   };
 
   const handleRefresh = async () => {
-    await Promise.all([loadStats(), loadTransactions(1)]);
+    await Promise.all([loadStats(), loadTransactions(1), loadInfraMetrics()]);
   };
 
   useEffect(() => {
     if (isAdmin) {
       loadStats();
+      loadInfraMetrics();
     }
   }, [isAdmin]);
 
@@ -163,7 +186,7 @@ export default function AdminOverviewPage() {
       ) : stats ? (
         <>
           {/* KPI Dashboard Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden">
               <CardContent className="p-5">
                 <div className="absolute right-3 top-3 text-muted-foreground/15">
@@ -195,26 +218,56 @@ export default function AdminOverviewPage() {
             </Card>
 
             {/* Platform Revenue Payout Wallet Card - Extremely Premium */}
-            <Card className="border border-primary/30 bg-primary/[0.04] p-0 shadow-xs relative overflow-hidden group hover:border-primary/50 transition-all">
+            <Card className="border border-primary/30 bg-primary/4 p-0 shadow-xs relative overflow-hidden group hover:border-primary/50 transition-all">
               <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/15 transition-all" />
               <CardContent className="p-5">
                 <div className="absolute right-3 top-3 text-primary/30 dark:text-primary/20">
-                  <Coins className="w-10 h-10 animate-pulse" />
+                  <Coins className="w-10 h-10" />
                 </div>
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  <p className="text-[9px] font-bold text-primary uppercase tracking-wider">Platform Revenue Wallet</p>
+                  <p className="text-[9px] font-bold text-primary uppercase tracking-wider">Revenue Wallet</p>
                 </div>
                 <CardTitle className="text-2xl font-extrabold text-primary border-none p-0 h-auto font-mono">
                   ${stats.platformBalance.toFixed(2)}
                 </CardTitle>
-                <p className="text-[9px] text-muted-foreground mt-1">Platform commission accumulator</p>
+              </CardContent>
+            </Card>
+
+            {/* Infrastructure Health Status Card */}
+            <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden hover:border-border/80 transition-all">
+              <CardContent className="p-5 space-y-2">
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                  <Activity className="w-3.5 h-3.5 text-purple-400" /> Host Infrastructure
+                </p>
+                {infraMetrics ? (
+                  <div className="space-y-1.5 font-mono text-[10px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Host CPU:</span>
+                      <span className="font-bold text-slate-200">{infraMetrics.hostCpu}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Host RAM:</span>
+                      <span className="font-bold text-slate-200">{infraMetrics.hostRam}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Containers:</span>
+                      <span className="font-bold text-purple-400">{infraMetrics.activeContainers} active</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-muted-foreground animate-pulse py-2">
+                    Loading cAdvisor stats...
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Transactions Ledger */}
-          <Card className="border border-border bg-card shadow-xs p-0 overflow-hidden">
+          {/* Split 2-column layout for Ledger and AlertsPanel */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Card className="border border-border bg-card shadow-xs p-0 overflow-hidden">
             <CardHeader className="p-5 border-b border-border bg-muted/20">
               <CardTitle className="text-sm font-bold text-foreground">Global Platform Ledger Logs</CardTitle>
               <CardDescription className="text-[10px] text-muted-foreground mt-0.5 font-sans">
@@ -287,7 +340,7 @@ export default function AdminOverviewPage() {
 
                 {/* From Date */}
                 <div>
-                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1 flex items-center gap-1">
+                  <label className="text-[9px] font-bold text-muted-foreground uppercase mb-1 flex items-center gap-1">
                     <Calendar className="w-2.5 h-2.5 text-muted-foreground" /> From Date
                   </label>
                   <input
@@ -300,7 +353,7 @@ export default function AdminOverviewPage() {
 
                 {/* To Date */}
                 <div>
-                  <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1 flex items-center gap-1">
+                  <label className="text-[9px] font-bold text-muted-foreground uppercase mb-1 flex items-center gap-1">
                     <Calendar className="w-2.5 h-2.5 text-muted-foreground" /> To Date
                   </label>
                   <input
@@ -425,6 +478,11 @@ export default function AdminOverviewPage() {
               </div>
             )}
           </Card>
+            </div>
+            <div>
+              <AlertsPanel />
+            </div>
+          </div>
         </>
       ) : (
         <div className="p-8 text-center text-muted-foreground bg-card border border-border rounded-xl">
