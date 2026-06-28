@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import Stripe = require('stripe');
 import { OwnerType } from '../enums/owner-type.enum';
 
+export type StripeWebhookKind = 'payments' | 'wallets';
+
 /**
  * Service governing Stripe API integrations (checkout sessions and webhook validation).
  */
@@ -44,10 +46,14 @@ export class StripeService {
     amount: number,
     workspaceId: string,
     workspaceType: OwnerType,
+    returnPath = '/settings',
   ): Promise<Record<string, unknown>> {
     const amountInCents = Math.round(amount * 100);
-    const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/settings?status=success`;
-    const cancelUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/settings?status=cancelled`;
+    const safeReturnPath = returnPath.startsWith('/')
+      ? returnPath
+      : '/settings';
+    const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}${safeReturnPath}?status=success`;
+    const cancelUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}${safeReturnPath}?status=cancelled`;
 
     const stripeInstance = this.getStripe();
     const session = await stripeInstance.checkout.sessions.create({
@@ -99,7 +105,7 @@ export class StripeService {
     ownerUserId: string,
   ): Promise<Record<string, unknown>> {
     const amountInCents = Math.round(amount * 100);
-    const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/?status=org_success`;
+    const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/dashboard?status=org_success&pending_org=${pendingId}`;
     const cancelUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/workspaces/create?status=cancelled`;
 
     const stripeInstance = this.getStripe();
@@ -137,11 +143,16 @@ export class StripeService {
    *
    * @param rawBody - The unparsed raw body Buffer.
    * @param signature - The stripe-signature header value.
+   * @param webhookKind - The Stripe webhook endpoint kind used to resolve the correct secret.
    * @returns The parsed and verified Stripe Event as a record.
    * @throws {Error} If validation fails or webhook signature is invalid.
    */
-  constructEvent(rawBody: Buffer, signature: string): Record<string, unknown> {
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+  constructEvent(
+    rawBody: Buffer,
+    signature: string,
+    webhookKind: StripeWebhookKind,
+  ): Record<string, unknown> {
+    const webhookSecret = this.getWebhookSecret(webhookKind);
     const stripeInstance = this.getStripe();
     const event = stripeInstance.webhooks.constructEvent(
       rawBody,
@@ -149,5 +160,28 @@ export class StripeService {
       webhookSecret,
     );
     return event as unknown as Record<string, unknown>;
+  }
+
+  /**
+   * Resolves the Stripe webhook secret for a specific endpoint kind.
+   *
+   * @param webhookKind - The configured webhook endpoint group.
+   * @returns The matching webhook signing secret.
+   * @throws {Error} If the required secret is missing.
+   */
+  private getWebhookSecret(webhookKind: StripeWebhookKind): string {
+    const secretMap: Record<StripeWebhookKind, string | undefined> = {
+      payments: process.env.STRIPE_PAYMENTS_WEBHOOK_SECRET,
+      wallets: process.env.STRIPE_WALLETS_WEBHOOK_SECRET,
+    };
+
+    const webhookSecret = secretMap[webhookKind];
+    if (!webhookSecret) {
+      throw new Error(
+        `Stripe webhook secret is missing for "${webhookKind}" endpoint`,
+      );
+    }
+
+    return webhookSecret;
   }
 }

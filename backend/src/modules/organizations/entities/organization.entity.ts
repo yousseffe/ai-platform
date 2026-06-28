@@ -6,6 +6,7 @@ import {
 } from 'typeorm';
 
 import { OrgStatus } from '../enums/org-status.enum';
+import { OrgType } from '../enums/org-type.enum';
 
 /**
  * Entity representing an organization workspace container.
@@ -41,7 +42,30 @@ export class Organization {
   status: OrgStatus;
 
   /**
-   * UUID link to the organization's PROVIDER wallet.
+   * Operational type of the organization (PROVIDER, CONSUMER, HYBRID).
+   * Determines which wallets are initialized and which portal features are shown.
+   */
+  @Column({
+    type: 'varchar',
+    enum: OrgType,
+    default: OrgType.CONSUMER,
+  })
+  type: OrgType;
+
+  /**
+   * Optional short description / bio of the organization.
+   */
+  @Column({ type: 'varchar', length: 300, nullable: true })
+  description: string | null;
+
+  /**
+   * Optional URL to the organization's logo or avatar image.
+   */
+  @Column({ name: 'avatar_url', type: 'varchar', nullable: true })
+  avatarUrl: string | null;
+
+  /**
+   * UUID link to the organization's CONSUMER wallet.
    */
   @Column({ name: 'wallet_id', type: 'uuid', nullable: true })
   walletId: string | null;

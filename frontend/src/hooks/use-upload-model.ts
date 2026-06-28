@@ -19,7 +19,7 @@ import { detectSchema } from "@/lib/services/models.service";
  *
  * @returns An object containing form controls, stepper progression handlers, and progress statuses.
  */
-export function useUploadModel() {
+export function useUploadModel(options?: { successRedirect?: (modelId: string) => string }) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
@@ -237,6 +237,10 @@ export function useUploadModel() {
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
+      const activeWorkspaceId = document.cookie.match(/(?:^|; )activeWorkspaceId=([^;]*)/)?.[1];
+      if (activeWorkspaceId) {
+        headers["X-Workspace-Id"] = decodeURIComponent(activeWorkspaceId);
+      }
 
       const response = await axios.post(`${backendUrl}/api/v1/models/${modelId}/versions`, formData, {
         headers,
@@ -257,7 +261,7 @@ export function useUploadModel() {
         toast.success("Model uploaded and compilation started!");
 
         setTimeout(() => {
-          router.push(`/models/${modelId}`);
+          router.push(options?.successRedirect?.(modelId) ?? `/models/${modelId}`);
           router.refresh();
         }, 800);
       } else {

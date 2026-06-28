@@ -4,9 +4,11 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Organization } from '../entities/organization.entity';
 import { OrgMember } from '../entities/org-member.entity';
 import { UsersService } from '../../users/services/users.service';
@@ -16,6 +18,7 @@ import { OrgRole } from '../../../shared/enums/org-role.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { OrgStatus } from '../enums/org-status.enum';
+import { OrgType } from '../enums/org-type.enum';
 import { Wallet } from '../../wallets/entities/wallet.entity';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import { Transaction } from '../../wallets/entities/transaction.entity';
@@ -23,6 +26,12 @@ import { TransactionType } from '../../wallets/enums/transaction-type.enum';
 import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
 import { RedisService } from '../../../shared/redis/redis.service';
 import { MailService } from '../../../shared/mail/mail.service';
+import { StripeService } from '../../../shared/stripe/stripe.service';
+import { ProcessedWebhook } from '../../wallets/entities/processed-webhook.entity';
+import { Project } from '../entities/project.entity';
+import { Model } from '../../models/entities/model.entity';
+import { MinioService } from '../../../shared/minio/minio.service';
+import * as fs from 'fs';
 
 /**
  * Service managing workspaces / organizations creation, collaborator enrollment,
@@ -35,13 +44,17 @@ export class OrganizationsService {
     public readonly orgRepository: Repository<Organization>,
     @InjectRepository(OrgMember)
     private readonly memberRepository: Repository<OrgMember>,
+    @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
+    @Inject(forwardRef(() => WalletsService))
     private readonly walletsService: WalletsService,
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
     private readonly redisService: RedisService,
     private readonly dataSource: DataSource,
     private readonly mailService: MailService,
+    private readonly stripeService: StripeService,
+    private readonly minioService: MinioService,
   ) {}
 
   /**
@@ -60,6 +73,11 @@ export class OrganizationsService {
     slug: string | undefined,
     ownerUserId: string,
     collaborators: Array<{ email: string; role: OrgRole }> = [],
+    type: OrgType = OrgType.CONSUMER,
+    description?: string,
+    avatarUrl?: string,
+    isPaidViaStripe = false,
+    stripeEventId?: string,
   ): Promise<Organization & { your_role: string }> {
     const formattedSlug = slug
       ? slug.toLowerCase().replace(/[^a-z0-9-_]/g, '')
@@ -93,43 +111,45 @@ export class OrganizationsService {
         ? parseFloat(configEntity.value)
         : 50.0;
 
-      // 1. Get creator consumer wallet
-      const creatorWallet = await queryRunner.manager.findOne(Wallet, {
-        where: {
-          ownerId: ownerUserId,
-          ownerType: OwnerType.USER,
-          walletType: WalletType.CONSUMER,
-        },
-      });
+      if (!isPaidViaStripe) {
+        // 1. Get creator consumer wallet
+        const creatorWallet = await queryRunner.manager.findOne(Wallet, {
+          where: {
+            ownerId: ownerUserId,
+            ownerType: OwnerType.USER,
+            walletType: WalletType.CONSUMER,
+          },
+        });
 
-      if (!creatorWallet) {
-        throw new BadRequestException('Creator wallet not initialized');
+        if (!creatorWallet) {
+          throw new BadRequestException('Creator wallet not initialized');
+        }
+
+        const balance =
+          typeof creatorWallet.balance === 'string'
+            ? parseFloat(creatorWallet.balance)
+            : creatorWallet.balance;
+
+        if (balance < orgCreationFee) {
+          throw new BadRequestException(
+            `Insufficient balance to create organization. Fee is ${orgCreationFee} credits.`,
+          );
+        }
+
+        // 2. Deduct fee from creator consumer wallet
+        creatorWallet.balance = balance - orgCreationFee;
+        await queryRunner.manager.save(Wallet, creatorWallet);
+
+        // Log Debit Transaction
+        const debitTx = queryRunner.manager.create(Transaction, {
+          walletId: creatorWallet.id,
+          type: TransactionType.DEBIT,
+          amount: orgCreationFee,
+          reference: `Organization creation fee: ${name}`,
+          status: TransactionStatus.COMPLETED,
+        });
+        await queryRunner.manager.save(Transaction, debitTx);
       }
-
-      const balance =
-        typeof creatorWallet.balance === 'string'
-          ? parseFloat(creatorWallet.balance)
-          : creatorWallet.balance;
-
-      if (balance < orgCreationFee) {
-        throw new BadRequestException(
-          `Insufficient balance to create organization. Fee is ${orgCreationFee} credits.`,
-        );
-      }
-
-      // 2. Deduct fee from creator consumer wallet
-      creatorWallet.balance = balance - orgCreationFee;
-      await queryRunner.manager.save(Wallet, creatorWallet);
-
-      // Log Debit Transaction
-      const debitTx = queryRunner.manager.create(Transaction, {
-        walletId: creatorWallet.id,
-        type: TransactionType.DEBIT,
-        amount: orgCreationFee,
-        reference: `Organization creation fee: ${name}`,
-        status: TransactionStatus.COMPLETED,
-      });
-      await queryRunner.manager.save(Transaction, debitTx);
 
       // 3. Pay Platform Admin
       const systemOwnerId = '00000000-0000-0000-0000-000000000000';
@@ -163,8 +183,11 @@ export class OrganizationsService {
         walletId: systemWallet.id,
         type: TransactionType.CREDIT,
         amount: orgCreationFee,
-        reference: `Platform commission for organization creation: ${name}`,
+        reference: isPaidViaStripe
+          ? `Platform commission for organization creation (Stripe payment): ${name}`
+          : `Platform commission for organization creation: ${name}`,
         status: TransactionStatus.COMPLETED,
+        stripeEventId: stripeEventId || null,
       });
       await queryRunner.manager.save(Transaction, platformTx);
 
@@ -173,19 +196,40 @@ export class OrganizationsService {
         slug: formattedSlug,
         createdBy: ownerUserId,
         status: OrgStatus.ACTIVE,
+        type,
+        description: description?.trim() ?? null,
+        avatarUrl: avatarUrl?.trim() ?? null,
       });
       const savedOrg = await queryRunner.manager.save(Organization, org);
 
-      const wallet = queryRunner.manager.create(Wallet, {
-        walletType: WalletType.CONSUMER,
-        ownerType: OwnerType.ORG,
-        ownerId: savedOrg.id,
-        balance: 0.0,
-        currency: 'CREDITS',
-      });
-      const savedWallet = await queryRunner.manager.save(Wallet, wallet);
+      // Consumer-capable organizations get a CONSUMER wallet for project spend.
+      if (type === OrgType.CONSUMER || type === OrgType.HYBRID) {
+        const consumerWallet = queryRunner.manager.create(Wallet, {
+          walletType: WalletType.CONSUMER,
+          ownerType: OwnerType.ORG,
+          ownerId: savedOrg.id,
+          balance: 0.0,
+          currency: 'CREDITS',
+        });
+        const savedWallet = await queryRunner.manager.save(
+          Wallet,
+          consumerWallet,
+        );
+        savedOrg.walletId = savedWallet.id;
+      }
 
-      savedOrg.walletId = savedWallet.id;
+      // Provider-capable organizations get a PROVIDER wallet for earnings.
+      if (type === OrgType.PROVIDER || type === OrgType.HYBRID) {
+        const providerWallet = queryRunner.manager.create(Wallet, {
+          walletType: WalletType.PROVIDER,
+          ownerType: OwnerType.ORG,
+          ownerId: savedOrg.id,
+          balance: 0.0,
+          currency: 'CREDITS',
+        });
+        await queryRunner.manager.save(Wallet, providerWallet);
+      }
+
       await queryRunner.manager.save(Organization, savedOrg);
 
       const ownerMember = queryRunner.manager.create(OrgMember, {
@@ -229,6 +273,15 @@ export class OrganizationsService {
         await queryRunner.manager.save(AuditLog, inviteLog);
       }
 
+      // Record webhook event idempotency atomically inside this transaction if paid via Stripe
+      if (isPaidViaStripe && stripeEventId) {
+        const processed = queryRunner.manager.create(ProcessedWebhook, {
+          stripeEventId,
+          walletId: systemWallet.id,
+        });
+        await queryRunner.manager.save(ProcessedWebhook, processed);
+      }
+
       await queryRunner.commitTransaction();
 
       // Log audit
@@ -249,6 +302,145 @@ export class OrganizationsService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Generates a Stripe Checkout Session for organization creation.
+   * Caches pending workspace creation parameters in Redis.
+   *
+   * @param name - Display name of organization.
+   * @param slug - Desired unique URL slug.
+   * @param ownerUserId - UUID of requesting owner user.
+   * @param collaborators - Initial invited collaborators array.
+   * @param type - OrgType categorization (PROVIDER, CONSUMER, HYBRID).
+   * @param description - Bio description.
+   * @param avatarUrl - Avatar logo image url.
+   * @returns Checkout Session redirect URL.
+   */
+  async createCheckoutSession(
+    name: string,
+    slug: string | undefined,
+    ownerUserId: string,
+    collaborators: Array<{ email: string; role: OrgRole }> = [],
+    type: OrgType = OrgType.CONSUMER,
+    description?: string,
+    avatarUrl?: string,
+  ): Promise<{ url: string }> {
+    const formattedSlug = slug
+      ? slug.toLowerCase().replace(/[^a-z0-9-_]/g, '')
+      : name
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '-')
+          .replace(/-+/g, '-');
+
+    // Validate name uniqueness
+    const existingName = await this.orgRepository.findOne({ where: { name } });
+    if (existingName) {
+      throw new ConflictException('Organization name already taken');
+    }
+
+    // Validate slug uniqueness
+    const existingSlug = await this.orgRepository.findOne({
+      where: { slug: formattedSlug },
+    });
+    if (existingSlug) {
+      throw new ConflictException('Organization slug is already in use');
+    }
+
+    // Validate collaborator emails
+    for (const col of collaborators) {
+      const user = await this.usersService.findOneByEmail(col.email);
+      if (!user) {
+        throw new BadRequestException(
+          `User not found with email: ${col.email}`,
+        );
+      }
+      if (col.role === OrgRole.OWNER) {
+        throw new BadRequestException(
+          'Cannot assign OWNER role during organization setup',
+        );
+      }
+    }
+
+    // Retrieve organization creation fee
+    const fee = await this.getOrgCreationFee();
+
+    // Generate unique pending ID
+    const pendingId =
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15);
+
+    // Cache the workspace payload details in Redis for 24 hours
+    const cacheKey = `pending_org:${pendingId}`;
+    const payload = {
+      name,
+      slug: formattedSlug,
+      ownerUserId,
+      type,
+      description,
+      avatarUrl,
+      collaborators,
+    };
+    await this.redisService.set(cacheKey, JSON.stringify(payload), 86400);
+
+    // Initiate checkout session in Stripe
+    const session = await this.stripeService.createOrgCheckoutSession(
+      fee,
+      pendingId,
+      ownerUserId,
+    );
+
+    return { url: session.url as string };
+  }
+
+  /**
+   * Resolves the current Stripe-backed organization checkout state for the owner.
+   *
+   * @param pendingId - Pending organization checkout identifier.
+   * @param ownerUserId - Authenticated owner user UUID.
+   * @returns Checkout state descriptor with optional organization metadata.
+   */
+  async getCheckoutStatus(
+    pendingId: string,
+    ownerUserId: string,
+  ): Promise<{
+    status: 'pending' | 'completed' | 'expired';
+    organization?: Pick<Organization, 'id' | 'name' | 'slug'>;
+  }> {
+    const completedKey = `completed_org:${pendingId}`;
+    const completedRaw = await this.redisService.get(completedKey);
+    if (completedRaw) {
+      const completed = JSON.parse(completedRaw) as {
+        ownerUserId: string;
+        organization: Pick<Organization, 'id' | 'name' | 'slug'>;
+      };
+
+      if (completed.ownerUserId !== ownerUserId) {
+        throw new ForbiddenException(
+          'You are not allowed to access this checkout state',
+        );
+      }
+
+      return {
+        status: 'completed',
+        organization: completed.organization,
+      };
+    }
+
+    const pendingKey = `pending_org:${pendingId}`;
+    const pendingRaw = await this.redisService.get(pendingKey);
+    if (pendingRaw) {
+      const pending = JSON.parse(pendingRaw) as { ownerUserId?: string };
+      if (pending.ownerUserId && pending.ownerUserId !== ownerUserId) {
+        throw new ForbiddenException(
+          'You are not allowed to access this checkout state',
+        );
+      }
+
+      return { status: 'pending' };
+    }
+
+    return { status: 'expired' };
   }
 
   /**
@@ -281,7 +473,9 @@ export class OrganizationsService {
     const orgIds = memberships.map((m) => m.orgId);
     if (orgIds.length === 0) return [];
 
-    const orgs = await this.orgRepository.findByIds(orgIds);
+    const orgs = await this.orgRepository.findBy({
+      id: In(orgIds),
+    });
 
     return orgs.map((org) => {
       const membership = memberships.find((m) => m.orgId === org.id);
@@ -343,6 +537,10 @@ export class OrganizationsService {
       throw new BadRequestException('User not found with this email');
     }
 
+    const requesterUser = await this.usersService.usersRepository.findOneBy({
+      id: requesterId,
+    });
+
     const existingMember = await this.memberRepository.findOne({
       where: { orgId, userId: user.id },
     });
@@ -367,6 +565,26 @@ export class OrganizationsService {
       metadata: { org_id: orgId, invited_user_id: user.id, role },
     });
     await this.auditLogRepository.save(log);
+
+    const inviteeName = user.fullName?.trim() || user.email;
+    const inviterName =
+      requesterUser?.fullName?.trim() ||
+      requesterUser?.email ||
+      'A workspace administrator';
+    this.mailService
+      .sendOrganizationInvitation(
+        user.email,
+        inviteeName,
+        org.name,
+        role,
+        inviterName,
+      )
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(
+          `Deferred organization invitation email send failed: ${msg}`,
+        );
+      });
 
     return savedMember;
   }
@@ -583,10 +801,12 @@ export class OrganizationsService {
     const orgName = org ? org.name : 'Unknown Workspace';
 
     // Trigger workspace access email asynchronously
-    this.mailService.sendWorkspaceAccessOtp(user.email, orgName, code).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`Deferred workspace access email send failed: ${msg}`);
-    });
+    this.mailService
+      .sendWorkspaceAccessOtp(user.email, orgName, code)
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`Deferred workspace access email send failed: ${msg}`);
+      });
 
     return { success: true };
   }
@@ -640,5 +860,171 @@ export class OrganizationsService {
       throw new NotFoundException(`Organization with slug '${slug}' not found`);
     }
     return org;
+  }
+
+  /**
+   * Updates editable organization profile fields after validating requester permissions.
+   *
+   * @param orgId - Organization UUID.
+   * @param requesterId - Authenticated user UUID.
+   * @param payload - Editable organization profile fields.
+   * @returns Updated organization record.
+   */
+  async updateOrganization(
+    orgId: string,
+    requesterId: string,
+    payload: {
+      name?: string;
+      description?: string | null;
+      avatarUrl?: string | null;
+    },
+  ): Promise<Organization> {
+    const role = await this.getMemberRole(orgId, requesterId);
+    if (role !== OrgRole.OWNER) {
+      throw new ForbiddenException(
+        'Only organization owners can edit settings',
+      );
+    }
+
+    const org = await this.orgRepository.findOne({ where: { id: orgId } });
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    if (payload.name && payload.name.trim() !== org.name) {
+      const existingName = await this.orgRepository.findOne({
+        where: { name: payload.name.trim() },
+      });
+      if (existingName) {
+        throw new ConflictException('Organization name already taken');
+      }
+      org.name = payload.name.trim();
+    }
+
+    if (payload.description !== undefined) {
+      org.description = payload.description?.trim() || null;
+    }
+
+    if (payload.avatarUrl !== undefined) {
+      org.avatarUrl = payload.avatarUrl?.trim() || null;
+    }
+
+    return this.orgRepository.save(org);
+  }
+
+  /**
+   * Uploads and assigns an organization logo image.
+   *
+   * @param orgId - Organization UUID.
+   * @param requesterId - Authenticated user UUID.
+   * @param file - Uploaded image file.
+   * @returns Updated organization record.
+   */
+  async uploadOrganizationLogo(
+    orgId: string,
+    requesterId: string,
+    file: Express.Multer.File,
+  ): Promise<Organization> {
+    if (!file) {
+      throw new BadRequestException('Logo image is required');
+    }
+
+    const role = await this.getMemberRole(orgId, requesterId);
+    if (role !== OrgRole.OWNER) {
+      throw new ForbiddenException(
+        'Only organization owners can update the logo',
+      );
+    }
+
+    const org = await this.orgRepository.findOne({ where: { id: orgId } });
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const objectName = `organizations/${org.slug}/branding/${Date.now()}-${safeName}`;
+    await this.minioService.uploadFile(objectName, file.path, file.mimetype);
+    if (fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+    org.avatarUrl = await this.minioService.getFileUrl(objectName);
+
+    return this.orgRepository.save(org);
+  }
+
+  /**
+   * Lists models explicitly owned by the organization.
+   *
+   * @param orgId - Organization UUID.
+   * @param requesterId - Authenticated user UUID.
+   * @returns Models registered by organization members.
+   */
+  async listOrganizationModels(
+    orgId: string,
+    requesterId: string,
+  ): Promise<Model[]> {
+    const requesterRole = await this.getMemberRole(orgId, requesterId);
+    if (!requesterRole) {
+      throw new ForbiddenException('You are not a member of this organization');
+    }
+
+    return this.dataSource.getRepository(Model).find({
+      where: { organization: { id: orgId } },
+      relations: [
+        'organization',
+        'user',
+        'versions',
+        'versions.uploadedBy',
+        'versions.reviewedBy',
+        'versions.testCases',
+        'versions.deployments',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Compiles stats for a given organization.
+   *
+   * @param orgId - Organization UUID.
+   * @returns Aggregated statistics.
+   */
+  async getOrgStats(orgId: string) {
+    const org = await this.orgRepository.findOne({ where: { id: orgId } });
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const memberCount = await this.memberRepository.count({
+      where: { orgId },
+    });
+
+    const projectCount = await this.dataSource.getRepository(Project).count({
+      where: { orgId, isActive: true },
+    });
+
+    const modelCount = await this.dataSource.getRepository(Model).count({
+      where: { organization: { id: orgId } },
+    });
+
+    const consumerBalance = await this.walletsService.getBalance(
+      orgId,
+      OwnerType.ORG,
+      WalletType.CONSUMER,
+    );
+
+    const totalEarnings = await this.walletsService.getBalance(
+      orgId,
+      OwnerType.ORG,
+      WalletType.PROVIDER,
+    );
+
+    return {
+      memberCount,
+      projectCount,
+      modelCount,
+      consumerBalance,
+      totalEarnings,
+    };
   }
 }

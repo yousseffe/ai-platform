@@ -8,6 +8,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { Organization } from '../../organizations/entities/organization.entity';
 import { ModelVersion } from './model-version.entity';
 import { ModelType } from '../enums/model-type.enum';
 import { TaskType } from '../enums/task-type.enum';
@@ -15,7 +16,7 @@ import { Framework } from '../enums/framework.enum';
 
 /**
  * Database table representation of an ML model registry.
- * Groups model versions and links ownership to a platform User.
+ * Groups model versions and links ownership to a user or provider organization.
  */
 @Entity('models')
 export class Model {
@@ -74,6 +75,12 @@ export class Model {
   user: User;
 
   /**
+   * Optional provider organization that owns and governs this model.
+   */
+  @ManyToOne(() => Organization, { nullable: true })
+  organization: Organization | null;
+
+  /**
    * Collection of uploaded, containerized, and failed versions registered under this model template.
    */
   @OneToMany(() => ModelVersion, (version) => version.model)
@@ -126,6 +133,12 @@ export class Model {
    */
   @Column({ type: 'boolean', default: false })
   isPublic: boolean;
+
+  /**
+   * Marketplace trust flag granted after organization maintainer approval.
+   */
+  @Column({ name: 'marketplace_verified', type: 'boolean', default: false })
+  marketplaceVerified: boolean;
 
   /**
    * Timestamp record indicating when this model template registry was initialized.

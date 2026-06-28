@@ -1,13 +1,14 @@
 import { create } from "zustand";
 import { Session } from "next-auth";
 import { smartFetch } from "@/lib/utils/smart-fetch";
-import { OwnerType, OrgRole, WalletType } from "@/types";
+import { OwnerType, OrgRole, WalletType, OrgType } from "@/types";
 
 export interface Workspace {
   id: string;
   name: string;
   slug: string;
   type: OwnerType;
+  orgType?: OrgType;
   role: OrgRole;
 }
 
@@ -25,7 +26,15 @@ interface WorkspaceState {
   setOtpModalOpen: (open: boolean) => void;
   setActiveWorkspace: (workspace: Workspace) => void;
   setViewMode: (mode: WalletType) => void;
-  createOrganization: (name: string, slug: string, collaborators?: Array<{ email: string; role: string }>) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  createOrganization: (
+    name: string,
+    slug: string,
+    collaborators?: Array<{ email: string; role: OrgRole }>,
+    type?: OrgType,
+    description?: string,
+    avatarUrl?: string,
+    bypassPayment?: boolean
+  ) => Promise<{ success: boolean; data?: { url?: string }; error?: string }>;
   becomeProvider: () => Promise<{ success: boolean; error?: string }>;
   fetchWorkspaceDetails: (session: Session | null) => Promise<void>;
   refreshData: () => Promise<void>;
@@ -108,13 +117,16 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     }
   },
 
-  createOrganization: async (name, slug, collaborators = []) => {
+  createOrganization: async (name, slug, collaborators = [], type, description, avatarUrl, bypassPayment = false) => {
     try {
-      const res = await smartFetch<{ id: string; name: string; slug: string }>("/organizations", {
+      const endpoint = bypassPayment ? "/organizations" : "/organizations/checkout-session";
+      const res = await smartFetch<{ url?: string }>(endpoint, {
         method: "POST",
-        body: JSON.stringify({ name, slug, collaborators }),
+        body: JSON.stringify({ name, slug, collaborators, type, description, avatarUrl }),
       });
-      await get().refreshData();
+      if (bypassPayment) {
+        await get().refreshData();
+      }
       return { success: true, data: res };
     } catch (err) {
       return {
@@ -209,7 +221,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       // 1. Fetch user profile and workspaces list
       const profile = await smartFetch<{
         user: { id: string; email: string; fullName: string; providerMode: boolean; isAdmin?: boolean; apiKey?: string };
-        workspaces: Array<{ id: string; name: string; slug: string; userRole: string }>;
+        workspaces: Array<{ id: string; name: string; slug: string; type: OrgType; userRole: string }>;
       }>("/auth/me");
 
       const personalWorkspace: Workspace = {
@@ -225,6 +237,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         name: org.name,
         slug: org.slug,
         type: OwnerType.ORG,
+        orgType: org.type,
         role: org.userRole as OrgRole,
       }));
 
@@ -238,7 +251,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       // 3. Resolve view mode
       const savedViewMode = getCookie("viewMode") as WalletType | null;
       let activeViewMode: WalletType = WalletType.CONSUMER;
-      const canBeProvider = active.type === OwnerType.ORG || profile.user.providerMode;
+      const canBeProvider =
+        active.type === OwnerType.USER
+          ? profile.user.providerMode
+          : active.orgType === OrgType.PROVIDER || active.orgType === OrgType.HYBRID;
 
       if (savedViewMode === WalletType.PROVIDER && canBeProvider) {
         activeViewMode = WalletType.PROVIDER;

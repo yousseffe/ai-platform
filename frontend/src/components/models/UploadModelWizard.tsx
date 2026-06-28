@@ -25,7 +25,15 @@ import StepInterfaceConfig from "./upload/StepInterfaceConfig";
  *
  * @returns The React component rendering the wizard.
  */
-export default function UploadModelWizard() {
+interface UploadModelWizardProps {
+  cancelHref?: string;
+  successRedirect?: (modelId: string) => string;
+}
+
+export default function UploadModelWizard({
+  cancelHref = "/models",
+  successRedirect,
+}: UploadModelWizardProps) {
   const router = useRouter();
   
   const {
@@ -47,7 +55,7 @@ export default function UploadModelWizard() {
     onInvalidSubmit,
     isDetectingSchema,
     handleDetectSchema,
-  } = useUploadModel();
+  } = useUploadModel({ successRedirect });
 
   const { register, setValue, handleSubmit, trigger, formState: { errors } } = form;
 
@@ -234,7 +242,7 @@ export default function UploadModelWizard() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => router.push("/models")}
+                onClick={() => router.push(cancelHref)}
                 className="py-2 h-10 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-all rounded-xl"
                 disabled={isUploading}
               >

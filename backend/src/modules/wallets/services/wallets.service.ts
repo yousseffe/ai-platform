@@ -2,9 +2,18 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThanOrEqual, LessThanOrEqual, ILike } from 'typeorm';
+import {
+  Repository,
+  Between,
+  MoreThanOrEqual,
+  LessThanOrEqual,
+  ILike,
+} from 'typeorm';
 import { Wallet } from '../entities/wallet.entity';
 import { Transaction } from '../entities/transaction.entity';
 import { ProcessedWebhook } from '../entities/processed-webhook.entity';
@@ -13,6 +22,10 @@ import { TransactionType } from '../enums/transaction-type.enum';
 import { TransactionStatus } from '../enums/transaction-status.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
+import { RedisService } from '../../../shared/redis/redis.service';
+import { OrganizationsService } from '../../organizations/services/organizations.service';
+import { OrgType } from '../../organizations/enums/org-type.enum';
+import { OrgRole } from '../../../shared/enums/org-role.enum';
 
 /**
  * Service governing ledger balance operations, wallet initializations, additions, and deductions.
@@ -28,6 +41,9 @@ export class WalletsService {
     private readonly processedWebhookRepository: Repository<ProcessedWebhook>,
     @InjectRepository(SystemConfig)
     private readonly systemConfigRepository: Repository<SystemConfig>,
+    private readonly redisService: RedisService,
+    @Inject(forwardRef(() => OrganizationsService))
+    private readonly orgsService: OrganizationsService,
   ) {}
 
   /**
@@ -88,6 +104,34 @@ export class WalletsService {
     return typeof wallet.balance === 'string'
       ? parseFloat(wallet.balance)
       : wallet.balance;
+  }
+
+  /**
+   * Retrieves all wallets belonging to an organization after validating membership.
+   *
+   * @param orgId - Organization UUID.
+   * @param userId - Requesting user UUID.
+   * @returns Array of organization wallet records.
+   * @throws {ForbiddenException} If the requester is not an organization member.
+   */
+  async getOrganizationWallets(
+    orgId: string,
+    userId: string,
+  ): Promise<Wallet[]> {
+    const memberRole = await this.orgsService.getMemberRole(orgId, userId);
+    if (!memberRole) {
+      throw new ForbiddenException('You are not a member of this organization');
+    }
+
+    return this.walletRepository.find({
+      where: {
+        ownerId: orgId,
+        ownerType: OwnerType.ORG,
+      },
+      order: {
+        createdAt: 'ASC',
+      },
+    });
   }
 
   /**
@@ -383,9 +427,69 @@ export class WalletsService {
       return false;
     }
 
-    const metadata = sessionOrIntent.metadata as Record<string, any> | undefined;
+    const metadata = sessionOrIntent.metadata as
+      | Record<string, any>
+      | undefined;
     if (!metadata) {
       return false;
+    }
+
+    // Handle Organization Creation Checkout Session
+    if (metadata.type === 'org_creation') {
+      const pendingId = metadata.pendingId;
+      const ownerUserId = metadata.ownerUserId;
+
+      if (!pendingId || !ownerUserId) {
+        return false;
+      }
+
+      const cacheKey = `pending_org:${pendingId}`;
+      const cachedDataStr = await this.redisService.get(cacheKey);
+      if (!cachedDataStr) {
+        throw new NotFoundException(
+          `Pending organization data not found or expired in Redis: ${pendingId}`,
+        );
+      }
+
+      const orgData = JSON.parse(cachedDataStr) as {
+        name: string;
+        slug?: string;
+        type?: OrgType;
+        description?: string;
+        avatarUrl?: string;
+        ownerUserId?: string;
+        collaborators?: Array<{ email: string; role: OrgRole }>;
+      };
+
+      // Call createOrganization on OrganizationsService
+      const organization = await this.orgsService.createOrganization(
+        orgData.name,
+        orgData.slug,
+        ownerUserId,
+        orgData.collaborators || [],
+        orgData.type || OrgType.CONSUMER,
+        orgData.description,
+        orgData.avatarUrl,
+        true, // isPaidViaStripe = true
+        stripeEventId,
+      );
+
+      // Clean up cached key
+      await this.redisService.del(cacheKey);
+      await this.redisService.set(
+        `completed_org:${pendingId}`,
+        JSON.stringify({
+          ownerUserId,
+          organization: {
+            id: organization.id,
+            name: organization.name,
+            slug: organization.slug,
+          },
+        }),
+        3600,
+      );
+
+      return true;
     }
 
     let config = await this.systemConfigRepository.findOne({
@@ -408,7 +512,11 @@ export class WalletsService {
         walletId = metadata.walletId;
         credits = parseFloat(metadata.credits);
         reference = sessionOrIntent.id || 'Stripe package purchase failure';
-      } else if (metadata.workspaceId && metadata.workspaceType && metadata.amount) {
+      } else if (
+        metadata.workspaceId &&
+        metadata.workspaceType &&
+        metadata.amount
+      ) {
         const ownerId = metadata.workspaceId;
         const ownerType = metadata.workspaceType as OwnerType;
         const wallet = await this.walletRepository.findOne({
@@ -443,29 +551,38 @@ export class WalletsService {
     let walletType: WalletType = WalletType.CONSUMER;
     let credits = 0;
     let reference = '';
+    let paymentId = '';
 
     // Handle package purchase checkout (Format B)
     if (metadata.walletId && metadata.credits) {
       const walletId = metadata.walletId;
       credits = parseFloat(metadata.credits);
-      reference = sessionOrIntent.payment_intent || sessionOrIntent.id || 'Stripe package purchase';
+      paymentId = String(sessionOrIntent.payment_intent || sessionOrIntent.id);
+      reference = paymentId || 'Stripe package purchase';
 
       const wallet = await this.walletRepository.findOneBy({ id: walletId });
       if (!wallet) {
-        throw new NotFoundException(`Target wallet with ID ${walletId} does not exist`);
+        throw new NotFoundException(
+          `Target wallet with ID ${walletId} does not exist`,
+        );
       }
       ownerId = wallet.ownerId;
       ownerType = wallet.ownerType;
       walletType = WalletType.CONSUMER;
     }
     // Handle custom top-up checkout (Format A)
-    else if (metadata.workspaceId && metadata.workspaceType && metadata.amount) {
+    else if (
+      metadata.workspaceId &&
+      metadata.workspaceType &&
+      metadata.amount
+    ) {
       ownerId = metadata.workspaceId;
       ownerType = metadata.workspaceType as OwnerType;
       walletType = WalletType.CONSUMER; // Top-ups are deposited to consumer wallet
       const egpAmount = parseFloat(metadata.amount);
       credits = egpAmount * creditsPerEgp;
-      reference = `Stripe checkout deposit: ${sessionOrIntent.payment_intent || sessionOrIntent.id} (${credits} credits purchased at ${creditsPerEgp} credits/EGP)`;
+      paymentId = String(sessionOrIntent.payment_intent || sessionOrIntent.id);
+      reference = `Stripe checkout deposit: ${paymentId} (${credits} credits purchased at ${creditsPerEgp} credits/EGP)`;
     } else {
       // Unknown metadata format or missing crucial fields
       return false;
@@ -475,8 +592,19 @@ export class WalletsService {
       throw new BadRequestException('Deposit amount must be positive');
     }
 
+    const paymentIdempotencyKey = paymentId ? `payment:${paymentId}` : '';
+    if (paymentIdempotencyKey) {
+      const alreadyCredited = await this.processedWebhookRepository.findOneBy({
+        stripeEventId: paymentIdempotencyKey,
+      });
+      if (alreadyCredited) {
+        return false;
+      }
+    }
+
     // Run database transaction to commit balance credit, transaction log, and processed webhook idempotency lock
-    const queryRunner = this.walletRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.walletRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -503,8 +631,19 @@ export class WalletsService {
       });
       await queryRunner.manager.save(ProcessedWebhook, processed);
 
+      if (paymentIdempotencyKey) {
+        const processedPayment = queryRunner.manager.create(ProcessedWebhook, {
+          stripeEventId: paymentIdempotencyKey,
+          walletId: wallet.id,
+        });
+        await queryRunner.manager.save(ProcessedWebhook, processedPayment);
+      }
+
       // 2. Perform atomic increment balance update
-      const currentBalance = typeof wallet.balance === 'string' ? parseFloat(wallet.balance) : wallet.balance;
+      const currentBalance =
+        typeof wallet.balance === 'string'
+          ? parseFloat(wallet.balance)
+          : wallet.balance;
       wallet.balance = currentBalance + credits;
       await queryRunner.manager.save(Wallet, wallet);
 
@@ -546,4 +685,3 @@ export class WalletsService {
     return config ? parseInt(config.value, 10) || 10 : 10;
   }
 }
-

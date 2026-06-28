@@ -8,8 +8,11 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Model } from './model.entity';
+import { User } from '../../users/entities/user.entity';
 import { Deployment } from '../../deployments/entities/deployment.entity';
 import { VersionStatus } from '../enums/version-status.enum';
+import { VersionReviewStatus } from '../enums/version-review-status.enum';
+import { ModelVersionTestCase } from './model-version-test-case.entity';
 
 /**
  * Database table representation of a specific ML model iteration.
@@ -30,6 +33,12 @@ export class ModelVersion {
   model: Model;
 
   /**
+   * User who uploaded this version inside the provider organization workflow.
+   */
+  @ManyToOne(() => User, { nullable: true })
+  uploadedBy: User | null;
+
+  /**
    * Incrementing version sequence number.
    */
   @Column()
@@ -44,6 +53,35 @@ export class ModelVersion {
     default: VersionStatus.UPLOADED,
   })
   status: VersionStatus;
+
+  /**
+   * Pull-request style review status for organization-owned versions.
+   */
+  @Column({
+    name: 'review_status',
+    type: 'varchar',
+    enum: VersionReviewStatus,
+    default: VersionReviewStatus.NOT_REQUIRED,
+  })
+  reviewStatus: VersionReviewStatus;
+
+  /**
+   * Maintainer/owner who reviewed the submitted version.
+   */
+  @ManyToOne(() => User, { nullable: true })
+  reviewedBy: User | null;
+
+  /**
+   * Reviewer decision comment shown in the organization history.
+   */
+  @Column({ name: 'review_comment', type: 'text', nullable: true })
+  reviewComment: string | null;
+
+  /**
+   * Timestamp of the last approval/decline decision.
+   */
+  @Column({ name: 'reviewed_at', type: 'timestamp', nullable: true })
+  reviewedAt: Date | null;
 
   /**
    * Storage location path for the primary serialization bundle (e.g. model.pkl).
@@ -98,6 +136,12 @@ export class ModelVersion {
    */
   @OneToMany(() => Deployment, (deployment) => deployment.modelVersion)
   deployments: Deployment[];
+
+  /**
+   * Saved reviewer test cases attached to this version.
+   */
+  @OneToMany(() => ModelVersionTestCase, (testCase) => testCase.version)
+  testCases: ModelVersionTestCase[];
 
   /**
    * Timestamp record indicating when this specific version upload was initialized.

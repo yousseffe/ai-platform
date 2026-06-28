@@ -9,11 +9,17 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { OrgRoleGuard, RequireOrgRole } from '../../auth/guards/org-role.guard';
 import { OrganizationsService } from '../services/organizations.service';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
+import { OrgType } from '../enums/org-type.enum';
 
 /**
  * Controller exposing endpoints for organization/workspace settings, memberships, and OTP challenges.
@@ -37,6 +43,9 @@ export class OrganizationsController {
     body: {
       name: string;
       slug?: string;
+      type?: OrgType;
+      description?: string;
+      avatarUrl?: string;
       collaborators?: Array<{ email: string; role: OrgRole }>;
     },
   ) {
@@ -45,6 +54,41 @@ export class OrganizationsController {
       body.slug,
       req.user.id,
       body.collaborators || [],
+      body.type ?? OrgType.CONSUMER,
+      body.description,
+      body.avatarUrl,
+    );
+  }
+
+  /**
+   * Generates a Stripe Checkout Session for organization creation.
+   * Caches pending workspace creation parameters in Redis.
+   *
+   * @param req - Request containing user details.
+   * @param body - Post parameters.
+   * @returns Checkout Session redirect URL.
+   */
+  @Post('checkout-session')
+  async createCheckoutSession(
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+    @Body()
+    body: {
+      name: string;
+      slug?: string;
+      type?: OrgType;
+      description?: string;
+      avatarUrl?: string;
+      collaborators?: Array<{ email: string; role: OrgRole }>;
+    },
+  ) {
+    return this.orgsService.createCheckoutSession(
+      body.name,
+      body.slug,
+      req.user.id,
+      body.collaborators || [],
+      body.type ?? OrgType.CONSUMER,
+      body.description,
+      body.avatarUrl,
     );
   }
 
@@ -68,6 +112,21 @@ export class OrganizationsController {
   async getOrgCreationFee() {
     const fee = await this.orgsService.getOrgCreationFee();
     return { fee };
+  }
+
+  /**
+   * Retrieves the current state of an organization Stripe checkout flow.
+   *
+   * @param pendingId - Pending organization checkout identifier.
+   * @param req - Request containing authenticated user details.
+   * @returns Pending/completed/expired status payload.
+   */
+  @Get('checkout-status/:pendingId')
+  async getCheckoutStatus(
+    @Param('pendingId') pendingId: string,
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+  ) {
+    return this.orgsService.getCheckoutStatus(pendingId, req.user.id);
   }
 
   /**
@@ -232,5 +291,122 @@ export class OrganizationsController {
       throw new BadRequestException('Code is required');
     }
     return this.orgsService.verifyAccessOtp(orgId, req.user.id, body.code);
+  }
+
+  /**
+   * Retrieves an organization details by its slug.
+   *
+   * @param slug - Organization unique URL slug.
+   * @returns Organization details.
+   */
+  @Get('slug/:slug')
+  async getBySlug(@Param('slug') slug: string) {
+    return this.orgsService.findOneBySlug(slug);
+  }
+
+  /**
+   * Updates organization profile settings.
+   *
+   * @param orgId - Organization UUID.
+   * @param req - Request containing user details.
+   * @param body - Editable organization profile fields.
+   * @returns Updated organization record.
+   */
+  @Patch(':orgId')
+  async updateOrganization(
+    @Param('orgId') orgId: string,
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+    @Body()
+    body: {
+      name?: string;
+      description?: string | null;
+      avatarUrl?: string | null;
+    },
+  ) {
+    return this.orgsService.updateOrganization(orgId, req.user.id, body);
+  }
+
+  /**
+   * Uploads an organization logo image and assigns it to the organization profile.
+   *
+   * @param orgId - Organization UUID.
+   * @param req - Request containing user details.
+   * @param file - Uploaded image file.
+   * @returns Updated organization record.
+   */
+  @Post(':orgId/logo')
+  @UseInterceptors(
+    FileInterceptor('logo', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `org-logo-${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(
+            new BadRequestException('Only image uploads are allowed'),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadOrganizationLogo(
+    @Param('orgId') orgId: string,
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Logo image is required');
+    }
+    return this.orgsService.uploadOrganizationLogo(orgId, req.user.id, file);
+  }
+
+  /**
+   * Lists models registered by members of this organization.
+   *
+   * @param orgId - Organization UUID.
+   * @param req - Request containing user details.
+   * @returns Organization member models.
+   */
+  @Get(':orgId/models')
+  async listOrganizationModels(
+    @Param('orgId') orgId: string,
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+  ) {
+    return this.orgsService.listOrganizationModels(orgId, req.user.id);
+  }
+
+  /**
+   * Retrieves the current user's role inside a specific organization.
+   *
+   * @param orgId - Organization UUID.
+   * @param req - Request containing user details.
+   * @returns User's active role.
+   */
+  @Get(':orgId/my-role')
+  async getMyRole(
+    @Param('orgId') orgId: string,
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+  ) {
+    const role = await this.orgsService.getMemberRole(orgId, req.user.id);
+    return { role };
+  }
+
+  /**
+   * Compiles organization stats metrics.
+   *
+   * @param orgId - Organization UUID.
+   * @returns Aggregated statistics.
+   */
+  @Get(':orgId/stats')
+  async getStats(@Param('orgId') orgId: string) {
+    return this.orgsService.getOrgStats(orgId);
   }
 }

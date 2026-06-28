@@ -5,7 +5,10 @@
  * @param otpCode - The 6-digit verification code.
  * @returns A string containing the formatted HTML email body.
  */
-export function getOtpVerificationTemplate(fullName: string, otpCode: string): string {
+export function getOtpVerificationTemplate(
+  fullName: string,
+  otpCode: string,
+): string {
   const year = new Date().getFullYear();
   return `<!DOCTYPE html>
 <html>

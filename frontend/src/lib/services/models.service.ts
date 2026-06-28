@@ -1,5 +1,5 @@
 import { smartFetch } from "@/lib/utils/smart-fetch";
-import { Model, ModelVersion, ModelLog } from "@/types";
+import { Model, ModelVersion, ModelLog, ModelVersionReviewEvent, ModelVersionTestCase } from "@/types";
 
 /**
  * Fetches all registered machine learning models from the backend.
@@ -81,6 +81,86 @@ export async function uploadModelVersion(id: string, formData: FormData): Promis
   return smartFetch<ModelVersion>(`/models/${id}/versions`, {
     method: "POST",
     body: formData,
+  });
+}
+
+export interface VersionArtifactPreview {
+  artifacts: Array<{
+    kind: string;
+    path: string | null;
+    url: string | null;
+    previewable: boolean;
+  }>;
+}
+
+export interface OrganizationModelAnalytics {
+  totals: {
+    models: number;
+    versions: number;
+    pendingReviews: number;
+    approvedVersions: number;
+    declinedVersions: number;
+    readyVersions: number;
+    runningDeployments: number;
+    totalEarnings: number;
+    marketplaceVerified: number;
+  };
+  byUploader: Array<{ name: string; models: number; versions: number }>;
+  recentVersions: Array<{
+    modelId: string;
+    modelName: string;
+    versionId: string;
+    versionNumber: number;
+    status: string;
+    reviewStatus: string;
+    uploadedBy: string | null;
+    reviewedBy: string | null;
+    createdAt: string;
+  }>;
+}
+
+export async function reviewModelVersion(
+  versionId: string,
+  decision: "approve" | "decline",
+  comment?: string
+): Promise<ModelVersion> {
+  return smartFetch<ModelVersion>(`/models/versions/${versionId}/review`, {
+    method: "POST",
+    body: JSON.stringify({ decision, comment }),
+  });
+}
+
+export async function saveModelVersionTestCase(
+  versionId: string,
+  body: { name: string; payload: string; expectedResult?: string; notes?: string }
+): Promise<ModelVersionTestCase> {
+  return smartFetch<ModelVersionTestCase>(`/models/versions/${versionId}/test-cases`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getModelVersionTestCases(versionId: string): Promise<ModelVersionTestCase[]> {
+  return smartFetch<ModelVersionTestCase[]>(`/models/versions/${versionId}/test-cases`, {
+    cache: "no-store",
+  });
+}
+
+export async function getModelVersionArtifacts(versionId: string): Promise<VersionArtifactPreview> {
+  return smartFetch<VersionArtifactPreview>(`/models/versions/${versionId}/artifacts`, {
+    cache: "no-store",
+  });
+}
+
+export async function getModelHistory(modelId: string): Promise<ModelVersionReviewEvent[]> {
+  return smartFetch<ModelVersionReviewEvent[]>(`/models/${modelId}/history`, {
+    cache: "no-store",
+  });
+}
+
+export async function getOrganizationModelAnalytics(orgId: string): Promise<OrganizationModelAnalytics> {
+  return smartFetch<OrganizationModelAnalytics>(`/models/organizations/${orgId}/analytics`, {
+    cache: "no-store",
   });
 }
 
@@ -221,5 +301,3 @@ export async function undeprecateModelVersion(versionId: string): Promise<ModelV
     method: "POST",
   });
 }
-
-

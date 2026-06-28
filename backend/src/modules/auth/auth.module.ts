@@ -11,6 +11,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { WalletsModule } from '../wallets/wallets.module';
+import { OrgApiKey } from '../organizations/entities/org-api-key.entity';
 import { OrgRoleGuard } from './guards/org-role.guard';
 import { ApiKeyOrJwtGuard } from './guards/api-key-or-jwt.guard';
 import { AdminGuard } from './guards/admin.guard';
@@ -18,7 +19,7 @@ import { getRsaKeys } from './utils/keys';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([VerificationCode, AuditLog, ApiKey]),
+    TypeOrmModule.forFeature([VerificationCode, AuditLog, ApiKey, OrgApiKey]),
     UsersModule,
     PassportModule,
     JwtModule.registerAsync({

@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Query,
+  Param,
   UseGuards,
   UseInterceptors,
   Req,
@@ -68,6 +69,22 @@ export class WalletsController {
   }
 
   /**
+   * Retrieves all wallet ledgers associated with a specific organization.
+   *
+   * @param orgId - Organization UUID.
+   * @param req - Authenticated request containing the user details.
+   * @returns Array of organization wallet records.
+   */
+  @Get('org/:orgId')
+  @UseGuards(JwtAuthGuard)
+  async getOrganizationWallets(
+    @Param('orgId') orgId: string,
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+  ) {
+    return this.walletsService.getOrganizationWallets(orgId, req.user.id);
+  }
+
+  /**
    * Mock endpoint allowing users to top up credits in their active workspace.
    *
    * @param req - Request envelope carrying resolved workspace parameters.
@@ -114,7 +131,7 @@ export class WalletsController {
       workspaceId: string;
       workspaceType: OwnerType;
     },
-    @Body() body: { amount: number },
+    @Body() body: { amount: number; returnPath?: string },
   ) {
     if (!body.amount || body.amount < 5.0) {
       throw new BadRequestException('Minimum deposit amount is $5.00');
@@ -124,6 +141,7 @@ export class WalletsController {
       body.amount,
       req.workspaceId,
       req.workspaceType,
+      body.returnPath,
     );
 
     return { url: session.url };
@@ -151,6 +169,7 @@ export class WalletsController {
       event = this.stripeService.constructEvent(
         req.rawBody as Buffer,
         signature,
+        'wallets',
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -165,13 +184,19 @@ export class WalletsController {
     try {
       const processed = await this.walletsService.processStripeWebhook(event);
       if (processed) {
-        this.logger.log(`[Stripe Webhook Success] Processed event ID: ${event.id}`);
+        this.logger.log(
+          `[Stripe Webhook Success] Processed event ID: ${event.id}`,
+        );
       } else {
-        this.logger.log(`[Stripe Webhook Skipped/Duplicate] Event ID: ${event.id}`);
+        this.logger.log(
+          `[Stripe Webhook Skipped/Duplicate] Event ID: ${event.id}`,
+        );
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`[Stripe Webhook Error] Failed to process event ${event.id}: ${message}`);
+      this.logger.error(
+        `[Stripe Webhook Error] Failed to process event ${event.id}: ${message}`,
+      );
       throw new InternalServerErrorException(
         `Failed to process Stripe webhook: ${message}`,
       );
@@ -268,4 +293,3 @@ export class WalletsController {
     return { credits_per_egp: rate };
   }
 }
-

@@ -13,4 +13,3 @@ export class UploadVersionDto {
   @IsOptional()
   triggerBuild?: string;
 }
-

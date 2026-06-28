@@ -12,7 +12,15 @@ import {
   Query,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In, Between, MoreThanOrEqual, LessThanOrEqual, ILike } from 'typeorm';
+import {
+  Repository,
+  DataSource,
+  In,
+  Between,
+  MoreThanOrEqual,
+  LessThanOrEqual,
+  ILike,
+} from 'typeorm';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
 import { Model } from '../../models/entities/model.entity';
@@ -241,18 +249,34 @@ export class AdminController {
     const configMap = new Map(configs.map((c) => [c.key, c.value]));
 
     return {
-      price_tabular: configMap.has('price_tabular') ? parseFloat(configMap.get('price_tabular')!) : 0.1,
-      price_nlp: configMap.has('price_nlp') ? parseFloat(configMap.get('price_nlp')!) : 0.2,
-      price_vision: configMap.has('price_vision') ? parseFloat(configMap.get('price_vision')!) : 0.3,
-      price_llm_gguf: configMap.has('price_llm_gguf') ? parseFloat(configMap.get('price_llm_gguf')!) : 0.5,
-      price_diffusion: configMap.has('price_diffusion') ? parseFloat(configMap.get('price_diffusion')!) : 1.0,
-      default_provider_share_percent: configMap.has('default_provider_share_percent') ? parseInt(configMap.get('default_provider_share_percent')!, 10) : 80,
-      playground_trial_limit: configMap.has('playground_trial_limit') ? parseInt(configMap.get('playground_trial_limit')!, 10) : 50,
+      price_tabular: configMap.has('price_tabular')
+        ? parseFloat(configMap.get('price_tabular')!)
+        : 0.1,
+      price_nlp: configMap.has('price_nlp')
+        ? parseFloat(configMap.get('price_nlp')!)
+        : 0.2,
+      price_vision: configMap.has('price_vision')
+        ? parseFloat(configMap.get('price_vision')!)
+        : 0.3,
+      price_llm_gguf: configMap.has('price_llm_gguf')
+        ? parseFloat(configMap.get('price_llm_gguf')!)
+        : 0.5,
+      price_diffusion: configMap.has('price_diffusion')
+        ? parseFloat(configMap.get('price_diffusion')!)
+        : 1.0,
+      default_provider_share_percent: configMap.has(
+        'default_provider_share_percent',
+      )
+        ? parseInt(configMap.get('default_provider_share_percent')!, 10)
+        : 80,
+      playground_trial_limit: configMap.has('playground_trial_limit')
+        ? parseInt(configMap.get('playground_trial_limit')!, 10)
+        : 50,
       credits_per_egp: configMap.has('credits_per_egp')
         ? parseInt(configMap.get('credits_per_egp')!, 10)
         : configMap.has('credits_per_usd')
-        ? parseInt(configMap.get('credits_per_usd')!, 10)
-        : 10,
+          ? parseInt(configMap.get('credits_per_usd')!, 10)
+          : 10,
     };
   }
 
@@ -283,7 +307,9 @@ export class AdminController {
         throw new BadRequestException(`Invalid value for config field: ${key}`);
       }
 
-      let config = await this.systemConfigRepository.findOne({ where: { key } });
+      let config = await this.systemConfigRepository.findOne({
+        where: { key },
+      });
       if (!config) {
         config = this.systemConfigRepository.create({
           key,
@@ -504,7 +530,10 @@ export class AdminController {
           id: m.id,
           name: m.name,
           framework: m.framework,
-          costPerRequest: typeof m.costPerRequest === 'string' ? parseFloat(m.costPerRequest) : m.costPerRequest,
+          costPerRequest:
+            typeof m.costPerRequest === 'string'
+              ? parseFloat(m.costPerRequest)
+              : m.costPerRequest,
           isPublic: m.isPublic,
         })),
       });
@@ -555,7 +584,8 @@ export class AdminController {
       order: { createdAt: 'DESC' },
     });
 
-    const consumerStats = await this.dataSource.getRepository(ModelLog)
+    const consumerStats = await this.dataSource
+      .getRepository(ModelLog)
       .createQueryBuilder('log')
       .innerJoinAndSelect('log.model', 'model')
       .select('model.id', 'modelId')
@@ -564,7 +594,10 @@ export class AdminController {
       .addSelect('model.framework', 'modelFramework')
       .addSelect('model.cost_per_request', 'costPerRequest')
       .addSelect('COUNT(log.id)', 'callCount')
-      .addSelect('SUM(CASE WHEN log.status = \'SUCCESS\' THEN model.cost_per_request ELSE 0 END)', 'totalSpent')
+      .addSelect(
+        "SUM(CASE WHEN log.status = 'SUCCESS' THEN model.cost_per_request ELSE 0 END)",
+        'totalSpent',
+      )
       .where('log.user_id = :userId', { userId: user.id })
       .groupBy('model.id')
       .addGroupBy('model.name')
@@ -573,7 +606,7 @@ export class AdminController {
       .addGroupBy('model.cost_per_request')
       .getRawMany();
 
-    const usageStats = consumerStats.map(s => ({
+    const usageStats = consumerStats.map((s) => ({
       modelId: s.modelId,
       modelName: s.modelName,
       modelType: s.modelType,
@@ -605,9 +638,10 @@ export class AdminController {
         .filter((k) => k.model !== null)
         .map((k) => ({
           id: k.id,
-          key: k.key && k.key.length > 15
-            ? `${k.key.slice(0, 11)}••••••••${k.key.slice(-4)}`
-            : k.key,
+          key:
+            k.key && k.key.length > 15
+              ? `${k.key.slice(0, 11)}••••••••${k.key.slice(-4)}`
+              : k.key,
           name: k.name,
           type: k.type,
           isActive: k.isActive,
@@ -618,7 +652,10 @@ export class AdminController {
         id: m.id,
         name: m.name,
         framework: m.framework,
-        costPerRequest: typeof m.costPerRequest === 'string' ? parseFloat(m.costPerRequest) : m.costPerRequest,
+        costPerRequest:
+          typeof m.costPerRequest === 'string'
+            ? parseFloat(m.costPerRequest)
+            : m.costPerRequest,
         isPublic: m.isPublic,
         createdAt: m.createdAt,
       })),
@@ -703,7 +740,10 @@ export class AdminController {
     if (type !== TransactionType.CREDIT && type !== TransactionType.DEBIT) {
       throw new BadRequestException('Adjustment type must be CREDIT or DEBIT');
     }
-    if (walletType !== WalletType.CONSUMER && walletType !== WalletType.PROVIDER) {
+    if (
+      walletType !== WalletType.CONSUMER &&
+      walletType !== WalletType.PROVIDER
+    ) {
       throw new BadRequestException('Wallet type must be CONSUMER or PROVIDER');
     }
 

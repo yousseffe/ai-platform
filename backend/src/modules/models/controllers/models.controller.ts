@@ -39,6 +39,7 @@ import { ModelVersion } from '../entities/model-version.entity';
 import { ModelLog } from '../entities/model-log.entity';
 import { User } from '../../users/entities/user.entity';
 import { ApiKey } from '../../auth/entities/api-key.entity';
+import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
 import { Wallet } from '../../wallets/entities/wallet.entity';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
@@ -63,6 +64,24 @@ interface RequestWithUser {
     id: string;
     email: string;
   };
+  workspaceId?: string;
+  workspaceType?: OwnerType;
+}
+
+interface PredictionRequestContext {
+  user: {
+    id: string;
+    email: string;
+    apiKey?: string;
+    apiKeyType?: ApiKeyType;
+    orgApiKeyId?: string;
+    orgApiKeyLabel?: string;
+    orgApiKeyPrefix?: string;
+    orgId?: string;
+    projectId?: string;
+  };
+  workspaceId: string;
+  workspaceType: OwnerType;
 }
 
 /**
@@ -83,6 +102,8 @@ export class ModelsController {
     private readonly modelLogRepository: Repository<ModelLog>,
     @InjectRepository(ApiKey)
     private readonly apiKeyRepository: Repository<ApiKey>,
+    @InjectRepository(OrgApiKey)
+    private readonly orgApiKeyRepository: Repository<OrgApiKey>,
     private readonly redisService: RedisService,
   ) {}
 
@@ -94,6 +115,7 @@ export class ModelsController {
    * @returns A promise resolving to the created Model.
    */
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(WorkspaceInterceptor)
   @Post()
   async createModel(
     @Body() body: CreateModelDto,
@@ -107,6 +129,7 @@ export class ModelsController {
       body.framework || Framework.CUSTOM,
       req.user.id,
       body.isPublic ?? false,
+      req.workspaceType === OwnerType.ORG ? req.workspaceId : undefined,
     );
   }
 
@@ -117,9 +140,13 @@ export class ModelsController {
    * @returns A promise resolving to an array of Models.
    */
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(WorkspaceInterceptor)
   @Get()
   async getModels(@Request() req: RequestWithUser): Promise<Model[]> {
-    return this.modelsService.getModels(req.user.id);
+    return this.modelsService.getModels(
+      req.user.id,
+      req.workspaceType === OwnerType.ORG ? req.workspaceId : undefined,
+    );
   }
 
   /**
@@ -178,7 +205,10 @@ export class ModelsController {
       .addSelect('model.framework', 'modelFramework')
       .addSelect('model.cost_per_request', 'costPerRequest')
       .addSelect('COUNT(log.id)', 'callCount')
-      .addSelect('SUM(CASE WHEN log.status = \'SUCCESS\' THEN model.cost_per_request ELSE 0 END)', 'totalSpent')
+      .addSelect(
+        "SUM(CASE WHEN log.status = 'SUCCESS' THEN model.cost_per_request ELSE 0 END)",
+        'totalSpent',
+      )
       .where('log.user_id = :userId', { userId: req.user.id })
       .groupBy('model.id')
       .addGroupBy('model.name')
@@ -187,7 +217,7 @@ export class ModelsController {
       .addGroupBy('model.cost_per_request')
       .getRawMany();
 
-    return stats.map(s => ({
+    return stats.map((s) => ({
       modelId: s.modelId,
       modelName: s.modelName,
       modelType: s.modelType,
@@ -222,8 +252,11 @@ export class ModelsController {
    */
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async getModel(@Param('id') id: string): Promise<Model & { uniqueUsersCount?: number }> {
-    const model = await this.modelsService.getModel(id);
+  async getModel(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ): Promise<Model & { uniqueUsersCount?: number }> {
+    const model = await this.modelsService.getModel(id, req.user.id);
 
     const result = await this.modelLogRepository
       .createQueryBuilder('log')
@@ -253,7 +286,7 @@ export class ModelsController {
     @Req() req: Record<string, unknown> & { user: { id: string } },
   ) {
     const userId = req.user.id;
-    const model = await this.modelsService.getModel(id);
+    const model = await this.modelsService.getModel(id, req.user.id);
     if (!model) {
       throw new NotFoundException('Model not found');
     }
@@ -267,13 +300,17 @@ export class ModelsController {
       },
     });
 
-    const limitConfig = await this.dataSource.getRepository(SystemConfig).findOne({
-      where: { key: 'playground_trial_limit' },
-    });
+    const limitConfig = await this.dataSource
+      .getRepository(SystemConfig)
+      .findOne({
+        where: { key: 'playground_trial_limit' },
+      });
     const limit = limitConfig ? parseInt(limitConfig.value, 10) : 50;
 
     if (!apiKeyEntity) {
-      const user = await this.dataSource.getRepository(User).findOneBy({ id: userId });
+      const user = await this.dataSource
+        .getRepository(User)
+        .findOneBy({ id: userId });
       const trialKey = 'ml_sk_trial_' + crypto.randomBytes(24).toString('hex');
       apiKeyEntity = this.apiKeyRepository.create({
         key: trialKey,
@@ -339,6 +376,7 @@ export class ModelsController {
       preprocess?: Express.Multer.File[];
       postprocess?: Express.Multer.File[];
     },
+    @Request() req: RequestWithUser,
   ): Promise<ModelVersion> {
     return this.modelsService.uploadVersion(
       id,
@@ -346,7 +384,96 @@ export class ModelsController {
       body.examplePayload,
       body.expectedResult,
       body.triggerBuild,
+      req.user.id,
     );
+  }
+
+  /**
+   * Maintainer pull-request style decision for an organization model version.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('versions/:versionId/review')
+  async reviewVersion(
+    @Param('versionId') versionId: string,
+    @Body() body: { decision: 'approve' | 'decline'; comment?: string },
+    @Request() req: RequestWithUser,
+  ): Promise<ModelVersion> {
+    if (body.decision !== 'approve' && body.decision !== 'decline') {
+      throw new BadRequestException('decision must be approve or decline');
+    }
+    return this.modelsService.reviewVersion(
+      versionId,
+      req.user.id,
+      body.decision,
+      body.comment,
+    );
+  }
+
+  /**
+   * Saves a reusable reviewer test case against a version.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('versions/:versionId/test-cases')
+  async addVersionTestCase(
+    @Param('versionId') versionId: string,
+    @Body()
+    body: {
+      name: string;
+      payload: string;
+      expectedResult?: string;
+      notes?: string;
+    },
+    @Request() req: RequestWithUser,
+  ) {
+    return this.modelsService.addVersionTestCase(versionId, req.user.id, body);
+  }
+
+  /**
+   * Lists saved reviewer test cases for a version.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('versions/:versionId/test-cases')
+  async getVersionTestCases(
+    @Param('versionId') versionId: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.modelsService.getVersionTestCases(versionId, req.user.id);
+  }
+
+  /**
+   * Returns signed artifact links for VS Code style review panels.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('versions/:versionId/artifacts')
+  async getVersionArtifacts(
+    @Param('versionId') versionId: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.modelsService.getVersionArtifactPreview(versionId, req.user.id);
+  }
+
+  /**
+   * Append-only model governance history.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/history')
+  async getModelHistory(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.modelsService.getModelHistory(id, req.user.id);
+  }
+
+  /**
+   * Provider organization analytics for decision making and member monitoring.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('organizations/:orgId/analytics')
+  async getOrganizationModelAnalytics(
+    @Param('orgId') orgId: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.modelsService.getOrganizationModelAnalytics(orgId, req.user.id);
   }
 
   /**
@@ -364,27 +491,27 @@ export class ModelsController {
     @Param('id') id: string,
     @Body() data: Record<string, unknown>,
     @Req()
-    req: Record<string, unknown> & {
-      user: { id: string; email: string; apiKey?: string };
-      workspaceId: string;
-      workspaceType: OwnerType;
-    },
+    req: Record<string, unknown> & PredictionRequestContext,
     @Res() res: Response,
   ): Promise<void> {
-    const model = await this.modelsService.getModel(id);
+    const model = await this.modelsService.getModel(id, req.user.id);
     let url: string;
     let deploymentId: string | null = null;
     try {
-      const deployment = await this.dataSource.getRepository(Deployment).findOne({
-        where: {
-          modelVersion: { model: { id } },
-          status: DeploymentStatus.RUNNING,
-        },
-        order: { createdAt: 'DESC' },
-        relations: ['modelVersion'],
-      });
+      const deployment = await this.dataSource
+        .getRepository(Deployment)
+        .findOne({
+          where: {
+            modelVersion: { model: { id } },
+            status: DeploymentStatus.RUNNING,
+          },
+          order: { createdAt: 'DESC' },
+          relations: ['modelVersion'],
+        });
       if (!deployment || deployment.url === null) {
-        throw new NotFoundException('No active deployment found for this model');
+        throw new NotFoundException(
+          'No active deployment found for this model',
+        );
       }
       url = deployment.url;
       deploymentId = deployment.id;
@@ -456,11 +583,7 @@ export class ModelsController {
     @Param('versionNum') versionNum: string,
     @Body() data: Record<string, unknown>,
     @Req()
-    req: Record<string, unknown> & {
-      user: { id: string; email: string; apiKey?: string };
-      workspaceId: string;
-      workspaceType: OwnerType;
-    },
+    req: Record<string, unknown> & PredictionRequestContext,
     @Res() res: Response,
   ): Promise<void> {
     const versionNumber = parseInt(versionNum, 10);
@@ -472,18 +595,22 @@ export class ModelsController {
     let url: string;
     let deploymentId: string | null = null;
     try {
-      const deployment = await this.dataSource.getRepository(Deployment).findOne({
-        where: {
-          modelVersion: {
-            model: { id },
-            versionNumber: versionNumber,
+      const deployment = await this.dataSource
+        .getRepository(Deployment)
+        .findOne({
+          where: {
+            modelVersion: {
+              model: { id },
+              versionNumber: versionNumber,
+            },
+            status: DeploymentStatus.RUNNING,
           },
-          status: DeploymentStatus.RUNNING,
-        },
-        relations: ['modelVersion'],
-      });
+          relations: ['modelVersion'],
+        });
       if (!deployment || deployment.url === null) {
-        throw new NotFoundException(`No active deployment found for version v${versionNumber}`);
+        throw new NotFoundException(
+          `No active deployment found for version v${versionNumber}`,
+        );
       }
       url = deployment.url;
       deploymentId = deployment.id;
@@ -545,7 +672,7 @@ export class ModelsController {
     url: string,
     deploymentId: string | null,
     data: Record<string, unknown>,
-    req: any,
+    req: PredictionRequestContext,
     res: Response,
   ): Promise<void> {
     const isTrial = req.user?.apiKeyType === ApiKeyType.TRIAL;
@@ -556,15 +683,21 @@ export class ModelsController {
     if (!isTrial) {
       if (!model.hasCustomPricing) {
         const configKey = 'price_' + model.type.toLowerCase();
-        const priceConfig = await this.dataSource.getRepository(SystemConfig).findOne({
-          where: { key: configKey },
-        });
+        const priceConfig = await this.dataSource
+          .getRepository(SystemConfig)
+          .findOne({
+            where: { key: configKey },
+          });
         cost = priceConfig ? parseFloat(priceConfig.value) : 0.1;
 
-        const shareConfig = await this.dataSource.getRepository(SystemConfig).findOne({
-          where: { key: 'default_provider_share_percent' },
-        });
-        providerSharePercent = shareConfig ? parseInt(shareConfig.value, 10) : 80;
+        const shareConfig = await this.dataSource
+          .getRepository(SystemConfig)
+          .findOne({
+            where: { key: 'default_provider_share_percent' },
+          });
+        providerSharePercent = shareConfig
+          ? parseInt(shareConfig.value, 10)
+          : 80;
       } else {
         cost =
           typeof model.costPerRequest === 'string'
@@ -592,7 +725,7 @@ export class ModelsController {
       where: { user: { id: model.user.id }, isActive: true },
     });
     const containerApiKey = modelOwnerApiKeyEntity?.key || '';
- 
+
     const targetEndpoint =
       model.type === ModelType.LLM_GGUF ? '/v1/chat/completions' : '/predict';
 
@@ -608,8 +741,8 @@ export class ModelsController {
     try {
       if (deploymentId) {
         await this.redisService.set(
-            `model:last-active:${deploymentId}`,
-            Date.now().toString(),
+          `model:last-active:${deploymentId}`,
+          Date.now().toString(),
         );
       }
 
@@ -651,10 +784,16 @@ export class ModelsController {
         await queryRunner.startTransaction();
 
         try {
-          const callerUser = await queryRunner.manager.findOne(User, {
-            where: { id: req.user.id },
-          });
-          const callerEmail = callerUser?.email || 'Unknown User';
+          const callerUser = req.user.orgApiKeyId
+            ? null
+            : await queryRunner.manager.findOne(User, {
+                where: { id: req.user.id },
+              });
+          const callerEmail =
+            callerUser?.email ||
+            req.user.orgApiKeyLabel ||
+            req.user.email ||
+            'Organization API Key';
 
           // 1. Deduct cost from consumer wallet
           await queryRunner.manager.query(
@@ -719,7 +858,10 @@ export class ModelsController {
               balance: 0.0,
               currency: 'EGP',
             });
-            providerWallet = await queryRunner.manager.save(Wallet, providerWallet);
+            providerWallet = await queryRunner.manager.save(
+              Wallet,
+              providerWallet,
+            );
           }
 
           const currentProviderBalance =
@@ -791,13 +933,26 @@ export class ModelsController {
 
       // Save execution details to ModelLog
       try {
-        const callerUser = await this.dataSource
-          .getRepository(User)
-          .findOneBy({ id: req.user.id });
+        const callerUser = req.user.orgApiKeyId
+          ? null
+          : await this.dataSource.getRepository(User).findOneBy({
+              id: req.user.id,
+            });
+        const orgApiKey = req.user.orgApiKeyId
+          ? await this.orgApiKeyRepository.findOneBy({
+              id: req.user.orgApiKeyId,
+            })
+          : null;
         const logEntry = this.modelLogRepository.create({
           model,
-          user: callerUser!,
-          apiKey: req.user.apiKey || 'JWT Session',
+          user: callerUser,
+          apiKey: req.user.apiKey || req.user.orgApiKeyPrefix || 'JWT Session',
+          orgApiKey,
+          orgId: req.user.orgId ?? null,
+          projectId: req.user.projectId ?? null,
+          apiKeyLabel: req.user.orgApiKeyLabel ?? null,
+          apiKeyPrefix: req.user.orgApiKeyPrefix ?? null,
+          creditsCharged: executionStatus === 'SUCCESS' ? cost : 0,
           responseTimeMs,
           status: executionStatus,
           statusCode,
@@ -855,7 +1010,9 @@ export class ModelsController {
       throw new NotFoundException('Model version not found');
     }
     const activeDeployment = version.deployments?.find(
-      (d) => d.status === DeploymentStatus.RUNNING || d.status === DeploymentStatus.STARTING,
+      (d) =>
+        d.status === DeploymentStatus.RUNNING ||
+        d.status === DeploymentStatus.STARTING,
     );
     if (activeDeployment) {
       await this.deploymentsService.stopDeployment(activeDeployment.id);

@@ -8,8 +8,11 @@ import { SearchController } from './controllers/search.controller';
 import { SchemaController } from './controllers/schema.controller';
 import { Model } from './entities/model.entity';
 import { ModelVersion } from './entities/model-version.entity';
+import { ModelVersionTestCase } from './entities/model-version-test-case.entity';
+import { ModelVersionReviewEvent } from './entities/model-version-review-event.entity';
 import { ModelLog } from './entities/model-log.entity';
 import { SystemConfig } from '../wallets/entities/system-config.entity';
+import { OrgApiKey } from '../organizations/entities/org-api-key.entity';
 import { DeploymentsModule } from '../deployments/deployments.module';
 import { HttpModule } from '@nestjs/axios';
 import { MinioModule } from '../../shared/minio/minio.module';
@@ -18,6 +21,7 @@ import { ModelVersionsRepository } from './repositories/model-versions.repositor
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
 import { WalletsModule } from '../wallets/wallets.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 
 /**
  * Module responsible for model cataloging, version tracking, file uploading,
@@ -25,7 +29,15 @@ import { WalletsModule } from '../wallets/wallets.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Model, ModelVersion, ModelLog, SystemConfig]),
+    TypeOrmModule.forFeature([
+      Model,
+      ModelVersion,
+      ModelVersionTestCase,
+      ModelVersionReviewEvent,
+      ModelLog,
+      SystemConfig,
+      OrgApiKey,
+    ]),
     BullModule.registerQueue({
       name: 'build-queue',
     }),
@@ -35,6 +47,7 @@ import { WalletsModule } from '../wallets/wallets.module';
     AuthModule,
     UsersModule,
     WalletsModule,
+    forwardRef(() => OrganizationsModule),
   ],
   providers: [
     ModelsService,

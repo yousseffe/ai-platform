@@ -40,7 +40,7 @@ export async function smartFetch<T = unknown>(path: string, options: RequestInit
   if (session?.accessToken) {
     headers.set("Authorization", `Bearer ${session.accessToken}`);
   }
-  if (activeWorkspaceId) {
+  if (activeWorkspaceId && !headers.has("X-Workspace-Id")) {
     headers.set("X-Workspace-Id", activeWorkspaceId);
   }
 
@@ -80,4 +80,3 @@ export async function smartFetch<T = unknown>(path: string, options: RequestInit
     return null as unknown as T;
   }
 }
-

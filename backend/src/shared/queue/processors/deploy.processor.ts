@@ -121,14 +121,18 @@ export class DeployProcessor extends WorkerHost {
 
       // Memory-based eviction check
       const TIER_RAM_MAP: Record<string, number> = {
-        SMALL: 512,      // 512 MB
-        MEDIUM: 1024,    // 1 GB
-        LARGE: 2048,     // 2 GB
+        SMALL: 512, // 512 MB
+        MEDIUM: 1024, // 1 GB
+        LARGE: 2048, // 2 GB
       };
 
-      const newModelTier = deployment.modelVersion.model.tier?.toUpperCase() || 'SMALL';
+      const newModelTier =
+        deployment.modelVersion.model.tier?.toUpperCase() || 'SMALL';
       const newModelRamMb = TIER_RAM_MAP[newModelTier] || 512;
-      const MAX_SYSTEM_RAM_MB = parseInt(process.env.MAX_SYSTEM_RAM_MB || '3072', 10); // Default: 3 GB (3072 MB)
+      const MAX_SYSTEM_RAM_MB = parseInt(
+        process.env.MAX_SYSTEM_RAM_MB || '3072',
+        10,
+      ); // Default: 3 GB (3072 MB)
 
       this.logger.log(
         `Checking memory limits for deploying ${deploymentId} (Tier: ${newModelTier}, footprint: ${newModelRamMb}MB)`,
@@ -145,7 +149,9 @@ export class DeployProcessor extends WorkerHost {
         return sum + (TIER_RAM_MAP[tier] || 512);
       }, 0);
 
-      this.logger.log(`Current memory usage: ${currentSystemRamMb}MB / ${MAX_SYSTEM_RAM_MB}MB`);
+      this.logger.log(
+        `Current memory usage: ${currentSystemRamMb}MB / ${MAX_SYSTEM_RAM_MB}MB`,
+      );
 
       if (currentSystemRamMb + newModelRamMb > MAX_SYSTEM_RAM_MB) {
         this.logger.warn(
@@ -155,14 +161,20 @@ export class DeployProcessor extends WorkerHost {
         // Fetch last active times from Redis for all running deployments
         const runningWithActiveTimes = await Promise.all(
           runningDeployments.map(async (dep) => {
-            const lastActiveStr = await this.redisService.get(`model:last-active:${dep.id}`);
-            const lastActiveTime = lastActiveStr ? parseInt(lastActiveStr, 10) : dep.createdAt.getTime();
+            const lastActiveStr = await this.redisService.get(
+              `model:last-active:${dep.id}`,
+            );
+            const lastActiveTime = lastActiveStr
+              ? parseInt(lastActiveStr, 10)
+              : dep.createdAt.getTime();
             return { dep, lastActiveTime };
           }),
         );
 
         // Sort by last active time ascending (oldest/least recently active first)
-        runningWithActiveTimes.sort((a, b) => a.lastActiveTime - b.lastActiveTime);
+        runningWithActiveTimes.sort(
+          (a, b) => a.lastActiveTime - b.lastActiveTime,
+        );
 
         for (const item of runningWithActiveTimes) {
           if (currentSystemRamMb + newModelRamMb <= MAX_SYSTEM_RAM_MB) {
@@ -170,7 +182,8 @@ export class DeployProcessor extends WorkerHost {
           }
 
           const depToStop = item.dep;
-          const depTier = depToStop.modelVersion.model.tier?.toUpperCase() || 'SMALL';
+          const depTier =
+            depToStop.modelVersion.model.tier?.toUpperCase() || 'SMALL';
           const depRamMb = TIER_RAM_MAP[depTier] || 512;
 
           this.logger.warn(
@@ -242,12 +255,19 @@ export class DeployProcessor extends WorkerHost {
         where: { status: DeploymentStatus.RUNNING },
       });
 
-      const IDLE_TIMEOUT_MS = parseInt(process.env.IDLE_TIMEOUT_MS || '300000', 10); // Default: 5 minutes (300000 ms)
+      const IDLE_TIMEOUT_MS = parseInt(
+        process.env.IDLE_TIMEOUT_MS || '300000',
+        10,
+      ); // Default: 5 minutes (300000 ms)
       const now = Date.now();
 
       for (const deployment of runningDeployments) {
-        const lastActiveStr = await this.redisService.get(`model:last-active:${deployment.id}`);
-        const lastActiveTime = lastActiveStr ? parseInt(lastActiveStr, 10) : deployment.createdAt.getTime();
+        const lastActiveStr = await this.redisService.get(
+          `model:last-active:${deployment.id}`,
+        );
+        const lastActiveTime = lastActiveStr
+          ? parseInt(lastActiveStr, 10)
+          : deployment.createdAt.getTime();
 
         if (now - lastActiveTime >= IDLE_TIMEOUT_MS) {
           this.logger.log(
@@ -274,18 +294,22 @@ export class DeployProcessor extends WorkerHost {
         try {
           await container.stop();
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           this.logger.warn(`Error stopping container: ${message}`);
         }
         try {
           await container.remove();
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           this.logger.error(`Error removing container: ${message}`);
         }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(`Error interacting with Docker for container ${deployment.containerId}: ${message}`);
+        this.logger.error(
+          `Error interacting with Docker for container ${deployment.containerId}: ${message}`,
+        );
       }
     }
 

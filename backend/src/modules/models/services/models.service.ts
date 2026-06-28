@@ -2,6 +2,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -15,7 +18,11 @@ import { Repository } from 'typeorm';
 import * as fs from 'fs';
 import { Model } from '../entities/model.entity';
 import { ModelVersion } from '../entities/model-version.entity';
+import { ModelVersionTestCase } from '../entities/model-version-test-case.entity';
+import { ModelVersionReviewEvent } from '../entities/model-version-review-event.entity';
 import { VersionStatus } from '../enums/version-status.enum';
+import { VersionReviewStatus } from '../enums/version-review-status.enum';
+import { VersionReviewAction } from '../enums/version-review-action.enum';
 import { ModelType } from '../enums/model-type.enum';
 import { TaskType } from '../enums/task-type.enum';
 import { Framework } from '../enums/framework.enum';
@@ -25,6 +32,9 @@ import { MinioService } from '../../../shared/minio/minio.service';
 import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import { ModelsSearchService } from './models-search.service';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
+import { OrganizationsService } from '../../organizations/services/organizations.service';
+import { OrgType } from '../../organizations/enums/org-type.enum';
+import { OrgRole } from '../../../shared/enums/org-role.enum';
 
 /**
  * Service managing model registration, listing, version uploads, MinIO storage sync,
@@ -40,7 +50,60 @@ export class ModelsService {
     private readonly modelsSearchService: ModelsSearchService,
     @InjectRepository(SystemConfig)
     private readonly systemConfigRepository: Repository<SystemConfig>,
+    @InjectRepository(ModelVersionTestCase)
+    private readonly testCaseRepository: Repository<ModelVersionTestCase>,
+    @InjectRepository(ModelVersionReviewEvent)
+    private readonly reviewEventRepository: Repository<ModelVersionReviewEvent>,
+    @Inject(forwardRef(() => OrganizationsService))
+    private readonly organizationsService: OrganizationsService,
   ) {}
+
+  private async assertProviderOrgAccess(
+    orgId: string,
+    userId: string,
+    allowedRoles: OrgRole[] = [
+      OrgRole.OWNER,
+      OrgRole.MAINTAINER,
+      OrgRole.CONTRIBUTOR,
+    ],
+  ): Promise<OrgRole> {
+    const org = await this.organizationsService.orgRepository.findOne({
+      where: { id: orgId },
+    });
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+    if (org.type !== OrgType.PROVIDER && org.type !== OrgType.HYBRID) {
+      throw new BadRequestException(
+        'Only provider or hybrid organizations can publish models',
+      );
+    }
+
+    const role = await this.organizationsService.getMemberRole(orgId, userId);
+    if (!role || !allowedRoles.includes(role)) {
+      throw new ForbiddenException('Insufficient organization permissions');
+    }
+    return role;
+  }
+
+  private async recordReviewEvent(params: {
+    model: Model;
+    version?: ModelVersion | null;
+    actorId?: string | null;
+    action: VersionReviewAction;
+    message?: string | null;
+    metadata?: Record<string, unknown> | null;
+  }): Promise<void> {
+    const event = this.reviewEventRepository.create({
+      model: params.model,
+      version: params.version ?? null,
+      actor: params.actorId ? ({ id: params.actorId } as any) : null,
+      action: params.action,
+      message: params.message ?? null,
+      metadata: params.metadata ?? null,
+    });
+    await this.reviewEventRepository.save(event);
+  }
 
   /**
    * Registers a new model name and description under a specific user account.
@@ -61,7 +124,11 @@ export class ModelsService {
     framework: Framework,
     userId: string,
     isPublic: boolean = false,
+    ownerOrgId?: string,
   ): Promise<Model> {
+    if (ownerOrgId) {
+      await this.assertProviderOrgAccess(ownerOrgId, userId);
+    }
     // Retrieve global type price default
     const configKey = 'price_' + type.toLowerCase();
     const priceConfig = await this.systemConfigRepository.findOne({
@@ -82,7 +149,9 @@ export class ModelsService {
       taskType,
       framework,
       user: { id: userId },
+      organization: ownerOrgId ? { id: ownerOrgId } : null,
       isPublic,
+      marketplaceVerified: false,
       tier: type === ModelType.DIFFUSION ? 'LARGE' : 'SMALL',
       costPerRequest: defaultCost,
       providerSharePercent: defaultShare,
@@ -97,6 +166,15 @@ export class ModelsService {
     });
     if (fullModel) {
       await this.modelsSearchService.indexModel(fullModel);
+      await this.recordReviewEvent({
+        model: fullModel,
+        actorId: userId,
+        action: VersionReviewAction.MODEL_CREATED,
+        message: ownerOrgId
+          ? 'Organization model registry created'
+          : 'Personal model registry created',
+        metadata: { ownerOrgId: ownerOrgId ?? null },
+      });
     }
 
     return saved;
@@ -108,10 +186,32 @@ export class ModelsService {
    * @param userId - The UUID of the owner.
    * @returns A promise resolving to an array of Model entities.
    */
-  async getModels(userId: string): Promise<Model[]> {
+  async getModels(userId: string, orgId?: string): Promise<Model[]> {
+    if (orgId) {
+      await this.assertProviderOrgAccess(orgId, userId, [
+        OrgRole.OWNER,
+        OrgRole.MAINTAINER,
+        OrgRole.CONTRIBUTOR,
+        OrgRole.VIEWER,
+      ]);
+      return this.modelsRepository.find({
+        where: { organization: { id: orgId } },
+        relations: [
+          'organization',
+          'user',
+          'versions',
+          'versions.uploadedBy',
+          'versions.reviewedBy',
+          'versions.testCases',
+          'versions.deployments',
+        ],
+        order: { createdAt: 'DESC' },
+      });
+    }
+
     return this.modelsRepository.find({
       where: { user: { id: userId } },
-      relations: ['versions', 'versions.deployments'],
+      relations: ['organization', 'versions', 'versions.deployments'],
     });
   }
 
@@ -124,7 +224,7 @@ export class ModelsService {
   async getPublicModels(): Promise<Model[]> {
     return this.modelsRepository.find({
       where: { isPublic: true },
-      relations: ['versions', 'versions.deployments', 'user'],
+      relations: ['organization', 'versions', 'versions.deployments', 'user'],
     });
   }
 
@@ -138,7 +238,7 @@ export class ModelsService {
   async getPublicModel(modelId: string): Promise<Model> {
     const model = await this.modelsRepository.findOne({
       where: { id: modelId, isPublic: true },
-      relations: ['versions', 'versions.deployments', 'user'],
+      relations: ['organization', 'versions', 'versions.deployments', 'user'],
     });
     if (!model) {
       throw new NotFoundException('Public model not found');
@@ -153,13 +253,36 @@ export class ModelsService {
    * @returns A promise resolving to the Model entity.
    * @throws {NotFoundException} If the model does not exist.
    */
-  async getModel(modelId: string): Promise<Model> {
+  async getModel(modelId: string, actorId?: string): Promise<Model> {
     const model = await this.modelsRepository.findOne({
       where: { id: modelId },
-      relations: ['versions', 'versions.deployments', 'user'],
+      relations: [
+        'organization',
+        'versions',
+        'versions.uploadedBy',
+        'versions.reviewedBy',
+        'versions.testCases',
+        'versions.deployments',
+        'user',
+      ],
     });
     if (!model) {
       throw new NotFoundException('Model not found');
+    }
+    if (actorId && model.organization) {
+      await this.assertProviderOrgAccess(model.organization.id, actorId, [
+        OrgRole.OWNER,
+        OrgRole.MAINTAINER,
+        OrgRole.CONTRIBUTOR,
+        OrgRole.VIEWER,
+      ]);
+    } else if (
+      actorId &&
+      !model.organization &&
+      !model.isPublic &&
+      model.user?.id !== actorId
+    ) {
+      throw new ForbiddenException('You cannot access this private model');
     }
     return model;
   }
@@ -189,13 +312,26 @@ export class ModelsService {
     examplePayload?: string,
     expectedResult?: string,
     triggerBuild?: string,
+    uploaderUserId?: string,
   ): Promise<ModelVersion> {
     const model = await this.modelsRepository.findOne({
       where: { id: modelId },
-      relations: ['versions', 'user'],
+      relations: ['versions', 'user', 'organization'],
     });
     if (!model) {
       throw new NotFoundException('Model not found');
+    }
+    if (model.organization) {
+      if (!uploaderUserId) {
+        throw new ForbiddenException('Missing authenticated uploader');
+      }
+      await this.assertProviderOrgAccess(model.organization.id, uploaderUserId, [
+        OrgRole.OWNER,
+        OrgRole.MAINTAINER,
+        OrgRole.CONTRIBUTOR,
+      ]);
+    } else if (uploaderUserId && model.user?.id !== uploaderUserId) {
+      throw new ForbiddenException('Only the model owner can upload versions');
     }
 
     const versionNumber = model.versions.length + 1;
@@ -287,8 +423,12 @@ export class ModelsService {
 
     const modelVersion = this.modelVersionsRepository.create({
       model,
+      uploadedBy: uploaderUserId ? ({ id: uploaderUserId } as any) : null,
       versionNumber,
-      status: VersionStatus.UPLOADED,
+      status: model.organization ? VersionStatus.UPLOADED : VersionStatus.UPLOADED,
+      reviewStatus: model.organization
+        ? VersionReviewStatus.PENDING
+        : VersionReviewStatus.NOT_REQUIRED,
       modelFilePath: finalModelPath,
       scalerFilePath: scalerObjName || prevVersion?.scalerFilePath || null,
       preprocessFilePath:
@@ -309,12 +449,337 @@ export class ModelsService {
 
     const savedVersion = await this.modelVersionsRepository.save(modelVersion);
 
-    if (triggerBuild !== 'false') {
+    await this.recordReviewEvent({
+      model,
+      version: savedVersion,
+      actorId: uploaderUserId,
+      action: VersionReviewAction.VERSION_SUBMITTED,
+      message: model.organization
+        ? `Version v${versionNumber} submitted for maintainer review`
+        : `Version v${versionNumber} uploaded`,
+      metadata: {
+        reviewRequired: Boolean(model.organization),
+        files: {
+          model: Boolean(modelObjName),
+          scaler: Boolean(scalerObjName),
+          preprocess: Boolean(preprocessObjName),
+          postprocess: Boolean(postprocessObjName),
+        },
+      },
+    });
+
+    if (!model.organization && triggerBuild !== 'false') {
       // Dispatch job to build queue
       await this.buildQueue.add('build-model', { versionId: savedVersion.id });
     }
 
     return savedVersion;
+  }
+
+  async addVersionTestCase(
+    versionId: string,
+    actorId: string,
+    body: {
+      name: string;
+      payload: string;
+      expectedResult?: string;
+      notes?: string;
+    },
+  ): Promise<ModelVersionTestCase> {
+    const version = await this.modelVersionsRepository.findOne({
+      where: { id: versionId },
+      relations: ['model', 'model.organization'],
+    });
+    if (!version) {
+      throw new NotFoundException('Model version not found');
+    }
+    if (version.model.organization) {
+      await this.assertProviderOrgAccess(version.model.organization.id, actorId);
+    }
+
+    const testCase = this.testCaseRepository.create({
+      version,
+      createdBy: { id: actorId } as any,
+      name: body.name,
+      payload: body.payload,
+      expectedResult: body.expectedResult ?? null,
+      notes: body.notes ?? null,
+    });
+    const saved = await this.testCaseRepository.save(testCase);
+    await this.recordReviewEvent({
+      model: version.model,
+      version,
+      actorId,
+      action: VersionReviewAction.TEST_CASE_ADDED,
+      message: `Test case saved: ${body.name}`,
+    });
+    return saved;
+  }
+
+  async getVersionTestCases(
+    versionId: string,
+    actorId: string,
+  ): Promise<ModelVersionTestCase[]> {
+    const version = await this.modelVersionsRepository.findOne({
+      where: { id: versionId },
+      relations: ['model', 'model.organization'],
+    });
+    if (!version) {
+      throw new NotFoundException('Model version not found');
+    }
+    if (version.model.organization) {
+      await this.assertProviderOrgAccess(version.model.organization.id, actorId, [
+        OrgRole.OWNER,
+        OrgRole.MAINTAINER,
+        OrgRole.CONTRIBUTOR,
+        OrgRole.VIEWER,
+      ]);
+    }
+    return this.testCaseRepository.find({
+      where: { version: { id: versionId } },
+      relations: ['createdBy'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async reviewVersion(
+    versionId: string,
+    reviewerId: string,
+    decision: 'approve' | 'decline',
+    comment?: string,
+  ): Promise<ModelVersion> {
+    const version = await this.modelVersionsRepository.findOne({
+      where: { id: versionId },
+      relations: ['model', 'model.organization'],
+    });
+    if (!version) {
+      throw new NotFoundException('Model version not found');
+    }
+    const orgId = version.model.organization?.id;
+    if (!orgId) {
+      throw new BadRequestException('Personal model versions do not need review');
+    }
+    await this.assertProviderOrgAccess(orgId, reviewerId, [
+      OrgRole.OWNER,
+      OrgRole.MAINTAINER,
+    ]);
+
+    version.reviewStatus =
+      decision === 'approve'
+        ? VersionReviewStatus.APPROVED
+        : VersionReviewStatus.DECLINED;
+    version.reviewedBy = { id: reviewerId } as any;
+    version.reviewComment = comment ?? null;
+    version.reviewedAt = new Date();
+
+    if (decision === 'approve') {
+      version.status = VersionStatus.BUILDING;
+      version.model.marketplaceVerified = true;
+      version.model.isPublic = true;
+      await this.modelsRepository.save(version.model);
+      await this.buildQueue.add('build-model', { versionId: version.id });
+      const indexedModel = await this.modelsRepository.findOne({
+        where: { id: version.model.id },
+        relations: ['organization', 'user', 'versions', 'versions.deployments'],
+      });
+      if (indexedModel) {
+        await this.modelsSearchService.indexModel(indexedModel);
+      }
+    }
+
+    const saved = await this.modelVersionsRepository.save(version);
+    await this.recordReviewEvent({
+      model: version.model,
+      version,
+      actorId: reviewerId,
+      action:
+        decision === 'approve'
+          ? VersionReviewAction.REVIEW_APPROVED
+          : VersionReviewAction.REVIEW_DECLINED,
+      message: comment ?? `Version ${decision}d by maintainer`,
+    });
+    if (decision === 'approve') {
+      await this.recordReviewEvent({
+        model: version.model,
+        version,
+        actorId: reviewerId,
+        action: VersionReviewAction.BUILD_STARTED,
+        message: 'Build started after maintainer approval',
+      });
+    }
+    return saved;
+  }
+
+  async getModelHistory(
+    modelId: string,
+    actorId: string,
+  ): Promise<ModelVersionReviewEvent[]> {
+    const model = await this.modelsRepository.findOne({
+      where: { id: modelId },
+      relations: ['organization'],
+    });
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+    if (model.organization) {
+      await this.assertProviderOrgAccess(model.organization.id, actorId, [
+        OrgRole.OWNER,
+        OrgRole.MAINTAINER,
+        OrgRole.CONTRIBUTOR,
+        OrgRole.VIEWER,
+      ]);
+    }
+    return this.reviewEventRepository.find({
+      where: { model: { id: modelId } },
+      relations: ['actor', 'version'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async getVersionArtifactPreview(
+    versionId: string,
+    actorId: string,
+  ): Promise<{
+    artifacts: Array<{
+      kind: string;
+      path: string | null;
+      url: string | null;
+      previewable: boolean;
+    }>;
+  }> {
+    const version = await this.modelVersionsRepository.findOne({
+      where: { id: versionId },
+      relations: ['model', 'model.organization'],
+    });
+    if (!version) {
+      throw new NotFoundException('Model version not found');
+    }
+    if (version.model.organization) {
+      await this.assertProviderOrgAccess(version.model.organization.id, actorId, [
+        OrgRole.OWNER,
+        OrgRole.MAINTAINER,
+        OrgRole.CONTRIBUTOR,
+        OrgRole.VIEWER,
+      ]);
+    }
+
+    const entries = [
+      ['model', version.modelFilePath],
+      ['scaler', version.scalerFilePath],
+      ['preprocess.py', version.preprocessFilePath],
+      ['postprocess.py', version.postprocessFilePath],
+    ] as const;
+
+    const artifacts = await Promise.all(
+      entries.map(async ([kind, artifactPath]) => ({
+        kind,
+        path: artifactPath,
+        url: artifactPath ? await this.minioService.getFileUrl(artifactPath) : null,
+        previewable: Boolean(
+          artifactPath &&
+            (artifactPath.endsWith('.py') ||
+              artifactPath.endsWith('.json') ||
+              artifactPath.endsWith('.txt')),
+        ),
+      })),
+    );
+
+    return { artifacts };
+  }
+
+  async getOrganizationModelAnalytics(orgId: string, actorId: string) {
+    await this.assertProviderOrgAccess(orgId, actorId, [
+      OrgRole.OWNER,
+      OrgRole.MAINTAINER,
+    ]);
+
+    const models = await this.modelsRepository.find({
+      where: { organization: { id: orgId } },
+      relations: [
+        'user',
+        'versions',
+        'versions.uploadedBy',
+        'versions.reviewedBy',
+        'versions.testCases',
+        'versions.deployments',
+      ],
+    });
+
+    const versions = models.flatMap((model) =>
+      (model.versions ?? []).map((version) => ({ model, version })),
+    );
+    const pendingReviews = versions.filter(
+      ({ version }) => version.reviewStatus === VersionReviewStatus.PENDING,
+    ).length;
+    const approvedVersions = versions.filter(
+      ({ version }) => version.reviewStatus === VersionReviewStatus.APPROVED,
+    ).length;
+    const declinedVersions = versions.filter(
+      ({ version }) => version.reviewStatus === VersionReviewStatus.DECLINED,
+    ).length;
+    const readyVersions = versions.filter(
+      ({ version }) => version.status === VersionStatus.READY,
+    ).length;
+    const runningDeployments = versions.reduce(
+      (count, { version }) =>
+        count +
+        (version.deployments ?? []).filter(
+          (deployment) => deployment.status === DeploymentStatus.RUNNING,
+        ).length,
+      0,
+    );
+    const totalEarnings = models.reduce(
+      (sum, model) => sum + (Number(model.totalEarnings) || 0),
+      0,
+    );
+
+    const byUploader = new Map<string, { name: string; models: number; versions: number }>();
+    for (const model of models) {
+      const creatorKey = model.user?.id ?? 'unknown';
+      const creatorName = model.user?.email ?? 'Unknown';
+      const current = byUploader.get(creatorKey) ?? {
+        name: creatorName,
+        models: 0,
+        versions: 0,
+      };
+      current.models += 1;
+      current.versions += model.versions?.length ?? 0;
+      byUploader.set(creatorKey, current);
+    }
+
+    return {
+      totals: {
+        models: models.length,
+        versions: versions.length,
+        pendingReviews,
+        approvedVersions,
+        declinedVersions,
+        readyVersions,
+        runningDeployments,
+        totalEarnings,
+        marketplaceVerified: models.filter((model) => model.marketplaceVerified)
+          .length,
+      },
+      byUploader: Array.from(byUploader.values()),
+      recentVersions: versions
+        .sort(
+          (a, b) =>
+            new Date(b.version.createdAt).getTime() -
+            new Date(a.version.createdAt).getTime(),
+        )
+        .slice(0, 12)
+        .map(({ model, version }) => ({
+          modelId: model.id,
+          modelName: model.name,
+          versionId: version.id,
+          versionNumber: version.versionNumber,
+          status: version.status,
+          reviewStatus: version.reviewStatus,
+          uploadedBy: version.uploadedBy?.email ?? model.user?.email ?? null,
+          reviewedBy: version.reviewedBy?.email ?? null,
+          createdAt: version.createdAt,
+        })),
+    };
   }
 
   /**
@@ -429,7 +894,9 @@ export class ModelsService {
     try {
       await execPromise(`docker rmi -f model-version-${versionId}`);
     } catch (e: any) {
-      console.warn(`Failed to delete Docker image model-version-${versionId}: ${e.message || e}`);
+      console.warn(
+        `Failed to delete Docker image model-version-${versionId}: ${e.message || e}`,
+      );
     }
   }
 

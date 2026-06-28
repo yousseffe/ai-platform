@@ -112,10 +112,12 @@ export class AuthService {
       await queryRunner.commitTransaction();
 
       // Trigger verification email asynchronously
-      this.mailService.sendOtpVerification(email, fullName, codeStr).catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`Deferred email send failed on register: ${msg}`);
-      });
+      this.mailService
+        .sendOtpVerification(email, fullName, codeStr)
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`Deferred email send failed on register: ${msg}`);
+        });
 
       return {
         success: true,
@@ -269,10 +271,12 @@ export class AuthService {
     );
 
     // Trigger verification email asynchronously
-    this.mailService.sendOtpVerification(email, user.fullName, codeStr).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`Deferred email send failed on resendOtp: ${msg}`);
-    });
+    this.mailService
+      .sendOtpVerification(email, user.fullName, codeStr)
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`Deferred email send failed on resendOtp: ${msg}`);
+      });
 
     return {
       success: true,

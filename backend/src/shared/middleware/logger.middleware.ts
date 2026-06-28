@@ -11,7 +11,7 @@ export class LoggerMiddleware implements NestMiddleware {
 
   /**
    * Intercepts request and registers handler on response finish to log outcome metadata.
-   * 
+   *
    * @param req - Express request payload context.
    * @param res - Express response pipeline context.
    * @param next - Forward execution chain handler.

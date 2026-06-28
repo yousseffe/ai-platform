@@ -6,7 +6,11 @@
  * @param otpCode - The 6-digit access verification code.
  * @returns A string containing the formatted HTML email body.
  */
-export function getWorkspaceAccessTemplate(email: string, orgName: string, otpCode: string): string {
+export function getWorkspaceAccessTemplate(
+  email: string,
+  orgName: string,
+  otpCode: string,
+): string {
   const year = new Date().getFullYear();
   return `<!DOCTYPE html>
 <html>

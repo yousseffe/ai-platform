@@ -1,5 +1,5 @@
 import { User } from "../user";
-import { DeploymentStatus, VersionStatus, PredictionStatus, ModelType, Framework } from "../enums";
+import { DeploymentStatus, VersionStatus, VersionReviewStatus, PredictionStatus, ModelType, Framework } from "../enums";
 
 export interface Deployment {
   id: string;
@@ -16,6 +16,11 @@ export interface ModelVersion {
   id: string;
   versionNumber: number;
   status: VersionStatus;
+  reviewStatus?: VersionReviewStatus;
+  uploadedBy?: User | null;
+  reviewedBy?: User | null;
+  reviewComment?: string | null;
+  reviewedAt?: string | null;
   modelFilePath: string;
   scalerFilePath?: string;
   preprocessFilePath?: string;
@@ -25,8 +30,29 @@ export interface ModelVersion {
   errorMessage?: string;
   buildProgress?: number;
   deployments?: Deployment[];
+  testCases?: ModelVersionTestCase[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ModelVersionTestCase {
+  id: string;
+  name: string;
+  payload: string;
+  expectedResult?: string | null;
+  notes?: string | null;
+  createdBy?: User | null;
+  createdAt: string;
+}
+
+export interface ModelVersionReviewEvent {
+  id: string;
+  action: string;
+  message?: string | null;
+  metadata?: Record<string, unknown> | null;
+  actor?: User | null;
+  version?: Pick<ModelVersion, "id" | "versionNumber" | "status" | "reviewStatus"> | null;
+  createdAt: string;
 }
 
 export interface Model {
@@ -34,6 +60,13 @@ export interface Model {
   name: string;
   description?: string;
   user?: User;
+  organization?: {
+    id: string;
+    name: string;
+    slug: string;
+    type: string;
+    avatarUrl?: string | null;
+  } | null;
   versions?: ModelVersion[];
   tier?: string;
   costPerRequest?: number;
@@ -42,6 +75,7 @@ export interface Model {
   totalEarnings?: number;
   uniqueUsersCount?: number;
   isPublic?: boolean;
+  marketplaceVerified?: boolean;
   type?: ModelType;
   framework?: Framework;
   taskType?: string;
@@ -72,6 +106,8 @@ export interface SearchModelHit {
   taskType: string;
   framework: string;
   isPublic: boolean;
+  marketplaceVerified?: boolean;
+  organizationName?: string | null;
   publisherEmail: string;
   versionCount: number;
   hasLiveDeployment: boolean;

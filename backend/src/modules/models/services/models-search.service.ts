@@ -11,6 +11,8 @@ interface ModelDocument {
   taskType: string;
   framework: string;
   isPublic: boolean;
+  marketplaceVerified: boolean;
+  organizationName: string | null;
   publisherEmail: string;
   versionCount: number;
   hasLiveDeployment: boolean;
@@ -112,6 +114,8 @@ export class ModelsSearchService implements OnModuleInit {
             taskType: { type: 'keyword' },
             framework: { type: 'keyword' },
             isPublic: { type: 'boolean' },
+            marketplaceVerified: { type: 'boolean' },
+            organizationName: { type: 'keyword' },
             publisherEmail: { type: 'keyword' },
             versionCount: { type: 'integer' },
             hasLiveDeployment: { type: 'boolean' },
@@ -275,6 +279,8 @@ export class ModelsSearchService implements OnModuleInit {
       taskType: model.taskType ?? '',
       framework: model.framework ?? '',
       isPublic: model.isPublic,
+      marketplaceVerified: model.marketplaceVerified,
+      organizationName: model.organization?.name ?? null,
       publisherEmail: model.user?.email ?? '',
       versionCount: model.versions?.length ?? 0,
       hasLiveDeployment,

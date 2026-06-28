@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Wallet } from './entities/wallet.entity';
 import { Transaction } from './entities/transaction.entity';
@@ -9,6 +9,7 @@ import { WalletsController } from './controllers/wallets.controller';
 import { PaymentsController } from './controllers/payments.controller';
 import { WalletController } from './controllers/wallet.controller';
 import { StripeModule } from '../../shared/stripe/stripe.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 
 /**
  * Module responsible for ledger balance initializations and credit/revenue logic.
@@ -22,6 +23,7 @@ import { StripeModule } from '../../shared/stripe/stripe.module';
       SystemConfig,
     ]),
     StripeModule,
+    forwardRef(() => OrganizationsModule),
   ],
   providers: [WalletsService],
   controllers: [WalletsController, PaymentsController, WalletController],

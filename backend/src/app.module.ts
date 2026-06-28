@@ -10,6 +10,8 @@ import { User } from './modules/users/entities/user.entity';
 import { AuditLog } from './modules/users/entities/audit-log.entity';
 import { Model } from './modules/models/entities/model.entity';
 import { ModelVersion } from './modules/models/entities/model-version.entity';
+import { ModelVersionTestCase } from './modules/models/entities/model-version-test-case.entity';
+import { ModelVersionReviewEvent } from './modules/models/entities/model-version-review-event.entity';
 import { Deployment } from './modules/deployments/entities/deployment.entity';
 import { MulterModule } from '@nestjs/platform-express';
 import { MinioModule } from './shared/minio/minio.module';
@@ -21,6 +23,8 @@ import { Transaction } from './modules/wallets/entities/transaction.entity';
 import { ProcessedWebhook } from './modules/wallets/entities/processed-webhook.entity';
 import { Organization } from './modules/organizations/entities/organization.entity';
 import { OrgMember } from './modules/organizations/entities/org-member.entity';
+import { Project } from './modules/organizations/entities/project.entity';
+import { OrgApiKey } from './modules/organizations/entities/org-api-key.entity';
 import { VerificationCode } from './modules/auth/entities/verification-code.entity';
 import { ApiKey } from './modules/auth/entities/api-key.entity';
 import { ModelLog } from './modules/models/entities/model-log.entity';
@@ -49,12 +53,16 @@ import { MailModule } from './shared/mail/mail.module';
         AuditLog,
         Model,
         ModelVersion,
+        ModelVersionTestCase,
+        ModelVersionReviewEvent,
         Deployment,
         Wallet,
         Transaction,
         ProcessedWebhook,
         Organization,
         OrgMember,
+        Project,
+        OrgApiKey,
         VerificationCode,
         ApiKey,
         ModelLog,
@@ -88,8 +96,6 @@ import { MailModule } from './shared/mail/mail.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(LoggerMiddleware)
-      .forRoutes('*');
+    consumer.apply(LoggerMiddleware).forRoutes('*');
   }
 }

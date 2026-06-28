@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { OrgRole } from "@/types";
+import { OrgRole, OrgType } from "@/types";
 
 /**
  * Validation schema for workspace creation.
  * Checks for a valid name (3-50 chars), a URL slug (lowercase alphanumeric & hyphens, 3-50 chars),
+ * organization type classification, optional description bio, optional avatar image url,
  * and an optional list of invited collaborators.
  */
 export const workspaceCreateSchema = z.object({
@@ -21,6 +22,17 @@ export const workspaceCreateSchema = z.object({
       "Slug must only contain lowercase alphanumeric characters and single hyphens, and cannot start or end with a hyphen"
     )
     .trim(),
+  type: z.nativeEnum(OrgType),
+  description: z
+    .string()
+    .max(200, "Description must be at most 200 characters")
+    .optional()
+    .or(z.literal("")),
+  avatarUrl: z
+    .string()
+    .url("Invalid avatar image URL format")
+    .optional()
+    .or(z.literal("")),
   collaborators: z
     .array(
       z.object({

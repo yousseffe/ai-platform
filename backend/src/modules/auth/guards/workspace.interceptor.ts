@@ -42,6 +42,10 @@ export class WorkspaceInterceptor implements NestInterceptor {
       return next.handle();
     }
 
+    if (request.workspaceId && request.workspaceType) {
+      return next.handle();
+    }
+
     // Default workspace context: Individual User
     let workspaceId = user.id;
     let workspaceType: OwnerType = OwnerType.USER;

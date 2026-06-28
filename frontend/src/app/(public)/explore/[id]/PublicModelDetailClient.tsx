@@ -396,6 +396,12 @@ console.log(data);`;
                     : "Free Sandbox Run"
                   }
                 </span>
+                {model.marketplaceVerified && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+                    <Shield className="w-3 h-3" />
+                    Verified Provider
+                  </span>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/20 pb-4">

@@ -154,6 +154,7 @@ export class PaymentsController {
       event = this.stripeService.constructEvent(
         req.rawBody as Buffer,
         signature,
+        'payments',
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -163,18 +164,26 @@ export class PaymentsController {
       );
     }
 
-    this.logger.log(`[Stripe Payments Webhook Received] Event Type: ${event.type}`);
+    this.logger.log(
+      `[Stripe Payments Webhook Received] Event Type: ${event.type}`,
+    );
 
     try {
       const processed = await this.walletsService.processStripeWebhook(event);
       if (processed) {
-        this.logger.log(`[Stripe Payments Webhook Success] Processed event ID: ${event.id}`);
+        this.logger.log(
+          `[Stripe Payments Webhook Success] Processed event ID: ${event.id}`,
+        );
       } else {
-        this.logger.log(`[Stripe Payments Webhook Skipped/Duplicate] Event ID: ${event.id}`);
+        this.logger.log(
+          `[Stripe Payments Webhook Skipped/Duplicate] Event ID: ${event.id}`,
+        );
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`[Stripe Payments Webhook Error] Failed to process event ${event.id}: ${message}`);
+      this.logger.error(
+        `[Stripe Payments Webhook Error] Failed to process event ${event.id}: ${message}`,
+      );
       throw new InternalServerErrorException(
         `Failed to process Stripe webhook: ${message}`,
       );

@@ -59,8 +59,13 @@ export class BuildProcessor extends WorkerHost {
   /**
    * Helper to persist build progress percentage (0-100) for real-time UI updates.
    */
-  private async updateProgress(versionId: string, progress: number): Promise<void> {
-    await this.modelVersionsRepository.update(versionId, { buildProgress: progress });
+  private async updateProgress(
+    versionId: string,
+    progress: number,
+  ): Promise<void> {
+    await this.modelVersionsRepository.update(versionId, {
+      buildProgress: progress,
+    });
   }
 
   async process(job: Job<BuildJobPayload, void, string>): Promise<void> {
@@ -125,28 +130,36 @@ export class BuildProcessor extends WorkerHost {
       await this.updateProgress(versionId, 5);
       const downloads: Promise<void>[] = [];
       if (version.modelFilePath) {
-        downloads.push(this.minioService.downloadFile(
-          version.modelFilePath,
-          path.join(buildDir, 'model.pkl'),
-        ));
+        downloads.push(
+          this.minioService.downloadFile(
+            version.modelFilePath,
+            path.join(buildDir, 'model.pkl'),
+          ),
+        );
       }
       if (version.scalerFilePath) {
-        downloads.push(this.minioService.downloadFile(
-          version.scalerFilePath,
-          path.join(buildDir, 'scaler.pkl'),
-        ));
+        downloads.push(
+          this.minioService.downloadFile(
+            version.scalerFilePath,
+            path.join(buildDir, 'scaler.pkl'),
+          ),
+        );
       }
       if (version.preprocessFilePath) {
-        downloads.push(this.minioService.downloadFile(
-          version.preprocessFilePath,
-          path.join(buildDir, 'preprocess.py'),
-        ));
+        downloads.push(
+          this.minioService.downloadFile(
+            version.preprocessFilePath,
+            path.join(buildDir, 'preprocess.py'),
+          ),
+        );
       }
       if (version.postprocessFilePath) {
-        downloads.push(this.minioService.downloadFile(
-          version.postprocessFilePath,
-          path.join(buildDir, 'postprocess.py'),
-        ));
+        downloads.push(
+          this.minioService.downloadFile(
+            version.postprocessFilePath,
+            path.join(buildDir, 'postprocess.py'),
+          ),
+        );
       }
       await Promise.all(downloads);
 
@@ -156,15 +169,19 @@ export class BuildProcessor extends WorkerHost {
       let modelPathEnv = 'model.pkl';
       const modelLocalPath = path.join(buildDir, 'model.pkl');
       if (fs.existsSync(modelLocalPath)) {
-        const isZip = isZipFile(modelLocalPath) && version.modelFilePath?.toLowerCase().endsWith('.zip');
+        const isZip =
+          isZipFile(modelLocalPath) &&
+          version.modelFilePath?.toLowerCase().endsWith('.zip');
         if (isZip) {
-          this.logger.log(`Detected model weights file is a ZIP archive. Extracting...`);
+          this.logger.log(
+            `Detected model weights file is a ZIP archive. Extracting...`,
+          );
           const unzippedDir = path.join(buildDir, 'unzipped_model');
           fs.mkdirSync(unzippedDir, { recursive: true });
           try {
             const { execSync } = require('child_process');
             execSync(`tar -xf model.pkl -C unzipped_model`, { cwd: buildDir });
-            
+
             const contents = fs.readdirSync(unzippedDir);
             const subdirs = contents.filter((file) =>
               fs.statSync(path.join(unzippedDir, file)).isDirectory(),
@@ -175,31 +192,57 @@ export class BuildProcessor extends WorkerHost {
               modelPathEnv = 'unzipped_model';
             }
             fs.unlinkSync(modelLocalPath);
-            this.logger.log(`Extraction complete. MODEL_PATH set to: ${modelPathEnv}`);
+            this.logger.log(
+              `Extraction complete. MODEL_PATH set to: ${modelPathEnv}`,
+            );
 
             // Auto-fix tokenizer in model_index.json for Stable Diffusion if needed
             const resolvedModelDir = path.join(buildDir, modelPathEnv);
-            const modelIndexJsonPath = path.join(resolvedModelDir, 'model_index.json');
+            const modelIndexJsonPath = path.join(
+              resolvedModelDir,
+              'model_index.json',
+            );
             if (fs.existsSync(modelIndexJsonPath)) {
               try {
-                const indexContent = fs.readFileSync(modelIndexJsonPath, 'utf8');
+                const indexContent = fs.readFileSync(
+                  modelIndexJsonPath,
+                  'utf8',
+                );
                 const indexData = JSON.parse(indexContent);
-                if (indexData && indexData.tokenizer && indexData.tokenizer[1] === 'CLIPTokenizer') {
+                if (
+                  indexData &&
+                  indexData.tokenizer &&
+                  indexData.tokenizer[1] === 'CLIPTokenizer'
+                ) {
                   const tokenizerDir = path.join(resolvedModelDir, 'tokenizer');
-                  const vocabExists = fs.existsSync(path.join(tokenizerDir, 'vocab.json'));
-                  const mergesExists = fs.existsSync(path.join(tokenizerDir, 'merges.txt'));
+                  const vocabExists = fs.existsSync(
+                    path.join(tokenizerDir, 'vocab.json'),
+                  );
+                  const mergesExists = fs.existsSync(
+                    path.join(tokenizerDir, 'merges.txt'),
+                  );
                   if (!vocabExists || !mergesExists) {
-                    this.logger.log(`vocab.json or merges.txt is missing. Swapping CLIPTokenizer to CLIPTokenizerFast in model_index.json`);
+                    this.logger.log(
+                      `vocab.json or merges.txt is missing. Swapping CLIPTokenizer to CLIPTokenizerFast in model_index.json`,
+                    );
                     indexData.tokenizer[1] = 'CLIPTokenizerFast';
-                    fs.writeFileSync(modelIndexJsonPath, JSON.stringify(indexData, null, 2), 'utf8');
+                    fs.writeFileSync(
+                      modelIndexJsonPath,
+                      JSON.stringify(indexData, null, 2),
+                      'utf8',
+                    );
                   }
                 }
               } catch (e: any) {
-                this.logger.warn(`Failed to inspect/auto-fix model_index.json: ${e.message || e}`);
+                this.logger.warn(
+                  `Failed to inspect/auto-fix model_index.json: ${e.message || e}`,
+                );
               }
             }
           } catch (err: any) {
-            this.logger.error(`Failed to extract ZIP archive: ${err.message || err}`);
+            this.logger.error(
+              `Failed to extract ZIP archive: ${err.message || err}`,
+            );
             throw err;
           }
         }
@@ -270,19 +313,98 @@ ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "
         // Detect if custom scripts require extra python packages not bundled in our base image
         const extraDependencies: string[] = [];
         const builtInAndBase = new Set([
-          'os', 'sys', 'json', 'math', 'pickle', 'importlib', 'datetime', 'time', 're', 'collections',
-          'numpy', 'pandas', 'sklearn', 'joblib', 'fastapi', 'uvicorn', 'pydantic', 'typing',
-          'base64', 'io', 'PIL', 'shutil', 'hashlib', 'uuid', 'binascii', 'argparse', 'logging', 'random',
-          'torch', 'torchvision', 'diffusers', 'transformers', 'accelerate',
+          'os',
+          'sys',
+          'json',
+          'math',
+          'pickle',
+          'importlib',
+          'datetime',
+          'time',
+          're',
+          'collections',
+          'numpy',
+          'pandas',
+          'sklearn',
+          'joblib',
+          'fastapi',
+          'uvicorn',
+          'pydantic',
+          'typing',
+          'base64',
+          'io',
+          'PIL',
+          'shutil',
+          'hashlib',
+          'uuid',
+          'binascii',
+          'argparse',
+          'logging',
+          'random',
+          'torch',
+          'torchvision',
+          'diffusers',
+          'transformers',
+          'accelerate',
           // Python stdlib modules commonly used in preprocess/postprocess scripts
-          'urllib', 'dataclasses', '__future__', 'abc', 'enum', 'functools', 'itertools', 'operator',
-          'string', 'struct', 'textwrap', 'copy', 'pathlib', 'tempfile', 'glob', 'csv', 'configparser',
-          'warnings', 'traceback', 'contextlib', 'decimal', 'fractions', 'statistics', 'array',
-          'bisect', 'heapq', 'queue', 'threading', 'multiprocessing', 'subprocess', 'signal',
-          'socket', 'http', 'email', 'html', 'xml', 'codecs', 'unicodedata', 'locale',
-          'pprint', 'inspect', 'dis', 'ast', 'token', 'keyword', 'tokenize',
-          'unittest', 'doctest', 'types', 'weakref', 'gc', 'platform', 'ctypes',
-          'gzip', 'bz2', 'lzma', 'zipfile', 'tarfile',
+          'urllib',
+          'dataclasses',
+          '__future__',
+          'abc',
+          'enum',
+          'functools',
+          'itertools',
+          'operator',
+          'string',
+          'struct',
+          'textwrap',
+          'copy',
+          'pathlib',
+          'tempfile',
+          'glob',
+          'csv',
+          'configparser',
+          'warnings',
+          'traceback',
+          'contextlib',
+          'decimal',
+          'fractions',
+          'statistics',
+          'array',
+          'bisect',
+          'heapq',
+          'queue',
+          'threading',
+          'multiprocessing',
+          'subprocess',
+          'signal',
+          'socket',
+          'http',
+          'email',
+          'html',
+          'xml',
+          'codecs',
+          'unicodedata',
+          'locale',
+          'pprint',
+          'inspect',
+          'dis',
+          'ast',
+          'token',
+          'keyword',
+          'tokenize',
+          'unittest',
+          'doctest',
+          'types',
+          'weakref',
+          'gc',
+          'platform',
+          'ctypes',
+          'gzip',
+          'bz2',
+          'lzma',
+          'zipfile',
+          'tarfile',
         ]);
 
         const scanImports = (filePath: string) => {
@@ -329,35 +451,51 @@ ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "
 
         if (version.model.type === ModelType.DIFFUSION) {
           try {
-            await this.docker.getImage('ai-platform-diffusion-base:latest').inspect();
+            await this.docker
+              .getImage('ai-platform-diffusion-base:latest')
+              .inspect();
             baseImage = 'ai-platform-diffusion-base:latest';
             useBaseImage = true;
           } catch (e) {
-            this.logger.log('Base image ai-platform-diffusion-base:latest not found. Falling back to python:3.9-slim.');
+            this.logger.log(
+              'Base image ai-platform-diffusion-base:latest not found. Falling back to python:3.9-slim.',
+            );
           }
         } else if (version.model.framework === Framework.PYTORCH) {
           try {
-            await this.docker.getImage('ai-platform-pytorch-base:latest').inspect();
+            await this.docker
+              .getImage('ai-platform-pytorch-base:latest')
+              .inspect();
             baseImage = 'ai-platform-pytorch-base:latest';
             useBaseImage = true;
           } catch (e) {
-            this.logger.log('Base image ai-platform-pytorch-base:latest not found. Falling back to python:3.9-slim.');
+            this.logger.log(
+              'Base image ai-platform-pytorch-base:latest not found. Falling back to python:3.9-slim.',
+            );
           }
         } else if (version.model.framework === Framework.TENSORFLOW) {
           try {
-            await this.docker.getImage('ai-platform-tensorflow-base:latest').inspect();
+            await this.docker
+              .getImage('ai-platform-tensorflow-base:latest')
+              .inspect();
             baseImage = 'ai-platform-tensorflow-base:latest';
             useBaseImage = true;
           } catch (e) {
-            this.logger.log('Base image ai-platform-tensorflow-base:latest not found. Trying sklearn base with extra tensorflow install.');
+            this.logger.log(
+              'Base image ai-platform-tensorflow-base:latest not found. Trying sklearn base with extra tensorflow install.',
+            );
             // Fallback: use sklearn base + extra tensorflow install
             try {
-              await this.docker.getImage('ai-platform-sklearn-base:latest').inspect();
+              await this.docker
+                .getImage('ai-platform-sklearn-base:latest')
+                .inspect();
               baseImage = 'ai-platform-sklearn-base:latest';
               useBaseImage = true;
               extraPipInstall += '\nRUN pip install --no-cache-dir tensorflow';
             } catch (e2) {
-              this.logger.log('No base images found. Falling back to python:3.9-slim.');
+              this.logger.log(
+                'No base images found. Falling back to python:3.9-slim.',
+              );
             }
           }
         } else if (
@@ -367,15 +505,20 @@ ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "
           version.model.type === ModelType.TABULAR
         ) {
           try {
-            await this.docker.getImage('ai-platform-sklearn-base:latest').inspect();
+            await this.docker
+              .getImage('ai-platform-sklearn-base:latest')
+              .inspect();
             baseImage = 'ai-platform-sklearn-base:latest';
             useBaseImage = true;
           } catch (e) {
-            this.logger.log('Base image ai-platform-sklearn-base:latest not found. Falling back to python:3.9-slim.');
+            this.logger.log(
+              'Base image ai-platform-sklearn-base:latest not found. Falling back to python:3.9-slim.',
+            );
           }
         }
 
-        const originalModelName = path.basename(version.modelFilePath || '') || version.model.name;
+        const originalModelName =
+          path.basename(version.modelFilePath || '') || version.model.name;
 
         if (useBaseImage) {
           dockerfileContent = `FROM ${baseImage}
@@ -418,10 +561,14 @@ numpy
 `;
 
         if (version.model.type === ModelType.DIFFUSION) {
-          requirementsContent = `--extra-index-url https://download.pytorch.org/whl/cpu\n` + requirementsContent;
+          requirementsContent =
+            `--extra-index-url https://download.pytorch.org/whl/cpu\n` +
+            requirementsContent;
           requirementsContent += '\ndiffusers\ntransformers\naccelerate\ntorch';
         } else if (version.model.framework === Framework.PYTORCH) {
-          requirementsContent = `--extra-index-url https://download.pytorch.org/whl/cpu\n` + requirementsContent;
+          requirementsContent =
+            `--extra-index-url https://download.pytorch.org/whl/cpu\n` +
+            requirementsContent;
           requirementsContent += '\ntorch\ntorchvision';
         } else if (version.model.framework === Framework.SKLEARN) {
           requirementsContent += '\nscikit-learn\njoblib';
@@ -498,9 +645,12 @@ numpy
       try {
         const { execSync } = require('child_process');
         execSync('docker image prune -f', { timeout: 30000 });
-        this.logger.log('Successfully pruned dangling/intermediate docker images');
+        this.logger.log(
+          'Successfully pruned dangling/intermediate docker images',
+        );
       } catch (pruneError: unknown) {
-        const pruneMsg = pruneError instanceof Error ? pruneError.message : String(pruneError);
+        const pruneMsg =
+          pruneError instanceof Error ? pruneError.message : String(pruneError);
         this.logger.warn(`Failed to prune dangling images: ${pruneMsg}`);
       }
 

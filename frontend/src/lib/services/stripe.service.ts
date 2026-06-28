@@ -12,14 +12,18 @@ interface CheckoutSessionResponse {
  * @returns A promise resolving to void once redirection starts.
  * @throws {Error} If session URL generation or redirect fails.
  */
-export async function redirectToCheckout(amount: number): Promise<void> {
+export async function redirectToCheckout(
+  amount: number,
+  options: { workspaceId?: string; returnPath?: string } = {}
+): Promise<void> {
   try {
     const data = await smartFetch<CheckoutSessionResponse>("/wallets/checkout-session", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(options.workspaceId ? { "X-Workspace-Id": options.workspaceId } : {}),
       },
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ amount, returnPath: options.returnPath }),
     });
 
     if (data && data.url) {

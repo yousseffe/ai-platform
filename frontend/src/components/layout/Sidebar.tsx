@@ -3,8 +3,9 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { toast } from "react-hot-toast";
 import {
   LayoutGrid,
   Layers,
@@ -23,6 +24,7 @@ import {
   Activity,
 } from "lucide-react";
 import { useWorkspace, Workspace } from "@/hooks/use-workspace";
+import { smartFetch } from "@/lib/utils/smart-fetch";
 import { OwnerType, WalletType } from "@/types";
 import {
   DropdownMenu,
@@ -99,7 +101,80 @@ export default function Sidebar() {
     switchingWorkspace,
     setViewMode,
     isAdmin,
+    refreshData,
   } = useWorkspace();
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  React.useEffect(() => {
+    const status = searchParams.get("status");
+    const pendingOrgId = searchParams.get("pending_org");
+
+    if (status !== "org_success" || !pendingOrgId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    /**
+     * Polls the backend until the Stripe webhook finishes organization creation.
+     */
+    const waitForOrganizationCreation = async () => {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        try {
+          const checkoutState = await smartFetch<{
+            status: "pending" | "completed" | "expired";
+            organization?: { id: string; name: string; slug: string };
+          }>(`/organizations/checkout-status/${pendingOrgId}`);
+
+          if (cancelled) {
+            return;
+          }
+
+          if (checkoutState.status === "completed" && checkoutState.organization) {
+            await refreshData();
+            toast.success("Workspace created successfully!");
+            router.replace(`/orgs/${checkoutState.organization.slug}/overview`);
+            return;
+          }
+
+          if (checkoutState.status === "expired") {
+            toast.error("Workspace payment succeeded, but creation status expired. Please refresh and check your organizations.");
+            router.replace("/dashboard");
+            return;
+          }
+        } catch (error) {
+          if (cancelled) {
+            return;
+          }
+
+          if (attempt === 9) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Failed to confirm workspace creation";
+            toast.error(message);
+            router.replace("/dashboard");
+            return;
+          }
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      }
+
+      if (!cancelled) {
+        toast.error("Workspace creation is taking longer than expected. Please refresh your dashboard in a moment.");
+        router.replace("/dashboard");
+      }
+    };
+
+    waitForOrganizationCreation().catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, pathname, router, refreshData]);
 
   const [otpCode, setOtpCode] = React.useState("");
   const [otpError, setOtpError] = React.useState("");
@@ -199,7 +274,13 @@ export default function Sidebar() {
               {workspaces.map((ws: Workspace) => (
                 <DropdownMenuItem
                   key={ws.id}
-                  onClick={() => triggerWorkspaceSwitch(ws)}
+                  onClick={() => {
+                    if (ws.type === OwnerType.USER) {
+                      triggerWorkspaceSwitch(ws);
+                    } else {
+                      router.push(`/orgs/${ws.slug}/overview`);
+                    }
+                  }}
                   className={`w-full flex items-center gap-2.5 p-2 rounded-lg text-left text-xs transition-colors cursor-pointer outline-none ${
                     activeWorkspace?.id === ws.id 
                       ? "bg-primary/10 font-semibold text-primary" 

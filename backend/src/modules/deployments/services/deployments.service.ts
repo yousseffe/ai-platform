@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import * as Docker from 'dockerode';
@@ -38,7 +43,9 @@ export class DeploymentsService implements OnModuleInit {
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Failed to register check-idle-deployments: ${message}`);
+      this.logger.error(
+        `Failed to register check-idle-deployments: ${message}`,
+      );
     }
   }
 
@@ -78,10 +85,13 @@ export class DeploymentsService implements OnModuleInit {
    * @returns A promise resolving to the deployment endpoint URL.
    * @throws {NotFoundException} If no active running deployment is found.
    */
-  async getActiveDeploymentUrlByVersion(modelId: string, versionNumber: number): Promise<string> {
+  async getActiveDeploymentUrlByVersion(
+    modelId: string,
+    versionNumber: number,
+  ): Promise<string> {
     const deployment = await this.deploymentsRepository.findOne({
       where: {
-        modelVersion: { 
+        modelVersion: {
           model: { id: modelId },
           versionNumber: versionNumber,
         },
@@ -91,11 +101,15 @@ export class DeploymentsService implements OnModuleInit {
     });
 
     if (!deployment) {
-      throw new NotFoundException(`No active deployment found for version v${versionNumber} of this model`);
+      throw new NotFoundException(
+        `No active deployment found for version v${versionNumber} of this model`,
+      );
     }
 
     if (deployment.url === null) {
-      throw new NotFoundException(`Active deployment URL is not set for version v${versionNumber}`);
+      throw new NotFoundException(
+        `Active deployment URL is not set for version v${versionNumber}`,
+      );
     }
 
     return deployment.url;

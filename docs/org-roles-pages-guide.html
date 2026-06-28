@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <title>دليل أدوار وصفحات الـ Organization</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: #111827;
+      background: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.75;
+      font-size: 12px;
+    }
+
+    .cover {
+      padding: 28px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      background: #f8fafc;
+      margin-bottom: 22px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 26px;
+      color: #0f172a;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 26px 0 10px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid #d1d5db;
+      font-size: 18px;
+      color: #111827;
+    }
+
+    h3 {
+      margin: 20px 0 8px;
+      font-size: 14px;
+      color: #1f2937;
+    }
+
+    p {
+      margin: 6px 0;
+    }
+
+    .muted {
+      color: #6b7280;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #334155;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge.provider {
+      color: #047857;
+      background: #ecfdf5;
+      border-color: #a7f3d0;
+    }
+
+    .badge.consumer {
+      color: #1d4ed8;
+      background: #eff6ff;
+      border-color: #bfdbfe;
+    }
+
+    .badge.admin {
+      color: #92400e;
+      background: #fffbeb;
+      border-color: #fde68a;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 18px;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      border: 1px solid #d1d5db;
+      padding: 8px 9px;
+      vertical-align: top;
+      text-align: right;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 800;
+    }
+
+    td ul {
+      margin: 0;
+      padding-right: 16px;
+    }
+
+    li {
+      margin: 2px 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 10px 0 18px;
+    }
+
+    .card {
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 12px;
+      background: #ffffff;
+      break-inside: avoid;
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .route {
+      direction: ltr;
+      unicode-bidi: embed;
+      display: inline-block;
+      padding: 1px 5px;
+      border-radius: 5px;
+      background: #f3f4f6;
+      color: #111827;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .note {
+      border-right: 4px solid #2563eb;
+      background: #eff6ff;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: #1e3a8a;
+      margin: 10px 0 18px;
+    }
+
+    .warning {
+      border-right: 4px solid #f59e0b;
+      background: #fffbeb;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: #78350f;
+      margin: 10px 0 18px;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <h1>دليل أدوار وصفحات الـ Organization</h1>
+    <p class="muted">
+      هذه الوثيقة تشرح الأدوار داخل الـ Organization، ما الذي يستطيع كل Role فعله، وما هي الصفحات المتاحة له داخل النظام.
+    </p>
+    <p>
+      <span class="badge provider">Provider Organization</span>
+      <span class="badge consumer">Consumer Organization</span>
+      <span class="badge">Hybrid Organization</span>
+      <span class="badge admin">Platform Administrator</span>
+    </p>
+  </section>
+
+  <section>
+    <h2>1. المفهوم العام</h2>
+    <p>
+      النظام يفرق بين نوعين أساسيين من المنظمات:
+    </p>
+    <ul>
+      <li><strong>Provider Organization:</strong> منظمة تنشر Models، تراجع Versions، تعتمد الإصدارات، وتتابع الأرباح والـ Production readiness.</li>
+      <li><strong>Consumer Organization:</strong> منظمة تستهلك Marketplace Models من خلال Projects و API Keys وتدير رصيد Credits.</li>
+      <li><strong>Hybrid Organization:</strong> تجمع بين Provider و Consumer في نفس الـ workspace، مع فصل واضح بين Credits و Earnings.</li>
+    </ul>
+
+    <div class="warning">
+      <strong>مهم:</strong>
+      الـ Provider Organization لا يجب أن يظهر له Consumer Balance كجزء أساسي من تجربته.
+      Provider-only يستخدم Provider Earnings فقط. Consumer Credits تظهر فقط في Consumer أو Hybrid.
+    </div>
+  </section>
+
+  <section>
+    <h2>2. الفرق بين Organization Roles و Platform Administrator</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 24%;">النوع</th>
+          <th>المعنى</th>
+          <th>نطاق الصلاحية</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Organization Owner</strong></td>
+          <td>أعلى Role داخل منظمة معينة.</td>
+          <td>يدير أعضاء المنظمة، الإعدادات، الحوكمة، الإصدارات، والماليات الخاصة بنفس المنظمة فقط.</td>
+        </tr>
+        <tr>
+          <td><strong>Organization Maintainer</strong></td>
+          <td>Role تشغيلي موثوق داخل المنظمة.</td>
+          <td>يراجع Versions، يدير أعضاء، ويوافق أو يرفض الإصدارات حسب نوع المنظمة.</td>
+        </tr>
+        <tr>
+          <td><strong>Platform Administrator</strong></td>
+          <td>ليس Role داخل Organization.</td>
+          <td>صلاحية على مستوى المنصة بالكامل: المستخدمين، الأسعار العامة، البنية التحتية، إعدادات النظام، الدعم، والرقابة العامة.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break">
+    <h2>3. Provider Organization Roles</h2>
+    <p>
+      Provider Organization مبنية حول نشر Models بشكل حوكمي: Contributor يرفع، Owner/Maintainer يراجعوا ويقرروا، Viewer يراقب فقط.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 18%;">Role</th>
+          <th>ماذا يفعل؟</th>
+          <th>ماذا لا يفعل؟</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Owner</strong></td>
+          <td>
+            <ul>
+              <li>يدير أعضاء المنظمة وأدوارهم.</li>
+              <li>يراجع Versions و Deployments.</li>
+              <li>يعتمد أو يرفض الإصدارات.</li>
+              <li>يفرض قرارات الحوكمة.</li>
+              <li>يرى Provider Finance والأرباح.</li>
+              <li>يدير إعدادات المنظمة.</li>
+            </ul>
+          </td>
+          <td>
+            ليس Platform Administrator ولا يدير إعدادات المنصة العامة إلا إذا كان لديه Admin role منفصل.
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Maintainer</strong></td>
+          <td>
+            <ul>
+              <li>يراجع Artifacts و Preprocess و Postprocess.</li>
+              <li>يراجع Test Cases وخطة الاختبار.</li>
+              <li>يعتمد أو يرفض Version.</li>
+              <li>يدير أعضاء المنظمة حسب السياسة الحالية.</li>
+              <li>يدير Production readiness.</li>
+            </ul>
+          </td>
+          <td>
+            لا يدير Billing أو Settings الحساسة إذا كانت مقصورة على Owner.
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Contributor</strong></td>
+          <td>
+            <ul>
+              <li>يرفع Models و Versions.</li>
+              <li>يرفع Model artifact و Scaler و Preprocess و Postprocess.</li>
+              <li>يضيف Test Cases.</li>
+              <li>يتابع حالة الـ Review الخاصة بما تم رفعه.</li>
+            </ul>
+          </td>
+          <td>
+            لا يعتمد Versions، لا يرفض Versions، لا يطلع إصدار إلى Production، ولا يدير أعضاء.
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Viewer</strong></td>
+          <td>
+            <ul>
+              <li>يرى Model registry.</li>
+              <li>يرى Versions وحالة الـ Review.</li>
+              <li>يرى History و Analytics المسموح بها قراءة فقط.</li>
+            </ul>
+          </td>
+          <td>
+            لا يرفع، لا يعدل، لا يعتمد، لا يرفض، ولا يدير أي شيء.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>4. Consumer Organization Roles</h2>
+    <p>
+      Consumer Organization مبنية حول استخدام Marketplace Models من خلال Projects و API Keys ورصيد Credits.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 18%;">Role</th>
+          <th>ماذا يفعل؟</th>
+          <th>الصفحات الأساسية</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Owner</strong></td>
+          <td>يدير الأعضاء، المشاريع، API Keys، الرصيد، الإعدادات، ومراقبة الاستخدام.</td>
+          <td>Overview, Members, Projects, Project Details, Billing, Settings</td>
+        </tr>
+        <tr>
+          <td><strong>Maintainer</strong></td>
+          <td>يدير Projects و API Keys و usage operations و member access.</td>
+          <td>Overview, Members, Projects, Project Details</td>
+        </tr>
+        <tr>
+          <td><strong>Contributor</strong></td>
+          <td>يعمل على تكاملات المشاريع و API Keys حسب صلاحيات المنظمة.</td>
+          <td>Overview, Projects, Project Details</td>
+        </tr>
+        <tr>
+          <td><strong>Viewer</strong></td>
+          <td>يراقب Projects و Usage بدون تعديل.</td>
+          <td>Overview, Projects, Usage sections</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break">
+    <h2>5. صفحات الـ Organization الموجودة في النظام</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 28%;">الصفحة</th>
+          <th style="width: 27%;">Route</th>
+          <th>الغرض</th>
+          <th style="width: 22%;">مين يدخلها؟</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Overview</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/overview</span></td>
+          <td>ملخص المنظمة، نوعها، عدد الأعضاء، عدد المشاريع أو الموديلات، workflows حسب النوع.</td>
+          <td>كل الأدوار داخل المنظمة.</td>
+        </tr>
+        <tr>
+          <td><strong>Members</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/members</span></td>
+          <td>إدارة الأعضاء، تغيير الأدوار، دعوة أو إزالة أعضاء، وتوضيح الفرق بين Organization RBAC و Platform Admin.</td>
+          <td>Owner و Maintainer.</td>
+        </tr>
+        <tr>
+          <td><strong>Billing / Provider Finance</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/billing</span></td>
+          <td>
+            Consumer: رصيد Credits و Top-up و Ledger.
+            Provider: أرباح Provider و Earnings Ledger فقط.
+            Hybrid: فصل بين Consumer Credits و Provider Earnings.
+          </td>
+          <td>Owner غالبًا. Provider finance لصاحب القرار المالي.</td>
+        </tr>
+        <tr>
+          <td><strong>Settings</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/settings</span></td>
+          <td>بيانات المنظمة، الاسم، الوصف، الشعار، وإعدادات الهوية.</td>
+          <td>Owner فقط أو حسب سياسة الإعدادات.</td>
+        </tr>
+        <tr>
+          <td><strong>Projects</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/projects</span></td>
+          <td>قائمة مشاريع Consumer organization، إنشاء مشاريع، متابعة project workspaces.</td>
+          <td>Consumer/Hybrid فقط حسب الدور.</td>
+        </tr>
+        <tr>
+          <td><strong>Project Details</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/projects/[projectId]</span></td>
+          <td>إدارة API Keys، رؤية usage، logs، وربط كل تطبيق أو environment بمفاتيح منفصلة.</td>
+          <td>Consumer/Hybrid حسب صلاحيات Projects و API Keys.</td>
+        </tr>
+        <tr>
+          <td><strong>Provider Models</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/models</span></td>
+          <td>Model registry الخاص بالمنظمة، حالة الإصدارات، readiness، live deployments، وروابط Analytics و Versions و Upload.</td>
+          <td>Provider/Hybrid: كل الأدوار حسب مستوى القراءة أو العمل.</td>
+        </tr>
+        <tr>
+          <td><strong>Upload Model</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/models/upload</span></td>
+          <td>رفع Model جديد أو Version جديد داخل المنظمة نفسها، وليس كـ personal upload.</td>
+          <td>Owner, Maintainer, Contributor.</td>
+        </tr>
+        <tr>
+          <td><strong>Model Review Page</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/models/[modelId]</span></td>
+          <td>صفحة Pull Request style: Artifact preview، Test plan، Review decision، Hard history، Versions list.</td>
+          <td>كل أدوار Provider تقرأ، Owner/Maintainer يقرروا.</td>
+        </tr>
+        <tr>
+          <td><strong>Provider Analytics</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/models/analytics</span></td>
+          <td>Dashboard لصاحب القرار: revenue، pending reviews، production، release risk، verified models، ومساهمة الأعضاء.</td>
+          <td>Owner و Maintainer.</td>
+        </tr>
+        <tr>
+          <td><strong>Versions Control</strong></td>
+          <td><span class="route">/orgs/[orgSlug]/models/versions</span></td>
+          <td>صفحة مركزية لكل Versions في المنظمة: approve/decline، production status، uploader، reviewer، build status.</td>
+          <td>Owner و Maintainer.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>6. Matrix مختصر للـ Provider Organization</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>الصلاحية</th>
+          <th>Owner</th>
+          <th>Maintainer</th>
+          <th>Contributor</th>
+          <th>Viewer</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>مشاهدة Provider Models</td>
+          <td>نعم</td><td>نعم</td><td>نعم</td><td>نعم</td>
+        </tr>
+        <tr>
+          <td>رفع Model / Version</td>
+          <td>نعم</td><td>نعم</td><td>نعم</td><td>لا</td>
+        </tr>
+        <tr>
+          <td>إضافة Test Cases</td>
+          <td>نعم</td><td>نعم</td><td>نعم</td><td>لا</td>
+        </tr>
+        <tr>
+          <td>Approve / Decline Version</td>
+          <td>نعم</td><td>نعم</td><td>لا</td><td>لا</td>
+        </tr>
+        <tr>
+          <td>إدارة Members و Roles</td>
+          <td>نعم</td><td>نعم حسب السياسة الحالية</td><td>لا</td><td>لا</td>
+        </tr>
+        <tr>
+          <td>Provider Finance / Earnings</td>
+          <td>نعم</td><td>حسب سياسة المنظمة</td><td>لا</td><td>لا</td>
+        </tr>
+        <tr>
+          <td>Provider Analytics</td>
+          <td>نعم</td><td>نعم</td><td>لا</td><td>لا</td>
+        </tr>
+        <tr>
+          <td>Settings</td>
+          <td>نعم</td><td>لا غالبًا</td><td>لا</td><td>لا</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break">
+    <h2>7. Workflow الخاص بالـ Provider Organization</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>1. Submit Work</h3>
+        <p>Contributor أو Maintainer أو Owner يرفع Model أو Version من صفحة Upload Model.</p>
+        <p><span class="route">/orgs/[orgSlug]/models/upload</span></p>
+      </div>
+      <div class="card">
+        <h3>2. Review Version</h3>
+        <p>Owner أو Maintainer يفتح Review page، يراجع artifacts و preprocess و postprocess و test cases.</p>
+        <p><span class="route">/orgs/[orgSlug]/models/[modelId]</span></p>
+      </div>
+      <div class="card">
+        <h3>3. Approve or Decline</h3>
+        <p>لو الإصدار جاهز، يتم اعتماده ويبدأ build. لو غير جاهز، يتم رفضه مع comment في history.</p>
+        <p><span class="route">/orgs/[orgSlug]/models/versions</span></p>
+      </div>
+      <div class="card">
+        <h3>4. Production + Marketplace</h3>
+        <p>الإصدارات المعتمدة يمكن أن تصل إلى Production وتظهر Verified في Marketplace حسب readiness.</p>
+        <p><span class="route">/explore</span></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>8. ملاحظات تصميم ومنطق</h2>
+    <ul>
+      <li>Provider-only لا يظهر له Top-up ولا Consumer Balance.</li>
+      <li>Provider Finance يعرض الأرباح والـ provider ledger فقط.</li>
+      <li>Consumer Billing يعرض credits و top-up و project spend.</li>
+      <li>Hybrid يعرض الاثنين ولكن بفصل واضح.</li>
+      <li>Versions Control و Analytics صفحات Governance، لذلك Owner/Maintainer فقط.</li>
+      <li>Upload متاح للـ Contributor لأنه يقدم العمل لكنه لا يقرر Production.</li>
+      <li>Hard history تحفظ كل submission و test case و approval و decline.</li>
+      <li>Platform Administrator منفصل تمامًا عن Organization roles.</li>
+    </ul>
+  </section>
+</body>
+</html>

@@ -7,9 +7,36 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as crypto from 'crypto';
+import type { Request as ExpressRequest } from 'express';
 import { ApiKey } from '../entities/api-key.entity';
+import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
 import { getRsaKeys } from '../utils/keys';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
+import { OwnerType } from '../../../shared/enums/owner-type.enum';
+
+interface AuthenticatedApiRequest extends ExpressRequest {
+  user?: {
+    id: string;
+    email: string;
+    apiKey?: string;
+    apiKeyType?: string;
+    jti?: string;
+    orgApiKeyId?: string;
+    orgApiKeyLabel?: string;
+    orgApiKeyPrefix?: string;
+    orgId?: string;
+    projectId?: string;
+  };
+  workspaceId?: string;
+  workspaceType?: OwnerType;
+}
+
+interface JwtPayload {
+  sub: string;
+  email: string;
+  jti?: string;
+}
 
 /**
  * Guard that permits request execution if a valid API Key OR a valid JWT token
@@ -21,6 +48,8 @@ export class ApiKeyOrJwtGuard implements CanActivate {
     private readonly jwtService: JwtService,
     @InjectRepository(ApiKey)
     private readonly apiKeyRepository: Repository<ApiKey>,
+    @InjectRepository(OrgApiKey)
+    private readonly orgApiKeyRepository: Repository<OrgApiKey>,
   ) {}
 
   /**
@@ -31,8 +60,13 @@ export class ApiKeyOrJwtGuard implements CanActivate {
    * @throws {UnauthorizedException} If credentials are missing or invalid.
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers['authorization'];
+    const request = context
+      .switchToHttp()
+      .getRequest<AuthenticatedApiRequest>();
+    const authHeaderValue = request.headers.authorization;
+    const authHeader = Array.isArray(authHeaderValue)
+      ? authHeaderValue[0]
+      : authHeaderValue;
 
     if (!authHeader) {
       throw new UnauthorizedException('Missing Authorization header');
@@ -44,7 +78,38 @@ export class ApiKeyOrJwtGuard implements CanActivate {
       throw new UnauthorizedException('Invalid Authorization format');
     }
 
-    // Check if it's an API Key
+    if (token.startsWith('sk_live_')) {
+      const keyHash = crypto.createHash('sha256').update(token).digest('hex');
+      const orgApiKey = await this.orgApiKeyRepository.findOne({
+        where: { keyHash, isActive: true },
+      });
+
+      if (!orgApiKey) {
+        throw new UnauthorizedException(
+          'Invalid or revoked organization API Key',
+        );
+      }
+
+      this.orgApiKeyRepository
+        .update(orgApiKey.id, { lastUsedAt: new Date() })
+        .catch(() => undefined);
+
+      request.user = {
+        id: `org-key:${orgApiKey.id}`,
+        email: `org:${orgApiKey.orgId}`,
+        apiKey: orgApiKey.keyPrefix,
+        orgApiKeyId: orgApiKey.id,
+        orgApiKeyLabel: orgApiKey.label,
+        orgApiKeyPrefix: orgApiKey.keyPrefix,
+        orgId: orgApiKey.orgId,
+        projectId: orgApiKey.projectId,
+      };
+      request.workspaceId = orgApiKey.orgId;
+      request.workspaceType = OwnerType.ORG;
+      return true;
+    }
+
+    // Check if it's a personal/model-scoped API Key
     if (token.startsWith('ml_sk_live_') || token.startsWith('ml_sk_trial_')) {
       const apiKeyEntity = await this.apiKeyRepository.findOne({
         where: { key: token, isActive: true },
@@ -65,22 +130,30 @@ export class ApiKeyOrJwtGuard implements CanActivate {
       // Verify key belongs to the model requested in parameter ID
       const modelId = request.params.id;
       if (!modelId) {
-        throw new UnauthorizedException('Target model ID parameter missing from request');
+        throw new UnauthorizedException(
+          'Target model ID parameter missing from request',
+        );
       }
 
       if (!apiKeyEntity.model || apiKeyEntity.model.id !== modelId) {
-        throw new UnauthorizedException('API Key does not authorize access to this model');
+        throw new UnauthorizedException(
+          'API Key does not authorize access to this model',
+        );
       }
 
       // If it is a trial key, verify call limits
       if (token.startsWith('ml_sk_trial_')) {
-        const limitConfig = await this.apiKeyRepository.manager.getRepository(SystemConfig).findOne({
-          where: { key: 'playground_trial_limit' },
-        });
+        const limitConfig = await this.apiKeyRepository.manager
+          .getRepository(SystemConfig)
+          .findOne({
+            where: { key: 'playground_trial_limit' },
+          });
         const limit = limitConfig ? parseInt(limitConfig.value, 10) : 50;
 
         if (apiKeyEntity.callsCount >= limit) {
-          throw new UnauthorizedException('Playground trial call limit reached. Please generate a live API Key.');
+          throw new UnauthorizedException(
+            'Playground trial call limit reached. Please generate a live API Key.',
+          );
         }
 
         apiKeyEntity.callsCount += 1;
@@ -100,7 +173,7 @@ export class ApiKeyOrJwtGuard implements CanActivate {
     // Otherwise, verify as standard JWT
     try {
       const keys = getRsaKeys();
-      const payload = await this.jwtService.verifyAsync(token, {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
         secret: undefined,
         publicKey: keys.publicKey,
         algorithms: ['RS256'],
@@ -112,7 +185,7 @@ export class ApiKeyOrJwtGuard implements CanActivate {
         jti: payload.jti,
       };
       return true;
-    } catch (err) {
+    } catch {
       throw new UnauthorizedException('Invalid JWT token or API Key');
     }
   }
