@@ -96,7 +96,7 @@ export function VersionHistoryTable({
                         <span className="text-muted-foreground text-[10px]">({v.id.substring(0, 8)})</span>
                       </td>
                       <td className="px-6 py-4 select-none">
-                        {(displayStatus === VersionStatus.BUILDING || displayStatus === DeploymentStatus.STARTING) ? (
+                        {displayStatus === VersionStatus.BUILDING ? (
                           <div className="flex items-center gap-3">
                             {/* Circular progress gauge */}
                             <div className="relative w-7 h-7 shrink-0">
@@ -139,6 +139,21 @@ export function VersionHistoryTable({
                               </span>
                             </div>
                           </div>
+                        ) : displayStatus === DeploymentStatus.STARTING ? (
+                          <div className="flex items-center gap-3">
+                            {/* Circular progress spinner */}
+                            <div className="relative w-7 h-7 shrink-0 flex items-center justify-center">
+                              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                            <div className="flex flex-col gap-0.5 animate-pulse">
+                              <span className="text-[9px] font-bold tracking-wider uppercase font-mono text-blue-400">
+                                Deploying
+                              </span>
+                              <span className="text-[8px] text-blue-400/60 font-mono">
+                                Warming up...
+                              </span>
+                            </div>
+                          </div>
                         ) : (
                           <div className="flex items-center gap-2">
                             <div
@@ -161,7 +176,7 @@ export function VersionHistoryTable({
                       <td className="px-6 py-4 text-muted-foreground">{new Date(v.createdAt).toLocaleDateString()}</td>
                       <td className="px-6 py-4 text-muted-foreground">
                         {displayStatus === "deployed" ? (
-                          <div className="flex items-center gap-2 bg-slate-105 dark:bg-slate-900/60 border border-border px-2.5 py-1 rounded-lg w-fit max-w-[200px] select-none">
+                          <div className="flex items-center gap-2 bg-slate-105 dark:bg-slate-900/60 border border-border px-2.5 py-1 rounded-lg w-fit max-w-50 select-none">
                             <span className="truncate text-[10px] text-muted-foreground select-all font-mono">
                               /v{v.versionNumber}/predict
                             </span>
@@ -190,7 +205,7 @@ export function VersionHistoryTable({
                               Rebuild
                             </button>
                           )}
-                          {isOwner && v.status === VersionStatus.READY && (!latestDeployment || latestDeployment.status !== DeploymentStatus.RUNNING) && (
+                          {isOwner && v.status === VersionStatus.READY && (!latestDeployment || (latestDeployment.status !== DeploymentStatus.RUNNING && latestDeployment.status !== DeploymentStatus.STARTING)) && (
                             <button
                               onClick={() => onDeploy(v.id)}
                               className="btn-primary px-3 py-1 text-[11px]"
@@ -198,7 +213,7 @@ export function VersionHistoryTable({
                               Deploy
                             </button>
                           )}
-                          {isOwner && latestDeployment && latestDeployment.status === DeploymentStatus.RUNNING && (
+                          {isOwner && latestDeployment && (latestDeployment.status === DeploymentStatus.RUNNING || latestDeployment.status === DeploymentStatus.STARTING) && (
                             <button
                               onClick={() => onStop(latestDeployment.id)}
                               className="btn-outline px-3 py-1 text-[11px] border-red-900/50 bg-red-950/20 text-red-400 hover:bg-red-950/40 hover:text-red-300"
@@ -236,7 +251,7 @@ export function VersionHistoryTable({
                     </tr>
                     {hasError && errorMessage && (
                       <tr className="bg-red-950/25 border-b border-red-900/35">
-                        <td colSpan={5} className="px-6 py-3 text-xs text-red-400 font-mono break-words leading-relaxed">
+                        <td colSpan={5} className="px-6 py-3 text-xs text-red-400 font-mono wrap-break-word leading-relaxed">
                           <span className="font-bold mr-2 text-[10px] uppercase tracking-wider text-red-300">Run Failure:</span>
                           {errorMessage}
                         </td>

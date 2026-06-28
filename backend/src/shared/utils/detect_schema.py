@@ -562,12 +562,33 @@ class SklearnIntrospector:
 
 class PyTorchIntrospector:
 
-    def introspect(self, path):
+    def introspect(self, path, original_filename: str = ""):
 
         schema = UnifiedSchema(
             framework="pytorch"
         )
 
+        filename = original_filename.lower() if original_filename else os.path.basename(path).lower()
+
+        # Heuristic task type check
+        is_nlp = any(x in filename for x in ["bert", "gpt", "llama", "roberta", "t5", "distilbert", "sentiment", "text", "nlp", "translation", "tokenizer"])
+        is_diffusion = any(x in filename for x in ["diffusion", "stable-diffusion", "sdxl", "text-to-image"])
+
+        if is_nlp:
+            schema.task_type = "text_classification"
+            schema.confidence = 0.8
+            schema.inputs.append(SchemaField(name="text", type="string", dtype="string"))
+            schema.outputs.append(SchemaField(name="label", type="string"))
+            schema.outputs.append(SchemaField(name="confidence", type="float"))
+            return schema
+        elif is_diffusion:
+            schema.task_type = "text_to_image"
+            schema.confidence = 0.9
+            schema.inputs.append(SchemaField(name="prompt", type="string", dtype="string"))
+            schema.outputs.append(SchemaField(name="image", type="image/png"))
+            return schema
+
+        # Default to Vision
         try:
 
             import torch
@@ -577,7 +598,7 @@ class PyTorchIntrospector:
                 map_location="cpu"
             )
 
-            schema.confidence = 0.5
+            schema.confidence = 0.8
 
             schema.task_type = "image_classification"
 
@@ -620,6 +641,8 @@ class PyTorchIntrospector:
 
             schema.warnings.append(str(e))
 
+            schema.task_type = "image_classification"
+            schema.confidence = 0.5
             schema.inputs.append(
                 SchemaField(
                     name="image",
@@ -636,7 +659,21 @@ class PyTorchIntrospector:
                 )
             )
 
+            schema.outputs.append(
+                SchemaField(
+                    name="class_name",
+                    type="string"
+                )
+            )
+            schema.outputs.append(
+                SchemaField(
+                    name="confidence",
+                    type="float"
+                )
+            )
+
             return schema
+
 
 class HuggingFaceIntrospector:
 
@@ -714,12 +751,33 @@ class HuggingFaceIntrospector:
 
 class TensorFlowIntrospector:
 
-    def introspect(self, path):
+    def introspect(self, path, original_filename: str = ""):
 
         schema = UnifiedSchema(
             framework="tensorflow"
         )
 
+        filename = original_filename.lower() if original_filename else os.path.basename(path).lower()
+
+        # Heuristic task type check
+        is_nlp = any(x in filename for x in ["bert", "gpt", "llama", "roberta", "t5", "distilbert", "sentiment", "text", "nlp", "translation", "tokenizer"])
+        is_diffusion = any(x in filename for x in ["diffusion", "stable-diffusion", "sdxl", "text-to-image"])
+
+        if is_nlp:
+            schema.task_type = "text_classification"
+            schema.confidence = 0.8
+            schema.inputs.append(SchemaField(name="text", type="string", dtype="string"))
+            schema.outputs.append(SchemaField(name="label", type="string"))
+            schema.outputs.append(SchemaField(name="confidence", type="float"))
+            return schema
+        elif is_diffusion:
+            schema.task_type = "text_to_image"
+            schema.confidence = 0.9
+            schema.inputs.append(SchemaField(name="prompt", type="string", dtype="string"))
+            schema.outputs.append(SchemaField(name="image", type="image/png"))
+            return schema
+
+        # Default to Vision
         try:
 
             import tensorflow as tf
@@ -1020,9 +1078,9 @@ def generate_schema(path: str, model_type_hint: str = "", original_filename: str
 
     framework = detect_model_type(path)
     if framework == "sklearn" or path.endswith('.pkl'): return SklearnIntrospector().introspect(path, model_type_hint, original_filename)
-    elif framework == "pytorch": return PyTorchIntrospector().introspect(path)
+    elif framework == "pytorch": return PyTorchIntrospector().introspect(path, original_filename)
     elif framework == "huggingface": return HuggingFaceIntrospector().introspect(path)
-    elif framework == "tensorflow": return TensorFlowIntrospector().introspect(path)
+    elif framework == "tensorflow": return TensorFlowIntrospector().introspect(path, original_filename)
     elif framework == "onnx": return OnnxIntrospector().introspect(path)
     elif framework == "diffusers": return DiffusersIntrospector().introspect(path)
     elif framework == "gguf": return GgufIntrospector().introspect(path)

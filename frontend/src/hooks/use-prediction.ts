@@ -1,8 +1,52 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getSession } from "next-auth/react";
 import { runPrediction } from "@/lib/actions/models.actions";
 import { smartFetch } from "@/lib/utils/smart-fetch";
 import { Model, ModelVersion, HistoryItem, DeploymentStatus, PredictionStatus, ModelType } from "@/types";
+
+/**
+ * Parses an SSE (Server-Sent Events) stream from an OpenAI-compatible endpoint.
+ * Extracts content deltas from each `data:` line and appends them token-by-token.
+ * Returns the full accumulated text and usage stats from the final chunk.
+ */
+function parseSSEChunk(rawChunk: string, buffer: { pending: string }) {
+  const text = buffer.pending + rawChunk;
+  const lines = text.split("\n");
+  // Last element may be incomplete — keep it for next chunk
+  buffer.pending = lines.pop() || "";
+
+  let contentDelta = "";
+  let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
+  let isDone = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith(":")) continue; // skip empty lines and SSE comments
+
+    if (trimmed === "data: [DONE]") {
+      isDone = true;
+      continue;
+    }
+
+    if (trimmed.startsWith("data: ")) {
+      try {
+        const json = JSON.parse(trimmed.slice(6));
+        const delta = json?.choices?.[0]?.delta;
+        if (delta?.content) {
+          contentDelta += delta.content;
+        }
+        // The final chunk sometimes carries usage info
+        if (json?.usage) {
+          usage = json.usage;
+        }
+      } catch {
+        // Not valid JSON — might be a partial line, ignore
+      }
+    }
+  }
+
+  return { contentDelta, usage, isDone };
+}
 
 /**
  * Custom hook to manage real-time prediction state, metrics, query formatting, and execution history.
@@ -25,15 +69,23 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
     ? (activeVersion.deployments || []).find((d) => d.status === DeploymentStatus.RUNNING)
     : null;
 
+  const isLlm = model.type === ModelType.LLM_GGUF;
+
   const fallbackPayload = model.type === ModelType.DIFFUSION
     ? '{\n  "prompt": "A cute dog coding in python",\n  "num_inference_steps": 10\n}'
-    : '{\n  "features": [1.2, 3.4, 5.6]\n}';
+    : isLlm
+      ? '{\n  "messages": [\n    {"role": "system", "content": "You are a helpful assistant."},\n    {"role": "user", "content": "Hello!"}\n  ],\n  "stream": true\n}'
+      : '{\n  "features": [1.2, 3.4, 5.6]\n}';
   const initialPayload = activeVersion?.examplePayload || fallbackPayload;
 
   const [isRunning, setIsRunning] = useState(false);
   const [payload, setPayload] = useState(initialPayload);
   const [result, setResult] = useState("");
   const [trialApiKey, setTrialApiKey] = useState<string | null>(null);
+  const [streamingText, setStreamingText] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [tokenStats, setTokenStats] = useState<{ promptTokens: number; completionTokens: number; tokensPerSec: number } | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Fetch sandbox trial key for playground predictions
   useEffect(() => {
@@ -118,18 +170,43 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
   /**
    * Executes inference query against active container instance.
    */
-  const handleRun = async () => {
-    if (!isValidJson) return;
+  /**
+   * Stops an in-progress streaming request.
+   */
+  const handleStopStream = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+    setIsRunning(false);
+  }, []);
+
+  const handleRun = async (payloadOverride?: string) => {
+    const effectivePayload = payloadOverride || payload;
+    if (!effectivePayload.trim()) return;
+    // Validate JSON
+    try { JSON.parse(effectivePayload); } catch { return; }
+
     setIsRunning(true);
     setResult("");
+    setStreamingText("");
+    setTokenStats(null);
     setHttpStatus("");
+    setIsStreaming(false);
     const startTime = performance.now();
 
     try {
-      const parsedPayload = JSON.parse(payload);
-      const isStreaming = parsedPayload.stream === true;
+      const parsedPayload = JSON.parse(effectivePayload);
 
-      if (isStreaming) {
+      // Auto-inject stream:true for LLM models if not explicitly set
+      if (isLlm && parsedPayload.stream === undefined) {
+        parsedPayload.stream = true;
+      }
+
+      const shouldStream = parsedPayload.stream === true;
+
+      if (shouldStream) {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
         const urlSuffix = selectedVersionNumber ? `/v${selectedVersionNumber}/predict` : `/predict`;
         const headers: Record<string, string> = {
@@ -144,10 +221,15 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
           }
         }
 
-        const response = await fetch(`${backendUrl}/models/${model.id}${urlSuffix}`, {
+        // Create abort controller so user can stop mid-stream
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
+        const response = await fetch(`${backendUrl}/api/v1/models/${model.id}${urlSuffix}`, {
           method: "POST",
           headers,
           body: JSON.stringify(parsedPayload),
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -165,28 +247,68 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
         }
 
         setHttpStatus("200 OK");
+        setIsStreaming(true);
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let done = false;
         let streamedResult = "";
+        let finalUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
+        const sseBuffer = { pending: "" };
+        const streamStartTime = performance.now();
 
         while (!done) {
           const { value, done: doneReading } = await reader.read();
           done = doneReading;
           if (value) {
             const chunkValue = decoder.decode(value, { stream: true });
-            streamedResult += chunkValue;
-            setResult(streamedResult);
+
+            // Try SSE parsing for OpenAI-compatible streams (llama.cpp)
+            const { contentDelta, usage, isDone } = parseSSEChunk(chunkValue, sseBuffer);
+
+            if (contentDelta || isDone) {
+              // Successfully parsed SSE — append extracted text tokens
+              streamedResult += contentDelta;
+              setStreamingText(streamedResult);
+              setResult(streamedResult);
+              if (usage) finalUsage = usage;
+              if (isDone) done = true;
+            } else if (!chunkValue.trim().startsWith("data:") && !chunkValue.trim().startsWith(":")) {
+              // Not SSE format — fall back to raw text append (for non-LLM streaming)
+              streamedResult += chunkValue;
+              setResult(streamedResult);
+            }
           }
         }
+
+        setIsStreaming(false);
+        abortControllerRef.current = null;
 
         const endTime = performance.now();
         const latencyMs = (endTime - startTime).toFixed(1);
         setLastLatency(`${latencyMs}ms`);
 
-        // Simulate realistic metrics for the streaming response
-        const extractedConfidence = `${(88 + Math.random() * 11.5).toFixed(2)}%`;
-        setLastConfidence(extractedConfidence);
+        // Use real token stats from usage if available
+        if (finalUsage && finalUsage.completion_tokens) {
+          const durationSec = (endTime - streamStartTime) / 1000;
+          const tps = durationSec > 0 ? finalUsage.completion_tokens / durationSec : 0;
+          setTokenStats({
+            promptTokens: finalUsage.prompt_tokens || 0,
+            completionTokens: finalUsage.completion_tokens,
+            tokensPerSec: Math.round(tps * 10) / 10,
+          });
+          setLastConfidence(`${finalUsage.completion_tokens} tokens`);
+        } else {
+          // Estimate tokens from character count (~4 chars per token)
+          const estTokens = Math.ceil(streamedResult.length / 4);
+          const durationSec = (endTime - streamStartTime) / 1000;
+          const tps = durationSec > 0 ? estTokens / durationSec : 0;
+          setTokenStats({
+            promptTokens: 0,
+            completionTokens: estTokens,
+            tokensPerSec: Math.round(tps * 10) / 10,
+          });
+          setLastConfidence(`~${estTokens} tokens`);
+        }
         const memUsage = `${Math.floor(450 + Math.random() * 50)}MB`;
         setLastMemory(memUsage);
 
@@ -196,9 +318,9 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
           status: PredictionStatus.SUCCESS,
           latency: `${latencyMs}ms`,
           outcome: "Stream completed",
-          payload,
+          payload: effectivePayload,
           response: streamedResult,
-          confidence: extractedConfidence,
+          confidence: tokenStats ? `${tokenStats.completionTokens} tokens` : "--",
           memory: memUsage,
         };
 
@@ -211,7 +333,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
           try {
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
             const urlSuffix = selectedVersionNumber ? `/v${selectedVersionNumber}/predict` : `/predict`;
-            const response = await fetch(`${backendUrl}/models/${model.id}${urlSuffix}`, {
+            const response = await fetch(`${backendUrl}/api/v1/models/${model.id}${urlSuffix}`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -288,7 +410,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
             status: PredictionStatus.SUCCESS,
             latency: `${latencyMs}ms`,
             outcome: responseData?.prediction || responseData?.class || "Success",
-            payload,
+            payload: effectivePayload,
             response: formattedRes,
             confidence: extractedConfidence,
             memory: memUsage,
@@ -310,7 +432,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
             status: PredictionStatus.FAILED,
             latency: `${latencyMs}ms`,
             outcome: res.error || "Failed",
-            payload,
+            payload: effectivePayload,
             response: JSON.stringify({ error: res.error }, null, 2),
             confidence: "--",
             memory: "--",
@@ -338,7 +460,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
         status: PredictionStatus.FAILED,
         latency: `${latencyMs}ms`,
         outcome: errorMsg,
-        payload,
+        payload: effectivePayload,
         response: JSON.stringify({ error: errorMsg }, null, 2),
         confidence: "--",
         memory: "--",
@@ -349,6 +471,8 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
       localStorage.setItem(`prediction_history_${model.id}`, JSON.stringify(updatedHistory));
     } finally {
       setIsRunning(false);
+      setIsStreaming(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -398,6 +522,10 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
   return {
     activeDeployment,
     isRunning,
+    isLlm,
+    isStreaming,
+    streamingText,
+    tokenStats,
     payload,
     setPayload,
     result,
@@ -409,6 +537,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
     httpStatus,
     history,
     handleRun,
+    handleStopStream,
     handleFormat,
     handleReset,
     handleClearHistory,

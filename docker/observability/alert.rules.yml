@@ -1,0 +1,47 @@
+groups:
+  - name: platform_alerts
+    rules:
+      - alert: HighContainerCPU
+        expr: sum(rate(container_cpu_usage_seconds_total{name=~"model-.+"}[5m])) by (name) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} is using high CPU"
+          description: "Container CPU usage has been above 90% for 5 minutes."
+
+      - alert: ContainerOOMKilled
+        expr: rate(container_oom_events_total{name=~"model-.+"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} was OOM killed"
+          description: "Container encountered Out-Of-Memory events."
+
+      - alert: ContainerRestarting
+        expr: changes(container_start_time_seconds{name=~"model-.+"}[10m]) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} is restarting frequently"
+          description: "Container restarted more than 3 times in 10 minutes."
+
+      - alert: HighHostMemory
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory usage is high"
+          description: "Physical host RAM utilization has been above 85% for 5 minutes."
+
+      - alert: HighHostDisk
+        expr: (node_filesystem_size_bytes{device=~"/dev/.*"} - node_filesystem_free_bytes{device=~"/dev/.*"}) / node_filesystem_size_bytes{device=~"/dev/.*"} * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host disk space is low"
+          description: "Host disk space usage is above 90% on device {{ $labels.device }}."

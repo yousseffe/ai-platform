@@ -71,7 +71,13 @@ export class SchemaController {
 
     try {
       // Execute the python schema generator
-      const command = `python3 "${scriptPath}" "${tempFilePath}"`;
+      let command = `python "${scriptPath}" "${tempFilePath}"`;
+      if (body?.originalFilename) {
+        command += ` --filename "${body.originalFilename}"`;
+      }
+      if (body?.modelType) {
+        command += ` --model-type "${body.modelType}"`;
+      }
       const { stdout, stderr } = await execPromise(command);
 
       if (stderr) {

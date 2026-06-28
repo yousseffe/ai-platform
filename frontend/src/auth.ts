@@ -2,55 +2,93 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { JWT } from "next-auth/jwt";
 
+let activeRefreshPromise: Promise<{ accessToken: string; refreshToken: string; error?: string }> | null = null;
+
 async function refreshAccessToken(token: JWT): Promise<JWT> {
-  try {
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
-    console.log("[Auth-Refresh] Attempting to refresh access token for user ID:", token.userId, "URL:", `${backendUrl}/api/v1/auth/refresh`);
-    
-    if (!token.refreshToken) {
-      console.warn("[Auth-Refresh] Warning: token.refreshToken is missing in JWT payload");
-    }
-
-    const response = await fetch(`${backendUrl}/api/v1/auth/refresh`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        refresh_token: token.refreshToken,
-      }),
+  if (activeRefreshPromise) {
+    console.log("[Auth-Refresh] Concurrent refresh request detected for user:", token.userId, ". Awaiting ongoing refresh...");
+    return activeRefreshPromise.then((refreshed) => {
+      if (refreshed.error) {
+        return {
+          ...token,
+          error: refreshed.error,
+        };
+      }
+      return {
+        ...token,
+        accessToken: refreshed.accessToken,
+        refreshToken: refreshed.refreshToken,
+        accessTokenExpires: Date.now() + 15 * 60 * 1000,
+      };
     });
-
-    console.log("[Auth-Refresh] Response status:", response.status, response.statusText);
-
-    const responseText = await response.text();
-    let refreshedTokens: Record<string, unknown> = {};
-    try {
-      refreshedTokens = JSON.parse(responseText) as Record<string, unknown>;
-    } catch (e) {
-      console.error("[Auth-Refresh] Failed to parse response JSON. Body:", responseText);
-      throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
-    }
-
-    if (!response.ok) {
-      console.error("[Auth-Refresh] Backend returned non-2xx response:", refreshedTokens);
-      throw refreshedTokens;
-    }
-
-    console.log("[Auth-Refresh] Token refreshed successfully!");
-    return {
-      ...token,
-      accessToken: refreshedTokens.access_token as string,
-      refreshToken: (refreshedTokens.refresh_token as string) ?? token.refreshToken,
-      accessTokenExpires: Date.now() + 15 * 60 * 1000, // 15 mins
-    };
-  } catch (error) {
-    console.error("[Auth-Refresh] RefreshAccessTokenError exception occurred:", error);
-    return {
-      ...token,
-      error: "RefreshAccessTokenError",
-    };
   }
+
+  activeRefreshPromise = (async () => {
+    try {
+      const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+      console.log("[Auth-Refresh] Attempting to refresh access token for user ID:", token.userId, "URL:", `${backendUrl}/api/v1/auth/refresh`);
+      
+      if (!token.refreshToken) {
+        console.warn("[Auth-Refresh] Warning: token.refreshToken is missing in JWT payload");
+      }
+
+      const response = await fetch(`${backendUrl}/api/v1/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          refresh_token: token.refreshToken,
+        }),
+      });
+
+      console.log("[Auth-Refresh] Response status:", response.status, response.statusText);
+
+      const responseText = await response.text();
+      let refreshedTokens: Record<string, unknown> = {};
+      try {
+        refreshedTokens = JSON.parse(responseText) as Record<string, unknown>;
+      } catch (e) {
+        console.error("[Auth-Refresh] Failed to parse response JSON. Body:", responseText);
+        throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+      }
+
+      if (!response.ok) {
+        console.error("[Auth-Refresh] Backend returned non-2xx response:", refreshedTokens);
+        throw refreshedTokens;
+      }
+
+      console.log("[Auth-Refresh] Token refreshed successfully!");
+      return {
+        accessToken: refreshedTokens.access_token as string,
+        refreshToken: (refreshedTokens.refresh_token as string) ?? token.refreshToken,
+      };
+    } catch (error) {
+      console.error("[Auth-Refresh] RefreshAccessTokenError exception occurred:", error);
+      return {
+        accessToken: "",
+        refreshToken: "",
+        error: "RefreshAccessTokenError",
+      };
+    } finally {
+      activeRefreshPromise = null;
+    }
+  })();
+
+  return activeRefreshPromise.then((refreshed) => {
+    if (refreshed.error) {
+      return {
+        ...token,
+        error: refreshed.error,
+      };
+    }
+    return {
+      ...token,
+      accessToken: refreshed.accessToken,
+      refreshToken: refreshed.refreshToken,
+      accessTokenExpires: Date.now() + 15 * 60 * 1000,
+    };
+  });
 }
 
 export const authOptions: NextAuthOptions = {

@@ -88,6 +88,12 @@ export class ModelVersion {
   errorMessage: string | null;
 
   /**
+   * Complete Docker build and compilation log outputs.
+   */
+  @Column({ type: 'text', nullable: true })
+  buildLogs: string | null;
+
+  /**
    * Build progress percentage (0-100) updated during the containerization pipeline.
    */
   @Column({ type: 'int', default: 0 })

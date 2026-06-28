@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { AlertCircle, Lock, Globe } from "lucide-react";
 import { UseFormRegister, FieldErrors } from "react-hook-form";
 
@@ -63,66 +62,6 @@ export default function StepGeneralInfo({ register, errors, isUploading }: StepG
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="type" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1 font-sans">
-            Model Type
-          </Label>
-          <select
-            id="type"
-            {...register("type")}
-            className="h-11 px-4 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-xl bg-background/50 text-xs w-full transition-all duration-200 dark:border-border/60 dark:bg-slate-900/50 dark:text-slate-200"
-            disabled={isUploading}
-          >
-            <option value="TABULAR">Tabular & Analytics</option>
-            <option value="NLP">Natural Language (NLP)</option>
-            <option value="VISION">Computer Vision</option>
-            <option value="LLM_GGUF">Large Language Model (GGUF)</option>
-            <option value="DIFFUSION">Stable Diffusion</option>
-          </select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="framework" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1 font-sans">
-            Framework
-          </Label>
-          <select
-            id="framework"
-            {...register("framework")}
-            className="h-11 px-4 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-xl bg-background/50 text-xs w-full transition-all duration-200 dark:border-border/60 dark:bg-slate-900/50 dark:text-slate-200"
-            disabled={isUploading}
-          >
-            <option value="SKLEARN">Scikit-Learn</option>
-            <option value="PYTORCH">PyTorch</option>
-            <option value="TENSORFLOW">TensorFlow</option>
-            <option value="ONNX">ONNX Runtime</option>
-            <option value="LLAMA_CPP">Llama.cpp</option>
-            <option value="VLLM">vLLM</option>
-            <option value="CUSTOM">Custom/Python</option>
-          </select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="taskType" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1 font-sans">
-            Task Type
-          </Label>
-          <select
-            id="taskType"
-            {...register("taskType")}
-            className="h-11 px-4 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-xl bg-background/50 text-xs w-full transition-all duration-200 dark:border-border/60 dark:bg-slate-900/50 dark:text-slate-200"
-            disabled={isUploading}
-          >
-            <option value="CLASSIFICATION">Classification</option>
-            <option value="REGRESSION">Regression</option>
-            <option value="GENERATION">Generation / Text-to-Image</option>
-            <option value="OBJECT_DETECTION">Object Detection</option>
-            <option value="SEGMENTATION">Segmentation</option>
-            <option value="EMBEDDING">Embedding</option>
-            <option value="CHAT">Chat / Conversational</option>
-            <option value="OTHER">Other / Miscellaneous</option>
-          </select>
-        </div>
-      </div>
 
       <div className="space-y-2">
         <Label htmlFor="description" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans">

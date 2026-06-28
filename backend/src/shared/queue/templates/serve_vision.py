@@ -5,7 +5,28 @@ import uvicorn
 import importlib.util
 import numpy as np
 
+otel_available = False
+if os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
+    try:
+        from opentelemetry import trace
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        provider = TracerProvider()
+        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+        trace.set_tracer_provider(provider)
+        otel_available = True
+    except Exception as e:
+        print(f"Warning: Failed to initialize OpenTelemetry trace provider: {e}")
+
 app = FastAPI()
+
+if os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") and otel_available:
+    try:
+        FastAPIInstrumentor.instrument_app(app)
+    except Exception as e:
+        print(f"Warning: Failed to instrument FastAPI app with OpenTelemetry: {e}")
 
 # Load preprocess if exists
 preprocess_func = None
@@ -133,7 +154,8 @@ try:
             import joblib
             model = joblib.load(model_path)
 except Exception as e:
-    print(f"Error loading {framework} model: {e}")
+    print(f"Error loading {framework} model from {model_path}: {e}")
+    sys.exit(1)
 
 # Load output schema for response formatting
 from schema_utils import load_output_schema, apply_schema

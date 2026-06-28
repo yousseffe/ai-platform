@@ -336,17 +336,6 @@ export default function Sidebar() {
                 <Key className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
                 API Credentials
               </Link>
-              <Link
-                href="/settings/diagnostics"
-                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  pathname === "/settings/diagnostics"
-                    ? "text-primary font-semibold bg-primary/[0.04]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
-                }`}
-              >
-                <Activity className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
-                Diagnostics
-              </Link>
             </div>
           )}
         </div>
