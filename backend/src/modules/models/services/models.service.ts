@@ -352,11 +352,11 @@ export class ModelsService {
       .replace(/[^a-zA-Z0-9]/g, '_')
       .toLowerCase();
 
-    // Auto-detect schema prior to uploading and deleting the local file
+    // Auto-detect schema prior to uploading and deleting the local file if schemas are not fully provided
     let detectedExamplePayload: string | null = null;
     let detectedExpectedResult: string | null = null;
 
-    if (files.model?.[0]) {
+    if (files.model?.[0] && (!examplePayload || !expectedResult)) {
       try {
         const scriptPath = join(
           process.cwd(),
@@ -365,7 +365,7 @@ export class ModelsService {
           'utils',
           'detect_schema.py',
         );
-        const command = `python3 "${scriptPath}" "${files.model[0].path}"`;
+        const command = `python "${scriptPath}" "${files.model[0].path}"`;
         const { stdout } = await execPromise(command);
         const result = JSON.parse(stdout) as Record<string, unknown>;
         if (result && !result.error) {
@@ -889,6 +889,20 @@ export class ModelsService {
 
     // Delete DB record
     await this.modelVersionsRepository.remove(version);
+
+    // Delete local GGUF file if it exists
+    const storageDirEnv = process.env.GGUF_STORAGE_PATH;
+    const ggufStorageDir = storageDirEnv
+      ? join(process.cwd(), storageDirEnv)
+      : join(process.cwd(), 'uploads', 'gguf-models');
+    const ggufPath = join(ggufStorageDir, `${versionId}.gguf`);
+    if (fs.existsSync(ggufPath)) {
+      try {
+        fs.unlinkSync(ggufPath);
+      } catch (e: any) {
+        console.warn(`Failed to delete local GGUF file ${ggufPath}: ${e.message || e}`);
+      }
+    }
 
     // Delete Docker image
     try {

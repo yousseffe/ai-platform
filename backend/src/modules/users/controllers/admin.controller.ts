@@ -10,6 +10,7 @@ import {
   BadRequestException,
   NotFoundException,
   Query,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -48,6 +49,7 @@ import { getDockerOptions } from '../../../shared/docker/docker.util';
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminController {
   private readonly docker: Docker;
+  private readonly logger = new Logger(AdminController.name);
 
   constructor(
     private readonly dataSource: DataSource,
@@ -120,17 +122,18 @@ export class AdminController {
             if (systemDelta > 0 && cpuDelta > 0) {
               cpu = ((cpuDelta / systemDelta) * numCpus * 100).toFixed(1) + '%';
             } else {
-              cpu = (2.5 + Math.random() * 5.0).toFixed(1) + '%';
+              cpu = '0.0%';
             }
             const usageBytes = stats.memory_stats.usage || 0;
             ram = (usageBytes / (1024 * 1024)).toFixed(0) + ' MB';
-          } catch {
-            cpu = (1.5 + Math.random() * 6.5).toFixed(1) + '%';
-            ram = Math.floor(180 + Math.random() * 120) + ' MB';
+          } catch (err: any) {
+            this.logger.error(`Failed to collect Docker container stats: ${err.message}`);
+            cpu = '0.0%';
+            ram = '0 MB';
           }
         } else {
-          cpu = (1.5 + Math.random() * 6.5).toFixed(1) + '%';
-          ram = Math.floor(180 + Math.random() * 120) + ' MB';
+          cpu = '0.0%';
+          ram = '0 MB';
         }
       }
 

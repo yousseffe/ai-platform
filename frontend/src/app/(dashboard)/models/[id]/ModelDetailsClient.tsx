@@ -14,7 +14,8 @@ import {
   Cpu, 
   Coins, 
   Server,
-  Users
+  Users,
+  Activity,
 } from "lucide-react";
 import { useModelDetails } from "@/hooks/use-model-details";
 import type { Model, ModelVersion } from "@/types";
@@ -23,6 +24,8 @@ import { VersionHistoryTable } from "@/components/models/VersionHistoryTable";
 import ModelOverview from "@/components/models/ModelOverview";
 import ModelPlayground from "@/components/models/ModelPlayground";
 import ActionsTerminal from "@/components/models/ActionsTerminal";
+import { ModelAnalytics } from "@/components/models/ModelAnalytics";
+import { ModelLogsConsole } from "@/components/models/ModelLogsConsole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -277,7 +280,7 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
 
       {/* Tabs Container */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="!h-10 bg-secondary/60 border border-border p-1 rounded-xl mb-6 gap-1.5 select-none flex flex-row w-fit shadow-sm items-center">
+        <TabsList className="h-10! bg-secondary/60 border border-border p-1 rounded-xl mb-6 gap-1.5 select-none flex flex-row w-fit shadow-sm items-center">
           <TabsTrigger 
             value="overview" 
             className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
@@ -296,6 +299,14 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
           >
             <PlayCircle className="w-3.5 h-3.5 mr-1.5" /> Playground
           </TabsTrigger>
+          {isOwner && (
+            <TabsTrigger 
+              value="monitoring" 
+              className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+            >
+              <Activity className="w-3.5 h-3.5 mr-1.5" /> Monitoring & Logs
+            </TabsTrigger>
+          )}
           {isOwner && (
             <TabsTrigger 
               value="settings" 
@@ -336,9 +347,11 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
           {/* GitHub Actions build logs console */}
           {activeVersion && (
             <ActionsTerminal
+              modelId={modelId}
               versionId={activeVersion.id}
               versionNumber={activeVersion.versionNumber}
               status={activeVersion.status}
+              buildLogs={activeVersion.buildLogs}
             />
           )}
         </TabsContent>
@@ -348,7 +361,27 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
           <ModelPlayground model={model} selectedVersionNumber={activeVersion?.versionNumber} />
         </TabsContent>
 
-        {/* Tab 4: Settings (Danger Zone Card) */}
+        {/* Tab 4: Monitoring & Logs */}
+        {isOwner && (
+          <TabsContent value="monitoring" className="space-y-6">
+            <ModelAnalytics modelId={modelId} />
+            {activeVersion?.deployments?.find((d) => d.status === DeploymentStatus.RUNNING) ? (
+              <ModelLogsConsole
+                deploymentId={activeVersion.deployments.find((d) => d.status === DeploymentStatus.RUNNING)!.id}
+              />
+            ) : (
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center text-slate-400">
+                <AlertTriangle className="w-8 h-8 text-amber-500 mb-2" />
+                <p className="font-semibold text-slate-200">No Running Deployment</p>
+                <p className="text-xs max-w-md text-center mt-1">
+                  Logs are only available for running deployments. Please deploy version v{activeVersion?.versionNumber} to stream container logs.
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        )}
+
+        {/* Tab 5: Settings (Danger Zone Card) */}
         {isOwner && (
           <TabsContent value="settings" className="space-y-6">
             <div className="border border-red-500/20 bg-red-500/5 rounded-2xl p-6 space-y-6 shadow-sm">

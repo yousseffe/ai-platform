@@ -12,6 +12,8 @@ import {
   Users,
   Cpu,
   Sliders,
+  ScrollText,
+  Bell,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -44,7 +46,7 @@ function SidebarLink({ href, active, icon, children }: SidebarLinkProps) {
       href={href}
       className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium transition-all text-sm select-none ${
         active
-          ? "bg-primary/[0.08] text-primary font-semibold shadow-sm"
+          ? "bg-primary/8 text-primary font-semibold shadow-sm"
           : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
       }`}
     >
@@ -118,6 +120,15 @@ export default function AdminSidebar() {
           <SidebarLink href="/admin/config" active={pathname === "/admin/config"} icon={<Sliders className="w-4 h-4" />}>
             <span>System Config</span>
           </SidebarLink>
+
+          <SidebarLink href="/admin/logs" active={pathname === "/admin/logs"} icon={<ScrollText className="w-4 h-4" />}>
+            <span>System Logs</span>
+          </SidebarLink>
+
+          <SidebarLink href="/admin/alerts" active={pathname === "/admin/alerts"} icon={<Bell className="w-4 h-4" />}>
+            <span>System Alerts</span>
+          </SidebarLink>
+
         </div>
       </nav>
 
@@ -134,7 +145,7 @@ export default function AdminSidebar() {
 
       {/* Sign Out Confirmation Modal */}
       <Dialog open={showLogoutModal} onOpenChange={setShowLogoutModal}>
-        <DialogContent className="sm:max-w-[340px] bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
+        <DialogContent className="sm:max-w-85 bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
           <DialogHeader className="space-y-1 text-left">
             <DialogTitle className="text-sm font-bold text-foreground">Confirm Sign Out</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">

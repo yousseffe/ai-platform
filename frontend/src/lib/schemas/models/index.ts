@@ -73,10 +73,10 @@ export const uploadModelFormSchema = z.object({
 
   examplePayload: z
     .string()
-    .optional()
+    .trim()
+    .min(1, "Example payload is required")
     .refine(
       (val) => {
-        if (!val || val.trim() === "") return true;
         try {
           JSON.parse(val);
           return true;
@@ -88,10 +88,10 @@ export const uploadModelFormSchema = z.object({
     ),
   expectedResult: z
     .string()
-    .optional()
+    .trim()
+    .min(1, "Expected prediction result is required")
     .refine(
       (val) => {
-        if (!val || val.trim() === "") return true;
         try {
           JSON.parse(val);
           return true;

@@ -1,91 +1,81 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Terminal, RefreshCw, CheckCircle2, ChevronRight } from "lucide-react";
+import { Terminal, RefreshCw, CheckCircle2, ChevronRight, XCircle } from "lucide-react";
+import { smartFetch } from "@/lib/utils/smart-fetch";
 
 interface ActionsTerminalProps {
+  modelId: string;
   versionId: string;
   versionNumber: number;
   status: string;
+  buildLogs?: string | null;
 }
 
-const MOCK_BUILD_LOGS = [
-  "Initializing container orchestrator...",
-  "Loading Docker engine v24.0.5 daemon context...",
-  "Fetching base image dependencies...",
-  "Run actions/checkout@v3 to sync version metadata",
-  "Download weights file from secure S3 bucket... [OK]",
-  "Run docker build -t mlhub-registry/model:v2 .",
-  "Sending build context to Docker daemon 289.4MB",
-  "Step 1/6 : FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime",
-  " ---> 3f5a9e5b7c8d",
-  "Step 2/6 : WORKDIR /workspace",
-  " ---> Running in container d8e9c7b6a5f4",
-  "Step 3/6 : COPY model_weights.pth preprocess.py postprocess.py /workspace/",
-  " ---> Pushed weights artifacts [OK]",
-  "Step 4/6 : RUN pip install --no-cache-dir requests pillow numpy torchvision scikit-learn",
-  "Collecting requests...",
-  "  Downloading requests-2.31.0-py3-none-any.whl (62 kB)",
-  "Collecting pillow...",
-  "  Downloading Pillow-10.0.0-cp310-cp310-manylinux_2_28_x86_64.whl (3.4 MB)",
-  "Installing collected packages: requests, pillow, numpy",
-  "Successfully installed dependencies in 4.2 seconds.",
-  " ---> Pushed requirements [OK]",
-  "Step 5/6 : EXPOSE 8000",
-  " ---> Port exposing completed [OK]",
-  "Step 6/6 : ENTRYPOINT [\"python\", \"-m\", \"mlhub.server\"]",
-  " ---> Compiled entrypoint configurations [OK]",
-  "Successfully built image 9e8d7c6b5a4f",
-  "Successfully tagged mlhub-registry/model:v2",
-  "Pushing Docker image weights registry... [OK]",
-  "Deploying active sandbox container on A100 node...",
-  "Running container health readiness probes...",
-  "Probe 1/3: GET /health ... 503 Service Unavailable",
-  "Probe 2/3: GET /health ... 503 Service Unavailable",
-  "Probe 3/3: GET /health ... 200 OK",
-  "Sandbox container is live and listening on port 8000!",
-  "Execution endpoint: http://localhost:8000/predictions/predict",
-];
-
-/**
- * Renders a terminal console displaying build output logs styled like GitHub Actions.
- * Simulates streaming of logs sequentially.
- */
-export default function ActionsTerminal({ versionId, versionNumber, status }: ActionsTerminalProps) {
+export default function ActionsTerminal({
+  modelId,
+  versionId,
+  versionNumber,
+  status,
+  buildLogs,
+}: ActionsTerminalProps) {
   const isBuildActive = status === "building" || status === "starting" || status === "uploading";
-  
-  const [lines, setLines] = useState<string[]>(() => isBuildActive ? [] : MOCK_BUILD_LOGS);
-  const [isStreaming, setIsStreaming] = useState(isBuildActive);
-  const [prevVersionId, setPrevVersionId] = useState(versionId);
-  const [prevStatus, setPrevStatus] = useState(status);
+  const isFailed = status === "failed";
+
+  const [lines, setLines] = useState<string[]>([]);
+  const [isPolling, setIsPolling] = useState(isBuildActive);
+  const [isLoading, setIsLoading] = useState(false);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
-  // official React pattern to sync state when props change to prevent effect warnings
-  if (versionId !== prevVersionId || status !== prevStatus) {
-    setPrevVersionId(versionId);
-    setPrevStatus(status);
-    setLines(isBuildActive ? [] : MOCK_BUILD_LOGS);
-    setIsStreaming(isBuildActive);
-  }
+  // Parse lines from raw string logs
+  const parseLogs = (rawLogs: string | null | undefined): string[] => {
+    if (!rawLogs) return [];
+    return rawLogs.split("\n").filter((line) => line.trim() !== "");
+  };
 
+  // Sync / initial load
   useEffect(() => {
+    if (buildLogs) {
+      setLines(parseLogs(buildLogs));
+    } else {
+      // Fetch initial logs if not provided
+      const fetchInitial = async () => {
+        setIsLoading(true);
+        try {
+          const res = await smartFetch<{ buildLogs: string | null }>(
+            `/models/${modelId}/versions/${versionId}/build-logs`
+          );
+          setLines(parseLogs(res?.buildLogs));
+        } catch (err) {
+          console.error("Failed to fetch initial build logs", err);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchInitial();
+    }
+  }, [versionId, modelId, buildLogs]);
+
+  // Polling for logs when build is active
+  useEffect(() => {
+    setIsPolling(isBuildActive);
     if (!isBuildActive) return;
 
-    let currentLine = 0;
-    const interval = setInterval(() => {
-      if (currentLine < MOCK_BUILD_LOGS.length) {
-        setLines((prev) => [...prev, MOCK_BUILD_LOGS[currentLine]]);
-        currentLine++;
-      } else {
-        setIsStreaming(false);
-        clearInterval(interval);
+    const interval = setInterval(async () => {
+      try {
+        const res = await smartFetch<{ buildLogs: string | null }>(
+          `/models/${modelId}/versions/${versionId}/build-logs`
+        );
+        if (res && res.buildLogs) {
+          setLines(parseLogs(res.buildLogs));
+        }
+      } catch (err) {
+        console.error("Failed to poll build logs", err);
       }
-    }, 100);
+    }, 3000);
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [versionId, isBuildActive]);
+    return () => clearInterval(interval);
+  }, [versionId, modelId, isBuildActive]);
 
   // Scroll to bottom of terminal when logs are appended
   useEffect(() => {
@@ -104,9 +94,13 @@ export default function ActionsTerminal({ versionId, versionNumber, status }: Ac
           <span className="text-[10px] bg-muted border border-border px-1.5 py-0.2 rounded text-muted-foreground">v{versionNumber}</span>
         </div>
         <div className="flex items-center gap-2">
-          {isStreaming ? (
+          {isPolling ? (
             <div className="flex items-center gap-1.5 text-blue-400 text-[10px] font-bold uppercase tracking-wider">
               <RefreshCw className="w-3.5 h-3.5 animate-spin" /> compiling container logs
+            </div>
+          ) : isFailed ? (
+            <div className="flex items-center gap-1.5 text-rose-500 text-[10px] font-bold uppercase tracking-wider">
+              <XCircle className="w-3.5 h-3.5" /> build failed
             </div>
           ) : (
             <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
@@ -118,21 +112,38 @@ export default function ActionsTerminal({ versionId, versionNumber, status }: Ac
 
       {/* Terminal Screen output */}
       <div className="p-5 h-72 bg-black/95 text-slate-300 font-mono text-[11px] overflow-y-auto leading-relaxed select-text space-y-1">
-        {lines.map((line, idx) => {
-          if (typeof line !== "string") return null;
-          const isStep = line.startsWith("Step") || line.startsWith("Run");
-          const isSuccess = line.includes("[OK]") || line.includes("SUCCESS") || line.includes("success");
-          
-          return (
-            <div key={idx} className="flex items-start gap-1">
-              <span className="text-muted-foreground/35 select-none w-5 text-right text-[10px] mr-2 pt-[1px]">{idx + 1}</span>
-              <span className={isStep ? "text-primary font-bold" : isSuccess ? "text-emerald-400 font-bold" : "text-slate-300"}>
-                {isStep && <ChevronRight className="w-3 h-3 inline-block mr-0.5 -mt-0.5" />}
-                {line}
-              </span>
-            </div>
-          );
-        })}
+        {isLoading && lines.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+            Loading build logs...
+          </div>
+        ) : lines.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground font-sans">
+            No build logs recorded yet.
+          </div>
+        ) : (
+          lines.map((line, idx) => {
+            if (typeof line !== "string") return null;
+            const isStep = line.startsWith("Step") || line.startsWith("Run") || line.startsWith("===>") || line.startsWith("[INFO]") || line.startsWith("[BUILD]") || line.startsWith("Step ");
+            const isSuccess = line.includes("[OK]") || line.includes("SUCCESS") || line.includes("success") || line.includes("Successfully");
+            const isError = line.toLowerCase().includes("error") || line.toLowerCase().includes("fail");
+            
+            return (
+              <div key={idx} className="flex items-start gap-1">
+                <span className="text-muted-foreground/35 select-none w-5 text-right text-[10px] mr-2 pt-px">{idx + 1}</span>
+                <span className={
+                  isError ? "text-rose-400 font-medium" :
+                  isStep ? "text-primary font-bold" : 
+                  isSuccess ? "text-emerald-400 font-bold" : 
+                  "text-slate-300"
+                }>
+                  {isStep && <ChevronRight className="w-3 h-3 inline-block mr-0.5 -mt-0.5" />}
+                  {line}
+                </span>
+              </div>
+            );
+          })
+        )}
         <div ref={terminalEndRef} />
       </div>
     </div>

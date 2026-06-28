@@ -12,6 +12,47 @@ import { createModel } from "@/lib/actions/models.actions";
 import { uploadModelFormSchema, type UploadModelFormInput } from "@/lib/schemas";
 import { detectSchema } from "@/lib/services/models.service";
 
+function mapDetectedAttributes(framework: string, task: string) {
+  const fw = (framework || "").toLowerCase();
+  const tk = (task || "").toLowerCase();
+
+  let type = "TABULAR";
+  let mappedFramework = "CUSTOM";
+  let taskType = "OTHER";
+
+  // Map Framework
+  if (fw === "sklearn") mappedFramework = "SKLEARN";
+  else if (fw === "pytorch") mappedFramework = "PYTORCH";
+  else if (fw === "tensorflow") mappedFramework = "TENSORFLOW";
+  else if (fw === "onnx") mappedFramework = "ONNX";
+  else if (fw === "gguf") mappedFramework = "LLAMA_CPP";
+  else if (fw === "diffusers" || fw === "huggingface") mappedFramework = "PYTORCH";
+
+  // Map Model Type & Task Type
+  if (tk.includes("llm_gguf") || tk.includes("chat")) {
+    type = "LLM_GGUF";
+    taskType = "CHAT";
+  } else if (tk.includes("diffusion") || tk.includes("text_to_image") || tk.includes("image_to_image")) {
+    type = "DIFFUSION";
+    taskType = "GENERATION";
+  } else if (tk.includes("image") || tk.includes("vision") || tk.includes("detection") || tk.includes("segmentation")) {
+    type = "VISION";
+    if (tk.includes("detection")) taskType = "OBJECT_DETECTION";
+    else if (tk.includes("segmentation")) taskType = "SEGMENTATION";
+    else taskType = "CLASSIFICATION";
+  } else if (tk.includes("text") || tk.includes("nlp") || tk.includes("generation") || tk.includes("translation")) {
+    type = "NLP";
+    if (tk.includes("generation")) taskType = "GENERATION";
+    else taskType = "CLASSIFICATION";
+  } else {
+    type = "TABULAR";
+    if (tk.includes("regression")) taskType = "REGRESSION";
+    else if (tk.includes("classification")) taskType = "CLASSIFICATION";
+  }
+
+  return { type, framework: mappedFramework, taskType };
+}
+
 
 /**
  * Custom React hook to coordinate machine learning model upload workflows.
@@ -30,6 +71,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
   const [submitError, setSubmitError] = useState("");
   const [createdModelId, setCreatedModelId] = useState<string | null>(null);
   const [createdVersionId, setCreatedVersionId] = useState<string | null>(null);
+  const [hasDetected, setHasDetected] = useState(false);
 
   // Initialize React Hook Form
   const form = useForm<UploadModelFormInput>({
@@ -50,35 +92,8 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       postprocessMode: "file",
       postprocessFile: null,
       postprocessCode: "",
-      examplePayload: `{
-  "input_data": [
-    {
-      "features": [
-        {
-          "name": "transaction_amount",
-          "value": 150.25
-        },
-        {
-          "name": "merchant_category",
-          "value": "retail"
-        }
-      ]
-    }
-  ]
-}`,
-      expectedResult: `{
-  "status": "success",
-  "predictions": [
-    {
-      "class": "legit",
-      "probability": 0.985,
-      "metadata": {
-        "model_version": "v1.2.0",
-        "latency_ms": 12
-      }
-    }
-  ]
-}`,
+      examplePayload: "",
+      expectedResult: "",
     },
   });
 
@@ -91,6 +106,11 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
   const preprocessMode = watch("preprocessMode") || "file";
   const postprocessFile = watch("postprocessFile") as File | null;
   const postprocessMode = watch("postprocessMode") || "file";
+
+  // Watch type, framework, and taskType inside the hook to ensure updates reactively trigger re-render
+  const detectedType = watch("type");
+  const detectedFramework = watch("framework");
+  const detectedTaskType = watch("taskType");
 
   /**
    * Uploads model artifacts and scripts to the backend in draft mode (triggerBuild=false)
@@ -113,7 +133,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       }
 
       setUploadProgress(50);
-      const result = await detectSchema(model, form.getValues("type"));
+      const result = await detectSchema(model);
       setUploadProgress(90);
 
       // Auto-populate examplePayload and expectedResult if detected
@@ -123,6 +143,13 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       if (result.expected_result) {
         form.setValue("expectedResult", result.expected_result);
       }
+
+      // Map detected attributes
+      const { type, framework, taskType } = mapDetectedAttributes(result.framework, result.task);
+      form.setValue("type", type);
+      form.setValue("framework", framework);
+      form.setValue("taskType", taskType);
+      setHasDetected(true);
 
       setUploadStatus("Analysis complete!");
       setUploadProgress(100);
@@ -160,7 +187,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
     } else if (step === 2) {
       const isValid = await trigger(["modelFile"]);
       if (isValid) {
-        await analyzeModelSchema();
+        setStep(3);
       }
     }
   };
@@ -170,7 +197,17 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
    * Called by handleSubmit as the error callback so we can see what is blocking submit.
    */
   const onInvalidSubmit = (errors: Record<string, unknown>) => {
-    console.error("[UploadModel] Form validation failed — errors:", JSON.stringify(errors, null, 2));
+    const cleanErrors = Object.keys(errors).reduce((acc, key) => {
+      const err = errors[key] as any;
+      if (err) {
+        acc[key] = {
+          type: err.type,
+          message: err.message,
+        };
+      }
+      return acc;
+    }, {} as Record<string, any>);
+    console.error("[UploadModel] Form validation failed — errors:", cleanErrors);
   };
 
   /**
@@ -287,7 +324,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
 
   /**
    * Triggers the automated model schema detection using the currently attached model file.
-   * On success, updates the form values for examplePayload and expectedResult.
+   * On success, updates the form values for examplePayload, expectedResult, and auto-detected enums.
    */
   const handleDetectSchema = async () => {
     const model = form.getValues("modelFile");
@@ -298,7 +335,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
 
     setIsDetectingSchema(true);
     try {
-      const result = await detectSchema(model, form.getValues("type"));
+      const result = await detectSchema(model);
       
       // Update form values
       if (result.example_payload) {
@@ -307,8 +344,15 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       if (result.expected_result) {
         form.setValue("expectedResult", result.expected_result);
       }
+
+      // Map detected attributes
+      const { type, framework, taskType } = mapDetectedAttributes(result.framework, result.task);
+      form.setValue("type", type);
+      form.setValue("framework", framework);
+      form.setValue("taskType", taskType);
       
-      toast.success("Model schema detected and loaded successfully!");
+      setHasDetected(true);
+      toast.success("Model schema and configuration auto-detected successfully!");
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e);
       toast.error(`Schema detection failed: ${errMsg}`);
@@ -337,5 +381,9 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
     onInvalidSubmit,
     isDetectingSchema,
     handleDetectSchema,
+    hasDetected,
+    detectedType,
+    detectedFramework,
+    detectedTaskType,
   };
 }

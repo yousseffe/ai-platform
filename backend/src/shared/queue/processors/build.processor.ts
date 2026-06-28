@@ -1,13 +1,15 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ModelVersion } from '../../../modules/models/entities/model-version.entity';
+import { Model } from '../../../modules/models/entities/model.entity';
 import { Deployment } from '../../../modules/deployments/entities/deployment.entity';
 import { VersionStatus } from '../../../modules/models/enums/version-status.enum';
 import { DeploymentStatus } from '../../../modules/deployments/enums/deployment-status.enum';
 import { ModelType } from '../../../modules/models/enums/model-type.enum';
 import { Framework } from '../../../modules/models/enums/framework.enum';
+import { TaskType } from '../../../modules/models/enums/task-type.enum';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Docker from 'dockerode';
@@ -33,7 +35,11 @@ function isZipFile(filePath: string): boolean {
  * BullMQ processor responsible for packaging uploaded model weights and scripts
  * into standalone, self-serving Docker container images.
  */
-@Processor('build-queue')
+@Processor('build-queue', {
+  concurrency: 1,
+  lockDuration: 600000, // 10 minutes lock duration to prevent stall on large model weights (e.g. GGUF)
+  stalledInterval: 600000,
+})
 export class BuildProcessor extends WorkerHost {
   private readonly docker: Docker;
   private readonly logger = new Logger(BuildProcessor.name);
@@ -44,6 +50,7 @@ export class BuildProcessor extends WorkerHost {
     @InjectRepository(Deployment)
     private readonly deploymentsRepository: Repository<Deployment>,
     private readonly minioService: MinioService,
+    private readonly dataSource: DataSource,
   ) {
     super();
     this.docker = new Docker(getDockerOptions());
@@ -59,32 +66,56 @@ export class BuildProcessor extends WorkerHost {
   /**
    * Helper to persist build progress percentage (0-100) for real-time UI updates.
    */
-  private async updateProgress(
-    versionId: string,
-    progress: number,
-  ): Promise<void> {
-    await this.modelVersionsRepository.update(versionId, {
-      buildProgress: progress,
-    });
+  private async updateProgress(versionId: string, progress: number, logs?: string): Promise<void> {
+    const updateData: any = { buildProgress: progress };
+    if (logs !== undefined) {
+      updateData.buildLogs = logs;
+    }
+    await this.modelVersionsRepository.update(versionId, updateData);
   }
 
   async process(job: Job<BuildJobPayload, void, string>): Promise<void> {
     const { versionId } = job.data;
-    this.logger.log(`Starting build process for version: ${versionId}`);
+    const logsBuffer: string[] = [];
 
-    await this.modelVersionsRepository.update(versionId, {
-      status: VersionStatus.BUILDING,
-      buildProgress: 0,
-    });
+    const logInfo = async (msg: string) => {
+      this.logger.log(msg);
+      logsBuffer.push(`[${new Date().toISOString()}] INFO: ${msg}`);
+      await this.modelVersionsRepository.update(versionId, {
+        buildLogs: logsBuffer.join('\n'),
+      });
+    };
+
+    const logError = async (msg: string, stack?: string) => {
+      this.logger.error(msg, stack);
+      logsBuffer.push(`[${new Date().toISOString()}] ERROR: ${msg}${stack ? `\n${stack}` : ''}`);
+      await this.modelVersionsRepository.update(versionId, {
+        buildLogs: logsBuffer.join('\n'),
+      });
+    };
+
+    await logInfo(`Starting build process for version: ${versionId}`);
+
     const version = await this.modelVersionsRepository.findOne({
       where: { id: versionId },
       relations: ['model'],
     });
 
     if (!version) {
-      this.logger.error(`Model version ${versionId} not found in database.`);
+      await logError(`Model version ${versionId} not found in database.`);
       return;
     }
+
+    if (version.status === VersionStatus.READY) {
+      await logInfo(`Model version ${versionId} is already READY. Skipping build.`);
+      return;
+    }
+
+    await this.modelVersionsRepository.update(versionId, {
+      status: VersionStatus.BUILDING,
+      buildProgress: 0,
+      buildLogs: logsBuffer.join('\n'),
+    });
 
     try {
       // Phase 0: Stop active deployments for this version before rebuilding
@@ -248,6 +279,152 @@ export class BuildProcessor extends WorkerHost {
         }
       }
 
+      // Double-Safety Auto-Detection Phase
+      let detectedFramework = version.model.framework;
+      let detectedType = version.model.type;
+
+      // 1. Analyze by original filename
+      const originalFileName = version.modelFilePath ? path.basename(version.modelFilePath).toLowerCase() : '';
+      if (originalFileName.endsWith('.pt') || originalFileName.endsWith('.pth')) {
+        detectedFramework = Framework.PYTORCH;
+      } else if (originalFileName.endsWith('.h5') || originalFileName.endsWith('.keras') || originalFileName.endsWith('.pb')) {
+        detectedFramework = Framework.TENSORFLOW;
+      } else if (originalFileName.endsWith('.onnx')) {
+        detectedFramework = Framework.ONNX;
+      } else if (originalFileName.endsWith('.pkl') || originalFileName.endsWith('.joblib')) {
+        detectedFramework = Framework.SKLEARN;
+      } else if (originalFileName.endsWith('.gguf')) {
+        detectedFramework = Framework.LLAMA_CPP;
+        detectedType = ModelType.LLM_GGUF;
+      }
+
+      // Check filename keyword clues for task type
+      if (detectedType !== ModelType.LLM_GGUF) {
+        if (originalFileName.includes('diffusion') || originalFileName.includes('stable-diffusion') || originalFileName.includes('sdxl')) {
+          detectedType = ModelType.DIFFUSION;
+        } else if (/mobilenet|resnet|vgg|efficientnet|vit|yolo|inception|convnext|densenet/i.test(originalFileName)) {
+          detectedType = ModelType.VISION;
+        } else if (/bert|gpt|llama|roberta|t5|distilbert|sentiment|text|nlp|translation/i.test(originalFileName)) {
+          detectedType = ModelType.NLP;
+        }
+      }
+
+      // 2. Check extracted ZIP directory structure if applicable
+      const unzippedDir = path.join(buildDir, 'unzipped_model');
+      if (fs.existsSync(unzippedDir) && fs.statSync(unzippedDir).isDirectory()) {
+        const findFileRecursive = (dir: string, filename: string): string | null => {
+          const files = fs.readdirSync(dir);
+          for (const file of files) {
+            const fullPath = path.join(dir, file);
+            if (fs.statSync(fullPath).isDirectory()) {
+              const res = findFileRecursive(fullPath, filename);
+              if (res) return res;
+            } else if (file.toLowerCase() === filename.toLowerCase()) {
+              return fullPath;
+            }
+          }
+          return null;
+        };
+
+        // Check for Stable Diffusion index
+        const modelIndexJson = findFileRecursive(unzippedDir, 'model_index.json');
+        if (modelIndexJson) {
+          detectedType = ModelType.DIFFUSION;
+          detectedFramework = Framework.PYTORCH;
+        }
+
+        // Check config.json for HF models
+        const configJsonPath = findFileRecursive(unzippedDir, 'config.json');
+        if (configJsonPath) {
+          try {
+            const configData = JSON.parse(fs.readFileSync(configJsonPath, 'utf8'));
+            const archs = (configData.architectures || []).map((a: string) => a.toLowerCase()).join(' ');
+            const modelTypeField = (configData.model_type || '').toLowerCase();
+            
+            if (/vit|resnet|mobilenet|convnext|yolo|swin|deit|clip/i.test(archs + ' ' + modelTypeField)) {
+              detectedType = ModelType.VISION;
+              detectedFramework = Framework.PYTORCH;
+            } else if (/bert|gpt|llama|t5|bart|roberta|distilbert|bloom|opt|mpt|falcon/i.test(archs + ' ' + modelTypeField)) {
+              detectedType = ModelType.NLP;
+              detectedFramework = Framework.PYTORCH;
+            }
+          } catch (configErr) {
+            // ignore
+          }
+        }
+
+        // Check for specific weight files
+        if (findFileRecursive(unzippedDir, 'pytorch_model.bin') || findFileRecursive(unzippedDir, 'model.safetensors')) {
+          detectedFramework = Framework.PYTORCH;
+        } else if (findFileRecursive(unzippedDir, 'tf_model.h5') || findFileRecursive(unzippedDir, 'saved_model.pb')) {
+          detectedFramework = Framework.TENSORFLOW;
+        } else if (findFileRecursive(unzippedDir, 'model.onnx')) {
+          detectedFramework = Framework.ONNX;
+        }
+      }
+
+      // 3. Scan preprocess and postprocess imports/content for secondary clues
+      const checkCodeHeuristics = (filePath: string) => {
+        if (!fs.existsSync(filePath)) return;
+        try {
+          const content = fs.readFileSync(filePath, 'utf8');
+          // Framework clues
+          if (/import\s+torch\b|from\s+torch\b/i.test(content)) {
+            detectedFramework = Framework.PYTORCH;
+          } else if (/import\s+tensorflow\b|from\s+tensorflow\b|import\s+keras\b|from\s+keras\b/i.test(content)) {
+            detectedFramework = Framework.TENSORFLOW;
+          } else if (/import\s+onnxruntime\b|import\s+onnx\b/i.test(content)) {
+            detectedFramework = Framework.ONNX;
+          } else if (/import\s+sklearn\b|from\s+sklearn\b/i.test(content)) {
+            detectedFramework = Framework.SKLEARN;
+          }
+
+          // Type clues
+          if (/cv2\b|PIL\b|Image\b|torchvision|skimage|matplotlib/i.test(content)) {
+            detectedType = ModelType.VISION;
+          } else if (/transformers\b|nltk\b|spacy\b|tokenizers\b|sentencepiece\b|gensim\b/i.test(content)) {
+            detectedType = ModelType.NLP;
+          } else if (/diffusers\b/i.test(content)) {
+            detectedType = ModelType.DIFFUSION;
+          }
+        } catch (codeErr) {
+          // ignore
+        }
+      };
+
+      checkCodeHeuristics(path.join(buildDir, 'preprocess.py'));
+      checkCodeHeuristics(path.join(buildDir, 'postprocess.py'));
+
+      // If mismatch detected, apply corrections
+      if (detectedFramework !== version.model.framework || detectedType !== version.model.type) {
+        let detectedTaskType = version.model.taskType;
+        if (detectedType === ModelType.DIFFUSION) {
+          detectedTaskType = TaskType.GENERATION;
+        } else if (detectedType === ModelType.LLM_GGUF) {
+          detectedTaskType = TaskType.CHAT;
+        } else if (detectedType === ModelType.VISION && (detectedTaskType as string) === 'OTHER') {
+          detectedTaskType = TaskType.CLASSIFICATION;
+        } else if (detectedType === ModelType.NLP && (detectedTaskType as string) === 'OTHER') {
+          detectedTaskType = TaskType.CLASSIFICATION;
+        }
+
+        const warnMsg = `Mismatch detected! Registered as framework: ${version.model.framework}, type: ${version.model.type}. ` +
+          `Auto-corrected to framework: ${detectedFramework}, type: ${detectedType}. Updating model metadata.`;
+        await logInfo(warnMsg);
+
+        // Update database parent model metadata
+        await this.dataSource.getRepository(Model).update(version.model.id, {
+          framework: detectedFramework,
+          type: detectedType,
+          taskType: detectedTaskType,
+        });
+
+        // Mutate in-memory representation so current build steps use correct templates and images
+        version.model.framework = detectedFramework;
+        version.model.type = detectedType;
+        version.model.taskType = detectedTaskType;
+      }
+
       // Phase 3: Generate Dockerfile (30% → 50%)
       await this.updateProgress(versionId, 30);
 
@@ -262,14 +439,49 @@ export class BuildProcessor extends WorkerHost {
       let dockerfileContent = '';
 
       if (version.model.type === ModelType.LLM_GGUF) {
-        dockerfileContent = `FROM ghcr.io/ggml-org/llama.cpp:server
-WORKDIR /app
-COPY model.pkl /models/model.gguf
-ENV LC_ALL=C.utf8
-EXPOSE 8080
-ENTRYPOINT ["/app/llama-server", "-m", "/models/model.gguf", "--port", "8080", "--host", "0.0.0.0"]
-`;
-        fs.writeFileSync(path.join(buildDir, 'requirements.txt'), '');
+        // Phase 3 & 4 bypass for LLM GGUF: We do not build a Docker image.
+        // Instead, we store the downloaded GGUF file in a persistent path on the host
+        // and mount it directly to the base llama.cpp container during deployment.
+        await this.updateProgress(versionId, 50);
+
+        const storageDirEnv = process.env.GGUF_STORAGE_PATH;
+        const ggufStorageDir = storageDirEnv
+          ? path.resolve(storageDirEnv)
+          : path.join(process.cwd(), 'uploads', 'gguf-models');
+
+        if (!fs.existsSync(ggufStorageDir)) {
+          fs.mkdirSync(ggufStorageDir, { recursive: true });
+        }
+
+        const sourcePath = path.join(buildDir, 'model.pkl');
+        const destPath = path.join(ggufStorageDir, `${versionId}.gguf`);
+
+        if (fs.existsSync(sourcePath)) {
+          fs.renameSync(sourcePath, destPath);
+        } else {
+          throw new Error('GGUF model weights file not found in build directory after download.');
+        }
+
+        await this.updateProgress(versionId, 90);
+
+        await this.modelVersionsRepository.update(versionId, {
+          status: VersionStatus.READY,
+          errorMessage: null,
+          buildProgress: 100,
+        });
+
+        // Cleanup local build directory
+        try {
+          if (fs.existsSync(buildDir)) {
+            fs.rmSync(buildDir, { recursive: true, force: true });
+          }
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Failed to cleanup build directory: ${message}`);
+        }
+
+        this.logger.log(`Bypassed Docker image build for GGUF model version: ${versionId}. GGUF model saved to ${destPath}`);
+        return;
       } else {
         let templateName = 'serve_tabular.py';
         if (version.model.type === ModelType.NLP) {
@@ -590,7 +802,7 @@ numpy
       fs.writeFileSync(path.join(buildDir, 'Dockerfile'), dockerfileContent);
 
       // Phase 4: Docker build (50% → 90%)
-      await this.updateProgress(versionId, 50);
+      await this.updateProgress(versionId, 50, logsBuffer.join('\n'));
 
       const pack = await this.docker.buildImage(
         {
@@ -622,42 +834,54 @@ numpy
             }
             resolve();
           },
-          (event: { stream?: string }) => {
-            // Track Docker build steps to update progress (50% → 90%)
-            if (event?.stream?.startsWith('Step ')) {
-              stepCount++;
-              // Estimate progress: each step advances from 50% toward 90%
-              const buildProgress = Math.min(90, 50 + stepCount * 5);
-              this.updateProgress(versionId, buildProgress).catch(() => {});
+          (event: { stream?: string; status?: string; progress?: string }) => {
+            if (event?.stream) {
+              const cleanStream = event.stream.trim();
+              if (cleanStream) {
+                this.logger.log(`[ModelBuild] [Version ${versionId}] ${cleanStream}`);
+              }
+              logsBuffer.push(cleanStream);
+              if (event.stream.startsWith('Step ')) {
+                stepCount++;
+                // Estimate progress: each step advances from 50% toward 90%
+                const buildProgress = Math.min(90, 50 + stepCount * 5);
+                this.updateProgress(versionId, buildProgress, logsBuffer.join('\n')).catch(() => {});
+              } else if (logsBuffer.length % 15 === 0) {
+                this.modelVersionsRepository.update(versionId, {
+                  buildLogs: logsBuffer.join('\n'),
+                }).catch(() => {});
+              }
+            } else if (event?.status) {
+              const statusLine = `${event.status} ${event.progress || ''}`.trim();
+              if (statusLine) {
+                this.logger.log(`[ModelBuild] [Version ${versionId}] ${statusLine}`);
+              }
+              logsBuffer.push(statusLine);
             }
           },
         );
       });
 
-      this.logger.log(
-        `Successfully built docker image for version: ${versionId}`,
-      );
+      await logInfo(`Successfully built docker image for version: ${versionId}`);
 
       // Phase 5: Cleanup (90% → 95%)
-      await this.updateProgress(versionId, 90);
+      await this.updateProgress(versionId, 90, logsBuffer.join('\n'));
 
       // Prune dangling/intermediate build images synchronously
       try {
         const { execSync } = require('child_process');
         execSync('docker image prune -f', { timeout: 30000 });
-        this.logger.log(
-          'Successfully pruned dangling/intermediate docker images',
-        );
+        await logInfo('Successfully pruned dangling/intermediate docker images');
       } catch (pruneError: unknown) {
-        const pruneMsg =
-          pruneError instanceof Error ? pruneError.message : String(pruneError);
-        this.logger.warn(`Failed to prune dangling images: ${pruneMsg}`);
+        const pruneMsg = pruneError instanceof Error ? pruneError.message : String(pruneError);
+        await logInfo(`Failed to prune dangling images: ${pruneMsg}`);
       }
 
       await this.modelVersionsRepository.update(versionId, {
         status: VersionStatus.READY,
         errorMessage: null,
         buildProgress: 100,
+        buildLogs: logsBuffer.join('\n'),
       });
 
       // Cleanup local build files
@@ -667,17 +891,18 @@ numpy
         }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(`Failed to cleanup build directory: ${message}`);
+        await logInfo(`Failed to cleanup build directory: ${message}`);
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(
+      await logError(
         `Failed to build model version ${versionId}: ${message}`,
         error instanceof Error ? error.stack : undefined,
       );
       await this.modelVersionsRepository.update(versionId, {
         status: VersionStatus.FAILED,
         errorMessage: message || 'Unknown error during containerization',
+        buildLogs: logsBuffer.join('\n'),
       });
       throw error;
     }

@@ -29,6 +29,7 @@ export interface ModelVersion {
   expectedResult?: string;
   errorMessage?: string;
   buildProgress?: number;
+  buildLogs?: string;
   deployments?: Deployment[];
   testCases?: ModelVersionTestCase[];
   createdAt: string;

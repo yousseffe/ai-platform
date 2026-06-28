@@ -55,6 +55,10 @@ export default function UploadModelWizard({
     onInvalidSubmit,
     isDetectingSchema,
     handleDetectSchema,
+    hasDetected,
+    detectedType,
+    detectedFramework,
+    detectedTaskType,
   } = useUploadModel({ successRedirect });
 
   const { register, setValue, handleSubmit, trigger, formState: { errors } } = form;
@@ -159,7 +163,7 @@ export default function UploadModelWizard({
               </div>
             </button>
           </div>
-
+ 
           {/* Form Content */}
           <CardContent className="p-8 space-y-6">
             {submitError && (
@@ -167,7 +171,7 @@ export default function UploadModelWizard({
                 {submitError}
               </div>
             )}
-
+ 
             {/* STEP 1: General Info */}
             {step === 1 && (
               <StepGeneralInfo
@@ -176,7 +180,7 @@ export default function UploadModelWizard({
                 isUploading={isUploading}
               />
             )}
-
+ 
             {/* STEP 2: Artifacts & Scripts */}
             {step === 2 && (
               <StepArtifacts
@@ -192,7 +196,7 @@ export default function UploadModelWizard({
                 postprocessMode={postprocessMode}
               />
             )}
-
+ 
             {/* STEP 3: Interface Configuration */}
             {step === 3 && (
               <StepInterfaceConfig
@@ -202,6 +206,11 @@ export default function UploadModelWizard({
                 isDetectingSchema={isDetectingSchema}
                 handleDetectSchema={handleDetectSchema}
                 hasModelFile={!!modelFile}
+                hasDetected={hasDetected}
+                detectedType={detectedType}
+                detectedFramework={detectedFramework}
+                detectedTaskType={detectedTaskType}
+                setValue={setValue}
               />
             )}
 
@@ -256,14 +265,20 @@ export default function UploadModelWizard({
 
             {step < 3 ? (
               <Button
+                key="btn-next-step"
                 type="button"
-                onClick={handleNextStep}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNextStep();
+                }}
                 className="bg-primary hover:bg-primary/95 text-primary-foreground py-2 h-10 px-5 text-xs flex items-center gap-2 cursor-pointer font-extrabold transition-all hover:translate-x-0.5 rounded-xl shadow-md shadow-primary/10"
               >
                 Next Step <ArrowRight className="w-4 h-4 animate-pulse" />
               </Button>
             ) : (
               <Button
+                key="btn-submit-form"
                 type="submit"
                 disabled={isUploading}
                 className="py-2 h-10 px-6 text-xs flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 border-none shadow-md shadow-emerald-500/20 text-white cursor-pointer font-extrabold transition-all disabled:opacity-50 rounded-xl"
