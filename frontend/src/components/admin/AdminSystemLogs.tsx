@@ -62,21 +62,55 @@ export function AdminSystemLogs() {
     isJson: boolean;
   }
 
+  // A valid OTel trace ID is exactly 32 lowercase hex chars (W3C Trace Context spec).
+  // We only show the Trace button for logs that have this field set in their JSON —
+  // NOT for arbitrary 32-char hex strings in plain-text logs (UUIDs, user IDs, etc.).
+  const isValidOtelTraceId = (id: string | undefined): id is string =>
+    typeof id === "string" && /^[a-f0-9]{32}$/.test(id);
+
   const parseLogLine = (lineStr: string): ParsedLog => {
-    let traceId: string | undefined = undefined;
     try {
       const parsed = JSON.parse(lineStr);
-      let level = (parsed.severity || parsed.level || "").toLowerCase();
+      let level = (parsed.severity || parsed.level || parsed.Level || "").toLowerCase();
       if (level === "warning") level = "warn";
-      
-      const message = parsed.body || parsed.message || parsed.msg || lineStr;
-      const context = parsed.attributes?.context || parsed.context || parsed.logger || parsed.name;
-      traceId = parsed.traceid || parsed.trace_id || parsed.attributes?.trace_id || parsed.attributes?.traceId;
-      const spanId = parsed.spanid || parsed.span_id || parsed.attributes?.span_id || parsed.attributes?.spanId;
+
+      const message =
+        parsed.body || parsed.message || parsed.msg || parsed.Message || lineStr;
+      const context =
+        parsed.logger ||
+        parsed.context ||
+        parsed.attributes?.context ||
+        parsed.attributes?.logger ||
+        parsed.name;
+
+      // OTel Winston transport injects `trace_id` (W3C snake_case).
+      // Legacy/collector convention uses `traceid`. Check both.
+      const traceId: string | undefined =
+        parsed.trace_id ||
+        parsed.traceid ||
+        parsed["trace-id"] ||
+        parsed.attributes?.trace_id ||
+        parsed.attributes?.traceid ||
+        parsed.attributes?.traceId ||
+        undefined;
+
+      const spanId: string | undefined =
+        parsed.span_id ||
+        parsed.spanid ||
+        parsed["span-id"] ||
+        parsed.attributes?.span_id ||
+        parsed.attributes?.spanId ||
+        undefined;
 
       if (!level) {
         const lowerMsg = String(message).toLowerCase();
-        if (lowerMsg.includes("error") || lowerMsg.includes("failed") || lowerMsg.includes("exception") || lowerMsg.includes("critical") || lowerMsg.includes("stderr")) {
+        if (
+          lowerMsg.includes("error") ||
+          lowerMsg.includes("failed") ||
+          lowerMsg.includes("exception") ||
+          lowerMsg.includes("critical") ||
+          lowerMsg.includes("stderr")
+        ) {
           level = "error";
         } else if (lowerMsg.includes("warning") || lowerMsg.includes("warn")) {
           level = "warn";
@@ -98,15 +132,17 @@ export function AdminSystemLogs() {
         isJson: true,
       };
     } catch {
-      // Check via regex fallback for hex string of 32 characters
-      const match = lineStr.match(/\b([a-f0-9]{32})\b/);
-      if (match) {
-        traceId = match[1];
-      }
-
+      // Plain-text log line — do NOT show a Trace button; we cannot reliably
+      // identify a real OTel trace ID in unstructured text.
       let level = "info";
       const lowerLine = lineStr.toLowerCase();
-      if (lowerLine.includes("error") || lowerLine.includes("failed") || lowerLine.includes("exception") || lowerLine.includes("critical") || lowerLine.includes("stderr")) {
+      if (
+        lowerLine.includes("error") ||
+        lowerLine.includes("failed") ||
+        lowerLine.includes("exception") ||
+        lowerLine.includes("critical") ||
+        lowerLine.includes("stderr")
+      ) {
         level = "error";
       } else if (lowerLine.includes("warning") || lowerLine.includes("warn")) {
         level = "warn";
@@ -118,7 +154,7 @@ export function AdminSystemLogs() {
         timestamp: "",
         level,
         message: lineStr,
-        traceId,
+        traceId: undefined, // never trust a plain-text hex match as a real trace ID
         isJson: false,
       };
     }
@@ -301,11 +337,11 @@ export function AdminSystemLogs() {
 
                     {/* Buttons / Controls */}
                     <div className="flex items-center gap-1.5 shrink-0 select-none">
-                      {parsed.traceId && (
+                      {isValidOtelTraceId(parsed.traceId) && (
                         <button
                           onClick={() => setSelectedTraceId(parsed.traceId!)}
                           className="p-1 bg-slate-900 border border-slate-800 hover:border-purple-500/40 hover:bg-purple-500/10 text-purple-400 text-[10px] rounded flex items-center gap-1 cursor-pointer transition-colors"
-                          title="Inspect distributed request trace"
+                          title={`Inspect distributed trace · ${parsed.traceId}`}
                         >
                           <Network className="w-3 h-3" />
                           <span className="hidden sm:inline">Trace</span>
@@ -379,7 +415,7 @@ export function AdminSystemLogs() {
         </div>
       </div>
 
-      {/* Slide-over trace panel */}
+      {/* Trace modal — rendered into document.body via portal */}
       {selectedTraceId && (
         <TraceFlowVisualizer
           traceId={selectedTraceId}

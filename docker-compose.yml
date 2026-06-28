@@ -1,18 +1,6 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: aidb
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: always
-
   redis:
     image: redis:7-alpine
     ports:
@@ -56,12 +44,14 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
     environment:
       - PORT=5000
-      - DB_HOST=postgres
+      - DB_HOST=host.docker.internal
       - DB_PORT=5432
       - DB_USER=postgres
-      - DB_PASSWORD=password
+      - DB_PASSWORD=khalid
       - DB_NAME=aidb
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -71,14 +61,19 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=models
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - PROMETHEUS_URL=http://prometheus:9090
+      - LOKI_URL=http://loki:3100
     volumes:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - postgres
       - redis
       - minio
+      - otel-collector
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: npm run dev
     networks:
       - default

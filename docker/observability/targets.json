@@ -10,5 +10,17 @@
       "user_id": "a5520549-6c49-442b-a705-b9fd01e11bf3",
       "model_type": "LLM_GGUF"
     }
+  },
+  {
+    "targets": [
+      "khalidmohfathi_chantale_v1_16b64d3b:8080"
+    ],
+    "labels": {
+      "container_name": "khalidmohfathi_chantale_v1_16b64d3b",
+      "model_id": "878c24c7-0a84-4483-8f57-cb8cab55bd37",
+      "version_id": "1c347142-e178-4c60-ac26-7f2d46ffb84c",
+      "user_id": "a5520549-6c49-442b-a705-b9fd01e11bf3",
+      "model_type": "LLM_GGUF"
+    }
   }
 ]

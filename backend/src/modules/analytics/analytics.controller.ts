@@ -363,6 +363,165 @@ export class AnalyticsController {
     }
   }
 
+  @Get('admin/traces/:traceId')
+  @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
+  async getAdminTrace(@Param('traceId') traceId: string) {
+    try {
+      const spans: any[] = [];
+
+      // The OTel Winston transport injects `trace_id` (W3C field name).
+      // The OTel Collector may use `traceid`. Try both JSON strategies plus
+      // a raw line-contains fallback so we catch all log formats.
+      const nowNs = BigInt(Date.now()) * 1_000_000n;
+      const oneDayNs = 24n * 60n * 60n * 1_000_000_000n;
+      const startNs = nowNs - oneDayNs;
+
+      const strategies: Array<{ label: string; logql: string }> = [
+        {
+          label: 'trace_id (OTel Winston)',
+          logql: `{container_name=~".+"} | json | trace_id = "${traceId}"`,
+        },
+        {
+          label: 'trace_id (service_name label)',
+          logql: `{service_name=~".+"} | json | trace_id = "${traceId}"`,
+        },
+        {
+          label: 'traceid (OTel Collector)',
+          logql: `{container_name=~".+"} | json | traceid = "${traceId}"`,
+        },
+        {
+          label: 'line filter fallback',
+          logql: `{container_name=~".+"} |= "${traceId}"`,
+        },
+      ];
+
+      for (const strategy of strategies) {
+        const url =
+          `${this.lokiUrl}/loki/api/v1/query_range` +
+          `?query=${encodeURIComponent(strategy.logql)}` +
+          `&limit=200` +
+          `&start=${startNs.toString()}` +
+          `&end=${nowNs.toString()}` +
+          `&direction=forward`;
+
+        try {
+          const response = await firstValueFrom(this.httpService.get(url));
+          const streams = response.data?.data?.result || [];
+
+          for (const stream of streams) {
+            const service: string =
+              stream.stream?.container_name ||
+              stream.stream?.service_name ||
+              stream.stream?.job ||
+              'unknown';
+
+            for (const val of stream.values || []) {
+              const timestampNs = parseInt(val[0]);
+              const line = val[1] as string;
+
+              let span: any;
+              try {
+                const parsed = JSON.parse(line);
+
+                // Extract trace/span IDs — OTel Winston uses W3C snake_case
+                const logTraceId =
+                  parsed.trace_id || parsed.traceid || parsed['trace-id'] ||
+                  parsed.attributes?.trace_id || parsed.attributes?.traceid;
+
+                // Only include logs that actually belong to this trace
+                if (logTraceId && logTraceId !== traceId) continue;
+
+                const spanId =
+                  parsed.span_id || parsed.spanid || parsed['span-id'] ||
+                  parsed.attributes?.span_id || parsed.attributes?.spanId;
+
+                const durationMs =
+                  Number(parsed.duration || parsed.durationMs ||
+                    parsed.attributes?.duration_ms || parsed['duration_ms'] || 0);
+
+                const rawMessage =
+                  parsed.body || parsed.message || parsed.msg || parsed.Message || line;
+                const context =
+                  parsed.logger || parsed.context || parsed.attributes?.context ||
+                  parsed.attributes?.logger || parsed.name;
+
+                const severity =
+                  (parsed.severity || parsed.level || parsed.Level || 'info')
+                    .toString()
+                    .toLowerCase()
+                    .replace('warning', 'warn');
+
+                span = {
+                  traceId,
+                  spanId,
+                  service,
+                  name: context ? `[${context}] ${rawMessage}` : rawMessage,
+                  timestampNs,
+                  durationMs,
+                  offsetMs: 0,
+                  status: severity === 'error' ? 'error' : 'success',
+                  attributes: parsed.attributes || {},
+                };
+              } catch {
+                // Plain-text — include if the raw line contains the traceId
+                if (!line.includes(traceId)) continue;
+                span = {
+                  traceId,
+                  service,
+                  name: line.length > 150 ? line.substring(0, 150) + '…' : line,
+                  timestampNs,
+                  durationMs: 0,
+                  offsetMs: 0,
+                  status: line.toLowerCase().includes('error') ? 'error' : 'success',
+                  attributes: {},
+                };
+              }
+
+              // Deduplicate: skip if we already have a span with the same timestamp + service
+              const isDupe = spans.some(
+                (s) => s.timestampNs === span.timestampNs && s.service === span.service,
+              );
+              if (!isDupe) spans.push(span);
+            }
+          }
+
+          // Stop after first strategy that actually returned results
+          if (spans.length > 0) break;
+        } catch (lokiErr) {
+          this.logger.warn(
+            `Loki trace strategy "${strategy.label}" failed: ${lokiErr.message}`,
+          );
+        }
+      }
+
+      // Sort chronologically
+      spans.sort((a, b) => a.timestampNs - b.timestampNs);
+
+      // Compute relative offsets from the first span
+      if (spans.length > 0) {
+        const firstTs = spans[0].timestampNs;
+        const lastTs = spans[spans.length - 1].timestampNs;
+        const totalNs = lastTs - firstTs || 1_000_000; // at least 1ms
+
+        for (const span of spans) {
+          span.offsetMs = Math.round((span.timestampNs - firstTs) / 1_000_000);
+          if (span.durationMs === 0) {
+            // Give zero-duration spans a minimum visible slice
+            span.durationMs = Math.max(1, Math.round(totalNs / spans.length / 1_000_000));
+          }
+        }
+      }
+
+      this.logger.log(
+        `Trace ${traceId}: resolved ${spans.length} span(s) from Loki`,
+      );
+      return { traceId, spans };
+    } catch (err) {
+      this.logger.error(`Error querying trace ${traceId}: ${err.message}`);
+      return { traceId, spans: [], error: err.message };
+    }
+  }
+
   @Get('admin/alerts')
   @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
   async getAdminAlerts() {
