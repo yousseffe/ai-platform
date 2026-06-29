@@ -3,9 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { VerificationCode } from './entities/verification-code.entity';
 import { ApiKey } from './entities/api-key.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
+import { McpToken } from './entities/mcp-token.entity';
 import { AuthService } from './services/auth.service';
 import { ApiIdentityService } from './services/api-identity.service';
+import { McpTokenService } from './services/mcp-token.service';
 import { AuthController } from './controllers/auth.controller';
+import { McpTokenController } from './controllers/mcp-token.controller';
 import { UsersModule } from '../users/users.module';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
@@ -20,7 +23,13 @@ import { getRsaKeys } from './utils/keys';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([VerificationCode, AuditLog, ApiKey, OrgApiKey]),
+    TypeOrmModule.forFeature([
+      VerificationCode,
+      AuditLog,
+      ApiKey,
+      OrgApiKey,
+      McpToken,
+    ]),
     UsersModule,
     PassportModule,
     JwtModule.registerAsync({
@@ -39,15 +48,17 @@ import { getRsaKeys } from './utils/keys';
   providers: [
     AuthService,
     ApiIdentityService,
+    McpTokenService,
     JwtStrategy,
     OrgRoleGuard,
     ApiKeyOrJwtGuard,
     AdminGuard,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, McpTokenController],
   exports: [
     AuthService,
     ApiIdentityService,
+    McpTokenService,
     OrgRoleGuard,
     ApiKeyOrJwtGuard,
     AdminGuard,

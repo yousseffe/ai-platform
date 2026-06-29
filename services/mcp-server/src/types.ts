@@ -8,7 +8,7 @@ import type { LokiClient } from './context/loki-client.js';
  * Classification of the credential that authenticated an MCP request.
  * Mirrors the backend `ApiKeyKind`.
  */
-export type ApiKeyKind = 'org' | 'personal' | 'trial' | 'jwt';
+export type ApiKeyKind = 'org' | 'personal' | 'trial' | 'jwt' | 'mcp';
 
 /**
  * Resolved caller identity returned by the backend `whoami` endpoint.
@@ -22,6 +22,8 @@ export interface ApiIdentity {
   orgId: string | null;
   projectId: string | null;
   modelId: string | null;
+  /** MCP token scopes, present only when keyType is 'mcp'. */
+  mcpScopes?: string[];
 }
 
 /**

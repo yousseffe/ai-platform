@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
 import { ApiKey } from '../entities/api-key.entity';
 import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
+import { McpToken } from '../entities/mcp-token.entity';
 import { getRsaKeys } from '../utils/keys';
 import { ApiIdentity } from '../interfaces/api-identity.interface';
 
@@ -15,7 +16,7 @@ interface JwtIdentityPayload {
 
 /**
  * Resolves any platform credential (organization key, personal/trial model key,
- * or RS256 JWT) to a scoped identity, without requiring a model-id route param.
+ * MCP access token, or RS256 JWT) to a scoped identity, without requiring a model-id route param.
  *
  * Used by the `whoami` endpoint so the MCP server can validate a caller's key
  * once and scope every subsequent tool call. Returns no secret material.
@@ -28,6 +29,8 @@ export class ApiIdentityService {
     private readonly apiKeyRepository: Repository<ApiKey>,
     @InjectRepository(OrgApiKey)
     private readonly orgApiKeyRepository: Repository<OrgApiKey>,
+    @InjectRepository(McpToken)
+    private readonly mcpTokenRepository: Repository<McpToken>,
   ) {}
 
   /**
@@ -45,6 +48,10 @@ export class ApiIdentityService {
     const [type, token] = authHeader.split(' ');
     if (type !== 'Bearer' || !token) {
       throw new UnauthorizedException('Invalid Authorization format');
+    }
+
+    if (token.startsWith('mcp_')) {
+      return this.resolveMcpToken(token);
     }
 
     if (token.startsWith('sk_live_')) {
@@ -145,5 +152,39 @@ export class ApiIdentityService {
     } catch {
       throw new UnauthorizedException('Invalid JWT token or API Key');
     }
+  }
+
+  /**
+   * Resolves a standard MCP Access Token (`mcp_*`) via its SHA-256 hash.
+   */
+  private async resolveMcpToken(token: string): Promise<ApiIdentity> {
+    const keyHash = crypto.createHash('sha256').update(token).digest('hex');
+    const mcpToken = await this.mcpTokenRepository.findOne({
+      where: { keyHash, isActive: true },
+      relations: ['user'],
+    });
+
+    if (!mcpToken) {
+      throw new UnauthorizedException('Invalid or revoked MCP Access Token');
+    }
+
+    if (mcpToken.expiresAt && mcpToken.expiresAt.getTime() < Date.now()) {
+      throw new UnauthorizedException('MCP Access Token has expired');
+    }
+
+    this.mcpTokenRepository
+      .update(mcpToken.id, { lastUsedAt: new Date() })
+      .catch(() => undefined);
+
+    return {
+      scope: 'user',
+      keyType: 'mcp',
+      userId: mcpToken.user.id,
+      email: mcpToken.user.email,
+      orgId: null,
+      projectId: null,
+      modelId: null,
+      mcpScopes: mcpToken.scopes,
+    };
   }
 }

@@ -37,6 +37,17 @@ app.post('/mcp', async (req, res) => {
     return;
   }
 
+  if (!bearer.startsWith('mcp_')) {
+    res.status(401).json(
+      rpcError(
+        'Invalid token type. The MCP server requires an MCP Access Token (mcp_...). ' +
+          'Generate one at Settings → MCP Access Tokens in the dashboard. ' +
+          'Model API keys (ml_sk_*) are not accepted.',
+      ),
+    );
+    return;
+  }
+
   const keyHash = crypto.createHash('sha256').update(bearer).digest('hex');
   if (!allowRequest(keyHash, cfg.rateLimitPerMinute)) {
     res.status(429).json(rpcError('Rate limit exceeded'));

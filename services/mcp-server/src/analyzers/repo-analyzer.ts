@@ -285,37 +285,48 @@ function buildSuggestions(
     case 'NestJS':
       return [
         `Create an injectable provider/service${svc ? ` under ${svc}` : ' under src/modules'} and register it in a module.`,
-        'Read credentials via ConfigService or process.env — never hardcode.',
-        `Install the SDK with: ${install}.`,
+        'Read credentials via NestJS ConfigService or process.env — never hardcode secrets.',
+        'Use the standard NestJS HttpService (axios wrapper) or fetch() to call the model prediction endpoint.',
       ];
     case 'Next.js':
       return [
-        'Call the provider from a server action or a route under app/api — keep the SDK call server-side.',
-        'Store secrets in .env.local; only expose non-secrets with the NEXT_PUBLIC_ prefix.',
-        `Install the SDK with: ${install}.`,
+        'Call the platform API from a Server Action or Route Handler (app/api/...) to keep the API key safe from the client browser.',
+        'Store secrets in .env.local; only prefix with NEXT_PUBLIC_ if you intend to expose the key to the browser (not recommended for live production keys).',
+        'Use native fetch() server-side to proxy calls to the platform predict URL (default: http://localhost:5000).',
+      ];
+    case 'React':
+    case 'Vue':
+    case 'Svelte':
+    case 'Nuxt':
+    case 'Angular':
+      return [
+        'WARNING: Calling the platform API directly from a static browser app exposes your API key and raises CORS errors in development.',
+        'DEV SOLUTION: Configure a proxy in your dev server. For Vite, add to vite.config.ts: server: { proxy: { "/api": "http://localhost:5000" } }.',
+        'PROD SOLUTION: Deploy a lightweight serverless function or API route as a proxy, and store the API key there.',
+        'Store your development API key in `.env` using your framework prefix (e.g. `VITE_MODEL_API_KEY=ml_sk_live_...` for Vite).',
       ];
     case 'Django':
     case 'FastAPI':
     case 'Flask':
       return [
-        'Add a service module and read the key from environment/settings.',
-        `Install the SDK with: ${install}.`,
-        'Keep provider calls server-side; never ship the key to the client.',
+        'Add a service module/file to execute fetch/requests calls and read the API key from system environment/settings.',
+        'Keep all model endpoint calls strictly server-side; never expose the key to frontend templates.',
+        `Install python dependency "requests" or "httpx" using: ${install}.`,
       ];
     case 'Laravel':
       return [
-        'Add a service class and bind it in a service provider; read the key from config/services.php + .env.',
-        `Install the SDK with: ${install}.`,
+        'Add a service class under app/Services and bind it in a ServiceProvider.',
+        'Read the API key from config/services.php + .env; use Http facade `Http::withToken($key)->post(...)` to call predict.',
       ];
     case 'Spring Boot':
       return [
-        'Add a @Service bean; inject the key via @Value from application properties / environment.',
-        `Add the dependency to your build (${install}).`,
+        'Add a @Service bean; inject the key via @Value("${model.api.key}") from application properties or environment variables.',
+        'Use RestClient or RestTemplate to make the POST call to the model predict URL.',
       ];
     default:
       return [
-        'Add a dedicated service/module for the provider client and read the key from an environment variable.',
-        `Install the SDK with: ${install}.`,
+        'Add a dedicated service/module for the model client and read the key from an environment variable.',
+        'Use native fetch() or a standard HTTP client library to perform POST requests.',
       ];
   }
 }

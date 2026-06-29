@@ -21,7 +21,7 @@ import {
   CreditCard,
   User,
   Key,
-  Activity,
+  Plug,
 } from "lucide-react";
 import { useWorkspace, Workspace } from "@/hooks/use-workspace";
 import { smartFetch } from "@/lib/utils/smart-fetch";
@@ -416,6 +416,17 @@ export default function Sidebar() {
               >
                 <Key className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
                 API Credentials
+              </Link>
+              <Link
+                href="/settings/mcp-tokens"
+                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  pathname === "/settings/mcp-tokens"
+                    ? "text-primary font-semibold bg-primary/[0.04]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+                }`}
+              >
+                <Plug className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+                MCP Access Tokens
               </Link>
             </div>
           )}

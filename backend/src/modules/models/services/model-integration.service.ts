@@ -35,9 +35,11 @@ export interface ModelIntegrationSpec {
     exampleRaw: string | null;
   };
   response: {
+    contentType: 'application/json';
     example: unknown | null;
     exampleRaw: string | null;
   };
+  classLabels: Record<string, any> | null;
   pricing: {
     creditsPerRequest: number;
     currency: 'CREDITS';
@@ -67,7 +69,9 @@ export class ModelIntegrationService {
     modelId: string,
     actorId?: string,
   ): Promise<ModelIntegrationSpec> {
-    const model = await this.modelsService.getModel(modelId, actorId);
+    const model = actorId
+      ? await this.modelsService.getModel(modelId, actorId)
+      : await this.modelsService.getPublicModel(modelId);
 
     const version = this.pickReferenceVersion(model.versions ?? []);
     if (!version) {
@@ -106,6 +110,7 @@ export class ModelIntegrationService {
       },
       request: this.parseSample(version.examplePayload),
       response: this.parseSample(version.expectedResult),
+      classLabels: version.classLabels || null,
       pricing: {
         creditsPerRequest: Number(model.costPerRequest) || 0,
         currency: 'CREDITS',

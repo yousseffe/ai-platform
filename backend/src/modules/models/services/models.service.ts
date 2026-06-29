@@ -313,6 +313,7 @@ export class ModelsService {
     expectedResult?: string,
     triggerBuild?: string,
     uploaderUserId?: string,
+    classLabels?: string,
   ): Promise<ModelVersion> {
     const model = await this.modelsRepository.findOne({
       where: { id: modelId },
@@ -421,6 +422,15 @@ export class ModelsService {
       );
     }
 
+    const parseJsonSafely = (val?: string): Record<string, any> | null => {
+      if (!val) return null;
+      try {
+        return typeof val === 'string' ? JSON.parse(val) : val;
+      } catch {
+        return null;
+      }
+    };
+
     const modelVersion = this.modelVersionsRepository.create({
       model,
       uploadedBy: uploaderUserId ? ({ id: uploaderUserId } as any) : null,
@@ -445,6 +455,7 @@ export class ModelsService {
         detectedExpectedResult ||
         prevVersion?.expectedResult ||
         null,
+      classLabels: parseJsonSafely(classLabels) || prevVersion?.classLabels || null,
     });
 
     const savedVersion = await this.modelVersionsRepository.save(modelVersion);
@@ -795,6 +806,7 @@ export class ModelsService {
     versionId: string,
     examplePayload?: string,
     expectedResult?: string,
+    classLabels?: string | Record<string, any>,
   ): Promise<ModelVersion> {
     const version = await this.modelVersionsRepository.findOne({
       where: { id: versionId },
@@ -804,11 +816,24 @@ export class ModelsService {
       throw new NotFoundException(`Model version ${versionId} not found.`);
     }
 
+    const parseJsonSafely = (val?: string | Record<string, any>): Record<string, any> | null => {
+      if (!val) return null;
+      if (typeof val !== 'string') return val;
+      try {
+        return JSON.parse(val);
+      } catch {
+        return null;
+      }
+    };
+
     if (examplePayload) {
       version.examplePayload = examplePayload;
     }
     if (expectedResult) {
       version.expectedResult = expectedResult;
+    }
+    if (classLabels) {
+      version.classLabels = parseJsonSafely(classLabels);
     }
 
     version.status = VersionStatus.BUILDING;

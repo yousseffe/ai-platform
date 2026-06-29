@@ -418,6 +418,7 @@ export class ModelsController {
       body.expectedResult,
       body.triggerBuild,
       req.user.id,
+      body.classLabels,
     );
   }
 

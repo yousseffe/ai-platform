@@ -1,7 +1,7 @@
 /**
  * Classification of the credential that authenticated an API request.
  */
-export type ApiKeyKind = 'org' | 'personal' | 'trial' | 'jwt';
+export type ApiKeyKind = 'org' | 'personal' | 'trial' | 'jwt' | 'mcp';
 
 /**
  * Resolved identity and scope for a platform credential.
@@ -30,4 +30,7 @@ export interface ApiIdentity {
 
   /** Model id a personal/trial key is bound to, when applicable. */
   modelId: string | null;
+
+  /** MCP token scopes, present only when keyType is 'mcp'. */
+  mcpScopes?: string[];
 }

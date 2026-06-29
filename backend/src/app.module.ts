@@ -39,6 +39,7 @@ import { Alert } from './modules/analytics/entities/alert.entity';
 import { FraudModule } from './modules/fraud/fraud.module';
 import { RiskBaseline } from './modules/fraud/entities/risk-baseline.entity';
 import { RiskEvent } from './modules/fraud/entities/risk-event.entity';
+import { McpToken } from './modules/auth/entities/mcp-token.entity';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -75,6 +76,7 @@ import { RiskEvent } from './modules/fraud/entities/risk-event.entity';
         Alert,
         RiskBaseline,
         RiskEvent,
+        McpToken,
       ],
       synchronize: true, // For MVP only
       logging: ['query', 'error', 'schema', 'warn'],

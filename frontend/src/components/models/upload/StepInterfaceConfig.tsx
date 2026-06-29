@@ -3,7 +3,6 @@
 import React from "react";
 import { AlertCircle, Terminal, Sparkles, Loader2, Settings2, ChevronDown, ChevronUp } from "lucide-react";
 import { UseFormRegister, UseFormSetValue, FieldErrors } from "react-hook-form";
-
 import { type UploadModelFormInput } from "@/lib/schemas";
 import { Label } from "@/components/ui/label";
 
@@ -72,6 +71,7 @@ export default function StepInterfaceConfig({
   setValue,
 }: StepInterfaceConfigProps) {
   const [showOverride, setShowOverride] = React.useState(!hasDetected);
+  const [showAdvanced, setShowAdvanced] = React.useState(false);
 
   // Sync state if hasDetected changes
   React.useEffect(() => {
@@ -204,7 +204,7 @@ export default function StepInterfaceConfig({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        
+
         {/* Example Payload Code Input */}
         <div className="space-y-2 flex flex-col">
           <Label htmlFor="examplePayload" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 font-sans">
@@ -264,6 +264,54 @@ export default function StepInterfaceConfig({
             <p className="text-[10px] text-slate-400 leading-relaxed font-sans font-medium">Provide the expected response JSON structure. Used to auto-generate the prediction schema and build interactive playground sandboxes.</p>
           )}
         </div>
+      </div>
+
+      {/* Advanced Schemas Collapsible Section */}
+      <div className="pt-4 border-t border-dashed border-border/80">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="h-9 px-4 text-[10px] font-bold text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100 border border-border bg-slate-50/50 dark:bg-slate-900/20 rounded-xl flex items-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
+        >
+          <Settings2 className="w-4 h-4 text-primary" />
+          Advanced Model Class Labels (Optional)
+          {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
+
+        {showAdvanced && (
+          <div className="mt-6 space-y-6 animate-in slide-in-from-top-2 duration-300">
+            {/* Class Labels Map */}
+            <div className="space-y-2 flex flex-col">
+              <Label htmlFor="classLabels" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 font-sans">
+                <Terminal className="w-3.5 h-3.5 text-primary" /> Class Labels Mapping (JSON)
+              </Label>
+              <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm flex-1 flex flex-col bg-slate-950">
+                <div className="bg-slate-900/60 border-b border-border/40 px-4 py-2 flex items-center justify-between text-[8px] font-bold text-slate-500 tracking-wider">
+                  <span>JSON KEY-VALUE</span>
+                  <span className="text-emerald-500 font-extrabold uppercase">Optional</span>
+                </div>
+                <textarea
+                  id="classLabels"
+                  {...register("classLabels")}
+                  placeholder='{&#10;  "0": "airplane",&#10;  "1": "automobile",&#10;  "2": "bird"&#10;}'
+                  className={`w-full bg-transparent text-indigo-200 font-mono text-[11px] p-5 resize-y h-32 focus:outline-none focus:ring-0 leading-relaxed border-0 ${
+                    errors.classLabels ? "text-red-400" : ""
+                  }`}
+                  spellCheck="false"
+                  disabled={isUploading}
+                />
+              </div>
+              {errors.classLabels ? (
+                <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {errors.classLabels.message}
+                </p>
+              ) : (
+                <p className="text-[10px] text-slate-400 leading-relaxed font-sans font-medium">Define a JSON map from index to string class names. Essential for classification models so external clients can render labels instead of raw numbers.</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { getSession } from "next-auth/react";
 import { runPrediction } from "@/lib/actions/models.actions";
 import { smartFetch } from "@/lib/utils/smart-fetch";
+import { getPredictionHistory, savePredictionHistory, clearPredictionHistory } from "@/lib/utils/indexed-db";
 import { Model, ModelVersion, HistoryItem, DeploymentStatus, PredictionStatus, ModelType } from "@/types";
 
 /**
@@ -136,36 +137,46 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
   const [lastMemory, setLastMemory] = useState<string>("--");
   const [httpStatus, setHttpStatus] = useState<string>("");
 
-  // History State initialized lazily from localStorage
-  const [history, setHistory] = useState<HistoryItem[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const stored = localStorage.getItem(`prediction_history_${model.id}`);
-      if (stored) {
-        return JSON.parse(stored);
-      }
+  // History State
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
-      // Mock initial history items to make it look premium
-      const mockHistory: HistoryItem[] = [
-        {
-          time: new Date(Date.now() - 1000 * 60 * 10).toISOString().replace("T", " ").substring(0, 19),
-          reqId: "req_" + Math.random().toString(36).substring(2, 9),
-          status: PredictionStatus.SUCCESS,
-          latency: "14.5ms",
-          outcome: "Prediction completed",
-          payload: initialPayload,
-          response: activeVersion?.expectedResult || '{\n  "prediction": "Class A",\n  "probability": 0.982\n}',
-          confidence: "98.2%",
-          memory: "420MB",
-        },
-      ];
-      localStorage.setItem(`prediction_history_${model.id}`, JSON.stringify(mockHistory));
-      return mockHistory;
-    } catch (e) {
-      console.error("Error loading history from localStorage:", e);
-      return [];
+  // Load history from IndexedDB on mount
+  useEffect(() => {
+    let active = true;
+    async function loadHistory() {
+      const stored = await getPredictionHistory(model.id);
+      if (!active) return;
+      if (stored) {
+        setHistory(stored);
+      } else {
+        const mockHistory: HistoryItem[] = [
+          {
+            time: new Date(Date.now() - 1000 * 60 * 10).toISOString().replace("T", " ").substring(0, 19),
+            reqId: "req_" + Math.random().toString(36).substring(2, 9),
+            status: PredictionStatus.SUCCESS,
+            latency: "14.5ms",
+            outcome: "Prediction completed",
+            payload: initialPayload,
+            response: activeVersion?.expectedResult || '{\n  "prediction": "Class A",\n  "probability": 0.982\n}',
+            confidence: "98.2%",
+            memory: "420MB",
+          },
+        ];
+        await savePredictionHistory(model.id, mockHistory);
+        if (active) {
+          setHistory(mockHistory);
+        }
+      }
     }
-  });
+    loadHistory();
+    return () => {
+      active = false;
+    };
+  }, [model.id, initialPayload, activeVersion?.expectedResult]);
+
+  const safeSaveHistory = useCallback((items: HistoryItem[]) => {
+    savePredictionHistory(model.id, items);
+  }, [model.id]);
 
   /**
    * Executes inference query against active container instance.
@@ -326,7 +337,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
 
         const updatedHistory = [newItem, ...history].slice(0, 20);
         setHistory(updatedHistory);
-        localStorage.setItem(`prediction_history_${model.id}`, JSON.stringify(updatedHistory));
+        safeSaveHistory(updatedHistory);
       } else {
         let res: { success: boolean; data?: Record<string, unknown>; error?: string };
         if (trialApiKey) {
@@ -418,7 +429,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
 
           const updatedHistory = [newItem, ...history].slice(0, 20);
           setHistory(updatedHistory);
-          localStorage.setItem(`prediction_history_${model.id}`, JSON.stringify(updatedHistory));
+          safeSaveHistory(updatedHistory);
         } else {
           setHttpStatus("500 Error");
           setResult(JSON.stringify({ error: res.error }, null, 2));
@@ -440,7 +451,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
 
           const updatedHistory = [newItem, ...history].slice(0, 20);
           setHistory(updatedHistory);
-          localStorage.setItem(`prediction_history_${model.id}`, JSON.stringify(updatedHistory));
+          safeSaveHistory(updatedHistory);
         }
       }
     } catch (err) {
@@ -468,7 +479,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
 
       const updatedHistory = [newItem, ...history].slice(0, 20);
       setHistory(updatedHistory);
-      localStorage.setItem(`prediction_history_${model.id}`, JSON.stringify(updatedHistory));
+      safeSaveHistory(updatedHistory);
     } finally {
       setIsRunning(false);
       setIsStreaming(false);
@@ -501,7 +512,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
   const handleClearHistory = () => {
     if (confirm("Are you sure you want to clear this model's prediction history?")) {
       setHistory([]);
-      localStorage.removeItem(`prediction_history_${model.id}`);
+      clearPredictionHistory(model.id);
     }
   };
 
