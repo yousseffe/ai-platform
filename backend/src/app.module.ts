@@ -36,6 +36,9 @@ import { LoggerMiddleware } from './shared/middleware/logger.middleware';
 import { MailModule } from './shared/mail/mail.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { Alert } from './modules/analytics/entities/alert.entity';
+import { FraudModule } from './modules/fraud/fraud.module';
+import { RiskBaseline } from './modules/fraud/entities/risk-baseline.entity';
+import { RiskEvent } from './modules/fraud/entities/risk-event.entity';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -70,6 +73,8 @@ import { Alert } from './modules/analytics/entities/alert.entity';
         ModelLog,
         SystemConfig,
         Alert,
+        RiskBaseline,
+        RiskEvent,
       ],
       synchronize: true, // For MVP only
       logging: ['query', 'error', 'schema', 'warn'],
@@ -95,6 +100,7 @@ import { Alert } from './modules/analytics/entities/alert.entity';
     OpenSearchModule,
     MailModule,
     AnalyticsModule,
+    FraudModule,
   ],
   controllers: [AppController],
   providers: [AppService],

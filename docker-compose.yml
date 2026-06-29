@@ -64,6 +64,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - PROMETHEUS_URL=http://prometheus:9090
       - LOKI_URL=http://loki:3100
+      - PUBLIC_API_URL=http://localhost:5000
     volumes:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules
@@ -78,6 +79,24 @@ services:
     networks:
       - default
       - models
+
+  mcp-server:
+    build:
+      context: ./services/mcp-server
+      dockerfile: Dockerfile
+    ports:
+      - "7000:7000"
+    environment:
+      - MCP_PORT=7000
+      - BACKEND_URL=http://backend:5000
+      - BACKEND_API_PREFIX=/api/v1
+      - PROMETHEUS_URL=http://prometheus:9090
+      - LOKI_URL=http://loki:3100
+      - MCP_IDENTITY_TTL_MS=30000
+      - MCP_RATE_LIMIT_PER_MIN=120
+    depends_on:
+      - backend
+    restart: always
 
   gateway:
     image: nginx:alpine

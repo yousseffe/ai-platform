@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import React from "react";
 import AdminSidebar from "@/components/layout/AdminSidebar";
 import AdminHeader from "@/components/layout/AdminHeader";
+import { smartFetch } from "@/lib/utils/smart-fetch";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -24,7 +25,14 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
     redirect("/login");
   }
 
-  const isAdmin = session?.user?.email?.toLowerCase().includes("admin");
+  let isAdmin = false;
+  try {
+    const profile = await smartFetch<{ user: { isAdmin?: boolean } }>("/auth/me");
+    isAdmin = !!profile.user.isAdmin;
+  } catch {
+    // If the profile fetch fails, deny access
+  }
+
   if (!isAdmin) {
     redirect("/dashboard");
   }

@@ -4,6 +4,7 @@ import { VerificationCode } from './entities/verification-code.entity';
 import { ApiKey } from './entities/api-key.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
 import { AuthService } from './services/auth.service';
+import { ApiIdentityService } from './services/api-identity.service';
 import { AuthController } from './controllers/auth.controller';
 import { UsersModule } from '../users/users.module';
 import { PassportModule } from '@nestjs/passport';
@@ -37,6 +38,7 @@ import { getRsaKeys } from './utils/keys';
   ],
   providers: [
     AuthService,
+    ApiIdentityService,
     JwtStrategy,
     OrgRoleGuard,
     ApiKeyOrJwtGuard,
@@ -45,6 +47,7 @@ import { getRsaKeys } from './utils/keys';
   controllers: [AuthController],
   exports: [
     AuthService,
+    ApiIdentityService,
     OrgRoleGuard,
     ApiKeyOrJwtGuard,
     AdminGuard,

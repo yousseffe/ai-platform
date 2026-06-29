@@ -38,6 +38,7 @@ import { Framework } from '../enums/framework.enum';
 import { Model } from '../entities/model.entity';
 import { ModelVersion } from '../entities/model-version.entity';
 import { ModelLog } from '../entities/model-log.entity';
+import { detectInjection } from '../../../shared/security/injection-patterns';
 import { User } from '../../users/entities/user.entity';
 import { ApiKey } from '../../auth/entities/api-key.entity';
 import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
@@ -83,6 +84,37 @@ interface PredictionRequestContext {
   };
   workspaceId: string;
   workspaceType: OwnerType;
+}
+
+/** Client request metadata captured per prediction for abuse/fraud analysis. */
+interface ClientRequestMeta {
+  ipAddress: string | null;
+  userAgent: string | null;
+  xForwardedFor: string | null;
+}
+
+/**
+ * Safely extracts client network metadata from the raw Express request for
+ * fraud/abuse analysis. Reads only headers/ip — never request bodies here.
+ *
+ * @param req - The raw request object.
+ * @returns The extracted {@link ClientRequestMeta}.
+ */
+function extractClientMeta(req: Record<string, unknown>): ClientRequestMeta {
+  const headers = (req.headers ?? {}) as Record<string, unknown>;
+  const ua = headers['user-agent'];
+  const xff = headers['x-forwarded-for'];
+  const first = (v: unknown): string | null =>
+    typeof v === 'string'
+      ? v.slice(0, 255)
+      : Array.isArray(v) && typeof v[0] === 'string'
+        ? v[0].slice(0, 255)
+        : null;
+  return {
+    ipAddress: typeof req.ip === 'string' ? req.ip : null,
+    userAgent: first(ua),
+    xForwardedFor: first(xff),
+  };
 }
 
 /**
@@ -575,7 +607,15 @@ export class ModelsController {
       }
     }
 
-    await this.handlePredictionProxy(model, url, deploymentId, data, req, res);
+    await this.handlePredictionProxy(
+      model,
+      url,
+      deploymentId,
+      data,
+      req,
+      res,
+      extractClientMeta(req),
+    );
   }
 
   @UseGuards(ApiKeyOrJwtGuard)
@@ -669,7 +709,15 @@ export class ModelsController {
       }
     }
 
-    await this.handlePredictionProxy(model, url, deploymentId, data, req, res);
+    await this.handlePredictionProxy(
+      model,
+      url,
+      deploymentId,
+      data,
+      req,
+      res,
+      extractClientMeta(req),
+    );
   }
 
   private async handlePredictionProxy(
@@ -679,8 +727,24 @@ export class ModelsController {
     data: Record<string, unknown>,
     req: PredictionRequestContext,
     res: Response,
+    clientMeta: ClientRequestMeta,
   ): Promise<void> {
     const isTrial = req.user?.apiKeyType === ApiKeyType.TRIAL;
+
+    // Capture deterministic request fingerprints for fraud/abuse analysis.
+    let requestSizeBytes: number | null = null;
+    let payloadHash: string | null = null;
+    let responseSizeBytes: number | null = null;
+    let errorMessage: string | null = null;
+    let injectionMatch: string | null = null;
+    try {
+      const serialized = JSON.stringify(data ?? {});
+      requestSizeBytes = Buffer.byteLength(serialized);
+      payloadHash = crypto.createHash('sha256').update(serialized).digest('hex');
+      injectionMatch = detectInjection(serialized);
+    } catch {
+      /* non-serializable payload — leave fingerprints null */
+    }
 
     let cost = 0;
     let providerSharePercent = model.providerSharePercent || 80;
@@ -770,12 +834,18 @@ export class ModelsController {
             headers,
           }),
         );
+        try {
+          responseSizeBytes = Buffer.byteLength(JSON.stringify(response.data));
+        } catch {
+          /* leave response size null */
+        }
         res.json(response.data);
       }
     } catch (err: unknown) {
       executionStatus = 'FAILED';
       statusCode = 500;
       const message = err instanceof Error ? err.message : String(err);
+      errorMessage = message.slice(0, 1000);
       res.status(500).json({ error: `Prediction failed: ${message}` });
       return;
     } finally {
@@ -961,6 +1031,14 @@ export class ModelsController {
           responseTimeMs,
           status: executionStatus,
           statusCode,
+          ipAddress: clientMeta.ipAddress,
+          userAgent: clientMeta.userAgent,
+          xForwardedFor: clientMeta.xForwardedFor,
+          requestSizeBytes,
+          responseSizeBytes,
+          payloadHash,
+          errorMessage,
+          injectionMatch,
         });
         await this.modelLogRepository.save(logEntry);
       } catch (logError) {
