@@ -124,6 +124,48 @@ export class MailService implements OnModuleInit {
   }
 
   /**
+   * Sends a plain-text security/fraud alert notification to a model owner.
+   *
+   * @param email - Recipient email.
+   * @param subject - Email subject line.
+   * @param body - Plain-text alert body.
+   * @returns A promise resolving to a success confirmation boolean.
+   */
+  async sendSecurityAlert(
+    email: string,
+    subject: string,
+    body: string,
+  ): Promise<boolean> {
+    if (!this.transporter) {
+      this.logger.error('Transporter is not initialized. Cannot send alert.');
+      return false;
+    }
+    const from = process.env.SMTP_FROM || '"MLHub Security" <no-reply@mlhub.com>';
+    try {
+      const rawInfo: unknown = await this.transporter.sendMail({
+        from,
+        to: email,
+        subject,
+        text: body,
+      });
+      const info = rawInfo as SMTPTransport.SentMessageInfo;
+      this.logger.log(
+        `Security alert email sent to ${email} (MessageID: ${info.messageId})`,
+      );
+      if (this.isSandbox) {
+        this.logger.log(
+          `[Ethereal Sandbox] Preview Security Alert at: ${this.getPreviewUrl(info)}`,
+        );
+      }
+      return true;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Failed to send security alert to ${email}: ${message}`);
+      return false;
+    }
+  }
+
+  /**
    * Delivers a workspace access verification email to the user.
    *
    * @param email - Target receiver email.

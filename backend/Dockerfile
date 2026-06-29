@@ -1,7 +1,7 @@
 FROM node:18-alpine
 
-# Install docker CLI so we can interact with Docker socket
-RUN apk add --no-cache docker-cli
+# Install docker CLI and Python 3 (needed by detect_schema.py)
+RUN apk add --no-cache docker-cli python3 && ln -sf python3 /usr/bin/python
 
 WORKDIR /usr/src/app
 

@@ -104,6 +104,56 @@ export class ModelLog {
   statusCode: number;
 
   /**
+   * Client IP address captured for abuse/velocity analysis.
+   */
+  @Column({ name: 'ip_address', type: 'varchar', nullable: true })
+  ipAddress: string | null;
+
+  /**
+   * Client User-Agent header captured for fingerprinting.
+   */
+  @Column({ name: 'user_agent', type: 'varchar', nullable: true })
+  userAgent: string | null;
+
+  /**
+   * Forwarded-for chain captured for proxied-client velocity analysis.
+   */
+  @Column({ name: 'x_forwarded_for', type: 'varchar', nullable: true })
+  xForwardedFor: string | null;
+
+  /**
+   * Size of the request payload in bytes.
+   */
+  @Column({ name: 'request_size_bytes', type: 'integer', nullable: true })
+  requestSizeBytes: number | null;
+
+  /**
+   * Size of the response payload in bytes.
+   */
+  @Column({ name: 'response_size_bytes', type: 'integer', nullable: true })
+  responseSizeBytes: number | null;
+
+  /**
+   * SHA-256 hash of the request payload, used to detect repeated/spam payloads
+   * without persisting the raw input.
+   */
+  @Column({ name: 'payload_hash', type: 'varchar', nullable: true })
+  payloadHash: string | null;
+
+  /**
+   * Captured error message on failed requests (truncated upstream).
+   */
+  @Column({ name: 'error_message', type: 'text', nullable: true })
+  errorMessage: string | null;
+
+  /**
+   * Matched prompt-injection pattern category, if the input tripped the detector.
+   * Stores only the category — never the raw input.
+   */
+  @Column({ name: 'injection_match', type: 'varchar', nullable: true })
+  injectionMatch: string | null;
+
+  /**
    * Creation log timestamp.
    */
   @CreateDateColumn({ name: 'created_at' })

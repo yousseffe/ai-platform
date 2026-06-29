@@ -28,3 +28,5 @@ declare module "next-auth/jwt" {
     error?: string;
   }
 }
+
+export * from "./mcp-token";
