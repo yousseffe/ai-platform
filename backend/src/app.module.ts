@@ -29,6 +29,7 @@ import { VerificationCode } from './modules/auth/entities/verification-code.enti
 import { ApiKey } from './modules/auth/entities/api-key.entity';
 import { ModelLog } from './modules/models/entities/model-log.entity';
 import { SystemConfig } from './modules/wallets/entities/system-config.entity';
+import { ModelReview } from './modules/models/entities/model-review.entity';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { OpenSearchModule } from './shared/opensearch/opensearch.module';
@@ -77,6 +78,7 @@ import { McpToken } from './modules/auth/entities/mcp-token.entity';
         RiskBaseline,
         RiskEvent,
         McpToken,
+        ModelReview,
       ],
       synchronize: true, // For MVP only
       logging: ['query', 'error', 'schema', 'warn'],

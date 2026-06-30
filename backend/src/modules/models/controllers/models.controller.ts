@@ -32,6 +32,7 @@ import { RedisService } from '../../../shared/redis/redis.service';
 
 import { CreateModelDto } from '../dto/create-model.dto';
 import { UploadVersionDto } from '../dto/upload-version.dto';
+import { CreateReviewDto } from '../dto/create-review.dto';
 import { ModelType } from '../enums/model-type.enum';
 import { TaskType } from '../enums/task-type.enum';
 import { Framework } from '../enums/framework.enum';
@@ -749,25 +750,33 @@ export class ModelsController {
 
     let cost = 0;
     let providerSharePercent = model.providerSharePercent || 80;
+    let tokenUsage: { promptTokens: number; completionTokens: number } | null = null;
+    let inputPricePerMToken = 0;
+    let outputPricePerMToken = 0;
+    const isLlmModel = model.type === ModelType.LLM_GGUF;
 
     if (!isTrial) {
       if (!model.hasCustomPricing) {
-        const configKey = 'price_' + model.type.toLowerCase();
-        const priceConfig = await this.dataSource
-          .getRepository(SystemConfig)
-          .findOne({
-            where: { key: configKey },
-          });
-        cost = priceConfig ? parseFloat(priceConfig.value) : 0.1;
-
-        const shareConfig = await this.dataSource
-          .getRepository(SystemConfig)
-          .findOne({
-            where: { key: 'default_provider_share_percent' },
-          });
-        providerSharePercent = shareConfig
-          ? parseInt(shareConfig.value, 10)
-          : 80;
+        if (isLlmModel) {
+          // Token-based billing: fetch separate input/output prices (credits per 1M tokens)
+          const [inputConfig, outputConfig, shareConfig] = await Promise.all([
+            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'price_llm_gguf_input' } }),
+            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'price_llm_gguf_output' } }),
+            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'default_provider_share_percent' } }),
+          ]);
+          inputPricePerMToken = inputConfig ? parseFloat(inputConfig.value) : 2.0;
+          outputPricePerMToken = outputConfig ? parseFloat(outputConfig.value) : 8.0;
+          providerSharePercent = shareConfig ? parseInt(shareConfig.value, 10) : 80;
+          cost = 0; // Computed after response from actual token counts
+        } else {
+          const configKey = 'price_' + model.type.toLowerCase();
+          const [priceConfig, shareConfig] = await Promise.all([
+            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: configKey } }),
+            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'default_provider_share_percent' } }),
+          ]);
+          cost = priceConfig ? parseFloat(priceConfig.value) : 0.1;
+          providerSharePercent = shareConfig ? parseInt(shareConfig.value, 10) : 80;
+        }
       } else {
         cost =
           typeof model.costPerRequest === 'string'
@@ -776,7 +785,22 @@ export class ModelsController {
       }
     }
 
-    if (cost > 0) {
+    if (isLlmModel && !isTrial && (inputPricePerMToken > 0 || outputPricePerMToken > 0)) {
+      // For token-based LLM billing, verify caller has at least the cost of 1K input tokens
+      const minCost = (1000 / 1_000_000) * inputPricePerMToken;
+      if (minCost > 0) {
+        const balance = await this.walletsService.getBalance(
+          req.workspaceId,
+          req.workspaceType,
+          WalletType.CONSUMER,
+        );
+        if (balance < minCost) {
+          throw new BadRequestException(
+            'Insufficient credits to perform prediction',
+          );
+        }
+      }
+    } else if (cost > 0) {
       const balance = await this.walletsService.getBalance(
         req.workspaceId,
         req.workspaceType,
@@ -840,6 +864,18 @@ export class ModelsController {
         } catch {
           /* leave response size null */
         }
+        // Extract token usage from OpenAI-compatible LLM responses for token billing
+        if (isLlmModel && response.data && typeof response.data === 'object') {
+          const usage = (response.data as Record<string, unknown>).usage as
+            | Record<string, number>
+            | undefined;
+          if (usage) {
+            tokenUsage = {
+              promptTokens: usage.prompt_tokens ?? 0,
+              completionTokens: usage.completion_tokens ?? 0,
+            };
+          }
+        }
         res.json(response.data);
       }
     } catch (err: unknown) {
@@ -852,6 +888,13 @@ export class ModelsController {
     } finally {
       const endTime = Date.now();
       const responseTimeMs = endTime - startTime;
+
+      // For LLM models, compute actual cost from token counts in the response
+      if (isLlmModel && !isTrial && tokenUsage && (inputPricePerMToken > 0 || outputPricePerMToken > 0)) {
+        cost =
+          (tokenUsage.promptTokens / 1_000_000) * inputPricePerMToken +
+          (tokenUsage.completionTokens / 1_000_000) * outputPricePerMToken;
+      }
 
       // Charge the user and write transaction logs if cost > 0 and request succeeded
       if (cost > 0 && executionStatus === 'SUCCESS') {
@@ -891,7 +934,10 @@ export class ModelsController {
               walletId: consumerWallet.id,
               type: TransactionType.DEBIT,
               amount: cost,
-              reference: `Inference debit for model: ${model.name}`,
+              reference:
+                isLlmModel && tokenUsage
+                  ? `Inference debit for model: ${model.name} (${tokenUsage.promptTokens} input + ${tokenUsage.completionTokens} output tokens)`
+                  : `Inference debit for model: ${model.name}`,
               status: TransactionStatus.COMPLETED,
             });
             await queryRunner.manager.save(Transaction, consumerTx);
@@ -1175,5 +1221,37 @@ export class ModelsController {
     throw new BadRequestException(
       'Auto-deployment timed out. Please try again.',
     );
+  }
+
+  /**
+   * Submits or updates a consumer rating and comment for a public model.
+   * Only consumers who have generated at least one API key for this model can review.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/reviews')
+  async createOrUpdateReview(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() dto: CreateReviewDto,
+  ) {
+    return this.modelsService.createOrUpdateReview(req.user.id, id, dto);
+  }
+
+  /**
+   * Deletes a user's review for a model.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/reviews')
+  async deleteReview(@Request() req: any, @Param('id') id: string) {
+    await this.modelsService.deleteReview(req.user.id, id);
+    return { success: true };
+  }
+
+  /**
+   * Retrieves all user reviews and ratings for a specific model.
+   */
+  @Get(':id/reviews')
+  async getReviews(@Param('id') id: string) {
+    return this.modelsService.getReviews(id);
   }
 }

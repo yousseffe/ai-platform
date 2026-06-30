@@ -19,6 +19,8 @@ interface PlatformModel {
   tier?: string;
   marketplaceVerified?: boolean;
   createdAt?: string;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 /**
@@ -38,6 +40,8 @@ function compactModel(m: PlatformModel): Record<string, unknown> {
     tier: m.tier ?? 'SMALL',
     marketplaceVerified: m.marketplaceVerified ?? false,
     createdAt: m.createdAt ?? null,
+    averageRating: m.averageRating !== undefined ? Number(m.averageRating) : 0.0,
+    reviewCount: m.reviewCount !== undefined ? Number(m.reviewCount) : 0,
   };
 }
 

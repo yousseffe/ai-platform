@@ -154,12 +154,21 @@ function ModelCard({ model }: { model: SearchModelHit }) {
           {model.name}
         </h3>
 
-        {/* Publisher */}
-        <div className="flex items-center gap-1.5 mb-3">
-          <User className="w-3 h-3 text-muted-foreground shrink-0" />
-          <span className="text-xs font-mono text-muted-foreground truncate">
-            {model.organizationName ? model.organizationName : `@${publisherName}`}
-          </span>
+        {/* Publisher & Rating Row */}
+        <div className="flex items-center justify-between mb-3 text-xs font-mono text-muted-foreground">
+          <div className="flex items-center gap-1.5 truncate">
+            <User className="w-3 h-3 text-muted-foreground shrink-0 text-muted-foreground/80" />
+            <span className="truncate">
+              {model.organizationName ? model.organizationName : `@${publisherName}`}
+            </span>
+          </div>
+          {model.reviewCount !== undefined && model.reviewCount > 0 && (
+            <div className="flex items-center gap-0.5 text-amber-500 shrink-0">
+              <span>★</span>
+              <span className="font-bold text-foreground">{Number(model.averageRating).toFixed(1)}</span>
+              <span className="text-[10px] text-muted-foreground">({model.reviewCount})</span>
+            </div>
+          )}
         </div>
 
         {/* Description */}

@@ -14,6 +14,8 @@ import {
   Sliders,
   ScrollText,
   Bell,
+  Bot,
+  ShieldAlert,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -95,11 +97,11 @@ export default function AdminSidebar() {
       </div>
 
       {/* Navigation list */}
-      <nav className="flex-1 py-6 px-4 space-y-4 font-sans">
+      <nav className="flex-1 py-6 px-4 space-y-4 font-sans overflow-y-auto">
         <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 mb-2 font-mono select-none">
           System Console
         </div>
-        
+
         <div className="space-y-1">
           <SidebarLink href="/admin" active={pathname === "/admin"} icon={<LayoutGrid className="w-4 h-4" />}>
             <span>Overview Dashboard</span>
@@ -128,7 +130,20 @@ export default function AdminSidebar() {
           <SidebarLink href="/admin/alerts" active={pathname === "/admin/alerts"} icon={<Bell className="w-4 h-4" />}>
             <span>System Alerts</span>
           </SidebarLink>
+        </div>
 
+        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 mt-4 mb-2 font-mono select-none">
+          Intelligence
+        </div>
+
+        <div className="space-y-1">
+          <SidebarLink href="/admin/mcp" active={pathname.startsWith("/admin/mcp")} icon={<Bot className="w-4 h-4" />}>
+            <span>MCP Agent Console</span>
+          </SidebarLink>
+
+          <SidebarLink href="/admin/fraud" active={pathname === "/admin/fraud"} icon={<ShieldAlert className="w-4 h-4" />}>
+            <span>Fraud & Security</span>
+          </SidebarLink>
         </div>
       </nav>
 

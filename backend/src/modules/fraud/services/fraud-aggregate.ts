@@ -26,6 +26,8 @@ export function aggregateFeatures(
   modelId: string,
   logs: ModelLog[],
   windowMinutes: number,
+  averageRating?: number,
+  reviewCount?: number,
 ): TrafficFeatures {
   const requestCount = logs.length;
   let errorCount = 0;
@@ -63,5 +65,7 @@ export function aggregateFeatures(
     injectionCount,
     trialCount,
     creditBurn,
+    averageRating,
+    reviewCount,
   };
 }

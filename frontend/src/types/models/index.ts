@@ -80,6 +80,8 @@ export interface Model {
   type?: ModelType;
   framework?: Framework;
   taskType?: string;
+  averageRating?: number;
+  reviewCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -112,6 +114,8 @@ export interface SearchModelHit {
   publisherEmail: string;
   versionCount: number;
   hasLiveDeployment: boolean;
+  averageRating?: number;
+  reviewCount?: number;
   createdAt: string;
 }
 
