@@ -3,14 +3,19 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { ModelsService } from './services/models.service';
 import { ModelsSearchService } from './services/models-search.service';
+import { ModelIntegrationService } from './services/model-integration.service';
 import { ModelsController } from './controllers/models.controller';
 import { SearchController } from './controllers/search.controller';
 import { SchemaController } from './controllers/schema.controller';
+import { IntegrationController } from './controllers/integration.controller';
+import { ModelsAdminController } from './controllers/models-admin.controller';
 import { Model } from './entities/model.entity';
 import { ModelVersion } from './entities/model-version.entity';
 import { ModelVersionTestCase } from './entities/model-version-test-case.entity';
 import { ModelVersionReviewEvent } from './entities/model-version-review-event.entity';
 import { ModelLog } from './entities/model-log.entity';
+import { ModelReview } from './entities/model-review.entity';
+import { ApiKey } from '../auth/entities/api-key.entity';
 import { SystemConfig } from '../wallets/entities/system-config.entity';
 import { OrgApiKey } from '../organizations/entities/org-api-key.entity';
 import { DeploymentsModule } from '../deployments/deployments.module';
@@ -35,6 +40,8 @@ import { OrganizationsModule } from '../organizations/organizations.module';
       ModelVersionTestCase,
       ModelVersionReviewEvent,
       ModelLog,
+      ModelReview,
+      ApiKey,
       SystemConfig,
       OrgApiKey,
     ]),
@@ -52,10 +59,17 @@ import { OrganizationsModule } from '../organizations/organizations.module';
   providers: [
     ModelsService,
     ModelsSearchService,
+    ModelIntegrationService,
     ModelsRepository,
     ModelVersionsRepository,
   ],
-  controllers: [SearchController, ModelsController, SchemaController],
+  controllers: [
+    SearchController,
+    ModelsController,
+    SchemaController,
+    IntegrationController,
+    ModelsAdminController,
+  ],
   exports: [
     ModelsService,
     ModelsSearchService,

@@ -130,12 +130,18 @@ export class SchemaController {
   @Post('versions/:versionId/build')
   async startBuild(
     @Param('versionId') versionId: string,
-    @Body() body: { examplePayload?: string; expectedResult?: string },
+    @Body()
+    body: {
+      examplePayload?: string;
+      expectedResult?: string;
+      classLabels?: string | Record<string, any>;
+    },
   ): Promise<Record<string, unknown>> {
     const version = await this.modelsService.startBuild(
       versionId,
       body.examplePayload,
       body.expectedResult,
+      body.classLabels,
     );
     return version as unknown as Record<string, unknown>;
   }

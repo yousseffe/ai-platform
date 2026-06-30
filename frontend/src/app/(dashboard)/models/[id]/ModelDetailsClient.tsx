@@ -25,6 +25,7 @@ import ModelOverview from "@/components/models/ModelOverview";
 import ModelPlayground from "@/components/models/ModelPlayground";
 import ActionsTerminal from "@/components/models/ActionsTerminal";
 import { ModelAnalytics } from "@/components/models/ModelAnalytics";
+import { ModelRequestHistoryTable } from "@/components/models/ModelRequestHistoryTable";
 import { ModelLogsConsole } from "@/components/models/ModelLogsConsole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -365,6 +366,7 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
         {isOwner && (
           <TabsContent value="monitoring" className="space-y-6">
             <ModelAnalytics modelId={modelId} />
+            <ModelRequestHistoryTable modelId={modelId} />
             {activeVersion?.deployments?.find((d) => d.status === DeploymentStatus.RUNNING) ? (
               <ModelLogsConsole
                 deploymentId={activeVersion.deployments.find((d) => d.status === DeploymentStatus.RUNNING)!.id}

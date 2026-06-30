@@ -8,6 +8,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
+import { ApiIdentityService } from '../services/api-identity.service';
+import { ApiIdentity } from '../interfaces/api-identity.interface';
 import { AuthDto } from '../dto/auth.dto';
 import { RegisterDto } from '../dto/register.dto';
 import { VerifyDto } from '../dto/verify.dto';
@@ -21,7 +23,10 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
  */
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private apiIdentityService: ApiIdentityService,
+  ) {}
 
   /**
    * Registers a new user account on the platform.
@@ -113,5 +118,20 @@ export class AuthController {
     @Req() req: Record<string, unknown> & { user: { id: string } },
   ) {
     return this.authService.getProfile(req.user.id);
+  }
+
+  /**
+   * Resolves the caller's credential (organization key, personal/trial model key,
+   * or JWT) to a scoped identity. Used by the MCP server to validate a key once
+   * and scope downstream tool calls. Returns no secret material.
+   *
+   * @param req - Request envelope carrying the raw Authorization header.
+   * @returns The resolved {@link ApiIdentity} for the credential.
+   */
+  @Get('whoami')
+  async whoami(
+    @Req() req: { headers: { authorization?: string } },
+  ): Promise<ApiIdentity> {
+    return this.apiIdentityService.resolve(req.headers.authorization);
   }
 }

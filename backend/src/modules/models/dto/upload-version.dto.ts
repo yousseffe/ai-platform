@@ -11,5 +11,9 @@ export class UploadVersionDto {
 
   @IsString()
   @IsOptional()
+  classLabels?: string;
+
+  @IsString()
+  @IsOptional()
   triggerBuild?: string;
 }

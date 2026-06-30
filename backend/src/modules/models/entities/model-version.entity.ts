@@ -120,6 +120,12 @@ export class ModelVersion {
   expectedResult: string | null;
 
   /**
+   * Mapping of class IDs to human-readable labels for classification models.
+   */
+  @Column({ name: 'class_labels', type: 'jsonb', nullable: true })
+  classLabels: Record<string, any> | null;
+
+  /**
    * Output trace log message captured when container building fails.
    */
   @Column({ type: 'text', nullable: true })

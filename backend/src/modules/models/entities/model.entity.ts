@@ -142,6 +142,24 @@ export class Model {
   marketplaceVerified: boolean;
 
   /**
+   * The average star rating calculated from user reviews.
+   */
+  @Column({
+    name: 'average_rating',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 0.0,
+  })
+  averageRating: number;
+
+  /**
+   * The total count of reviews/comments submitted for this model.
+   */
+  @Column({ name: 'review_count', type: 'integer', default: 0 })
+  reviewCount: number;
+
+  /**
    * Timestamp record indicating when this model template registry was initialized.
    */
   @CreateDateColumn()

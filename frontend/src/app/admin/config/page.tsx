@@ -29,6 +29,9 @@ export default function AdminConfigPage() {
   const [loadingFee, setLoadingFee] = useState(false);
   const [updatingFee, setUpdatingFee] = useState(false);
 
+  // Live credits/EGP rate for the summary stat card
+  const [creditsPerEgp, setCreditsPerEgp] = useState<number>(10);
+
   // Load workspace context on mount
   useEffect(() => {
     if (session) {
@@ -48,10 +51,16 @@ export default function AdminConfigPage() {
   const loadFeeConfig = async (showToast = false) => {
     setLoadingFee(true);
     try {
-      const res = await smartFetch<{ fee: number }>("/admin/config/org-creation-fee");
-      if (res) {
-        setOrgFee(res.fee);
-        setFeeInput(res.fee.toString());
+      const [feeRes, pricingRes] = await Promise.all([
+        smartFetch<{ fee: number }>("/admin/config/org-creation-fee"),
+        smartFetch<{ credits_per_egp: number }>("/admin/config/pricing-defaults"),
+      ]);
+      if (feeRes) {
+        setOrgFee(feeRes.fee);
+        setFeeInput(feeRes.fee.toString());
+      }
+      if (pricingRes?.credits_per_egp) {
+        setCreditsPerEgp(pricingRes.credits_per_egp);
       }
       if (showToast) {
         toast.success("System configurations synced!");
@@ -149,7 +158,7 @@ export default function AdminConfigPage() {
             </div>
             <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Exchange Rates Coefficient</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-foreground">10.0</span>
+              <span className="text-2xl font-extrabold text-foreground">{creditsPerEgp.toFixed(1)}</span>
               <span className="text-[10px] text-muted-foreground">Credits per 1.00 EGP</span>
             </div>
           </CardContent>

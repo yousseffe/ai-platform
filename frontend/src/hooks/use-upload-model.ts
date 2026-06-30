@@ -94,6 +94,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       postprocessCode: "",
       examplePayload: "",
       expectedResult: "",
+      classLabels: "",
     },
   });
 
@@ -263,6 +264,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       // Add schema configuration and trigger build flag
       formData.append("examplePayload", data.examplePayload || "");
       formData.append("expectedResult", data.expectedResult || "");
+      formData.append("classLabels", data.classLabels || "");
       formData.append("triggerBuild", "true");
 
       // 3. Upload version files using Axios to track progress

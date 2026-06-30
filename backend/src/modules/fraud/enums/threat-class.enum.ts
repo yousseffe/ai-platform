@@ -1,0 +1,12 @@
+/**
+ * Classification of a detected risk/abuse pattern on a registered model.
+ */
+export enum ThreatClass {
+  SPAM = 'SPAM',
+  ABUSE = 'ABUSE',
+  RESOURCE_ABUSE = 'RESOURCE_ABUSE',
+  ANOMALOUS_TRAFFIC = 'ANOMALOUS_TRAFFIC',
+  QUOTA_ABUSE = 'QUOTA_ABUSE',
+  PROMPT_INJECTION = 'PROMPT_INJECTION',
+  API_ABUSE = 'API_ABUSE',
+}

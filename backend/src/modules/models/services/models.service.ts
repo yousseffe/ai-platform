@@ -20,6 +20,9 @@ import { Model } from '../entities/model.entity';
 import { ModelVersion } from '../entities/model-version.entity';
 import { ModelVersionTestCase } from '../entities/model-version-test-case.entity';
 import { ModelVersionReviewEvent } from '../entities/model-version-review-event.entity';
+import { ModelReview } from '../entities/model-review.entity';
+import { ApiKey } from '../../auth/entities/api-key.entity';
+import { CreateReviewDto } from '../dto/create-review.dto';
 import { VersionStatus } from '../enums/version-status.enum';
 import { VersionReviewStatus } from '../enums/version-review-status.enum';
 import { VersionReviewAction } from '../enums/version-review-action.enum';
@@ -54,6 +57,10 @@ export class ModelsService {
     private readonly testCaseRepository: Repository<ModelVersionTestCase>,
     @InjectRepository(ModelVersionReviewEvent)
     private readonly reviewEventRepository: Repository<ModelVersionReviewEvent>,
+    @InjectRepository(ModelReview)
+    private readonly modelReviewRepository: Repository<ModelReview>,
+    @InjectRepository(ApiKey)
+    private readonly apiKeyRepository: Repository<ApiKey>,
     @Inject(forwardRef(() => OrganizationsService))
     private readonly organizationsService: OrganizationsService,
   ) {}
@@ -315,6 +322,7 @@ export class ModelsService {
     expectedResult?: string,
     triggerBuild?: string,
     uploaderUserId?: string,
+    classLabels?: string,
   ): Promise<ModelVersion> {
     const model = await this.modelsRepository.findOne({
       where: { id: modelId },
@@ -423,6 +431,15 @@ export class ModelsService {
       );
     }
 
+    const parseJsonSafely = (val?: string): Record<string, any> | null => {
+      if (!val) return null;
+      try {
+        return typeof val === 'string' ? JSON.parse(val) : val;
+      } catch {
+        return null;
+      }
+    };
+
     const modelVersion = this.modelVersionsRepository.create({
       model,
       uploadedBy: uploaderUserId ? ({ id: uploaderUserId } as any) : null,
@@ -447,6 +464,7 @@ export class ModelsService {
         detectedExpectedResult ||
         prevVersion?.expectedResult ||
         null,
+      classLabels: parseJsonSafely(classLabels) || prevVersion?.classLabels || null,
     });
 
     const savedVersion = await this.modelVersionsRepository.save(modelVersion);
@@ -797,6 +815,7 @@ export class ModelsService {
     versionId: string,
     examplePayload?: string,
     expectedResult?: string,
+    classLabels?: string | Record<string, any>,
   ): Promise<ModelVersion> {
     const version = await this.modelVersionsRepository.findOne({
       where: { id: versionId },
@@ -806,11 +825,24 @@ export class ModelsService {
       throw new NotFoundException(`Model version ${versionId} not found.`);
     }
 
+    const parseJsonSafely = (val?: string | Record<string, any>): Record<string, any> | null => {
+      if (!val) return null;
+      if (typeof val !== 'string') return val;
+      try {
+        return JSON.parse(val);
+      } catch {
+        return null;
+      }
+    };
+
     if (examplePayload) {
       version.examplePayload = examplePayload;
     }
     if (expectedResult) {
       version.expectedResult = expectedResult;
+    }
+    if (classLabels) {
+      version.classLabels = parseJsonSafely(classLabels);
     }
 
     version.status = VersionStatus.BUILDING;
@@ -985,5 +1017,114 @@ export class ModelsService {
     version.status = VersionStatus.READY;
     await this.modelVersionsRepository.save(version);
     return version;
+  }
+
+  /**
+   * Creates or updates a consumer review for a model.
+   * Verifies that the consumer has generated at least one API key for this model.
+   */
+  async createOrUpdateReview(
+    userId: string,
+    modelId: string,
+    dto: CreateReviewDto,
+  ): Promise<ModelReview> {
+    // 1. Verify that the user has generated at least one API key for this model
+    const hasKey = await this.apiKeyRepository.exists({
+      where: { user: { id: userId }, model: { id: modelId } },
+    });
+    if (!hasKey) {
+      throw new ForbiddenException(
+        'You must generate at least one API key for this model to leave a review.',
+      );
+    }
+
+    // 2. Fetch the model
+    const model = await this.modelsRepository.findOneBy({ id: modelId });
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+
+    // 3. Find or create review
+    let review = await this.modelReviewRepository.findOne({
+      where: { user: { id: userId }, model: { id: modelId } },
+    });
+
+    if (review) {
+      review.rating = dto.rating;
+      review.comment = dto.comment ?? null;
+    } else {
+      review = this.modelReviewRepository.create({
+        rating: dto.rating,
+        comment: dto.comment ?? null,
+        user: { id: userId } as any,
+        model,
+      });
+    }
+
+    const savedReview = await this.modelReviewRepository.save(review);
+
+    // 4. Recalculate average rating & review count for the model
+    await this.updateModelRatingStats(modelId);
+
+    return savedReview;
+  }
+
+  /**
+   * Deletes a review for a model.
+   */
+  async deleteReview(userId: string, modelId: string): Promise<void> {
+    const review = await this.modelReviewRepository.findOne({
+      where: { user: { id: userId }, model: { id: modelId } },
+    });
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.modelReviewRepository.remove(review);
+
+    // Recalculate average rating & review count for the model
+    await this.updateModelRatingStats(modelId);
+  }
+
+  /**
+   * Retrieves all reviews for a specific model.
+   */
+  async getReviews(modelId: string): Promise<ModelReview[]> {
+    return this.modelReviewRepository.find({
+      where: { model: { id: modelId } },
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Recalculates average rating and review count, updates the Model, and syncs to OpenSearch.
+   */
+  private async updateModelRatingStats(modelId: string): Promise<void> {
+    const reviews = await this.modelReviewRepository.find({
+      where: { model: { id: modelId } },
+    });
+
+    const count = reviews.length;
+    const avg =
+      count > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / count : 0.0;
+
+    await this.modelsRepository.update(modelId, {
+      averageRating: avg,
+      reviewCount: count,
+    });
+
+    // Re-index model in OpenSearch
+    const fullModel = await this.modelsRepository.findOne({
+      where: { id: modelId },
+      relations: ['organization', 'versions', 'versions.deployments', 'user'],
+    });
+    if (fullModel) {
+      try {
+        await this.modelsSearchService.indexModel(fullModel);
+      } catch (err: any) {
+        console.error(`Failed to index model ${modelId} after review update: ${err.message}`);
+      }
+    }
   }
 }

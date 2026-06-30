@@ -17,6 +17,9 @@ import { DataSource } from 'typeorm';
 import { Client } from '@opensearch-project/opensearch';
 import { Model } from '../../modules/models/entities/model.entity';
 import { ModelVersion } from '../../modules/models/entities/model-version.entity';
+import { ModelVersionTestCase } from '../../modules/models/entities/model-version-test-case.entity';
+import { ModelVersionReviewEvent } from '../../modules/models/entities/model-version-review-event.entity';
+import { ModelReview } from '../../modules/models/entities/model-review.entity';
 import { User } from '../../modules/users/entities/user.entity';
 import { AuditLog } from '../../modules/users/entities/audit-log.entity';
 import { Deployment } from '../../modules/deployments/entities/deployment.entity';
@@ -37,13 +40,16 @@ async function seed(): Promise<void> {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432'),
     username: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'password',
+    password: process.env.DB_PASSWORD || 'khalid',
     database: process.env.DB_NAME || 'aidb',
     entities: [
       User,
       AuditLog,
       Model,
       ModelVersion,
+      ModelVersionTestCase,
+      ModelVersionReviewEvent,
+      ModelReview,
       Deployment,
       Wallet,
       Transaction,
@@ -109,6 +115,8 @@ async function seed(): Promise<void> {
           versionCount: { type: 'integer' },
           hasLiveDeployment: { type: 'boolean' },
           createdAt: { type: 'date' },
+          averageRating: { type: 'float' },
+          reviewCount: { type: 'integer' },
         },
       },
     },
@@ -149,6 +157,8 @@ async function seed(): Promise<void> {
       versionCount: model.versions?.length ?? 0,
       hasLiveDeployment,
       createdAt: model.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      averageRating: Number(model.averageRating ?? 0),
+      reviewCount: Number(model.reviewCount ?? 0),
     };
 
     return [{ index: { _index: OPENSEARCH_INDEX, _id: model.id } }, doc];

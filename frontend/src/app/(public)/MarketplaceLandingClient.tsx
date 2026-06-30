@@ -555,12 +555,22 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
                         {model.name}
                       </h3>
 
-                      {/* Publisher */}
-                      <div className="flex items-center gap-1.5 mb-3">
-                        <User className="w-3 h-3 text-muted-foreground shrink-0" />
-                        <span className="text-xs font-mono text-muted-foreground truncate">
-                          {model.organization?.name ? publisherName : `@${publisherName}`}
-                        </span>
+                      {/* Publisher & Rating Row */}
+                      <div className="flex items-center justify-between mb-3 text-xs font-mono text-muted-foreground">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <User className="w-3 h-3 text-muted-foreground shrink-0" />
+                          <span className="truncate">
+                            @                          {model.organization?.name ? publisherName : `@${publisherName}`}
+
+                          </span>
+                        </div>
+                        {model.reviewCount !== undefined && model.reviewCount > 0 && (
+                          <div className="flex items-center gap-0.5 text-amber-500 shrink-0">
+                            <span>★</span>
+                            <span className="font-bold text-foreground">{Number(model.averageRating).toFixed(1)}</span>
+                            <span className="text-[10px] text-muted-foreground">({model.reviewCount})</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Description */}
@@ -644,9 +654,20 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
                         {model.description || "Shared ML template."}
                       </p>
                       {/* Publisher/date metadata — font-mono fits for these */}
+<<<<<<< HEAD
                       <span className="text-[10px] text-muted-foreground/75 font-mono mt-2 block">
                         {model.organization?.name ? publisherName : `@${publisherName}`} • {new Date(model.createdAt).toLocaleDateString()}
                       </span>
+=======
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground/75 font-mono mt-2">
+                        <span>@{publisherName} • {new Date(model.createdAt).toLocaleDateString()}</span>
+                        {model.reviewCount !== undefined && model.reviewCount > 0 && (
+                          <span className="flex items-center gap-0.5 text-amber-500 font-bold shrink-0">
+                            ★ {Number(model.averageRating).toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+>>>>>>> 79ec6c3e212ede197ba99a7108b09787ed693665
                     </div>
                   </Link>
                 );

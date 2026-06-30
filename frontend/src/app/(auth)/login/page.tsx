@@ -34,11 +34,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (session) {
-      if (session.user?.email?.toLowerCase().includes("admin")) {
-        router.push("/admin");
-      } else {
-        router.push("/");
-      }
+      router.push("/dashboard");
     }
   }, [session, router]);
 
@@ -58,12 +54,6 @@ export default function LoginPage() {
         toast.error("Invalid email or password");
       } else {
         toast.success("Successfully logged in!");
-        if (data.email.toLowerCase().includes("admin")) {
-          router.push("/admin");
-        } else {
-          router.push("/");
-        }
-        router.refresh();
       }
     } catch {
       setError("An unexpected error occurred. Please try again.");

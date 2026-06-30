@@ -29,6 +29,7 @@ import { VerificationCode } from './modules/auth/entities/verification-code.enti
 import { ApiKey } from './modules/auth/entities/api-key.entity';
 import { ModelLog } from './modules/models/entities/model-log.entity';
 import { SystemConfig } from './modules/wallets/entities/system-config.entity';
+import { ModelReview } from './modules/models/entities/model-review.entity';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { OpenSearchModule } from './shared/opensearch/opensearch.module';
@@ -36,6 +37,10 @@ import { LoggerMiddleware } from './shared/middleware/logger.middleware';
 import { MailModule } from './shared/mail/mail.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { Alert } from './modules/analytics/entities/alert.entity';
+import { FraudModule } from './modules/fraud/fraud.module';
+import { RiskBaseline } from './modules/fraud/entities/risk-baseline.entity';
+import { RiskEvent } from './modules/fraud/entities/risk-event.entity';
+import { McpToken } from './modules/auth/entities/mcp-token.entity';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -70,6 +75,10 @@ import { Alert } from './modules/analytics/entities/alert.entity';
         ModelLog,
         SystemConfig,
         Alert,
+        RiskBaseline,
+        RiskEvent,
+        McpToken,
+        ModelReview,
       ],
       synchronize: true, // For MVP only
       logging: ['query', 'error', 'schema', 'warn'],
@@ -95,6 +104,7 @@ import { Alert } from './modules/analytics/entities/alert.entity';
     OpenSearchModule,
     MailModule,
     AnalyticsModule,
+    FraudModule,
   ],
   controllers: [AppController],
   providers: [AppService],

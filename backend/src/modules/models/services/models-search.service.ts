@@ -17,6 +17,8 @@ interface ModelDocument {
   versionCount: number;
   hasLiveDeployment: boolean;
   createdAt: string;
+  averageRating: number;
+  reviewCount: number;
 }
 
 /** Facet bucket returned by OpenSearch aggregations. */
@@ -120,6 +122,8 @@ export class ModelsSearchService implements OnModuleInit {
             versionCount: { type: 'integer' },
             hasLiveDeployment: { type: 'boolean' },
             createdAt: { type: 'date' },
+            averageRating: { type: 'float' },
+            reviewCount: { type: 'integer' },
           },
         },
       });
@@ -285,6 +289,8 @@ export class ModelsSearchService implements OnModuleInit {
       versionCount: model.versions?.length ?? 0,
       hasLiveDeployment,
       createdAt: model.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      averageRating: Number(model.averageRating ?? 0),
+      reviewCount: Number(model.reviewCount ?? 0),
     };
   }
 

@@ -245,6 +245,48 @@ export class AnalyticsController {
     }
   }
 
+  @Get('models/:id/request-history')
+  @UseGuards(ApiKeyOrJwtGuard)
+  async getModelRequestHistory(
+    @Param('id') id: string,
+    @Query('limit') limit = '50',
+    @Req() req: any,
+  ) {
+    const userId = req.user.id;
+    const model = await this.modelsRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
+
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+
+    if (model.user.id !== userId && !req.user.isAdmin) {
+      throw new ForbiddenException('You do not own this model');
+    }
+
+    const logs = await this.dataSource.getRepository(ModelLog).find({
+      where: { model: { id } },
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+      take: Math.min(parseInt(limit, 10) || 50, 100),
+    });
+
+    return logs.map(l => ({
+      id: l.id,
+      status: l.status,
+      statusCode: l.statusCode,
+      responseTimeMs: l.responseTimeMs,
+      creditsCharged: Number(l.creditsCharged) || 0,
+      requestSizeBytes: l.requestSizeBytes,
+      responseSizeBytes: l.responseSizeBytes,
+      ipAddress: l.ipAddress,
+      createdAt: l.createdAt,
+      caller: l.user ? l.user.email : (l.apiKeyPrefix ? `Key: ${l.apiKeyPrefix}...` : 'Anonymous'),
+    }));
+  }
+
   @Get('admin/metrics')
   @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
   async getAdminMetrics() {

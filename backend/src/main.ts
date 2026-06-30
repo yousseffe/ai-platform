@@ -11,6 +11,24 @@ import * as winston from 'winston';
 import { OpenTelemetryTransportV3 } from '@opentelemetry/winston-transport';
 
 import * as bodyParser from 'body-parser';
+import * as cors from 'cors';
+
+/**
+ * Matches the public, API-key-authenticated prediction endpoints
+ * (`/api/v1/models/:id/predict` and `/api/v1/models/:id/v:n/predict`).
+ * These are called from arbitrary user origins, so they get open CORS.
+ */
+const PUBLIC_PREDICT_PATH = /^\/api\/v1\/models\/[^/]+\/(v[^/]+\/)?predict$/;
+
+/**
+ * Trusted first-party origins (dashboard) allowed to send credentialed
+ * (cookie/JWT) requests. Configurable via the comma-separated `CORS_ORIGINS`
+ * env var; defaults to the local frontend.
+ */
+const dashboardOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3001')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 // Custom Winston format: promotes the nest-winston `context` meta field to a
 // top-level JSON key so Loki can extract it via `| json | context = "..."`.
@@ -41,10 +59,24 @@ async function bootstrap() {
     }),
   });
   app.setGlobalPrefix('api/v1');
-  app.enableCors({
-    origin: 'http://localhost:3001',
-    credentials: true,
-  });
+  // Per-request CORS: the public prediction API is Bearer-key authenticated and
+  // consumed from any user origin, so it reflects the caller's origin without
+  // credentials. Every other route stays locked to the trusted, credentialed
+  // dashboard allowlist.
+  app.use(
+    cors((req: express.Request, callback) => {
+      if (PUBLIC_PREDICT_PATH.test(req.path)) {
+        callback(null, {
+          origin: true,
+          credentials: false,
+          methods: ['POST', 'OPTIONS'],
+          allowedHeaders: ['Content-Type', 'Authorization'],
+        });
+        return;
+      }
+      callback(null, { origin: dashboardOrigins, credentials: true });
+    }),
+  );
 
   // Serve uploads statically
   app.use('/uploads', express.static(join(__dirname, '..', 'uploads')));

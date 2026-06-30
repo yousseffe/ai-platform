@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import type { Request as ExpressRequest } from 'express';
 import { ApiKey } from '../entities/api-key.entity';
+import { McpToken } from '../entities/mcp-token.entity';
 import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
 import { getRsaKeys } from '../utils/keys';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
@@ -60,6 +61,8 @@ export class ApiKeyOrJwtGuard implements CanActivate {
     private readonly apiKeyRepository: Repository<ApiKey>,
     @InjectRepository(OrgApiKey)
     private readonly orgApiKeyRepository: Repository<OrgApiKey>,
+    @InjectRepository(McpToken)
+    private readonly mcpTokenRepository: Repository<McpToken>,
   ) {}
 
   /**
@@ -90,6 +93,35 @@ export class ApiKeyOrJwtGuard implements CanActivate {
       throw new UnauthorizedException(
         'Missing API credentials. Use Authorization: Bearer <token> or x-api-key.',
       );
+    }
+
+    // MCP access tokens (mcp_...) — issued by the platform's MCP token service.
+    // Forwarded by the MCP server when it calls backend admin endpoints on behalf
+    // of an authenticated admin caller.
+    if (token.startsWith('mcp_')) {
+      const keyHash = crypto.createHash('sha256').update(token).digest('hex');
+      const mcpToken = await this.mcpTokenRepository.findOne({
+        where: { keyHash, isActive: true },
+        relations: ['user'],
+      });
+
+      if (!mcpToken) {
+        throw new UnauthorizedException('Invalid or revoked MCP token');
+      }
+
+      if (mcpToken.expiresAt && mcpToken.expiresAt.getTime() < Date.now()) {
+        throw new UnauthorizedException('MCP token has expired');
+      }
+
+      this.mcpTokenRepository
+        .update(mcpToken.id, { lastUsedAt: new Date() })
+        .catch(() => undefined);
+
+      request.user = {
+        id: mcpToken.user.id,
+        email: mcpToken.user.email,
+      };
+      return true;
     }
 
     if (token.startsWith('sk_live_')) {

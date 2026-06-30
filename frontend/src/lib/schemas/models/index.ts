@@ -30,6 +30,21 @@ export const uploadVersionSchema = z.object({
       { message: "Example payload must be a valid JSON string" }
     ),
   expectedResult: z.string().optional(),
+  classLabels: z
+    .string()
+    .optional()
+    .refine(
+      (val) => {
+        if (!val || val.trim() === "") return true;
+        try {
+          JSON.parse(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "Class labels must be a valid JSON string" }
+    ),
 });
 
 export type UploadVersionInput = z.infer<typeof uploadVersionSchema>;
@@ -100,6 +115,21 @@ export const uploadModelFormSchema = z.object({
         }
       },
       { message: "Expected result must be a valid JSON string" }
+    ),
+  classLabels: z
+    .string()
+    .optional()
+    .refine(
+      (val) => {
+        if (!val || val.trim() === "") return true;
+        try {
+          JSON.parse(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "Class labels must be a valid JSON string" }
     ),
 });
 
