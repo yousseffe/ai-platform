@@ -654,20 +654,9 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
                         {model.description || "Shared ML template."}
                       </p>
                       {/* Publisher/date metadata — font-mono fits for these */}
-<<<<<<< HEAD
                       <span className="text-[10px] text-muted-foreground/75 font-mono mt-2 block">
                         {model.organization?.name ? publisherName : `@${publisherName}`} • {new Date(model.createdAt).toLocaleDateString()}
                       </span>
-=======
-                      <div className="flex items-center justify-between text-[10px] text-muted-foreground/75 font-mono mt-2">
-                        <span>@{publisherName} • {new Date(model.createdAt).toLocaleDateString()}</span>
-                        {model.reviewCount !== undefined && model.reviewCount > 0 && (
-                          <span className="flex items-center gap-0.5 text-amber-500 font-bold shrink-0">
-                            ★ {Number(model.averageRating).toFixed(1)}
-                          </span>
-                        )}
-                      </div>
->>>>>>> 79ec6c3e212ede197ba99a7108b09787ed693665
                     </div>
                   </Link>
                 );
