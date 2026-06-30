@@ -442,7 +442,7 @@ export default function ProjectDetailPage() {
                 <table className="min-w-full text-left">
                   <thead>
                     <tr className="border-b border-border bg-secondary/40">
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Label</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Label & Model</th>
                       <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Key</th>
                       <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Status</th>
                       <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Last Used</th>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Copy, CheckCircle, AlertTriangle, KeyRound, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { createApiKey, CreatedApiKey } from "@/lib/services/projects.service";
+import { getPublicModels } from "@/lib/services/models.service";
+import { smartFetch } from "@/lib/utils/smart-fetch";
+import { Model } from "@/types";
 
 interface CreateApiKeyModalProps {
   orgId: string;
@@ -45,18 +48,77 @@ export default function CreateApiKeyModal({
   onCreated,
 }: CreateApiKeyModalProps) {
   const [label, setLabel] = useState("");
+  const [selectedModelId, setSelectedModelId] = useState("");
+  const [availableModels, setAvailableModels] = useState<Model[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdKey, setCreatedKey] = useState<CreatedApiKey | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!open || createdKey) return;
+
+    let active = true;
+
+    const loadModels = async () => {
+      setIsLoadingModels(true);
+      try {
+        const [publicModels, orgModels] = await Promise.all([
+          getPublicModels().catch(() => []),
+          smartFetch<Model[]>(`/organizations/${orgId}/models`, {
+            cache: "no-store",
+          }).catch(() => []),
+        ]);
+
+        if (!active) return;
+
+        const deduped = new Map<string, Model>();
+        [...publicModels, ...orgModels].forEach((model) => {
+          deduped.set(model.id, model);
+        });
+
+        const mergedModels = Array.from(deduped.values()).sort((a, b) =>
+          a.name.localeCompare(b.name),
+        );
+
+        setAvailableModels(mergedModels);
+        setSelectedModelId((current) =>
+          current && deduped.has(current)
+            ? current
+            : mergedModels[0]?.id ?? "",
+        );
+      } catch (error) {
+        if (active) {
+          toast.error(
+            error instanceof Error ? error.message : "Failed to load models",
+          );
+        }
+      } finally {
+        if (active) {
+          setIsLoadingModels(false);
+        }
+      }
+    };
+
+    void loadModels();
+
+    return () => {
+      active = false;
+    };
+  }, [open, createdKey, orgId]);
 
   const handleCreate = async () => {
     if (!label.trim()) {
       toast.error("Please enter a label for this key");
       return;
     }
+    if (!selectedModelId) {
+      toast.error("Please select which model this key should access");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const result = await createApiKey(orgId, projectId, label.trim());
+      const result = await createApiKey(orgId, projectId, label.trim(), selectedModelId);
       setCreatedKey(result);
       onCreated();
     } catch (error) {
@@ -80,10 +142,13 @@ export default function CreateApiKeyModal({
 
   const handleClose = () => {
     setLabel("");
+    setSelectedModelId("");
     setCreatedKey(null);
     setCopied(false);
     onClose();
   };
+
+  const selectedModel = availableModels.find((model) => model.id === selectedModelId);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -100,7 +165,7 @@ export default function CreateApiKeyModal({
               <DialogDescription className="text-sm mt-0.5">
                 {createdKey
                   ? "Copy your key now — it won't be shown again."
-                  : "Give this key a label to identify it later."}
+                  : "Give this key a label and choose the model it should be allowed to call."}
               </DialogDescription>
             </div>
           </div>
@@ -122,6 +187,39 @@ export default function CreateApiKeyModal({
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                 disabled={isSubmitting}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="key-model" className="text-sm font-medium">Allowed Model</Label>
+              <select
+                id="key-model"
+                value={selectedModelId}
+                onChange={(e) => setSelectedModelId(e.target.value)}
+                disabled={isSubmitting || isLoadingModels || availableModels.length === 0}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+              >
+                {isLoadingModels ? (
+                  <option value="">Loading models...</option>
+                ) : availableModels.length === 0 ? (
+                  <option value="">No available models found</option>
+                ) : (
+                  availableModels.map((model) => {
+                    const ownerLabel = model.organization?.name
+                      ? ` · ${model.organization.name}`
+                      : model.isPublic
+                        ? " · Marketplace"
+                        : "";
+                    return (
+                      <option key={model.id} value={model.id}>
+                        {model.name}{ownerLabel}
+                      </option>
+                    );
+                  })
+                )}
+              </select>
+              <p className="text-xs leading-5 text-muted-foreground">
+                This key will only work for the selected model.
+                {selectedModel ? ` Current selection: ${selectedModel.name}.` : ""}
+              </p>
             </div>
           </div>
         )}
@@ -145,6 +243,15 @@ export default function CreateApiKeyModal({
                 <p className="mt-2 text-sm font-semibold text-foreground">Shown once only</p>
               </div>
             </div>
+            {createdKey.model && (
+              <div className="rounded-2xl border border-border bg-background/80 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Allowed Model</p>
+                <p className="mt-2 text-sm font-semibold text-foreground">{createdKey.model.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {[createdKey.model.framework, createdKey.model.type].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground font-medium">Your API Key</Label>
               <div className="flex items-center gap-2 rounded-2xl border border-border bg-muted p-3">
@@ -164,6 +271,12 @@ export default function CreateApiKeyModal({
                 </button>
               </div>
             </div>
+            <div className="rounded-2xl border border-border bg-background/80 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Request Auth</p>
+              <p className="mt-2 text-xs leading-5 text-foreground">
+                Send this key as <code className="font-mono">Authorization: Bearer &lt;key&gt;</code> or <code className="font-mono">x-api-key: &lt;key&gt;</code>.
+              </p>
+            </div>
           </div>
         )}
 
@@ -173,7 +286,16 @@ export default function CreateApiKeyModal({
               <Button variant="outline" size="sm" onClick={handleClose} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleCreate} disabled={isSubmitting || !label.trim()}>
+              <Button
+                size="sm"
+                onClick={handleCreate}
+                disabled={
+                  isSubmitting ||
+                  isLoadingModels ||
+                  !label.trim() ||
+                  !selectedModelId
+                }
+              >
                 {isSubmitting ? (
                   <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</>
                 ) : (

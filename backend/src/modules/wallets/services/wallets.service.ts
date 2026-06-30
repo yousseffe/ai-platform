@@ -118,10 +118,7 @@ export class WalletsService {
     orgId: string,
     userId: string,
   ): Promise<Wallet[]> {
-    const memberRole = await this.orgsService.getMemberRole(orgId, userId);
-    if (!memberRole) {
-      throw new ForbiddenException('You are not a member of this organization');
-    }
+    await this.assertBillingAccess(orgId, OwnerType.ORG, userId);
 
     return this.walletRepository.find({
       where: {
@@ -132,6 +129,35 @@ export class WalletsService {
         createdAt: 'ASC',
       },
     });
+  }
+
+  /**
+   * Enforces that organization billing data is visible only to workspace owners.
+   * Personal wallets keep their existing authenticated-user behavior.
+   *
+   * @param ownerId - Workspace owner UUID.
+   * @param ownerType - USER or ORG workspace type.
+   * @param userId - Authenticated user UUID.
+   */
+  async assertBillingAccess(
+    ownerId: string,
+    ownerType: OwnerType,
+    userId: string,
+  ): Promise<void> {
+    if (ownerType !== OwnerType.ORG) {
+      return;
+    }
+
+    const memberRole = await this.orgsService.getMemberRole(ownerId, userId);
+    if (!memberRole) {
+      throw new ForbiddenException('You are not a member of this organization');
+    }
+
+    if (memberRole !== OrgRole.OWNER) {
+      throw new ForbiddenException(
+        'Only organization owners can access billing data',
+      );
+    }
   }
 
   /**
@@ -284,13 +310,19 @@ export class WalletsService {
     }
 
     wallet.balance = currentBalance - amount;
+    if (wallet.walletType === WalletType.PROVIDER && wallet.currency !== 'EGP') {
+      wallet.currency = 'EGP';
+    }
     const savedWallet = await this.walletRepository.save(wallet);
 
     const transaction = this.transactionRepository.create({
       walletId: wallet.id,
       type: TransactionType.DEBIT,
       amount,
-      reference: 'User cash-out withdrawal',
+      reference:
+        ownerType === OwnerType.ORG
+          ? 'Organization provider wallet withdrawal'
+          : 'User cash-out withdrawal',
       status: TransactionStatus.COMPLETED,
     });
     await this.transactionRepository.save(transaction);

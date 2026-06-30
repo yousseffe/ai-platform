@@ -23,7 +23,7 @@ import { smartFetch } from "@/lib/utils/smart-fetch";
 import { toast } from "react-hot-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlatformStats } from "@/types";
+import { PlatformStats, PlatformTransaction } from "@/types";
 import { AlertsPanel } from "@/components/admin/AlertsPanel";
 
 /**
@@ -52,7 +52,7 @@ export default function AdminOverviewPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [scope, setScope] = useState<"ALL" | "SYSTEM_REVENUE">("ALL");
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<PlatformTransaction[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [txLoading, setTxLoading] = useState(false);
@@ -115,7 +115,7 @@ export default function AdminOverviewPage() {
       if (toDate) {
         url += `&endDate=${encodeURIComponent(toDate)}`;
       }
-      const res = await smartFetch<{ success: boolean; data: any[]; total: number; page: number }>(url);
+      const res = await smartFetch<{ success: boolean; data: PlatformTransaction[]; total: number; page: number }>(url);
       if (res && res.success) {
         setTransactions(res.data);
         setTotal(res.total);
@@ -229,7 +229,7 @@ export default function AdminOverviewPage() {
                   <p className="text-[9px] font-bold text-primary uppercase tracking-wider">Revenue Wallet</p>
                 </div>
                 <CardTitle className="text-2xl font-extrabold text-primary border-none p-0 h-auto font-mono">
-                  ${stats.platformBalance.toFixed(2)}
+                  {stats.platformBalance.toFixed(2)} {stats.platformCurrency || "EGP"}
                 </CardTitle>
               </CardContent>
             </Card>
@@ -388,8 +388,10 @@ export default function AdminOverviewPage() {
                       {transactions.map((tx) => {
                         const isCredit = tx.type === "CREDIT";
                         const valFloat = typeof tx.amount === "string" ? parseFloat(tx.amount) : tx.amount;
-                        // Format display balance: if system revenue contains "commission" and not "usd"/"egp", it represents consumer credits
-                        const isCreditsWallet = tx.reference?.toLowerCase().includes("commission") && !tx.reference?.toLowerCase().includes("usd") && !tx.reference?.toLowerCase().includes("egp");
+                        const isCreditsWallet = tx.walletCurrency === "CREDITS";
+                        const displayAmount = isCreditsWallet
+                          ? `${Math.round(valFloat)} Credits`
+                          : `${valFloat.toFixed(2)} ${tx.walletCurrency || "EGP"}`;
                         return (
                           <TableRow key={tx.id} className="hover:bg-muted/30 border-b border-border">
                             <TableCell className="px-5 py-3 font-bold text-foreground max-w-xs truncate">
@@ -412,7 +414,7 @@ export default function AdminOverviewPage() {
                               </span>
                             </TableCell>
                             <TableCell className={`px-5 py-3 font-bold ${isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                              {isCredit ? "+" : "-"}{isCreditsWallet ? `${Math.round(valFloat)} Credits` : `${valFloat.toFixed(2)} EGP`}
+                              {isCredit ? "+" : "-"}{displayAmount}
                             </TableCell>
                             <TableCell className="px-5 py-3 text-muted-foreground select-all text-[10px]">
                               {tx.id}

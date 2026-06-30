@@ -42,6 +42,10 @@ export interface PlatformTransaction {
   amount: string | number;
   /** Ledger logs summary reference description */
   reference: string;
+  /** Source wallet type for formatting/admin filtering */
+  walletType: "CONSUMER" | "PROVIDER" | null;
+  /** Source wallet currency for formatting/admin filtering */
+  walletCurrency: string | null;
   /** Completion status of ledger payment */
   status: string;
   /** Creation timestamp string */
@@ -58,8 +62,10 @@ export interface PlatformStats {
   totalModels: number;
   /** Cumulative count of initialized organization workspaces */
   totalOrgs: number;
-  /** Current credits balance in system commission wallet */
+  /** Current balance in the platform revenue wallet */
   platformBalance: number;
+  /** Currency code used by the platform revenue wallet */
+  platformCurrency: string;
   /** List of recent platform ledger logs */
   recentTransactions: PlatformTransaction[];
 }

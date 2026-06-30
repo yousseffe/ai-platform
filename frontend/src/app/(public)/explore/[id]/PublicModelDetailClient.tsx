@@ -435,7 +435,7 @@ console.log(data);`;
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
                   <User className="w-3.5 h-3.5 text-primary" />
                 </div>
-                <span>Published by <strong className="text-foreground">{model.user?.username ?? model.user?.email?.split("@")[0] ?? "MLHub Community"}</strong></span>
+                <span>Published by <strong className="text-foreground">{model.organization?.name ?? model.user?.username ?? model.user?.email?.split("@")[0] ?? "MLHub Community"}</strong></span>
                 <span className="text-border">·</span>
                 <Calendar className="w-3.5 h-3.5" />
                 <span>{formatDate(model.createdAt)}</span>

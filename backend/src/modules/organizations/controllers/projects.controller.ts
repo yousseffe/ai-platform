@@ -9,10 +9,12 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  Req,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { OrgRoleGuard, RequireOrgRole } from '../../auth/guards/org-role.guard';
 import { ProjectsService } from '../services/projects.service';
+import { OrganizationsService } from '../services/organizations.service';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
 import { OrgApiKey } from '../entities/org-api-key.entity';
 
@@ -24,7 +26,10 @@ import { OrgApiKey } from '../entities/org-api-key.entity';
 @Controller('organizations/:orgId/projects')
 @UseGuards(JwtAuthGuard)
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly organizationsService: OrganizationsService,
+  ) {}
 
   // ─── Projects ────────────────────────────────────────────────────────────
 
@@ -67,6 +72,36 @@ export class ProjectsController {
   )
   async listProjects(@Param('orgId') orgId: string) {
     return this.projectsService.listProjects(orgId);
+  }
+
+  /**
+   * Returns organization-wide consumer usage analytics.
+   * API-key breakdowns are returned only for OWNER and MAINTAINER roles.
+   *
+   * @param orgId - UUID of the organization.
+   * @param req - Authenticated request context.
+   * @returns Aggregated usage summary across projects, API keys, models, days, and months.
+   */
+  @Get('usage/summary')
+  @UseGuards(OrgRoleGuard)
+  @RequireOrgRole(
+    OrgRole.OWNER,
+    OrgRole.MAINTAINER,
+    OrgRole.CONTRIBUTOR,
+    OrgRole.VIEWER,
+  )
+  async getOrganizationUsage(
+    @Param('orgId') orgId: string,
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+  ) {
+    const role = await this.organizationsService.getMemberRole(
+      orgId,
+      req.user.id,
+    );
+    return this.projectsService.getOrganizationUsage(
+      orgId,
+      role ?? OrgRole.VIEWER,
+    );
   }
 
   /**
@@ -129,12 +164,13 @@ export class ProjectsController {
   async createApiKey(
     @Param('orgId') orgId: string,
     @Param('projectId') projectId: string,
-    @Body() body: { label: string },
+    @Body() body: { label: string; modelId: string },
   ) {
     const result = await this.projectsService.createApiKey(
       orgId,
       projectId,
       body.label,
+      body.modelId,
     );
     // Strip keyHash before returning — only expose rawKey (once) and prefix
     const { keyHash, ...safeKey } = result;

@@ -16,7 +16,8 @@ import { Framework } from '../enums/framework.enum';
 
 /**
  * Database table representation of an ML model registry.
- * Groups model versions and links ownership to a user or provider organization.
+ * Groups model versions and links ownership to either a personal user workspace
+ * or a shared organization workspace.
  */
 @Entity('models')
 export class Model {
@@ -69,13 +70,13 @@ export class Model {
   framework: Framework;
 
   /**
-   * Owner user account record who registered this model context.
+   * User account record of the member who originally created this model entry.
    */
   @ManyToOne(() => User)
   user: User;
 
   /**
-   * Optional provider organization that owns and governs this model.
+   * Optional organization workspace that owns and governs this model.
    */
   @ManyToOne(() => Organization, { nullable: true })
   organization: Organization | null;

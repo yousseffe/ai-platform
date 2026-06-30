@@ -93,6 +93,7 @@ export default function Sidebar() {
     workspaces,
     viewMode,
     balance,
+    canAccessBilling,
     isProviderModeEnabled,
     triggerWorkspaceSwitch,
     confirmWorkspaceSwitch,
@@ -395,17 +396,19 @@ export default function Sidebar() {
                 <User className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
                 Profile & Role
               </Link>
-              <Link
-                href="/settings/billing"
-                className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  pathname === "/settings/billing"
-                    ? "text-primary font-semibold bg-primary/[0.04]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
-                }`}
-              >
-                <Coins className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
-                Billing & Wallet
-              </Link>
+              {canAccessBilling && (
+                <Link
+                  href="/settings/billing"
+                  className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    pathname === "/settings/billing"
+                      ? "text-primary font-semibold bg-primary/[0.04]"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+                  }`}
+                >
+                  <Coins className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+                  Billing & Wallet
+                </Link>
+              )}
               <Link
                 href="/settings/api"
                 className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
@@ -431,7 +434,7 @@ export default function Sidebar() {
           >
             <Plus className="w-3.5 h-3.5" strokeWidth={2.5} /> Publish Model
           </Link>
-        ) : (
+        ) : canAccessBilling ? (
           <Card size="sm" className="border border-border bg-gradient-to-br from-secondary/50 via-card to-secondary/15 shadow-xs">
             <CardContent className="flex flex-col gap-2.5 p-0">
               <div className="flex justify-between items-start">
@@ -449,6 +452,12 @@ export default function Sidebar() {
               >
                 Top Up Credits
               </Link>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card size="sm" className="border border-border bg-secondary/20 shadow-xs">
+            <CardContent className="p-0 text-[10px] text-muted-foreground leading-relaxed">
+              Billing data is limited to organization owners for shared workspaces.
             </CardContent>
           </Card>
         )}

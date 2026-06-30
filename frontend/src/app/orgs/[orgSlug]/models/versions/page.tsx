@@ -162,7 +162,7 @@ export default function OrgModelVersionsPage() {
                       <p className="mt-1 text-xs text-muted-foreground">v{version.versionNumber} · {new Date(version.createdAt).toLocaleString()}</p>
                     </td>
                     <td className="px-5 py-4 text-xs text-muted-foreground">
-                      {version.uploadedBy?.email || model.user?.email || "Unknown"}
+                      {version.uploadedBy?.email || org.name || "Unknown"}
                     </td>
                     <td className="px-5 py-4">
                       <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-bold uppercase ${reviewClass(version.reviewStatus)}`}>

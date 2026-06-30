@@ -66,6 +66,52 @@ export class AdminController {
   }
 
   /**
+   * Attaches wallet metadata so admin clients can format ledger amounts using
+   * the real wallet currency instead of guessing from the transaction text.
+   */
+  private async enrichTransactions(
+    transactions: Transaction[],
+  ): Promise<
+    Array<
+      Transaction & {
+        walletType: WalletType | null;
+        walletCurrency: string | null;
+      }
+    >
+  > {
+    const walletIds = [...new Set(transactions.map((tx) => tx.walletId))];
+    if (walletIds.length === 0) {
+      return transactions.map((tx) => ({
+        ...tx,
+        walletType: null,
+        walletCurrency: null,
+      }));
+    }
+
+    const wallets = await this.walletRepository.find({
+      where: { id: In(walletIds) },
+    });
+    const walletMap = new Map(
+      wallets.map((wallet) => [
+        wallet.id,
+        {
+          walletType: wallet.walletType,
+          walletCurrency: wallet.currency,
+        },
+      ]),
+    );
+
+    return transactions.map((tx) => {
+      const walletMeta = walletMap.get(tx.walletId);
+      return {
+        ...tx,
+        walletType: walletMeta?.walletType ?? null,
+        walletCurrency: walletMeta?.walletCurrency ?? null,
+      };
+    });
+  }
+
+  /**
    * Retrieves all registered platform models with deployment stats and container metrics.
    *
    * @returns Detailed models registry list.
@@ -346,6 +392,7 @@ export class AdminController {
     const platformBalance = platformWallet
       ? parseFloat(platformWallet.balance as any) || 0.0
       : 0.0;
+    const platformCurrency = platformWallet?.currency || 'EGP';
 
     const recentTransactions = await this.dataSource
       .getRepository(Transaction)
@@ -353,13 +400,16 @@ export class AdminController {
         order: { createdAt: 'DESC' },
         take: 15,
       });
+    const enrichedRecentTransactions =
+      await this.enrichTransactions(recentTransactions);
 
     return {
       totalUsers,
       totalModels,
       totalOrgs,
       platformBalance,
-      recentTransactions,
+      platformCurrency,
+      recentTransactions: enrichedRecentTransactions,
     };
   }
 
@@ -445,10 +495,11 @@ export class AdminController {
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
       });
+    const enrichedTransactions = await this.enrichTransactions(transactions);
 
     return {
       success: true,
-      data: transactions,
+      data: enrichedTransactions,
       total,
       page: pageNum,
       limit: limitNum,

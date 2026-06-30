@@ -16,6 +16,12 @@ export interface OrgApiKey {
   id: string;
   projectId: string;
   orgId: string;
+  model?: {
+    id: string;
+    name: string;
+    type?: string;
+    framework?: string;
+  } | null;
   keyPrefix: string;
   label: string;
   isActive: boolean;
@@ -76,6 +82,66 @@ export interface ProjectApiKeyLog {
   createdAt: string;
 }
 
+export interface OrganizationUsageSummary {
+  scope: "FULL" | "OPERATIONAL" | "LIMITED";
+  totals: {
+    requests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    creditsCharged: number;
+    errorRate: number;
+    lastUsedAt: string | null;
+  };
+  projects: Array<{
+    id: string;
+    name: string;
+    requests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    creditsCharged: number;
+    errorRate: number;
+    lastUsedAt: string | null;
+  }>;
+  apiKeys: Array<{
+    id: string;
+    label: string;
+    keyPrefix: string;
+    projectId: string;
+    projectName: string;
+    requests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    creditsCharged: number;
+    errorRate: number;
+    lastUsedAt: string | null;
+  }>;
+  models: Array<{
+    id: string;
+    name: string;
+    type: string;
+    framework: string;
+    requests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    creditsCharged: number;
+    errorRate: number;
+    averageLatencyMs: number;
+    lastUsedAt: string | null;
+  }>;
+  daily: Array<{
+    date: string;
+    requests: number;
+    creditsCharged: number;
+    failedRequests: number;
+  }>;
+  monthly: Array<{
+    month: string;
+    requests: number;
+    creditsCharged: number;
+    failedRequests: number;
+  }>;
+}
+
 /**
  * Fetches all active projects for an organization.
  *
@@ -84,6 +150,20 @@ export interface ProjectApiKeyLog {
  */
 export async function listProjects(orgId: string): Promise<Project[]> {
   return smartFetch<Project[]>(`/organizations/${orgId}/projects`);
+}
+
+/**
+ * Fetches organization-wide consumer usage analytics.
+ *
+ * @param orgId - UUID of the organization.
+ * @returns Aggregated usage summary.
+ */
+export async function getOrganizationUsageSummary(
+  orgId: string,
+): Promise<OrganizationUsageSummary> {
+  return smartFetch<OrganizationUsageSummary>(
+    `/organizations/${orgId}/projects/usage/summary`,
+  );
 }
 
 /**
@@ -97,7 +177,7 @@ export async function listProjects(orgId: string): Promise<Project[]> {
 export async function createProject(
   orgId: string,
   name: string,
-  description?: string
+  description?: string,
 ): Promise<Project> {
   return smartFetch<Project>(`/organizations/${orgId}/projects`, {
     method: "POST",
@@ -113,7 +193,10 @@ export async function createProject(
  * @param projectId - UUID of the project.
  * @returns The Project entity.
  */
-export async function getProject(orgId: string, projectId: string): Promise<Project> {
+export async function getProject(
+  orgId: string,
+  projectId: string,
+): Promise<Project> {
   return smartFetch<Project>(`/organizations/${orgId}/projects/${projectId}`);
 }
 
@@ -126,11 +209,11 @@ export async function getProject(orgId: string, projectId: string): Promise<Proj
  */
 export async function deleteProject(
   orgId: string,
-  projectId: string
+  projectId: string,
 ): Promise<{ message: string }> {
   return smartFetch<{ message: string }>(
     `/organizations/${orgId}/projects/${projectId}`,
-    { method: "DELETE" }
+    { method: "DELETE" },
   );
 }
 
@@ -146,15 +229,16 @@ export async function deleteProject(
 export async function createApiKey(
   orgId: string,
   projectId: string,
-  label: string
+  label: string,
+  modelId: string,
 ): Promise<CreatedApiKey> {
   return smartFetch<CreatedApiKey>(
     `/organizations/${orgId}/projects/${projectId}/api-keys`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label }),
-    }
+      body: JSON.stringify({ label, modelId }),
+    },
   );
 }
 
@@ -165,9 +249,12 @@ export async function createApiKey(
  * @param projectId - UUID of the project.
  * @returns Array of OrgApiKey entities.
  */
-export async function listApiKeys(orgId: string, projectId: string): Promise<OrgApiKey[]> {
+export async function listApiKeys(
+  orgId: string,
+  projectId: string,
+): Promise<OrgApiKey[]> {
   return smartFetch<OrgApiKey[]>(
-    `/organizations/${orgId}/projects/${projectId}/api-keys`
+    `/organizations/${orgId}/projects/${projectId}/api-keys`,
   );
 }
 
@@ -182,11 +269,11 @@ export async function listApiKeys(orgId: string, projectId: string): Promise<Org
 export async function revokeApiKey(
   orgId: string,
   projectId: string,
-  keyId: string
+  keyId: string,
 ): Promise<{ message: string }> {
   return smartFetch<{ message: string }>(
     `/organizations/${orgId}/projects/${projectId}/api-keys/${keyId}`,
-    { method: "DELETE" }
+    { method: "DELETE" },
   );
 }
 
@@ -199,10 +286,10 @@ export async function revokeApiKey(
  */
 export async function getProjectApiKeyUsage(
   orgId: string,
-  projectId: string
+  projectId: string,
 ): Promise<ProjectApiKeyUsage> {
   return smartFetch<ProjectApiKeyUsage>(
-    `/organizations/${orgId}/projects/${projectId}/api-keys/usage`
+    `/organizations/${orgId}/projects/${projectId}/api-keys/usage`,
   );
 }
 
@@ -215,9 +302,9 @@ export async function getProjectApiKeyUsage(
  */
 export async function listProjectApiKeyLogs(
   orgId: string,
-  projectId: string
+  projectId: string,
 ): Promise<ProjectApiKeyLog[]> {
   return smartFetch<ProjectApiKeyLog[]>(
-    `/organizations/${orgId}/projects/${projectId}/api-keys/logs`
+    `/organizations/${orgId}/projects/${projectId}/api-keys/logs`,
   );
 }

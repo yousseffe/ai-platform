@@ -41,7 +41,7 @@ export default function OrgModelAnalyticsPage() {
 
   const totals = analytics?.totals;
   const metrics = [
-    { label: "Provider Revenue", value: `${(totals?.totalEarnings ?? 0).toLocaleString()} cr`, icon: <TrendingUp className="h-4 w-4" />, tone: "text-emerald-700 bg-emerald-500/10 border-emerald-500/20" },
+    { label: "Provider Revenue", value: `${(totals?.totalEarnings ?? 0).toLocaleString()} EGP`, icon: <TrendingUp className="h-4 w-4" />, tone: "text-emerald-700 bg-emerald-500/10 border-emerald-500/20" },
     { label: "Models", value: totals?.models ?? 0, icon: <BarChart3 className="h-4 w-4" />, tone: "text-primary bg-primary/10 border-primary/20" },
     { label: "Pending Reviews", value: totals?.pendingReviews ?? 0, icon: <Clock3 className="h-4 w-4" />, tone: "text-amber-700 bg-amber-500/10 border-amber-500/20" },
     { label: "Production", value: totals?.runningDeployments ?? 0, icon: <CheckCircle2 className="h-4 w-4" />, tone: "text-blue-700 bg-blue-500/10 border-blue-500/20" },

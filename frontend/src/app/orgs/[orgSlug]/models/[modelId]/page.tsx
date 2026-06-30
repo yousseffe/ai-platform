@@ -231,7 +231,7 @@ export default function OrgModelReviewPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-foreground">v{version.versionNumber}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {version.uploadedBy?.email || model.user?.email || "Unknown uploader"}
+                    {version.uploadedBy?.email || org.name || "Unknown uploader"}
                   </p>
                   <span className={`mt-2 inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase ${reviewTone(version.reviewStatus)}`}>
                     {version.reviewStatus || VersionReviewStatus.NOT_REQUIRED}
@@ -264,7 +264,7 @@ export default function OrgModelReviewPage() {
               <div className="rounded-lg border border-border bg-background p-4">
                 <Activity className="mb-3 h-4 w-4 text-muted-foreground" />
                 <p className="text-[10px] font-bold uppercase text-muted-foreground">Uploaded by</p>
-                <p className="mt-1 truncate text-sm font-bold text-foreground">{selectedVersion?.uploadedBy?.email || model.user?.email}</p>
+                <p className="mt-1 truncate text-sm font-bold text-foreground">{selectedVersion?.uploadedBy?.email || org.name}</p>
               </div>
               <div className="rounded-lg border border-border bg-background p-4">
                 <CheckCircle2 className="mb-3 h-4 w-4 text-muted-foreground" />

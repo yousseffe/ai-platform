@@ -41,6 +41,8 @@ import { ModelLog } from '../entities/model-log.entity';
 import { User } from '../../users/entities/user.entity';
 import { ApiKey } from '../../auth/entities/api-key.entity';
 import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
+import { Organization } from '../../organizations/entities/organization.entity';
+import { Project } from '../../organizations/entities/project.entity';
 import { Wallet } from '../../wallets/entities/wallet.entity';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
@@ -50,6 +52,8 @@ import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { TransactionType } from '../../wallets/enums/transaction-type.enum';
 import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
+import { OrgStatus } from '../../organizations/enums/org-status.enum';
+import { OrgType } from '../../organizations/enums/org-type.enum';
 import { Deployment } from '../../deployments/entities/deployment.entity';
 import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import { VersionStatus } from '../enums/version-status.enum';
@@ -64,6 +68,7 @@ interface RequestWithUser {
   user: {
     id: string;
     email: string;
+    isAdmin?: boolean;
   };
   workspaceId?: string;
   workspaceType?: OwnerType;
@@ -230,16 +235,24 @@ export class ModelsController {
   }
 
   /**
-   * Retrieves prediction logs received on models owned by the authenticated user (Provider).
+   * Retrieves recent prediction logs for the active publishing workspace.
+   * Personal workspaces read user-owned models, while organization workspaces
+   * read organization-owned models.
    *
    * @param req - Authenticated user request context.
    */
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(WorkspaceInterceptor)
   @Get('logs/provider')
   async getProviderLogs(@Request() req: RequestWithUser): Promise<ModelLog[]> {
+    const where =
+      req.workspaceType === OwnerType.ORG
+        ? { model: { organization: { id: req.workspaceId } } }
+        : { model: { user: { id: req.user.id } } };
+
     return this.modelLogRepository.find({
-      where: { model: { user: { id: req.user.id } } },
-      relations: ['model'],
+      where,
+      relations: ['model', 'model.organization'],
       order: { createdAt: 'DESC' },
       take: 50,
     });
@@ -495,7 +508,10 @@ export class ModelsController {
     req: Record<string, unknown> & PredictionRequestContext,
     @Res() res: Response,
   ): Promise<void> {
-    const model = await this.modelsService.getModel(id, req.user.id);
+    const model = await this.modelsService.getModel(
+      id,
+      req.user.orgApiKeyId ? undefined : req.user.id,
+    );
     let url: string;
     let deploymentId: string | null = null;
     try {
@@ -594,7 +610,10 @@ export class ModelsController {
       throw new BadRequestException('Invalid version number');
     }
 
-    const model = await this.modelsService.getModel(id);
+    const model = await this.modelsService.getModel(
+      id,
+      req.user.orgApiKeyId ? undefined : req.user.id,
+    );
     let url: string;
     let deploymentId: string | null = null;
     try {
@@ -672,6 +691,87 @@ export class ModelsController {
     await this.handlePredictionProxy(model, url, deploymentId, data, req, res);
   }
 
+  private async assertOrgApiKeyPredictionAccess(
+    model: Model,
+    req: PredictionRequestContext,
+  ): Promise<OrgApiKey | null> {
+    if (!req.user.orgApiKeyId) {
+      return null;
+    }
+
+    const orgApiKey = await this.orgApiKeyRepository.findOne({
+      where: {
+        id: req.user.orgApiKeyId,
+        orgId: req.user.orgId,
+        projectId: req.user.projectId,
+        isActive: true,
+      },
+      relations: ['model'],
+    });
+
+    if (!orgApiKey) {
+      throw new ForbiddenException(
+        'This organization API key is invalid or has been revoked',
+      );
+    }
+
+    const organization = await this.dataSource
+      .getRepository(Organization)
+      .findOne({
+        where: { id: orgApiKey.orgId },
+      });
+
+    if (!organization) {
+      throw new ForbiddenException(
+        'The organization attached to this API key no longer exists',
+      );
+    }
+
+    if (organization.status !== OrgStatus.ACTIVE) {
+      throw new ForbiddenException(
+        'This organization is inactive and cannot use API keys',
+      );
+    }
+
+    if (
+      organization.type !== OrgType.CONSUMER &&
+      organization.type !== OrgType.HYBRID
+    ) {
+      throw new ForbiddenException(
+        'This organization API key can only be used from consumer-capable workspaces',
+      );
+    }
+
+    const project = await this.dataSource.getRepository(Project).findOne({
+      where: {
+        id: orgApiKey.projectId,
+        orgId: orgApiKey.orgId,
+        isActive: true,
+      },
+    });
+
+    if (!project) {
+      throw new ForbiddenException(
+        'The project attached to this API key is inactive or no longer exists',
+      );
+    }
+
+    const isSameOrgModel = model.organization?.id === organization.id;
+    if (!model.isPublic && !isSameOrgModel) {
+      throw new ForbiddenException(
+        'This organization API key can only call public marketplace models or models owned by the same organization',
+      );
+    }
+
+    if (orgApiKey.model && orgApiKey.model.id !== model.id) {
+      throw new ForbiddenException(
+        `This organization API key is scoped to model "${orgApiKey.model.name}" only`,
+      );
+    }
+
+    return orgApiKey;
+  }
+
   private async handlePredictionProxy(
     model: Model,
     url: string,
@@ -680,6 +780,10 @@ export class ModelsController {
     req: PredictionRequestContext,
     res: Response,
   ): Promise<void> {
+    const validatedOrgApiKey = await this.assertOrgApiKeyPredictionAccess(
+      model,
+      req,
+    );
     const isTrial = req.user?.apiKeyType === ApiKeyType.TRIAL;
 
     let cost = 0;
@@ -727,8 +831,19 @@ export class ModelsController {
     // Retrieve active API key of the model owner to authorize NestJS proxy call to the container.
     // The container templates enforce checking the request headers for this API key.
     const modelOwnerApiKeyEntity = await this.apiKeyRepository.findOne({
-      where: { user: { id: model.user.id }, type: ApiKeyType.LIVE, isActive: true },
+      where: {
+        user: { id: model.user.id },
+        type: ApiKeyType.LIVE,
+        isActive: true,
+      },
     });
+
+    if (!modelOwnerApiKeyEntity?.key) {
+      throw new BadRequestException(
+        'The target model is missing an active provider API key for prediction routing',
+      );
+    }
+
     const containerApiKey = modelOwnerApiKeyEntity?.key || '';
 
     const targetEndpoint =
@@ -838,7 +953,7 @@ export class ModelsController {
           const creditsPerEgp = config ? parseInt(config.value, 10) || 10 : 10;
           const costInEgp = cost / creditsPerEgp;
 
-          // 2. Pay Provider (model owner) in EGP
+          // 2. Pay the publishing workspace in EGP
           const providerShareEgp = costInEgp * (providerSharePercent / 100);
 
           // Update model's total earnings in database
@@ -847,21 +962,31 @@ export class ModelsController {
             [providerShareEgp, model.id],
           );
 
+          const providerWalletOwnerId = model.organization?.id ?? model.user.id;
+          const providerWalletOwnerType = model.organization
+            ? OwnerType.ORG
+            : OwnerType.USER;
+          const providerWalletCurrency = 'EGP';
+          const revenueRecipientLabel =
+            model.organization?.name ??
+            model.user.email ??
+            'Personal publishing workspace';
+
           let providerWallet = await queryRunner.manager.findOne(Wallet, {
             where: {
-              ownerId: model.user.id,
-              ownerType: OwnerType.USER,
+              ownerId: providerWalletOwnerId,
+              ownerType: providerWalletOwnerType,
               walletType: WalletType.PROVIDER,
             },
           });
 
           if (!providerWallet) {
             providerWallet = queryRunner.manager.create(Wallet, {
-              ownerId: model.user.id,
-              ownerType: OwnerType.USER,
+              ownerId: providerWalletOwnerId,
+              ownerType: providerWalletOwnerType,
               walletType: WalletType.PROVIDER,
               balance: 0.0,
-              currency: 'EGP',
+              currency: providerWalletCurrency,
             });
             providerWallet = await queryRunner.manager.save(
               Wallet,
@@ -873,6 +998,9 @@ export class ModelsController {
             typeof providerWallet.balance === 'string'
               ? parseFloat(providerWallet.balance)
               : providerWallet.balance;
+          if (providerWallet.currency !== providerWalletCurrency) {
+            providerWallet.currency = providerWalletCurrency;
+          }
           providerWallet.balance = currentProviderBalance + providerShareEgp;
           await queryRunner.manager.save(Wallet, providerWallet);
 
@@ -880,7 +1008,7 @@ export class ModelsController {
             walletId: providerWallet.id,
             type: TransactionType.CREDIT,
             amount: providerShareEgp,
-            reference: `Inference credit share for model: ${model.name} by user ${callerEmail} (EGP ${providerShareEgp.toFixed(4)})`,
+            reference: `Inference revenue share for model: ${model.name} to ${revenueRecipientLabel} from ${callerEmail} (EGP ${providerShareEgp.toFixed(4)})`,
             status: TransactionStatus.COMPLETED,
           });
           await queryRunner.manager.save(Transaction, providerTx);
@@ -938,6 +1066,12 @@ export class ModelsController {
 
       // Save execution details to ModelLog
       try {
+        if (validatedOrgApiKey && executionStatus === 'SUCCESS') {
+          await this.orgApiKeyRepository.update(validatedOrgApiKey.id, {
+            lastUsedAt: new Date(),
+          });
+        }
+
         const callerUser = req.user.orgApiKeyId
           ? null
           : await this.dataSource.getRepository(User).findOneBy({
@@ -1044,14 +1178,14 @@ export class ModelsController {
   async getBuildLogs(
     @Param('id') id: string,
     @Param('versionId') versionId: string,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ): Promise<{ buildLogs: string | null }> {
-    const model = await this.modelsService.getModel(id);
+    const model = await this.modelsService.getModel(id, req.user.id);
     if (!model) {
       throw new NotFoundException('Model not found');
     }
-    // Check ownership
-    if (model.user?.id !== req.user.id && !req.user.isAdmin) {
+
+    if (!model.organization && model.user?.id !== req.user.id && !req.user.isAdmin) {
       throw new ForbiddenException('You do not have access to this model');
     }
 

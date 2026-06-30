@@ -508,7 +508,7 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
                 const latestVer = model.versions?.length
                   ? [...model.versions].sort((a, b) => b.versionNumber - a.versionNumber)[0]
                   : null;
-                const publisherName = model.user?.email ? model.user.email.split("@")[0] : "community";
+                const publisherName = model.organization?.name || (model.user?.email ? model.user.email.split("@")[0] : "community");
                 const isLive = latestVer?.deployments?.some(d => d.status === DeploymentStatus.RUNNING);
 
                 const type      = (model as unknown as Record<string, unknown>).type      as string | undefined;
@@ -559,7 +559,7 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
                       <div className="flex items-center gap-1.5 mb-3">
                         <User className="w-3 h-3 text-muted-foreground shrink-0" />
                         <span className="text-xs font-mono text-muted-foreground truncate">
-                          @{publisherName}
+                          {model.organization?.name ? publisherName : `@${publisherName}`}
                         </span>
                       </div>
 
@@ -617,7 +617,7 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
                 const latestVer = model.versions?.length
                   ? [...model.versions].sort((a, b) => b.versionNumber - a.versionNumber)[0]
                   : null;
-                const publisherName = model.user?.email ? model.user.email.split("@")[0] : "community";
+                const publisherName = model.organization?.name || (model.user?.email ? model.user.email.split("@")[0] : "community");
 
                 return (
                   <Link
@@ -645,7 +645,7 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
                       </p>
                       {/* Publisher/date metadata — font-mono fits for these */}
                       <span className="text-[10px] text-muted-foreground/75 font-mono mt-2 block">
-                        @{publisherName} • {new Date(model.createdAt).toLocaleDateString()}
+                        {model.organization?.name ? publisherName : `@${publisherName}`} • {new Date(model.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                   </Link>

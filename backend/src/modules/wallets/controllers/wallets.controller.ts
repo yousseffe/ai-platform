@@ -50,6 +50,7 @@ export class WalletsController {
   async getBalance(
     @Req()
     req: Record<string, unknown> & {
+      user: { id: string };
       workspaceId: string;
       workspaceType: OwnerType;
     },
@@ -58,6 +59,12 @@ export class WalletsController {
     if (type !== WalletType.CONSUMER && type !== WalletType.PROVIDER) {
       throw new BadRequestException('Invalid wallet type');
     }
+
+    await this.walletsService.assertBillingAccess(
+      req.workspaceId,
+      req.workspaceType,
+      req.user.id,
+    );
 
     const balance = await this.walletsService.getBalance(
       req.workspaceId,
@@ -97,6 +104,7 @@ export class WalletsController {
   async addFunds(
     @Req()
     req: Record<string, unknown> & {
+      user: { id: string };
       workspaceId: string;
       workspaceType: OwnerType;
     },
@@ -106,6 +114,12 @@ export class WalletsController {
     if (type !== WalletType.CONSUMER && type !== WalletType.PROVIDER) {
       throw new BadRequestException('Invalid wallet type');
     }
+
+    await this.walletsService.assertBillingAccess(
+      req.workspaceId,
+      req.workspaceType,
+      req.user.id,
+    );
 
     return this.walletsService.addFunds(
       req.workspaceId,
@@ -128,6 +142,7 @@ export class WalletsController {
   async createCheckoutSession(
     @Req()
     req: Record<string, unknown> & {
+      user: { id: string };
       workspaceId: string;
       workspaceType: OwnerType;
     },
@@ -136,6 +151,12 @@ export class WalletsController {
     if (!body.amount || body.amount < 5.0) {
       throw new BadRequestException('Minimum deposit amount is $5.00');
     }
+
+    await this.walletsService.assertBillingAccess(
+      req.workspaceId,
+      req.workspaceType,
+      req.user.id,
+    );
 
     const session = await this.stripeService.createCheckoutSession(
       body.amount,
@@ -218,6 +239,7 @@ export class WalletsController {
   async withdraw(
     @Req()
     req: Record<string, unknown> & {
+      user: { id: string };
       workspaceId: string;
       workspaceType: OwnerType;
     },
@@ -226,6 +248,12 @@ export class WalletsController {
     if (!body.amount || body.amount <= 0) {
       throw new BadRequestException('Amount to withdraw must be positive');
     }
+
+    await this.walletsService.assertBillingAccess(
+      req.workspaceId,
+      req.workspaceType,
+      req.user.id,
+    );
 
     return this.walletsService.withdrawFunds(
       req.workspaceId,
@@ -249,6 +277,7 @@ export class WalletsController {
   async getTransactions(
     @Req()
     req: Record<string, unknown> & {
+      user: { id: string };
       workspaceId: string;
       workspaceType: OwnerType;
     },
@@ -264,6 +293,12 @@ export class WalletsController {
     if (type !== WalletType.CONSUMER && type !== WalletType.PROVIDER) {
       throw new BadRequestException('Invalid wallet type');
     }
+
+    await this.walletsService.assertBillingAccess(
+      req.workspaceId,
+      req.workspaceType,
+      req.user.id,
+    );
 
     return this.walletsService.getTransactions(
       req.workspaceId,

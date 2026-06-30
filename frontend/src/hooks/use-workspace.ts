@@ -17,6 +17,7 @@ interface WorkspaceState {
   workspaces: Workspace[];
   viewMode: WalletType;
   balance: number;
+  canAccessBilling: boolean;
   isLoading: boolean;
   isProviderModeEnabled: boolean;
   switchingWorkspace: Workspace | null;
@@ -25,6 +26,7 @@ interface WorkspaceState {
   apiKey: string;
   setOtpModalOpen: (open: boolean) => void;
   setActiveWorkspace: (workspace: Workspace) => void;
+  switchToPersonalWorkspace: () => Promise<{ success: boolean; error?: string }>;
   setViewMode: (mode: WalletType) => void;
   createOrganization: (
     name: string,
@@ -68,6 +70,21 @@ function getCookie(name: string): string | null {
 }
 
 /**
+ * Billing data is available for personal workspaces and organization owners only.
+ */
+function canAccessWorkspaceBilling(workspace: Workspace | null): boolean {
+  if (!workspace) return false;
+  return workspace.type === OwnerType.USER || workspace.role === OrgRole.OWNER;
+}
+
+/**
+ * Personal workspace is the local developer context represented by owner type USER.
+ */
+function findPersonalWorkspace(workspaces: Workspace[]): Workspace | undefined {
+  return workspaces.find((workspace) => workspace.type === OwnerType.USER);
+}
+
+/**
  * Zustand store to manage multi-tenant workspaces, active view mode,
  * credit ledgers, organization switcher OTP security verification, and provider status.
  */
@@ -76,6 +93,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   viewMode: WalletType.CONSUMER,
   balance: 0.00,
+  canAccessBilling: true,
   isLoading: true,
   isProviderModeEnabled: false,
   switchingWorkspace: null,
@@ -92,10 +110,51 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     set({
       activeWorkspace: workspace,
       viewMode: WalletType.CONSUMER,
+      canAccessBilling: canAccessWorkspaceBilling(workspace),
       isLoading: true,
     });
 
     get().refreshData();
+  },
+
+  switchToPersonalWorkspace: async () => {
+    let personalWorkspace = findPersonalWorkspace(get().workspaces);
+
+    if (!personalWorkspace) {
+      try {
+        const { getSession } = await import("next-auth/react");
+        const session = await getSession();
+        await get().fetchWorkspaceDetails(session);
+        personalWorkspace = findPersonalWorkspace(get().workspaces);
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : "Failed to resolve personal workspace",
+        };
+      }
+    }
+
+    if (!personalWorkspace) {
+      return {
+        success: false,
+        error: "Personal workspace not found",
+      };
+    }
+
+    setCookie("activeWorkspaceId", personalWorkspace.id);
+    setCookie("viewMode", WalletType.CONSUMER);
+
+    set({
+      activeWorkspace: personalWorkspace,
+      viewMode: WalletType.CONSUMER,
+      canAccessBilling: true,
+      switchingWorkspace: null,
+      isOtpModalOpen: false,
+      isLoading: true,
+    });
+
+    await get().refreshData();
+    return { success: true };
   },
 
   setViewMode: (mode) => {
@@ -106,7 +165,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     set({ viewMode: mode });
 
     // Fetch active workspace balance for the new mode
-    if (activeWorkspace) {
+    if (activeWorkspace && canAccessWorkspaceBilling(activeWorkspace)) {
       smartFetch<{ balance: number }>(`/wallets/balance?type=${mode}`, {
         headers: {
           "X-Workspace-Id": activeWorkspace.id,
@@ -114,6 +173,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       })
         .then((res) => set({ balance: res.balance }))
         .catch(console.error);
+    } else {
+      set({ balance: 0 });
     }
   },
 
@@ -261,22 +322,29 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       }
       setCookie("viewMode", activeViewMode);
 
-      // 4. Fetch active workspace balance
-      const walletRes = await smartFetch<{ balance: number }>(
-        `/wallets/balance?type=${activeViewMode}`,
-        {
-          headers: {
-            "X-Workspace-Id": active.id,
-          },
-        }
-      );
+      const canAccessBilling = canAccessWorkspaceBilling(active);
+      let balance = 0;
+
+      // 4. Fetch active workspace balance only when this workspace role can view billing
+      if (canAccessBilling) {
+        const walletRes = await smartFetch<{ balance: number }>(
+          `/wallets/balance?type=${activeViewMode}`,
+          {
+            headers: {
+              "X-Workspace-Id": active.id,
+            },
+          }
+        );
+        balance = walletRes.balance;
+      }
 
       set({
         workspaces: allWorkspaces,
         activeWorkspace: active,
         viewMode: activeViewMode,
         isProviderModeEnabled: canBeProvider,
-        balance: walletRes.balance,
+        balance,
+        canAccessBilling,
         isAdmin: !!profile.user.isAdmin,
         apiKey: profile.user.apiKey || "",
         isLoading: false,

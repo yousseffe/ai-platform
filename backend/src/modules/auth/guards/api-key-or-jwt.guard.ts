@@ -38,6 +38,16 @@ interface JwtPayload {
   jti?: string;
 }
 
+function getHeaderString(
+  value: string | string[] | undefined,
+): string | undefined {
+  if (Array.isArray(value)) {
+    return typeof value[0] === 'string' ? value[0] : undefined;
+  }
+
+  return typeof value === 'string' ? value : undefined;
+}
+
 /**
  * Guard that permits request execution if a valid API Key OR a valid JWT token
  * is supplied via the Authorization header.
@@ -63,19 +73,23 @@ export class ApiKeyOrJwtGuard implements CanActivate {
     const request = context
       .switchToHttp()
       .getRequest<AuthenticatedApiRequest>();
-    const authHeaderValue = request.headers.authorization;
-    const authHeader = Array.isArray(authHeaderValue)
-      ? authHeaderValue[0]
-      : authHeaderValue;
+    const authHeader = getHeaderString(request.headers.authorization);
+    const apiKeyHeader = getHeaderString(request.headers['x-api-key']);
 
-    if (!authHeader) {
-      throw new UnauthorizedException('Missing Authorization header');
+    let token = apiKeyHeader?.trim() || '';
+
+    if (!token && authHeader) {
+      const [type, authToken] = authHeader.split(' ');
+      if (type !== 'Bearer' || !authToken) {
+        throw new UnauthorizedException('Invalid Authorization format');
+      }
+      token = authToken.trim();
     }
 
-    const [type, token] = authHeader.split(' ');
-
-    if (type !== 'Bearer' || !token) {
-      throw new UnauthorizedException('Invalid Authorization format');
+    if (!token) {
+      throw new UnauthorizedException(
+        'Missing API credentials. Use Authorization: Bearer <token> or x-api-key.',
+      );
     }
 
     if (token.startsWith('sk_live_')) {
@@ -89,10 +103,6 @@ export class ApiKeyOrJwtGuard implements CanActivate {
           'Invalid or revoked organization API Key',
         );
       }
-
-      this.orgApiKeyRepository
-        .update(orgApiKey.id, { lastUsedAt: new Date() })
-        .catch(() => undefined);
 
       request.user = {
         id: `org-key:${orgApiKey.id}`,

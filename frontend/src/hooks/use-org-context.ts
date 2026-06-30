@@ -28,6 +28,7 @@ const BASE_ROLE_PERMISSIONS: Record<OrgRole, OrgAction[]> = {
     OrgAction.MANAGE_API_KEYS,
     OrgAction.VIEW_API_KEYS,
     OrgAction.VIEW_PROJECT_USAGE,
+    OrgAction.VIEW_USAGE,
     OrgAction.VIEW_BILLING,
     OrgAction.EDIT_SETTINGS,
     OrgAction.UPLOAD_MODEL,
@@ -43,6 +44,7 @@ const BASE_ROLE_PERMISSIONS: Record<OrgRole, OrgAction[]> = {
     OrgAction.MANAGE_API_KEYS,
     OrgAction.VIEW_API_KEYS,
     OrgAction.VIEW_PROJECT_USAGE,
+    OrgAction.VIEW_USAGE,
     OrgAction.UPLOAD_MODEL,
     OrgAction.DEPLOY_MODEL,
   ],
@@ -51,12 +53,14 @@ const BASE_ROLE_PERMISSIONS: Record<OrgRole, OrgAction[]> = {
     OrgAction.VIEW_MODELS,
     OrgAction.VIEW_API_KEYS,
     OrgAction.VIEW_PROJECT_USAGE,
+    OrgAction.VIEW_USAGE,
     OrgAction.UPLOAD_MODEL,
   ],
   [OrgRole.VIEWER]: [
     OrgAction.VIEW_PROJECTS,
     OrgAction.VIEW_MODELS,
     OrgAction.VIEW_PROJECT_USAGE,
+    OrgAction.VIEW_USAGE,
   ],
 };
 
@@ -77,13 +81,8 @@ const PROVIDER_ROLE_PERMISSIONS: Record<OrgRole, OrgAction[]> = {
     OrgAction.UPLOAD_MODEL,
     OrgAction.DEPLOY_MODEL,
   ],
-  [OrgRole.CONTRIBUTOR]: [
-    OrgAction.VIEW_MODELS,
-    OrgAction.UPLOAD_MODEL,
-  ],
-  [OrgRole.VIEWER]: [
-    OrgAction.VIEW_MODELS,
-  ],
+  [OrgRole.CONTRIBUTOR]: [OrgAction.VIEW_MODELS, OrgAction.UPLOAD_MODEL],
+  [OrgRole.VIEWER]: [OrgAction.VIEW_MODELS],
 };
 
 const CONSUMER_ROLE_PERMISSIONS: Record<OrgRole, OrgAction[]> = {
@@ -96,6 +95,7 @@ const CONSUMER_ROLE_PERMISSIONS: Record<OrgRole, OrgAction[]> = {
     OrgAction.MANAGE_API_KEYS,
     OrgAction.VIEW_API_KEYS,
     OrgAction.VIEW_PROJECT_USAGE,
+    OrgAction.VIEW_USAGE,
     OrgAction.VIEW_BILLING,
     OrgAction.EDIT_SETTINGS,
   ],
@@ -108,20 +108,24 @@ const CONSUMER_ROLE_PERMISSIONS: Record<OrgRole, OrgAction[]> = {
     OrgAction.MANAGE_API_KEYS,
     OrgAction.VIEW_API_KEYS,
     OrgAction.VIEW_PROJECT_USAGE,
+    OrgAction.VIEW_USAGE,
   ],
   [OrgRole.CONTRIBUTOR]: [
     OrgAction.VIEW_PROJECTS,
-    OrgAction.MANAGE_API_KEYS,
     OrgAction.VIEW_API_KEYS,
     OrgAction.VIEW_PROJECT_USAGE,
+    OrgAction.VIEW_USAGE,
   ],
   [OrgRole.VIEWER]: [
     OrgAction.VIEW_PROJECTS,
     OrgAction.VIEW_PROJECT_USAGE,
+    OrgAction.VIEW_USAGE,
   ],
 };
 
-function getPermissionMatrix(orgType?: OrgType | null): Record<OrgRole, OrgAction[]> {
+function getPermissionMatrix(
+  orgType?: OrgType | null,
+): Record<OrgRole, OrgAction[]> {
   if (orgType === OrgType.PROVIDER) return PROVIDER_ROLE_PERMISSIONS;
   if (orgType === OrgType.CONSUMER) return CONSUMER_ROLE_PERMISSIONS;
   return BASE_ROLE_PERMISSIONS;
@@ -166,7 +170,7 @@ export const useOrgContext = create<OrgContextState>((set, get) => ({
     try {
       const org = await smartFetch<OrgDetails>(`/organizations/slug/${slug}`);
       const membership = await smartFetch<{ role: OrgRole }>(
-        `/organizations/${org.id}/my-role`
+        `/organizations/${org.id}/my-role`,
       );
       set({ org, myRole: membership.role, isLoading: false });
     } catch (error) {

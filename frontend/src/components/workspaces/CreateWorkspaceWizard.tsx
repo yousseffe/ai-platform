@@ -32,11 +32,15 @@ export default function CreateWorkspaceWizard() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [orgFee, setOrgFee] = useState<number>(50);
+  const [orgFee, setOrgFee] = useState<number | null>(null);
+  const [isFeeLoading, setIsFeeLoading] = useState(true);
+  const [feeLoadError, setFeeLoadError] = useState("");
 
   // Fetch the creation fee from backend system config
   useEffect(() => {
     const fetchCreationFee = async () => {
+      setIsFeeLoading(true);
+      setFeeLoadError("");
       try {
         const feeRes = await smartFetch<{ fee: number }>("/organizations/config/org-creation-fee");
         if (feeRes && typeof feeRes.fee === "number") {
@@ -44,10 +48,37 @@ export default function CreateWorkspaceWizard() {
         }
       } catch (err) {
         console.error("Failed to fetch organization creation fee:", err);
+        setFeeLoadError("Unable to load the current workspace creation fee.");
+      } finally {
+        setIsFeeLoading(false);
       }
     };
     fetchCreationFee();
   }, []);
+
+  useEffect(() => {
+    if (step !== 4 || (!feeLoadError && orgFee !== null)) {
+      return;
+    }
+
+    const retryFetchCreationFee = async () => {
+      setIsFeeLoading(true);
+      setFeeLoadError("");
+      try {
+        const feeRes = await smartFetch<{ fee: number }>("/organizations/config/org-creation-fee");
+        if (feeRes && typeof feeRes.fee === "number") {
+          setOrgFee(feeRes.fee);
+        }
+      } catch (err) {
+        console.error("Retry failed to fetch organization creation fee:", err);
+        setFeeLoadError("Unable to load the current workspace creation fee.");
+      } finally {
+        setIsFeeLoading(false);
+      }
+    };
+
+    retryFetchCreationFee();
+  }, [step, feeLoadError, orgFee]);
 
   // Collaborator local invite states
   const [inviteEmail, setInviteEmail] = useState("");
@@ -161,6 +192,10 @@ export default function CreateWorkspaceWizard() {
     setIsSubmitting(true);
 
     try {
+      if (orgFee === null) {
+        throw new Error("Workspace creation fee is still loading. Please wait a moment and try again.");
+      }
+
       const res = await createOrganization(
         data.name,
         data.slug,
@@ -361,11 +396,13 @@ export default function CreateWorkspaceWizard() {
 
             {/* STEP 4: Review & Wallet details */}
             {step === 4 && (
-              <StepWalletReview
-                orgFee={orgFee}
-                orgType={watchType}
-                orgName={watchName}
-                orgSlug={watchSlug}
+          <StepWalletReview
+            orgFee={orgFee}
+            isFeeLoading={isFeeLoading}
+            feeLoadError={feeLoadError}
+            orgType={watchType}
+            orgName={watchName}
+            orgSlug={watchSlug}
                 orgDescription={watchDescription}
               />
             )}

@@ -113,7 +113,9 @@ export class ModelsService {
    * @param type - The model type (tabular, nlp, vision, etc.).
    * @param taskType - The task category (classification, regression, generation, etc.).
    * @param framework - The development framework (scikit-learn, pytorch, gguf, etc.).
-   * @param userId - The UUID of the model owner.
+   * @param userId - The UUID of the authenticated member creating the model.
+   * @param isPublic - Visibility flag for marketplace exposure.
+   * @param organizationId - Optional organization workspace that should own the model.
    * @returns A promise resolving to the created Model entity.
    */
   async createModel(
@@ -124,10 +126,10 @@ export class ModelsService {
     framework: Framework,
     userId: string,
     isPublic: boolean = false,
-    ownerOrgId?: string,
+    organizationId?: string,
   ): Promise<Model> {
-    if (ownerOrgId) {
-      await this.assertProviderOrgAccess(ownerOrgId, userId);
+    if (organizationId) {
+      await this.assertProviderOrgAccess(organizationId, userId);
     }
     // Retrieve global type price default
     const configKey = 'price_' + type.toLowerCase();
@@ -149,7 +151,7 @@ export class ModelsService {
       taskType,
       framework,
       user: { id: userId },
-      organization: ownerOrgId ? { id: ownerOrgId } : null,
+      organization: organizationId ? { id: organizationId } : null,
       isPublic,
       marketplaceVerified: false,
       tier: type === ModelType.DIFFUSION ? 'LARGE' : 'SMALL',
@@ -162,7 +164,7 @@ export class ModelsService {
     // Index in OpenSearch — load with relations so the document is complete
     const fullModel = await this.modelsRepository.findOne({
       where: { id: saved.id },
-      relations: ['versions', 'versions.deployments', 'user'],
+      relations: ['organization', 'versions', 'versions.deployments', 'user'],
     });
     if (fullModel) {
       await this.modelsSearchService.indexModel(fullModel);
@@ -170,10 +172,10 @@ export class ModelsService {
         model: fullModel,
         actorId: userId,
         action: VersionReviewAction.MODEL_CREATED,
-        message: ownerOrgId
+        message: organizationId
           ? 'Organization model registry created'
           : 'Personal model registry created',
-        metadata: { ownerOrgId: ownerOrgId ?? null },
+        metadata: { organizationId: organizationId ?? null },
       });
     }
 
@@ -342,10 +344,10 @@ export class ModelsService {
       )[0];
     }
 
-    const publisher = model.user?.email
-      ? model.user.email.split('@')[0]
-      : 'unknown';
-    const sanitizedPublisher = publisher
+    const ownerScope =
+      model.organization?.slug ??
+      (model.user?.email ? model.user.email.split('@')[0] : 'unknown');
+    const sanitizedOwnerScope = ownerScope
       .replace(/[^a-zA-Z0-9]/g, '_')
       .toLowerCase();
     const sanitizedName = model.name
@@ -390,7 +392,7 @@ export class ModelsService {
       if (!file) {
         return null;
       }
-      const objectName = `${sanitizedPublisher}/${sanitizedName}/v${versionNumber}/${prefix}-${file.originalname}`;
+      const objectName = `${sanitizedOwnerScope}/${sanitizedName}/v${versionNumber}/${prefix}-${file.originalname}`;
       await this.minioService.uploadFile(objectName, file.path, file.mimetype);
       try {
         if (fs.existsSync(file.path)) {
