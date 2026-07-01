@@ -136,9 +136,23 @@ async def predict(request: Request):
     elif scaler:
         pass 
     
-    # Format data for TABULAR inference (Scikit-learn expects 2D array: [[val1, val2]])
+    # Format data for TABULAR inference.
+    # Sklearn numeric models expect shape (1, n_features): [[v1, v2, ...]].
+    # Sklearn text pipelines (TF-IDF, CountVectorizer, etc.) expect a 1-D
+    # iterable of strings and break if wrapped in an extra list.
     if isinstance(data, dict):
-        data = [list(data.values())]
+        values = list(data.values())
+        if not values:
+            data = [values]
+        elif isinstance(values[0], (list, tuple)):
+            # Value is already a feature vector: {"features": [1,2,3]} → [[1,2,3]]
+            data = values
+        elif any(isinstance(v, str) for v in values):
+            # Text / categorical field(s) — keep as 1-D for text pipelines
+            data = values
+        else:
+            # Pure numeric features — wrap into 2-D array: [[val1, val2, ...]]
+            data = [values]
     elif isinstance(data, list):
         if len(data) > 0 and isinstance(data[0], dict):
             data = [list(item.values()) for item in data]
