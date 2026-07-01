@@ -22,6 +22,7 @@ import {
   User,
   Key,
   Plug,
+  Workflow,
 } from "lucide-react";
 import { useWorkspace, Workspace } from "@/hooks/use-workspace";
 import { smartFetch } from "@/lib/utils/smart-fetch";
@@ -361,7 +362,11 @@ export default function Sidebar() {
             Models Registry
           </SidebarLink>
         )}
-
+        {viewMode === WalletType.PROVIDER && (
+        <SidebarLink href="/pipelines" active={isActive("/pipelines")} icon={<Workflow className="w-4 h-4" strokeWidth={1.5} />}>
+          Pipelines
+        </SidebarLink>
+        )}
         {/* Collapsible settings button link */}
         <div className="flex flex-col">
           <button
