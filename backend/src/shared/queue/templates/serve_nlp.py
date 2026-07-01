@@ -207,9 +207,22 @@ async def predict(request: Request):
         else:
             try:
                 data = preprocess_func(data)
-            except TypeError:
-                # Fallback: try passing just the text
-                data = preprocess_func(raw_text)
+            except (TypeError, AttributeError, KeyError, ValueError):
+                # Fallback: try passing just the extracted text.
+                # Only fall back to raw_text when it is actually a string;
+                # if raw_text is a list (e.g. multi-field dict or wrong input
+                # shape), extract the first string element instead so we don't
+                # forward an unintended list to a function expecting a string.
+                if isinstance(raw_text, str):
+                    data = preprocess_func(raw_text)
+                elif isinstance(raw_text, list):
+                    first_str = next((v for v in raw_text if isinstance(v, str)), None)
+                    if first_str is not None:
+                        data = preprocess_func(first_str)
+                    else:
+                        data = preprocess_func(raw_text)
+                else:
+                    data = preprocess_func(raw_text)
     else:
         # Default NLP formatting: expects 1D list of strings
         if isinstance(data, dict):

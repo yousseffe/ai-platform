@@ -608,9 +608,12 @@ export class BuildProcessor extends WorkerHost {
               const match = line.match(/^\s*(?:import|from)\s+([a-zA-Z0-9_]+)/);
               if (match) {
                 const pkg = match[1];
-                if (!builtInAndBase.has(pkg)) {
-                  extraDependencies.push(pkg);
-                }
+                if (builtInAndBase.has(pkg)) continue;
+                // Skip local modules — a .py file with the same name exists in the build dir
+                if (fs.existsSync(path.join(buildDir, `${pkg}.py`))) continue;
+                // Skip names that follow the local-module convention: <modelname>_preprocess / _postprocess
+                if (/_preprocess$|_postprocess$/.test(pkg)) continue;
+                extraDependencies.push(pkg);
               }
             }
           } catch (err: unknown) {

@@ -4,6 +4,12 @@ import { BullModule } from '@nestjs/bullmq';
 import { ModelsService } from './services/models.service';
 import { ModelsSearchService } from './services/models-search.service';
 import { ModelIntegrationService } from './services/model-integration.service';
+import { InferencePricingService } from './services/inference-pricing.service';
+import { InferenceBillingService } from './services/inference-billing.service';
+import { InferenceLogService } from './services/inference-log.service';
+import { InferenceDeploymentResolverService } from './services/inference-deployment-resolver.service';
+import { InferenceCallPreparerService } from './services/inference-call-preparer.service';
+import { InferenceClient } from './services/inference-client.service';
 import { ModelsController } from './controllers/models.controller';
 import { SearchController } from './controllers/search.controller';
 import { SchemaController } from './controllers/schema.controller';
@@ -62,6 +68,12 @@ import { OrganizationsModule } from '../organizations/organizations.module';
     ModelIntegrationService,
     ModelsRepository,
     ModelVersionsRepository,
+    InferencePricingService,
+    InferenceBillingService,
+    InferenceLogService,
+    InferenceDeploymentResolverService,
+    InferenceCallPreparerService,
+    InferenceClient,
   ],
   controllers: [
     SearchController,
@@ -75,6 +87,7 @@ import { OrganizationsModule } from '../organizations/organizations.module';
     ModelsSearchService,
     ModelsRepository,
     ModelVersionsRepository,
+    InferenceClient,
   ],
 })
 export class ModelsModule {}

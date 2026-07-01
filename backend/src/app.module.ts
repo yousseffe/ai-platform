@@ -41,6 +41,12 @@ import { FraudModule } from './modules/fraud/fraud.module';
 import { RiskBaseline } from './modules/fraud/entities/risk-baseline.entity';
 import { RiskEvent } from './modules/fraud/entities/risk-event.entity';
 import { McpToken } from './modules/auth/entities/mcp-token.entity';
+import { PipelinesModule } from './modules/pipelines/pipelines.module';
+import { Pipeline } from './modules/pipelines/entities/pipeline.entity';
+import { PipelineStep } from './modules/pipelines/entities/pipeline-step.entity';
+import { PipelineEdge } from './modules/pipelines/entities/pipeline-edge.entity';
+import { PipelineRun } from './modules/pipelines/entities/pipeline-run.entity';
+import { PipelineStepRun } from './modules/pipelines/entities/pipeline-step-run.entity';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -78,6 +84,11 @@ import { McpToken } from './modules/auth/entities/mcp-token.entity';
         RiskBaseline,
         RiskEvent,
         McpToken,
+        Pipeline,
+        PipelineStep,
+        PipelineEdge,
+        PipelineRun,
+        PipelineStepRun,
         ModelReview,
       ],
       synchronize: true, // For MVP only
@@ -105,6 +116,7 @@ import { McpToken } from './modules/auth/entities/mcp-token.entity';
     MailModule,
     AnalyticsModule,
     FraudModule,
+    PipelinesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

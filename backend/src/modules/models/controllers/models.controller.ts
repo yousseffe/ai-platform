@@ -28,7 +28,6 @@ import { firstValueFrom } from 'rxjs';
 import { Readable } from 'stream';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { RedisService } from '../../../shared/redis/redis.service';
 
 import { CreateModelDto } from '../dto/create-model.dto';
 import { UploadVersionDto } from '../dto/upload-version.dto';
@@ -39,29 +38,24 @@ import { Framework } from '../enums/framework.enum';
 import { Model } from '../entities/model.entity';
 import { ModelVersion } from '../entities/model-version.entity';
 import { ModelLog } from '../entities/model-log.entity';
-import { detectInjection } from '../../../shared/security/injection-patterns';
-import { User } from '../../users/entities/user.entity';
+import { ModelReview } from '../entities/model-review.entity';
 import { ApiKey } from '../../auth/entities/api-key.entity';
+import { User } from '../../users/entities/user.entity';
 import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
 import { Project } from '../../organizations/entities/project.entity';
-import { Wallet } from '../../wallets/entities/wallet.entity';
-import { Transaction } from '../../wallets/entities/transaction.entity';
 import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
 import { WorkspaceInterceptor } from '../../auth/guards/workspace.interceptor';
-import { WalletsService } from '../../wallets/services/wallets.service';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
-import { WalletType } from '../../../shared/enums/wallet-type.enum';
-import { TransactionType } from '../../wallets/enums/transaction-type.enum';
-import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
 import { OrgStatus } from '../../organizations/enums/org-status.enum';
 import { OrgType } from '../../organizations/enums/org-type.enum';
-import { Deployment } from '../../deployments/entities/deployment.entity';
 import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
-import { VersionStatus } from '../enums/version-status.enum';
 import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import * as crypto from 'crypto';
+import { InferenceClient } from '../services/inference-client.service';
+import { ClientRequestMeta, PredictionActor } from '../interfaces/inference.interface';
+import { extractClientMeta } from '../../../shared/utils/client-meta.util';
 
 /**
  * Interface representing a NestJS request authenticated with a JWT payload.
@@ -92,37 +86,6 @@ interface PredictionRequestContext {
   workspaceType: OwnerType;
 }
 
-/** Client request metadata captured per prediction for abuse/fraud analysis. */
-interface ClientRequestMeta {
-  ipAddress: string | null;
-  userAgent: string | null;
-  xForwardedFor: string | null;
-}
-
-/**
- * Safely extracts client network metadata from the raw Express request for
- * fraud/abuse analysis. Reads only headers/ip — never request bodies here.
- *
- * @param req - The raw request object.
- * @returns The extracted {@link ClientRequestMeta}.
- */
-function extractClientMeta(req: Record<string, unknown>): ClientRequestMeta {
-  const headers = (req.headers ?? {}) as Record<string, unknown>;
-  const ua = headers['user-agent'];
-  const xff = headers['x-forwarded-for'];
-  const first = (v: unknown): string | null =>
-    typeof v === 'string'
-      ? v.slice(0, 255)
-      : Array.isArray(v) && typeof v[0] === 'string'
-        ? v[0].slice(0, 255)
-        : null;
-  return {
-    ipAddress: typeof req.ip === 'string' ? req.ip : null,
-    userAgent: first(ua),
-    xForwardedFor: first(xff),
-  };
-}
-
 /**
  * Controller exposing REST endpoints for ML model catalog management,
  * version uploading, and proxying client prediction requests.
@@ -135,7 +98,6 @@ export class ModelsController {
     private readonly modelsService: ModelsService,
     private readonly deploymentsService: DeploymentsService,
     private readonly httpService: HttpService,
-    private readonly walletsService: WalletsService,
     private readonly dataSource: DataSource,
     @InjectRepository(ModelLog)
     private readonly modelLogRepository: Repository<ModelLog>,
@@ -143,7 +105,7 @@ export class ModelsController {
     private readonly apiKeyRepository: Repository<ApiKey>,
     @InjectRepository(OrgApiKey)
     private readonly orgApiKeyRepository: Repository<OrgApiKey>,
-    private readonly redisService: RedisService,
+    private readonly inferenceClient: InferenceClient,
   ) {}
 
   /**
@@ -525,8 +487,9 @@ export class ModelsController {
   }
 
   /**
-   * Proxies a prediction request to the active container deployment.
-   * Supports streaming SSE response for LLM GGUF models when requested.
+   * Proxies a prediction request to the active container deployment, via the
+   * shared {@link InferenceClient}. Supports streaming SSE response for LLM
+   * GGUF models when requested.
    *
    * @param id - The model UUID.
    * @param data - Raw JSON payload representing inputs.
@@ -546,96 +509,14 @@ export class ModelsController {
       id,
       req.user.orgApiKeyId ? undefined : req.user.id,
     );
-    let url: string;
-    let deploymentId: string | null = null;
-    try {
-      const deployment = await this.dataSource
-        .getRepository(Deployment)
-        .findOne({
-          where: {
-            modelVersion: { model: { id } },
-            status: DeploymentStatus.RUNNING,
-          },
-          order: { createdAt: 'DESC' },
-          relations: ['modelVersion'],
-        });
-      if (!deployment || deployment.url === null) {
-        throw new NotFoundException(
-          'No active deployment found for this model',
-        );
-      }
-      url = deployment.url;
-      deploymentId = deployment.id;
-    } catch (err: unknown) {
-      if (err instanceof NotFoundException) {
-        this.logger.log(
-          `No active deployment found for model ${id}. Attempting auto-deployment...`,
-        );
-        // Find latest version
-        const latestVersion =
-          model.versions && model.versions.length
-            ? [...model.versions].sort(
-                (a, b) => b.versionNumber - a.versionNumber,
-              )[0]
-            : null;
-
-        if (!latestVersion) {
-          throw new NotFoundException(
-            'No versions available for this model to deploy.',
-          );
-        }
-
-        if (latestVersion.status !== VersionStatus.READY) {
-          throw new BadRequestException(
-            `Latest version v${latestVersion.versionNumber} is not ready (status: ${latestVersion.status}). Cannot deploy automatically.`,
-          );
-        }
-
-        // Check if there is already a STARTING deployment
-        let deployment = await this.dataSource
-          .getRepository(Deployment)
-          .findOne({
-            where: {
-              modelVersion: { id: latestVersion.id },
-              status: DeploymentStatus.STARTING,
-            },
-            order: { createdAt: 'DESC' },
-          });
-
-        if (!deployment) {
-          this.logger.log(
-            `Triggering new auto-deployment for version ${latestVersion.id}...`,
-          );
-          deployment = await this.deploymentsService.deployVersion(
-            latestVersion.id,
-          );
-        } else {
-          this.logger.log(
-            `Found already starting deployment ${deployment.id}. Waiting for it...`,
-          );
-        }
-
-        // Wait for it to become RUNNING
-        const isLlm = model.type === ModelType.LLM_GGUF;
-        const waitTimeout = isLlm ? 300000 : 30000;
-        url = await this.waitForDeployment(deployment.id, waitTimeout);
-        deploymentId = deployment.id;
-      } else {
-        throw err;
-      }
-    }
-
-    await this.handlePredictionProxy(
-      model,
-      url,
-      deploymentId,
-      data,
-      req,
-      res,
-      extractClientMeta(req),
-    );
+    const { url, deploymentId } = await this.inferenceClient.resolveDeploymentUrl(model);
+    await this.respondWithPrediction(model, url, deploymentId, data, req, res);
   }
 
+  /**
+   * Proxies a prediction request to a specific pinned model version's
+   * deployment. See {@link predict} for the latest-version equivalent.
+   */
   @UseGuards(ApiKeyOrJwtGuard)
   @UseInterceptors(WorkspaceInterceptor)
   @Post(':id/v:versionNum/predict')
@@ -656,91 +537,23 @@ export class ModelsController {
       id,
       req.user.orgApiKeyId ? undefined : req.user.id,
     );
-    let url: string;
-    let deploymentId: string | null = null;
-    try {
-      const deployment = await this.dataSource
-        .getRepository(Deployment)
-        .findOne({
-          where: {
-            modelVersion: {
-              model: { id },
-              versionNumber: versionNumber,
-            },
-            status: DeploymentStatus.RUNNING,
-          },
-          relations: ['modelVersion'],
-        });
-      if (!deployment || deployment.url === null) {
-        throw new NotFoundException(
-          `No active deployment found for version v${versionNumber}`,
-        );
-      }
-      url = deployment.url;
-      deploymentId = deployment.id;
-    } catch (err: unknown) {
-      if (err instanceof NotFoundException) {
-        this.logger.log(
-          `No active deployment found for model ${id} version v${versionNumber}. Attempting auto-deployment...`,
-        );
-        // Find specific version
-        const targetVersion = model.versions?.find(
-          (v) => v.versionNumber === versionNumber,
-        );
-
-        if (!targetVersion) {
-          throw new NotFoundException(
-            `Version v${versionNumber} is not found for this model.`,
-          );
-        }
-
-        if (targetVersion.status !== VersionStatus.READY) {
-          throw new BadRequestException(
-            `Version v${targetVersion.versionNumber} is not ready (status: ${targetVersion.status}). Cannot deploy automatically.`,
-          );
-        }
-
-        // Check if there is already a STARTING deployment
-        let deployment = await this.dataSource
-          .getRepository(Deployment)
-          .findOne({
-            where: {
-              modelVersion: { id: targetVersion.id },
-              status: DeploymentStatus.STARTING,
-            },
-            order: { createdAt: 'DESC' },
-          });
-
-        if (!deployment) {
-          this.logger.log(
-            `Triggering new auto-deployment for version ${targetVersion.id}...`,
-          );
-          deployment = await this.deploymentsService.deployVersion(
-            targetVersion.id,
-          );
-        }
-
-        // Wait for it to become RUNNING
-        const isLlm = model.type === ModelType.LLM_GGUF;
-        const waitTimeout = isLlm ? 300000 : 30000;
-        url = await this.waitForDeployment(deployment.id, waitTimeout);
-        deploymentId = deployment.id;
-      } else {
-        throw err;
-      }
-    }
-
-    await this.handlePredictionProxy(
+    const { url, deploymentId } = await this.inferenceClient.resolveDeploymentUrl(
       model,
-      url,
-      deploymentId,
-      data,
-      req,
-      res,
-      extractClientMeta(req),
+      versionNumber,
     );
+    await this.respondWithPrediction(model, url, deploymentId, data, req, res);
   }
 
+  /**
+   * Validates that an organization API key is active, scoped to an active
+   * project, and authorized to call the target model (a public marketplace
+   * model, or one owned by the same organization, and not scoped to a
+   * different model). No-op for JWT sessions and personal `ml_sk_*` keys.
+   *
+   * @param model - The model being predicted against.
+   * @param req - The authenticated prediction request context.
+   * @returns The validated {@link OrgApiKey}, or `null` if the caller isn't using one.
+   */
   private async assertOrgApiKeyPredictionAccess(
     model: Model,
     req: PredictionRequestContext,
@@ -822,409 +635,136 @@ export class ModelsController {
     return orgApiKey;
   }
 
-  private async handlePredictionProxy(
+  /**
+   * Builds the {@link PredictionActor} identity used for billing/logging from
+   * the authenticated request context.
+   */
+  private buildActor(req: PredictionRequestContext): PredictionActor {
+    return {
+      userId: req.user.id,
+      email: req.user.email,
+      apiKey: req.user.apiKey,
+      apiKeyType: req.user.apiKeyType,
+      orgApiKeyId: req.user.orgApiKeyId,
+      orgApiKeyLabel: req.user.orgApiKeyLabel,
+      orgApiKeyPrefix: req.user.orgApiKeyPrefix,
+      orgId: req.user.orgId,
+      projectId: req.user.projectId,
+      workspaceId: req.workspaceId,
+      workspaceType: req.workspaceType,
+    };
+  }
+
+  /**
+   * Dispatches a resolved deployment call to either the streaming SSE path
+   * (LLM `stream: true` requests) or the standard JSON
+   * {@link InferenceClient.runInference} path. Validates organization API key
+   * scoping first when the caller authenticated with one.
+   */
+  private async respondWithPrediction(
     model: Model,
     url: string,
-    deploymentId: string | null,
+    deploymentId: string,
     data: Record<string, unknown>,
-    req: PredictionRequestContext,
+    req: Record<string, unknown> & PredictionRequestContext,
     res: Response,
-    clientMeta: ClientRequestMeta,
   ): Promise<void> {
-    const validatedOrgApiKey = await this.assertOrgApiKeyPredictionAccess(
-      model,
-      req,
-    );
-    const isTrial = req.user?.apiKeyType === ApiKeyType.TRIAL;
+    const orgApiKey = await this.assertOrgApiKeyPredictionAccess(model, req);
+    const actor = this.buildActor(req);
+    const clientMeta = extractClientMeta(req);
 
-    // Capture deterministic request fingerprints for fraud/abuse analysis.
-    let requestSizeBytes: number | null = null;
-    let payloadHash: string | null = null;
-    let responseSizeBytes: number | null = null;
-    let errorMessage: string | null = null;
-    let injectionMatch: string | null = null;
-    try {
-      const serialized = JSON.stringify(data ?? {});
-      requestSizeBytes = Buffer.byteLength(serialized);
-      payloadHash = crypto.createHash('sha256').update(serialized).digest('hex');
-      injectionMatch = detectInjection(serialized);
-    } catch {
-      /* non-serializable payload — leave fingerprints null */
-    }
-
-    let cost = 0;
-    let providerSharePercent = model.providerSharePercent || 80;
-    let tokenUsage: { promptTokens: number; completionTokens: number } | null = null;
-    let inputPricePerMToken = 0;
-    let outputPricePerMToken = 0;
-    const isLlmModel = model.type === ModelType.LLM_GGUF;
-
-    if (!isTrial) {
-      if (!model.hasCustomPricing) {
-        if (isLlmModel) {
-          // Token-based billing: fetch separate input/output prices (credits per 1M tokens)
-          const [inputConfig, outputConfig, shareConfig] = await Promise.all([
-            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'price_llm_gguf_input' } }),
-            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'price_llm_gguf_output' } }),
-            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'default_provider_share_percent' } }),
-          ]);
-          inputPricePerMToken = inputConfig ? parseFloat(inputConfig.value) : 2.0;
-          outputPricePerMToken = outputConfig ? parseFloat(outputConfig.value) : 8.0;
-          providerSharePercent = shareConfig ? parseInt(shareConfig.value, 10) : 80;
-          cost = 0; // Computed after response from actual token counts
-        } else {
-          const configKey = 'price_' + model.type.toLowerCase();
-          const [priceConfig, shareConfig] = await Promise.all([
-            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: configKey } }),
-            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'default_provider_share_percent' } }),
-          ]);
-          cost = priceConfig ? parseFloat(priceConfig.value) : 0.1;
-          providerSharePercent = shareConfig ? parseInt(shareConfig.value, 10) : 80;
-        }
-      } else {
-        cost =
-          typeof model.costPerRequest === 'string'
-            ? parseFloat(model.costPerRequest)
-            : model.costPerRequest;
-      }
-    }
-
-    if (isLlmModel && !isTrial && (inputPricePerMToken > 0 || outputPricePerMToken > 0)) {
-      // For token-based LLM billing, verify caller has at least the cost of 1K input tokens
-      const minCost = (1000 / 1_000_000) * inputPricePerMToken;
-      if (minCost > 0) {
-        const balance = await this.walletsService.getBalance(
-          req.workspaceId,
-          req.workspaceType,
-          WalletType.CONSUMER,
-        );
-        if (balance < minCost) {
-          throw new BadRequestException(
-            'Insufficient credits to perform prediction',
-          );
-        }
-      }
-    } else if (cost > 0) {
-      const balance = await this.walletsService.getBalance(
-        req.workspaceId,
-        req.workspaceType,
-        WalletType.CONSUMER,
-      );
-      if (balance < cost) {
-        throw new BadRequestException(
-          'Insufficient credits to perform prediction',
-        );
-      }
-    }
-
-    // Retrieve active API key of the model owner to authorize NestJS proxy call to the container.
-    // The container templates enforce checking the request headers for this API key.
-    const modelOwnerApiKeyEntity = await this.apiKeyRepository.findOne({
-      where: {
-        user: { id: model.user.id },
-        type: ApiKeyType.LIVE,
-        isActive: true,
-      },
-    });
-
-    if (!modelOwnerApiKeyEntity?.key) {
-      throw new BadRequestException(
-        'The target model is missing an active provider API key for prediction routing',
-      );
-    }
-
-    const containerApiKey = modelOwnerApiKeyEntity?.key || '';
-
-    const targetEndpoint =
-      model.type === ModelType.LLM_GGUF ? '/v1/chat/completions' : '/predict';
-
-    const startTime = Date.now();
-    let statusCode = 200;
-    let executionStatus = 'SUCCESS';
-
-    const headers = {
-      Authorization: `Bearer ${containerApiKey}`,
-      'x-api-key': containerApiKey,
-    };
-
-    try {
-      if (deploymentId) {
-        await this.redisService.set(
-          `model:last-active:${deploymentId}`,
-          Date.now().toString(),
-        );
-      }
-
-      if (data.stream === true) {
-        const response = await firstValueFrom(
-          this.httpService.post<Readable>(`${url}${targetEndpoint}`, data, {
-            headers,
-            responseType: 'stream',
-          }),
-        );
-
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-
-        response.data.pipe(res);
-      } else {
-        const response = await firstValueFrom(
-          this.httpService.post<unknown>(`${url}${targetEndpoint}`, data, {
-            headers,
-          }),
-        );
-        try {
-          responseSizeBytes = Buffer.byteLength(JSON.stringify(response.data));
-        } catch {
-          /* leave response size null */
-        }
-        // Extract token usage from OpenAI-compatible LLM responses for token billing
-        if (isLlmModel && response.data && typeof response.data === 'object') {
-          const usage = (response.data as Record<string, unknown>).usage as
-            | Record<string, number>
-            | undefined;
-          if (usage) {
-            tokenUsage = {
-              promptTokens: usage.prompt_tokens ?? 0,
-              completionTokens: usage.completion_tokens ?? 0,
-            };
-          }
-        }
-        res.json(response.data);
-      }
-    } catch (err: unknown) {
-      executionStatus = 'FAILED';
-      statusCode = 500;
-      const message = err instanceof Error ? err.message : String(err);
-      errorMessage = message.slice(0, 1000);
-      res.status(500).json({ error: `Prediction failed: ${message}` });
+    if (data.stream === true) {
+      await this.streamPrediction(model, url, deploymentId, data, actor, clientMeta, res);
+      this.touchOrgApiKeyUsage(orgApiKey);
       return;
-    } finally {
-      const endTime = Date.now();
-      const responseTimeMs = endTime - startTime;
+    }
 
-      // For LLM models, compute actual cost from token counts in the response
-      if (isLlmModel && !isTrial && tokenUsage && (inputPricePerMToken > 0 || outputPricePerMToken > 0)) {
-        cost =
-          (tokenUsage.promptTokens / 1_000_000) * inputPricePerMToken +
-          (tokenUsage.completionTokens / 1_000_000) * outputPricePerMToken;
-      }
+    const result = await this.inferenceClient.runInference(
+      model,
+      url,
+      deploymentId,
+      data,
+      actor,
+      clientMeta,
+    );
+    if (result.status === 'FAILED') {
+      res.status(result.statusCode).json({ error: `Prediction failed: ${result.errorMessage}` });
+      return;
+    }
+    this.touchOrgApiKeyUsage(orgApiKey);
+    res.json(result.output);
+  }
 
-      // Charge the user and write transaction logs if cost > 0 and request succeeded
-      if (cost > 0 && executionStatus === 'SUCCESS') {
-        const queryRunner = this.dataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
+  /** Fire-and-forget freshness update for a successfully used organization API key. */
+  private touchOrgApiKeyUsage(orgApiKey: OrgApiKey | null): void {
+    if (!orgApiKey) {
+      return;
+    }
+    this.orgApiKeyRepository
+      .update(orgApiKey.id, { lastUsedAt: new Date() })
+      .catch(() => undefined);
+  }
 
-        try {
-          const callerUser = req.user.orgApiKeyId
-            ? null
-            : await queryRunner.manager.findOne(User, {
-                where: { id: req.user.id },
-              });
-          const callerEmail =
-            callerUser?.email ||
-            req.user.orgApiKeyLabel ||
-            req.user.email ||
-            'Organization API Key';
+  /**
+   * Pipes a streaming SSE prediction response directly to the client while
+   * still charging and logging the call exactly like a non-streaming one.
+   */
+  private async streamPrediction(
+    model: Model,
+    url: string,
+    deploymentId: string,
+    data: Record<string, unknown>,
+    actor: PredictionActor,
+    clientMeta: ClientRequestMeta,
+    res: Response,
+  ): Promise<void> {
+    const prepared = await this.inferenceClient.prepareCall(model, actor);
+    const startTime = Date.now();
 
-          // 1. Deduct cost from consumer wallet
-          await queryRunner.manager.query(
-            `UPDATE wallets SET balance = balance - $1 WHERE owner_id = $2 AND owner_type = $3 AND wallet_type = $4`,
-            [cost, req.workspaceId, req.workspaceType, WalletType.CONSUMER],
-          );
+    try {
+      await this.inferenceClient.markActive(deploymentId);
 
-          // Get consumer wallet ID to write transaction
-          const consumerWallet = await queryRunner.manager.findOne(Wallet, {
-            where: {
-              ownerId: req.workspaceId,
-              ownerType: req.workspaceType,
-              walletType: WalletType.CONSUMER,
-            },
-          });
+      const response = await firstValueFrom(
+        this.httpService.post<Readable>(`${url}${prepared.endpoint}`, data, {
+          headers: prepared.headers,
+          responseType: 'stream',
+        }),
+      );
 
-          if (consumerWallet) {
-            const consumerTx = queryRunner.manager.create(Transaction, {
-              walletId: consumerWallet.id,
-              type: TransactionType.DEBIT,
-              amount: cost,
-              reference:
-                isLlmModel && tokenUsage
-                  ? `Inference debit for model: ${model.name} (${tokenUsage.promptTokens} input + ${tokenUsage.completionTokens} output tokens)`
-                  : `Inference debit for model: ${model.name}`,
-              status: TransactionStatus.COMPLETED,
-            });
-            await queryRunner.manager.save(Transaction, consumerTx);
-          }
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      response.data.pipe(res);
 
-          // Load system config for credits_per_egp
-          let config = await queryRunner.manager.findOne(SystemConfig, {
-            where: { key: 'credits_per_egp' },
-          });
-          if (!config) {
-            config = await queryRunner.manager.findOne(SystemConfig, {
-              where: { key: 'credits_per_usd' },
-            });
-          }
-          const creditsPerEgp = config ? parseInt(config.value, 10) || 10 : 10;
-          const costInEgp = cost / creditsPerEgp;
-
-          // 2. Pay the publishing workspace in EGP
-          const providerShareEgp = costInEgp * (providerSharePercent / 100);
-
-          // Update model's total earnings in database
-          await queryRunner.manager.query(
-            `UPDATE models SET total_earnings = total_earnings + $1 WHERE id = $2`,
-            [providerShareEgp, model.id],
-          );
-
-          const providerWalletOwnerId = model.organization?.id ?? model.user.id;
-          const providerWalletOwnerType = model.organization
-            ? OwnerType.ORG
-            : OwnerType.USER;
-          const providerWalletCurrency = 'EGP';
-          const revenueRecipientLabel =
-            model.organization?.name ??
-            model.user.email ??
-            'Personal publishing workspace';
-
-          let providerWallet = await queryRunner.manager.findOne(Wallet, {
-            where: {
-              ownerId: providerWalletOwnerId,
-              ownerType: providerWalletOwnerType,
-              walletType: WalletType.PROVIDER,
-            },
-          });
-
-          if (!providerWallet) {
-            providerWallet = queryRunner.manager.create(Wallet, {
-              ownerId: providerWalletOwnerId,
-              ownerType: providerWalletOwnerType,
-              walletType: WalletType.PROVIDER,
-              balance: 0.0,
-              currency: providerWalletCurrency,
-            });
-            providerWallet = await queryRunner.manager.save(
-              Wallet,
-              providerWallet,
-            );
-          }
-
-          const currentProviderBalance =
-            typeof providerWallet.balance === 'string'
-              ? parseFloat(providerWallet.balance)
-              : providerWallet.balance;
-          if (providerWallet.currency !== providerWalletCurrency) {
-            providerWallet.currency = providerWalletCurrency;
-          }
-          providerWallet.balance = currentProviderBalance + providerShareEgp;
-          await queryRunner.manager.save(Wallet, providerWallet);
-
-          const providerTx = queryRunner.manager.create(Transaction, {
-            walletId: providerWallet.id,
-            type: TransactionType.CREDIT,
-            amount: providerShareEgp,
-            reference: `Inference revenue share for model: ${model.name} to ${revenueRecipientLabel} from ${callerEmail} (EGP ${providerShareEgp.toFixed(4)})`,
-            status: TransactionStatus.COMPLETED,
-          });
-          await queryRunner.manager.save(Transaction, providerTx);
-
-          // 3. Pay Platform Admin in EGP
-          const platformShareEgp = costInEgp - providerShareEgp;
-          if (platformShareEgp > 0) {
-            const systemOwnerId = '00000000-0000-0000-0000-000000000000';
-
-            // Check if system wallet exists, if not create
-            let systemWallet = await queryRunner.manager.findOne(Wallet, {
-              where: {
-                ownerId: systemOwnerId,
-                ownerType: OwnerType.USER,
-                walletType: WalletType.PROVIDER,
-              },
-            });
-
-            if (!systemWallet) {
-              systemWallet = queryRunner.manager.create(Wallet, {
-                walletType: WalletType.PROVIDER,
-                ownerType: OwnerType.USER,
-                ownerId: systemOwnerId,
-                balance: 0.0,
-                currency: 'EGP',
-              });
-              await queryRunner.manager.save(Wallet, systemWallet);
-            }
-
-            const currentSystemBalance =
-              typeof systemWallet.balance === 'string'
-                ? parseFloat(systemWallet.balance)
-                : systemWallet.balance;
-            systemWallet.balance = currentSystemBalance + platformShareEgp;
-            await queryRunner.manager.save(Wallet, systemWallet);
-
-            const platformTx = queryRunner.manager.create(Transaction, {
-              walletId: systemWallet.id,
-              type: TransactionType.CREDIT,
-              amount: platformShareEgp,
-              reference: `Platform commission for model: ${model.name} from call by user ${callerEmail} (EGP ${platformShareEgp.toFixed(4)})`,
-              status: TransactionStatus.COMPLETED,
-            });
-            await queryRunner.manager.save(Transaction, platformTx);
-          }
-
-          await queryRunner.commitTransaction();
-        } catch (error) {
-          await queryRunner.rollbackTransaction();
-          console.error('[Billing Error] Rollback transaction:', error);
-        } finally {
-          await queryRunner.release();
-        }
-      }
-
-      // Save execution details to ModelLog
-      try {
-        if (validatedOrgApiKey && executionStatus === 'SUCCESS') {
-          await this.orgApiKeyRepository.update(validatedOrgApiKey.id, {
-            lastUsedAt: new Date(),
-          });
-        }
-
-        const callerUser = req.user.orgApiKeyId
-          ? null
-          : await this.dataSource.getRepository(User).findOneBy({
-              id: req.user.id,
-            });
-        const orgApiKey = req.user.orgApiKeyId
-          ? await this.orgApiKeyRepository.findOneBy({
-              id: req.user.orgApiKeyId,
-            })
-          : null;
-        const logEntry = this.modelLogRepository.create({
-          model,
-          user: callerUser,
-          apiKey: req.user.apiKey || req.user.orgApiKeyPrefix || 'JWT Session',
-          orgApiKey,
-          orgId: req.user.orgId ?? null,
-          projectId: req.user.projectId ?? null,
-          apiKeyLabel: req.user.orgApiKeyLabel ?? null,
-          apiKeyPrefix: req.user.orgApiKeyPrefix ?? null,
-          creditsCharged: executionStatus === 'SUCCESS' ? cost : 0,
-          responseTimeMs,
-          status: executionStatus,
-          statusCode,
-          ipAddress: clientMeta.ipAddress,
-          userAgent: clientMeta.userAgent,
-          xForwardedFor: clientMeta.xForwardedFor,
-          requestSizeBytes,
-          responseSizeBytes,
-          payloadHash,
-          errorMessage,
-          injectionMatch,
-        });
-        await this.modelLogRepository.save(logEntry);
-      } catch (logError) {
-        console.error('Failed to save model execution log:', logError);
-      }
+      await this.inferenceClient.recordOutcome({
+        model,
+        actor,
+        clientMeta,
+        data,
+        cost: prepared.cost,
+        providerSharePercent: prepared.providerSharePercent,
+        statusCode: 200,
+        status: 'SUCCESS',
+        responseTimeMs: Date.now() - startTime,
+        errorMessage: null,
+        responseSizeBytes: null,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      await this.inferenceClient.recordOutcome({
+        model,
+        actor,
+        clientMeta,
+        data,
+        cost: prepared.cost,
+        providerSharePercent: prepared.providerSharePercent,
+        statusCode: 500,
+        status: 'FAILED',
+        responseTimeMs: Date.now() - startTime,
+        errorMessage: message.slice(0, 1000),
+        responseSizeBytes: null,
+      });
+      res.status(500).json({ error: `Prediction failed: ${message}` });
     }
   }
 
@@ -1325,49 +865,16 @@ export class ModelsController {
   }
 
   /**
-   * Helper method that polls deployment state until it becomes RUNNING or FAILED.
-   * Used for on-demand cold starts when a model has no active containers.
-   */
-  private async waitForDeployment(
-    deploymentId: string,
-    timeoutMs = 30000,
-  ): Promise<string> {
-    const startTime = Date.now();
-    const interval = 500; // check every 500ms
-
-    while (Date.now() - startTime < timeoutMs) {
-      const dep = await this.deploymentsService.getDeployment(deploymentId);
-      if (dep) {
-        if (dep.status === DeploymentStatus.RUNNING && dep.url) {
-          // Allow 3 seconds for Uvicorn serving process to boot up inside the container
-          await new Promise((resolve) => setTimeout(resolve, 3000));
-          return dep.url;
-        }
-        if (dep.status === DeploymentStatus.FAILED) {
-          throw new BadRequestException(
-            `Auto-deployment failed: ${dep.errorMessage || 'Unknown error'}`,
-          );
-        }
-      }
-      await new Promise((resolve) => setTimeout(resolve, interval));
-    }
-
-    throw new BadRequestException(
-      'Auto-deployment timed out. Please try again.',
-    );
-  }
-
-  /**
    * Submits or updates a consumer rating and comment for a public model.
    * Only consumers who have generated at least one API key for this model can review.
    */
   @UseGuards(JwtAuthGuard)
   @Post(':id/reviews')
   async createOrUpdateReview(
-    @Request() req: any,
+    @Request() req: RequestWithUser,
     @Param('id') id: string,
     @Body() dto: CreateReviewDto,
-  ) {
+  ): Promise<ModelReview> {
     return this.modelsService.createOrUpdateReview(req.user.id, id, dto);
   }
 
@@ -1376,7 +883,10 @@ export class ModelsController {
    */
   @UseGuards(JwtAuthGuard)
   @Delete(':id/reviews')
-  async deleteReview(@Request() req: any, @Param('id') id: string) {
+  async deleteReview(
+    @Request() req: RequestWithUser,
+    @Param('id') id: string,
+  ): Promise<{ success: boolean }> {
     await this.modelsService.deleteReview(req.user.id, id);
     return { success: true };
   }
@@ -1385,7 +895,7 @@ export class ModelsController {
    * Retrieves all user reviews and ratings for a specific model.
    */
   @Get(':id/reviews')
-  async getReviews(@Param('id') id: string) {
+  async getReviews(@Param('id') id: string): Promise<ModelReview[]> {
     return this.modelsService.getReviews(id);
   }
 }
