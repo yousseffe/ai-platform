@@ -112,10 +112,6 @@ except Exception as e:
     print(f"Error loading {framework} model from {model_path}: {e}")
     sys.exit(1)
 
-# Load output schema for response formatting
-from schema_utils import load_output_schema, apply_schema
-output_schema = load_output_schema()
-
 
 @app.post("/predict")
 async def predict(request: Request):
@@ -150,7 +146,6 @@ async def predict(request: Request):
             # Always wrap 1D list in a 2D array for tabular models
             data = [data]
             
-    # Inference
     # Inference
     try:
         prediction_proba = None
@@ -217,11 +212,6 @@ async def predict(request: Request):
         
     if prediction_proba is not None and not postprocess_func:
         result["probabilities"] = prediction_proba
-
-    # Apply output schema enforcement if defined
-    schema_result = apply_schema(result, output_schema)
-    if schema_result is not None:
-        return schema_result
 
     return result
 

@@ -2,19 +2,21 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Key, Terminal, ScrollText, Loader2 } from "lucide-react";
+import { Bot, Key, Terminal, ScrollText, MessageSquare, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { toast } from "react-hot-toast";
 import McpTokenManager from "@/components/admin/McpTokenManager";
 import McpToolConsole from "@/components/admin/McpToolConsole";
 import McpUsageLogs from "@/components/admin/McpUsageLogs";
+import McpChat from "@/components/admin/McpChat";
 
-type Tab = "tokens" | "console" | "logs";
+type Tab = "tokens" | "console" | "chat" | "logs";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "tokens", label: "Token Manager", icon: <Key className="w-3.5 h-3.5" /> },
   { id: "console", label: "Tool Console", icon: <Terminal className="w-3.5 h-3.5" /> },
+  { id: "chat", label: "Chat", icon: <MessageSquare className="w-3.5 h-3.5" /> },
   { id: "logs", label: "Usage Logs", icon: <ScrollText className="w-3.5 h-3.5" /> },
 ];
 
@@ -87,7 +89,7 @@ export default function AdminMcpPage() {
           >
             {tab.icon}
             {tab.label}
-            {tab.id === "console" && activeToken && (
+            {(tab.id === "console" || tab.id === "chat") && activeToken && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             )}
           </button>
@@ -111,6 +113,12 @@ export default function AdminMcpPage() {
               </div>
             )}
             <McpToolConsole activeToken={activeToken} />
+          </div>
+        )}
+
+        {activeTab === "chat" && (
+          <div className="h-[calc(100vh-280px)] flex flex-col">
+            <McpChat activeToken={activeToken} />
           </div>
         )}
 
