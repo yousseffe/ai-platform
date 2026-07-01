@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { PipelineStep, MapperRule } from "@/types";
 import { MapperRuleRow } from "@/lib/schemas";
 import { pathsFromJsonSample } from "@/lib/utils/json-paths";
+import { groupByStage, stepNamespacePath } from "@/lib/utils/pipelines";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -77,9 +78,10 @@ function serialiseRow(row: MapperRuleRow): MapperRule | null {
  */
 function stepOptionLabel(step: PipelineStep): string {
   const modelName = step.modelVersion?.model?.name;
+  const roleSuffix = step.role ? ` [${step.role}]` : "";
   return modelName
-    ? `Step ${step.order} — ${modelName} v${step.modelVersion?.versionNumber ?? ""}`
-    : `Step ${step.order}${step.label ? ` (${step.label})` : ""}`;
+    ? `Step ${step.order}${roleSuffix} — ${modelName} v${step.modelVersion?.versionNumber ?? ""}`
+    : `Step ${step.order}${roleSuffix}${step.label ? ` (${step.label})` : ""}`;
 }
 
 interface MapperEdgeDialogProps {
@@ -109,6 +111,8 @@ export function MapperEdgeDialog({ steps, isSubmitting, onUpsert }: MapperEdgeDi
   const [error, setError] = useState("");
 
   const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
+  const stages = groupByStage(sortedSteps);
+  const stageSizeByOrder = new Map(stages.map((stage) => [stage[0].order, stage.length]));
   const toStepOrder =
     toStepId === BOUNDARY
       ? Infinity
@@ -119,10 +123,13 @@ export function MapperEdgeDialog({ steps, isSubmitting, onUpsert }: MapperEdgeDi
     { value: "previous", label: "Previous Step" },
     ...sortedSteps
       .filter((s) => s.order < toStepOrder)
-      .map((s) => ({
-        value: `steps.${s.order}`,
-        label: `steps.${s.order} — ${s.modelVersion?.model?.name ?? `Step ${s.order}`}`,
-      })),
+      .map((s) => {
+        const path = stepNamespacePath(s, stageSizeByOrder.get(s.order) ?? 1);
+        return {
+          value: path,
+          label: `${path} — ${s.modelVersion?.model?.name ?? `Step ${s.order}`}`,
+        };
+      }),
   ];
 
   const fromSuggestionsForNamespace = (ns: string): string[] => {
@@ -133,8 +140,10 @@ export function MapperEdgeDialog({ steps, isSubmitting, onUpsert }: MapperEdgeDi
       const prevStep = [...sortedSteps].reverse().find((s) => s.order < toStepOrder);
       return pathsFromJsonSample(prevStep?.modelVersion?.expectedResult);
     }
-    const orderStr = ns.replace("steps.", "");
-    const step = sortedSteps.find((s) => String(s.order) === orderStr);
+    const [, orderStr, roleOrId] = ns.split(".");
+    const step = sortedSteps.find(
+      (s) => String(s.order) === orderStr && (!roleOrId || (s.role ?? s.id) === roleOrId),
+    );
     return pathsFromJsonSample(step?.modelVersion?.expectedResult);
   };
 

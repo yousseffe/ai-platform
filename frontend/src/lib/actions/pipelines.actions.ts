@@ -1,7 +1,7 @@
 "use server";
 
 import * as pipelinesService from "@/lib/services/pipelines.service";
-import { Pipeline, PipelineStep, PipelineEdge, PipelineRun } from "@/types";
+import { Pipeline, PipelineStep, PipelineEdge, PipelineRun, PipelineType } from "@/types";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -38,14 +38,16 @@ export async function getPipeline(id: string): Promise<Pipeline | null> {
  *
  * @param name - The pipeline's display name.
  * @param description - Optional long-form explanation of what it does.
+ * @param type - The UI preset for the pipeline's intended shape.
  * @returns A promise resolving to a discriminated union containing the created Pipeline or an error.
  */
 export async function createPipeline(
   name: string,
-  description?: string
+  description?: string,
+  type?: PipelineType
 ): Promise<{ success: true; data: Pipeline } | { success: false; error: string }> {
   try {
-    const res = await pipelinesService.createPipeline(name, description);
+    const res = await pipelinesService.createPipeline(name, description, type);
     revalidatePath("/pipelines");
     return { success: true, data: res };
   } catch (error) {
@@ -55,7 +57,7 @@ export async function createPipeline(
 }
 
 /**
- * Edits a pipeline's name/description.
+ * Edits a pipeline's name/description/type.
  *
  * @param id - The pipeline UUID.
  * @param body - The fields to update.
@@ -63,7 +65,7 @@ export async function createPipeline(
  */
 export async function updatePipeline(
   id: string,
-  body: { name?: string; description?: string }
+  body: { name?: string; description?: string; type?: PipelineType }
 ): Promise<{ success: true; data: Pipeline } | { success: false; error: string }> {
   try {
     const res = await pipelinesService.updatePipeline(id, body);
@@ -127,6 +129,7 @@ export async function addPipelineStep(
     order: number;
     modelVersionId: string;
     label?: string;
+    role?: string;
     pinPolicy?: string;
     maxRetries?: number;
   }

@@ -49,6 +49,7 @@ export class PipelineStepsService {
       pipeline,
       order: dto.order,
       label: dto.label ?? null,
+      role: dto.role ?? null,
       modelVersion,
       pinPolicy: dto.pinPolicy ?? PipelinePinPolicy.PINNED,
       timeoutMs: dto.timeoutMs ?? null,
@@ -80,6 +81,7 @@ export class PipelineStepsService {
 
     if (dto.order !== undefined) step.order = dto.order;
     if (dto.label !== undefined) step.label = dto.label;
+    if (dto.role !== undefined) step.role = dto.role;
     if (dto.pinPolicy !== undefined) step.pinPolicy = dto.pinPolicy;
     if (dto.timeoutMs !== undefined) step.timeoutMs = dto.timeoutMs;
     if (dto.maxRetries !== undefined) step.maxRetries = dto.maxRetries;

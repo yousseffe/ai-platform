@@ -12,10 +12,12 @@ import { PipelineStepSource } from '../enums/pipeline-step-source.enum';
 import { PipelinePinPolicy } from '../enums/pipeline-pin-policy.enum';
 
 /**
- * One node in a pipeline's chain: a model call. The model behind a step can
- * come from an upload made while building the pipeline (`NEW_UPLOAD`) or a
- * reference to an already-uploaded model the user or marketplace owns
- * (`EXISTING`) — both ultimately resolve to a `modelVersion`.
+ * One node in a pipeline: a model call. Steps are grouped into stages by
+ * `order` — a stage with multiple steps runs them concurrently as parallel
+ * branches. The model behind a step can come from an upload made while
+ * building the pipeline (`NEW_UPLOAD`) or a reference to an already-uploaded
+ * model the user or marketplace owns (`EXISTING`) — both ultimately resolve
+ * to a `modelVersion`.
  */
 @Entity('pipeline_steps')
 export class PipelineStep {
@@ -34,7 +36,9 @@ export class PipelineStep {
   pipeline: Pipeline;
 
   /**
-   * 0-based position of this step within the pipeline's linear chain.
+   * 0-based stage index. Steps sharing the same `order` within a pipeline
+   * execute concurrently as parallel branches of that stage; stages
+   * themselves still run in ascending `order`.
    */
   @Column()
   order: number;
@@ -44,6 +48,15 @@ export class PipelineStep {
    */
   @Column({ type: 'varchar', nullable: true })
   label: string | null;
+
+  /**
+   * Disambiguates this step from its siblings when its stage (`order`) has
+   * more than one step — e.g. `"summarizer"`, `"classifier"`. Used to key
+   * this step's output under `steps.<order>.<role>` in mapper contexts.
+   * Required only when a stage has multiple steps (enforced at validation).
+   */
+  @Column({ type: 'varchar', nullable: true })
+  role: string | null;
 
   /**
    * Provenance of the model this step calls: a fresh upload bound during

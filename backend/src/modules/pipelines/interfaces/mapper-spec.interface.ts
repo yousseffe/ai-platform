@@ -44,14 +44,23 @@ export interface MapperSpec {
 }
 
 /**
- * Everything a mapper rule can read from when transforming the payload for
- * one edge. Rule `from`/`template` paths are namespaced against this object:
+ * Everything a mapper rule can read from when transforming the payload
+ * crossing one edge. Rule `from`/`template` paths are namespaced against this
+ * object:
  * - `input.*` — the pipeline run's original external input, available at every edge
- * - `previous.*` — the immediately-upstream step's output (or `input` itself
- *   for the edge feeding the first step)
- * - `steps.<order>.*` — any earlier step's output, keyed by its 0-based `order`,
- *   so a step (or the pipeline's final output) can combine fields from
- *   multiple non-adjacent steps, not just the one directly before it
+ * - `previous.*` — this edge's own upstream step's output (or `input` itself
+ *   when the edge's `fromStep` is null)
+ * - `steps.<order>.*` — any earlier stage's output, keyed by its 0-based
+ *   `order`. When that stage has exactly one step, `steps.<order>` is that
+ *   step's output directly (`steps.<order>.fieldName`). When the stage has
+ *   multiple parallel steps, it's nested one level deeper by each step's
+ *   `role` (`steps.<order>.<role>.fieldName`) so a downstream "join" step —
+ *   or the pipeline's final output — can address one specific branch by name.
+ *
+ * A step (or the pipeline's output) with more than one inbound edge applies
+ * each edge independently against its own `previous`/`steps` context and
+ * shallow-merges the results — this is how parallel branches, each with
+ * their own from/to mapper, combine into one join step's input.
  */
 export interface MapperContext {
   input: Record<string, unknown>;

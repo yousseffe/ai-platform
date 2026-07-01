@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsUUID,
   Min,
+  MaxLength,
 } from 'class-validator';
 import { PipelinePinPolicy } from '../enums/pipeline-pin-policy.enum';
 
@@ -22,6 +23,12 @@ export class UpdateStepDto {
   @IsString()
   @IsOptional()
   label?: string;
+
+  /** Disambiguates this step from its stage siblings when parallel. */
+  @IsString()
+  @IsOptional()
+  @MaxLength(64)
+  role?: string;
 
   @IsEnum(PipelinePinPolicy)
   @IsOptional()

@@ -14,8 +14,11 @@ import { MapperSpec } from '../interfaces/mapper-spec.interface';
 /**
  * The transform applied between two steps. A null `fromStep` represents the
  * pipeline's external input; a null `toStep` represents its external output.
- * The `spec` is interpreted by {@link MapperEngineService} — it is never
- * executed as code.
+ * A step (or the external output) may have more than one inbound edge — each
+ * is applied independently and the results are merged, which is how a
+ * fan-in "join" step combines multiple parallel branches, each with its own
+ * from/to mapper. The `spec` is interpreted by {@link MapperEngineService} —
+ * it is never executed as code.
  */
 @Entity('pipeline_edges')
 export class PipelineEdge {

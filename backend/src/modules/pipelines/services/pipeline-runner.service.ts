@@ -4,17 +4,17 @@ import { Repository } from 'typeorm';
 import { PipelineRun } from '../entities/pipeline-run.entity';
 import { PipelineEdge } from '../entities/pipeline-edge.entity';
 import { PipelineRunStatus } from '../enums/pipeline-run-status.enum';
-import { MapperEngineService } from './mapper-engine.service';
 import { PipelineStepLoopService } from './pipeline-step-loop.service';
 import { PipelineRunPersistenceService } from './pipeline-run-persistence.service';
 import { buildPipelineRunActor } from './pipeline-run-actor.util';
-import { MapperContext } from '../interfaces/mapper-spec.interface';
 import { ClientRequestMeta } from '../../models/interfaces/inference.interface';
 
 /**
  * Executes a {@link PipelineRun}: loads the pipeline's steps and edges,
- * delegates the step-by-step walk to {@link PipelineStepLoopService}, then
- * applies the pipeline's output mapper and finalizes the run record.
+ * delegates the stage-by-stage walk to {@link PipelineStepLoopService}, then
+ * resolves the pipeline's final output — merging every edge that targets the
+ * pipeline's external output the same way a fan-in join step would — and
+ * finalizes the run record.
  */
 @Injectable()
 export class PipelineRunnerService {
@@ -25,7 +25,6 @@ export class PipelineRunnerService {
     private readonly runRepository: Repository<PipelineRun>,
     @InjectRepository(PipelineEdge)
     private readonly edgeRepository: Repository<PipelineEdge>,
-    private readonly mapperEngine: MapperEngineService,
     private readonly stepLoop: PipelineStepLoopService,
     private readonly persistence: PipelineRunPersistenceService,
   ) {}
@@ -105,17 +104,13 @@ export class PipelineRunnerService {
       return;
     }
 
-    const lastStep = steps[steps.length - 1];
-    const outboundEdge =
-      edges.find((e) => e.fromStep?.id === lastStep.id && !e.toStep) ?? null;
-    const outputContext: MapperContext = {
-      input: run.input,
-      previous: outcome.payload,
-      steps: outcome.stepOutputs,
-    };
-    const finalOutput = this.mapperEngine.apply(
-      outboundEdge?.spec,
-      outputContext,
+    const finalOutput = this.stepLoop.resolveMappedInput(
+      null,
+      outcome.lastStageOrder + 1,
+      steps,
+      edges,
+      outcome.stepOutputs,
+      run.input,
     );
 
     await this.persistence.finishRun(

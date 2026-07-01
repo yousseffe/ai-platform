@@ -10,12 +10,16 @@ import {
 import { User } from '../../users/entities/user.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
 import { PipelineStatus } from '../enums/pipeline-status.enum';
+import { PipelineType } from '../enums/pipeline-type.enum';
 import { PipelineStep } from './pipeline-step.entity';
 import { PipelineRun } from './pipeline-run.entity';
 
 /**
- * A reusable, ordered chain of model-calling steps. The output of one step is
- * transformed by a {@link PipelineEdge} mapper into the input of the next.
+ * A reusable chain of model-calling steps, grouped into stages. The output of
+ * a stage is transformed by one or more {@link PipelineEdge} mappers into the
+ * input of the next stage — steps sharing a stage run concurrently, so the
+ * same edge-based mapper mechanism expresses sequential, context-augmented,
+ * and parallel/fan-out-fan-in shapes alike.
  */
 @Entity('pipelines')
 export class Pipeline {
@@ -58,6 +62,18 @@ export class Pipeline {
     default: PipelineStatus.DRAFT,
   })
   status: PipelineStatus;
+
+  /**
+   * UI preset describing the pipeline's intended shape (sequential,
+   * context-augmented, or parallel). Metadata only — does not change how the
+   * pipeline is executed or validated.
+   */
+  @Column({
+    type: 'varchar',
+    enum: PipelineType,
+    default: PipelineType.SEQUENTIAL_CHAIN,
+  })
+  type: PipelineType;
 
   /**
    * Increments on every edit; recorded on each {@link PipelineRun} for

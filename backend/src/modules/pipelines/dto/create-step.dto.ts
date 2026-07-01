@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsUUID,
   Min,
+  MaxLength,
 } from 'class-validator';
 import { PipelinePinPolicy } from '../enums/pipeline-pin-policy.enum';
 
@@ -15,7 +16,10 @@ import { PipelinePinPolicy } from '../enums/pipeline-pin-policy.enum';
  * first, then adding the resulting version's ID here.
  */
 export class CreateStepDto {
-  /** 0-based position of this step within the pipeline's chain. */
+  /**
+   * 0-based stage index. Steps added with the same `order` as an existing
+   * step run concurrently as parallel branches of that stage.
+   */
   @IsInt()
   @Min(0)
   order: number;
@@ -28,6 +32,16 @@ export class CreateStepDto {
   @IsString()
   @IsOptional()
   label?: string;
+
+  /**
+   * Disambiguates this step from its stage siblings when it's one of
+   * several parallel branches sharing the same `order`. Required (checked
+   * at validation time) whenever a stage has more than one step.
+   */
+  @IsString()
+  @IsOptional()
+  @MaxLength(64)
+  role?: string;
 
   /** Whether to pin to the exact version above or always use the latest READY one. */
   @IsEnum(PipelinePinPolicy)

@@ -28,19 +28,21 @@ export function usePipelineBuilder(pipelineId: string) {
   const [error, setError] = useState("");
 
   /**
-   * Adds a step bound to the selected model version, appended at the end of the chain.
+   * Adds a step bound to the selected model version, either starting a new
+   * stage or joining an existing one as a parallel branch.
    *
    * @param input - The validated step form values.
-   * @param nextOrder - The 0-based position to insert this step at.
+   * @param order - The 0-based stage index this step belongs to.
    */
-  const handleAddStep = async (input: CreateStepInput, nextOrder: number) => {
+  const handleAddStep = async (input: CreateStepInput, order: number) => {
     setError("");
     setIsSubmitting(true);
     try {
       const res = await addPipelineStep(pipelineId, {
-        order: nextOrder,
+        order,
         modelVersionId: input.modelVersionId,
         label: input.label,
+        role: input.role,
         pinPolicy: input.pinPolicy,
         maxRetries: input.maxRetries,
       });

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Pipeline, PipelineRun, PipelineEdge, PipelineStatus } from "@/types";
+import { Pipeline, PipelineRun, PipelineEdge, PipelineStatus, PipelineType } from "@/types";
 import { usePipelineBuilder } from "@/hooks/use-pipeline-builder";
 import { usePipelineRuns } from "@/hooks/use-pipeline-runs";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,13 @@ interface PipelineDetailsClientProps {
   edges: PipelineEdge[];
   readyVersionOptions: ReadyVersionOption[];
 }
+
+/** Short display label for each pipeline-type preset, for the header badge. */
+const PIPELINE_TYPE_LABELS: Record<PipelineType, string> = {
+  [PipelineType.SEQUENTIAL_CHAIN]: "Sequential",
+  [PipelineType.CONTEXT_AUGMENTED]: "Context-Augmented",
+  [PipelineType.PARALLEL]: "Parallel",
+};
 
 /**
  * Client orchestration component for the Pipeline builder/run view. Wires
@@ -53,6 +60,9 @@ export function PipelineDetailsClient({ pipeline, runs, edges, readyVersionOptio
             <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border font-bold text-[10px] font-mono">
               v{pipeline.version}
             </span>
+            <span className="px-2 py-0.5 rounded bg-secondary text-secondary-foreground border border-border font-bold text-[10px] font-mono">
+              {PIPELINE_TYPE_LABELS[pipeline.type]}
+            </span>
           </div>
           {pipeline.description && (
             <p className="text-xs text-muted-foreground mt-1 font-mono">{pipeline.description}</p>
@@ -76,6 +86,7 @@ export function PipelineDetailsClient({ pipeline, runs, edges, readyVersionOptio
 
       <PipelineStepsPanel
         steps={steps}
+        pipelineType={pipeline.type}
         readyVersionOptions={readyVersionOptions}
         isSubmitting={builder.isSubmitting}
         onAddStep={builder.handleAddStep}

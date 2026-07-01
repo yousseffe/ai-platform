@@ -1,5 +1,5 @@
 import { smartFetch } from "@/lib/utils/smart-fetch";
-import { Pipeline, PipelineStep, PipelineEdge, PipelineRun } from "@/types";
+import { Pipeline, PipelineStep, PipelineEdge, PipelineRun, PipelineType } from "@/types";
 
 /**
  * Fetches all pipelines owned by the authenticated user.
@@ -29,17 +29,22 @@ export async function getPipeline(id: string): Promise<Pipeline> {
  *
  * @param name - The pipeline's display name.
  * @param description - Optional long-form explanation of what it does.
+ * @param type - The UI preset for the pipeline's intended shape. Defaults to a sequential chain.
  * @returns A promise resolving to the created Pipeline.
  */
-export async function createPipeline(name: string, description?: string): Promise<Pipeline> {
+export async function createPipeline(
+  name: string,
+  description?: string,
+  type?: PipelineType
+): Promise<Pipeline> {
   return smartFetch<Pipeline>("/pipelines", {
     method: "POST",
-    body: JSON.stringify({ name, description }),
+    body: JSON.stringify({ name, description, type }),
   });
 }
 
 /**
- * Edits a pipeline's name/description.
+ * Edits a pipeline's name/description/type.
  *
  * @param id - The pipeline UUID.
  * @param body - The fields to update.
@@ -47,7 +52,7 @@ export async function createPipeline(name: string, description?: string): Promis
  */
 export async function updatePipeline(
   id: string,
-  body: { name?: string; description?: string }
+  body: { name?: string; description?: string; type?: PipelineType }
 ): Promise<Pipeline> {
   return smartFetch<Pipeline>(`/pipelines/${id}`, {
     method: "PATCH",
@@ -93,6 +98,7 @@ export async function addPipelineStep(
     order: number;
     modelVersionId: string;
     label?: string;
+    role?: string;
     pinPolicy?: string;
     maxRetries?: number;
   }
@@ -118,6 +124,7 @@ export async function updatePipelineStep(
     order: number;
     modelVersionId: string;
     label: string;
+    role: string;
     pinPolicy: string;
     maxRetries: number;
   }>

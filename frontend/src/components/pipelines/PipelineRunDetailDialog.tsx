@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { Split } from "lucide-react";
 import { getPipelineRun } from "@/lib/actions/pipelines.actions";
-import { PipelineRun, PipelineStepRunStatus } from "@/types";
+import { PipelineRun, PipelineStepRun, PipelineStepRunStatus } from "@/types";
+import { groupByStage } from "@/lib/utils/pipelines";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface PipelineRunDetailDialogProps {
@@ -70,32 +72,22 @@ export function PipelineRunDetailDialog({ runId, onOpenChange }: PipelineRunDeta
               </div>
             )}
 
-            {(run.stepRuns ?? [])
-              .slice()
-              .sort((a, b) => a.order - b.order)
-              .map((stepRun) => (
-                <div key={stepRun.id} className="border border-border rounded-lg p-3 bg-background space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${getStepStatusDotClass(stepRun.status)}`} />
-                      <span className="font-bold text-foreground">
-                        {stepRun.step?.label || `Step ${stepRun.order}`}
-                      </span>
-                    </div>
-                    <span className="text-muted-foreground">
-                      {stepRun.responseTimeMs != null ? `${stepRun.responseTimeMs}ms` : ""} · {stepRun.cost} credits
-                    </span>
+            {groupByStage(run.stepRuns ?? []).map((stage) => (
+              <div key={stage[0].order}>
+                {stage.length > 1 && (
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary mb-1.5">
+                    <Split className="w-3 h-3" /> Parallel — Stage {stage[0].order}
                   </div>
-                  {stepRun.errorMessage && (
-                    <p className="text-destructive">{stepRun.errorMessage}</p>
-                  )}
-                  {stepRun.output && (
-                    <pre className="bg-[#0b0c0e] text-slate-300 rounded p-2 overflow-x-auto text-[10px]">
-                      {JSON.stringify(stepRun.output, null, 2)}
-                    </pre>
-                  )}
+                )}
+                <div className={stage.length > 1 ? "flex flex-col md:flex-row gap-2" : undefined}>
+                  {stage.map((stepRun) => (
+                    <div key={stepRun.id} className="flex-1 min-w-0 border border-border rounded-lg p-3 bg-background space-y-2">
+                      <StepRunCard stepRun={stepRun} />
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            ))}
 
             {run.output && (
               <div>
@@ -109,5 +101,34 @@ export function PipelineRunDetailDialog({ runId, onOpenChange }: PipelineRunDeta
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * One step run's status, timing, and output (or error) within the trace.
+ *
+ * @param props.stepRun - The step run to render.
+ */
+function StepRunCard({ stepRun }: { stepRun: PipelineStepRun }) {
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${getStepStatusDotClass(stepRun.status)}`} />
+          <span className="font-bold text-foreground">
+            {stepRun.step?.label || stepRun.step?.role || `Step ${stepRun.order}`}
+          </span>
+        </div>
+        <span className="text-muted-foreground">
+          {stepRun.responseTimeMs != null ? `${stepRun.responseTimeMs}ms` : ""} · {stepRun.cost} credits
+        </span>
+      </div>
+      {stepRun.errorMessage && <p className="text-destructive">{stepRun.errorMessage}</p>}
+      {stepRun.output && (
+        <pre className="bg-[#0b0c0e] text-slate-300 rounded p-2 overflow-x-auto text-[10px]">
+          {JSON.stringify(stepRun.output, null, 2)}
+        </pre>
+      )}
+    </>
   );
 }
