@@ -29,7 +29,7 @@ export function securityModule(): McpModule {
           {
             title: 'Get model risk report',
             description:
-              'Return the deterministic fraud/abuse risk report for a model the caller owns: current risk score, threat class, recent findings (rules + evidence), recommendations, and the traffic baseline.',
+              'Return the deterministic fraud/abuse risk report for a model the caller owns: current risk score, threat class, recent findings (rules + evidence), recommendations, the traffic baseline, and the model reviews/ratings summary.',
             inputSchema: { modelId: z.string().describe('Model UUID') },
           },
           async ({ modelId }) => {

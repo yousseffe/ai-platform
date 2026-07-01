@@ -6,6 +6,7 @@ import { Model } from '../models/entities/model.entity';
 import { Alert } from '../analytics/entities/alert.entity';
 import { MailModule } from '../../shared/mail/mail.module';
 import { AuthModule } from '../auth/auth.module';
+import { UsersModule } from '../users/users.module';
 import { RiskBaseline } from './entities/risk-baseline.entity';
 import { RiskEvent } from './entities/risk-event.entity';
 import { FraudService } from './services/fraud.service';
@@ -22,6 +23,7 @@ import { FraudController } from './controllers/fraud.controller';
     BullModule.registerQueue({ name: 'fraud-queue' }),
     MailModule,
     AuthModule,
+    UsersModule,
   ],
   controllers: [FraudController],
   providers: [FraudService, FraudProcessor],

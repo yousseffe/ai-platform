@@ -3,7 +3,10 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Model } from '../../models/entities/model.entity';
 
 /**
  * Entity representing a hashed API key bound to a specific project and organization.
@@ -24,6 +27,11 @@ export class OrgApiKey {
   /** UUID of the organization. Denormalized for fast guard lookups. */
   @Column({ name: 'org_id', type: 'uuid' })
   orgId: string;
+
+  /** Optional model scope. Legacy keys may be null; new keys should target one model. */
+  @ManyToOne(() => Model, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'model_id' })
+  model: Model | null;
 
   /** SHA-256 hash of the raw API key. Used for secure lookups. */
   @Column({ name: 'key_hash', type: 'varchar', unique: true })

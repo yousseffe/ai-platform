@@ -1,8 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ModelsService } from './models.service';
 import { ModelVersion } from '../entities/model-version.entity';
 import { ModelType } from '../enums/model-type.enum';
 import { VersionStatus } from '../enums/version-status.enum';
+import { BillingUnit, getBillingUnit } from '../enums/billing-unit.enum';
+import { SystemConfig } from '../../wallets/entities/system-config.entity';
 
 /**
  * A consumer-facing description of how to call a deployed model's prediction API.
@@ -17,6 +21,8 @@ export interface ModelIntegrationSpec {
     taskType: string;
     description: string | null;
     isPublic: boolean;
+    averageRating: number;
+    reviewCount: number;
   };
   endpoint: {
     method: 'POST';
@@ -41,8 +47,15 @@ export interface ModelIntegrationSpec {
   };
   classLabels: Record<string, any> | null;
   pricing: {
-    creditsPerRequest: number;
+    billingUnit: BillingUnit;
     currency: 'CREDITS';
+    /** Credits per 1M input tokens — present only for LLM_GGUF models. */
+    inputCreditsPerMToken?: number;
+    /** Credits per 1M output tokens — present only for LLM_GGUF models. */
+    outputCreditsPerMToken?: number;
+    /** Credits per request/prediction — present for non-LLM models. */
+    creditsPerRequest?: number;
+    note: string;
   };
   notes: string[];
 }
@@ -55,7 +68,11 @@ export interface ModelIntegrationSpec {
  */
 @Injectable()
 export class ModelIntegrationService {
-  constructor(private readonly modelsService: ModelsService) {}
+  constructor(
+    private readonly modelsService: ModelsService,
+    @InjectRepository(SystemConfig)
+    private readonly systemConfigRepository: Repository<SystemConfig>,
+  ) {}
 
   /**
    * Builds the {@link ModelIntegrationSpec} for a model the actor may access.
@@ -96,6 +113,8 @@ export class ModelIntegrationService {
         taskType: model.taskType,
         description: model.description,
         isPublic: model.isPublic,
+        averageRating: Number(model.averageRating ?? 0.0),
+        reviewCount: Number(model.reviewCount ?? 0),
       },
       endpoint: {
         method: 'POST',
@@ -111,10 +130,7 @@ export class ModelIntegrationService {
       request: this.parseSample(version.examplePayload),
       response: this.parseSample(version.expectedResult),
       classLabels: version.classLabels || null,
-      pricing: {
-        creditsPerRequest: Number(model.costPerRequest) || 0,
-        currency: 'CREDITS',
-      },
+      pricing: await this.buildPricingSpec(model),
       notes: this.buildNotes(isLlm),
     };
   }
@@ -163,7 +179,9 @@ export class ModelIntegrationService {
     const notes = [
       'Send requests with header "Content-Type: application/json".',
       'The model auto-deploys on first call; the initial request may take longer while the container starts.',
-      'Each successful prediction debits the configured credits from the caller wallet.',
+      isLlm
+        ? 'Each successful prediction debits credits based on token usage (input and output tokens are billed at separate rates per 1M tokens).'
+        : 'Each successful prediction debits the configured credits from the caller wallet.',
     ];
     if (isLlm) {
       notes.push(
@@ -171,5 +189,53 @@ export class ModelIntegrationService {
       );
     }
     return notes;
+  }
+
+  /**
+   * Builds the pricing descriptor for the integration spec. LLM_GGUF models use
+   * token-based pricing (separate input/output rates); all other types use a flat
+   * per-request or per-prediction rate.
+   */
+  private async buildPricingSpec(model: {
+    type: string;
+    costPerRequest: number;
+    hasCustomPricing: boolean;
+  }): Promise<ModelIntegrationSpec['pricing']> {
+    const isLlm = model.type === ModelType.LLM_GGUF;
+    const billingUnit = getBillingUnit(model.type);
+
+    if (isLlm) {
+      const [inputConfig, outputConfig] = await Promise.all([
+        this.systemConfigRepository.findOne({ where: { key: 'price_llm_gguf_input' } }),
+        this.systemConfigRepository.findOne({ where: { key: 'price_llm_gguf_output' } }),
+      ]);
+      return {
+        billingUnit,
+        inputCreditsPerMToken: inputConfig ? parseFloat(inputConfig.value) : 2.0,
+        outputCreditsPerMToken: outputConfig ? parseFloat(outputConfig.value) : 8.0,
+        currency: 'CREDITS',
+        note: 'Input and output tokens billed at separate rates per 1M tokens processed.',
+      };
+    }
+
+    const creditsPerRequest = model.hasCustomPricing
+      ? Number(model.costPerRequest) || 0
+      : await this.getDefaultPrice(model.type);
+
+    return {
+      billingUnit,
+      creditsPerRequest,
+      currency: 'CREDITS',
+      note: `Billed per ${billingUnit === BillingUnit.PER_IMAGE ? 'image' : 'prediction'}.`,
+    };
+  }
+
+  /**
+   * Retrieves the system-default price for a given model type from system_configs.
+   */
+  private async getDefaultPrice(modelType: string): Promise<number> {
+    const key = 'price_' + modelType.toLowerCase();
+    const config = await this.systemConfigRepository.findOne({ where: { key } });
+    return config ? parseFloat(config.value) : 0.1;
   }
 }

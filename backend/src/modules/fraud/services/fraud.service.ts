@@ -84,7 +84,14 @@ export class FraudService {
     modelId: string,
     modelLogs: ModelLog[],
   ): Promise<boolean> {
-    const features = aggregateFeatures(modelId, modelLogs, WINDOW_MINUTES);
+    const model = modelLogs[0]?.model ?? null;
+    const features = aggregateFeatures(
+      modelId,
+      modelLogs,
+      WINDOW_MINUTES,
+      model ? Number(model.averageRating ?? 0.0) : undefined,
+      model ? Number(model.reviewCount ?? 0) : undefined,
+    );
 
     let baseline = await this.baselineRepository.findOne({ where: { modelId } });
     const prior = {
@@ -214,6 +221,55 @@ export class FraudService {
   }
 
   /**
+   * Returns recent risk events across ALL models — admin-only, no ownership check.
+   *
+   * @param limit - Maximum number of events to return (default 50).
+   * @returns Array of recent risk events with modelId and threat metadata.
+   */
+  async getAdminRiskEvents(limit = 50): Promise<unknown[]> {
+    return this.riskEventRepository.find({
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  /**
+   * Returns a risk report for any model — admin-only, bypasses ownership check.
+   *
+   * @param modelId - Target model UUID.
+   * @returns The risk report with model name and owner email included.
+   * @throws {NotFoundException} If the model does not exist.
+   */
+  async getAdminRiskReport(modelId: string): Promise<unknown> {
+    const model = await this.modelLogRepository.manager
+      .getRepository(Model)
+      .findOne({ where: { id: modelId }, relations: ['user'] });
+    if (!model) throw new NotFoundException('Model not found');
+
+    const [events, baseline] = await Promise.all([
+      this.riskEventRepository.find({
+        where: { modelId },
+        order: { createdAt: 'DESC' },
+        take: 20,
+      }),
+      this.baselineRepository.findOne({ where: { modelId } }),
+    ]);
+
+    const latest = events[0];
+    return {
+      modelId,
+      modelName: model.name,
+      ownerEmail: model.user?.email ?? null,
+      currentRiskScore: latest ? latest.riskScore : 0,
+      currentThreatClass: latest ? latest.threatClass : null,
+      averageRating: Number(model.averageRating ?? 0.0),
+      reviewCount: Number(model.reviewCount ?? 0),
+      baseline,
+      events,
+    };
+  }
+
+  /**
    * Returns a risk report for a model the actor owns: recent findings and the
    * current baseline.
    *
@@ -246,6 +302,8 @@ export class FraudService {
       modelId,
       currentRiskScore: latest ? latest.riskScore : 0,
       currentThreatClass: latest ? latest.threatClass : null,
+      averageRating: Number(model.averageRating ?? 0.0),
+      reviewCount: Number(model.reviewCount ?? 0),
       baseline,
       events,
     };

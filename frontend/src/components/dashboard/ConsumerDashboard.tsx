@@ -21,7 +21,7 @@ interface ConsumerDashboardProps {
  * Refactored for clean Expo Go console aesthetics.
  */
 export default function ConsumerDashboard({ logs }: ConsumerDashboardProps) {
-  const { balance } = useWorkspace();
+  const { balance, canAccessBilling } = useWorkspace();
 
   return (
     <div className="w-full space-y-5 animate-fade-in text-foreground font-sans">
@@ -67,16 +67,22 @@ export default function ConsumerDashboard({ logs }: ConsumerDashboardProps) {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Consumer Balance</p>
-                <CardTitle className="text-2xl font-extrabold text-foreground border-none p-0 h-auto mt-1 tracking-tight">${balance.toFixed(2)}</CardTitle>
+                <CardTitle className="text-2xl font-extrabold text-foreground border-none p-0 h-auto mt-1 tracking-tight">
+                  {canAccessBilling ? balance.toFixed(2) : "Restricted"}
+                </CardTitle>
               </div>
               <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/15">
                 <Coins className="w-4 h-4" strokeWidth={2} />
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-border/40">
-              <Link href="/settings" className="text-xs text-primary font-bold hover:underline flex items-center gap-1">
-                Top Up Balance <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
+              {canAccessBilling ? (
+                <Link href="/settings" className="text-xs text-primary font-bold hover:underline flex items-center gap-1">
+                  Top Up Balance <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+              ) : (
+                <p className="text-[10px] text-muted-foreground font-mono">Only organization owners can view shared billing.</p>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -45,6 +45,16 @@ export default function ApiKeyRow({ apiKey, onRevoke, canRevoke }: ApiKeyRowProp
           </div>
           <div>
             <span className="text-sm font-semibold text-foreground">{apiKey.label}</span>
+            {apiKey.model && (
+              <p className="mt-1 text-xs text-foreground/80">
+                {apiKey.model.name}
+                {(apiKey.model.framework || apiKey.model.type) && (
+                  <span className="text-muted-foreground">
+                    {" "}· {[apiKey.model.framework, apiKey.model.type].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </p>
+            )}
             <p className="mt-1 text-[11px] text-muted-foreground">
               Created {new Date(apiKey.createdAt).toLocaleDateString("en-US", {
                 month: "short",

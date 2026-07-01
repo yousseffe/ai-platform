@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { buttonVariants } from "@/components/ui/button";
 import { Model, DeploymentStatus, ModelLog } from "@/types";
 import { InferenceLogsTable } from "./InferenceLogsTable";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 interface PublisherDashboardProps {
   models: Model[];
@@ -29,6 +30,7 @@ export default function PublisherDashboard({
   balance,
   logs,
 }: PublisherDashboardProps) {
+  const { canAccessBilling } = useWorkspace();
   const [currentPage, setCurrentPage] = React.useState(1);
   const [prevLength, setPrevLength] = React.useState(models.length);
 
@@ -135,16 +137,22 @@ export default function PublisherDashboard({
             <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Earned Revenue</p>
-                <h3 className="text-2xl font-extrabold text-foreground tracking-tight">${balance.toFixed(2)}</h3>
+                <h3 className="text-2xl font-extrabold text-foreground tracking-tight">
+                  {canAccessBilling ? `$${balance.toFixed(2)}` : "Restricted"}
+                </h3>
               </div>
               <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/15 shadow-2xs">
                 <TrendingUp className="w-4 h-4" strokeWidth={2} />
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-border/40">
-              <Link href="/settings/billing" className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/95 font-bold hover:underline">
-                Withdraw & Manage Earnings <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
+              {canAccessBilling ? (
+                <Link href="/settings/billing" className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/95 font-bold hover:underline">
+                  Withdraw & Manage Earnings <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+              ) : (
+                <p className="text-[10px] text-muted-foreground font-mono">Only organization owners can view shared billing.</p>
+              )}
             </div>
           </CardContent>
         </Card>

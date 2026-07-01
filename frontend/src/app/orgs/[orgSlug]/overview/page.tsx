@@ -63,7 +63,7 @@ export default function OrgOverviewPage() {
     { label: "Projects", value: stats?.projectCount ?? "—", icon: <FolderKanban className="w-4 h-4" strokeWidth={1.8} />, tone: "primary" as const, caption: "Consumer app workspaces", show: showConsumer },
     { label: "Models Published", value: stats?.modelCount ?? "—", icon: <Layers className="w-4 h-4" strokeWidth={1.8} />, tone: "emerald" as const, caption: "Organization-owned provider registry", show: showProvider },
     { label: "Credits Balance", value: stats ? `${stats.consumerBalance.toLocaleString()} cr` : "—", icon: <Coins className="w-4 h-4" strokeWidth={1.8} />, tone: "amber" as const, caption: "Shared consumer wallet", show: showConsumer && can(OrgAction.VIEW_BILLING) },
-    { label: "Total Earnings", value: stats ? `${stats.totalEarnings.toLocaleString()} cr` : "—", icon: <TrendingUp className="w-4 h-4" strokeWidth={1.8} />, tone: "emerald" as const, caption: "Provider wallet balance", show: showProvider && can(OrgAction.VIEW_BILLING) },
+    { label: "Total Earnings", value: stats ? `${stats.totalEarnings.toLocaleString()} EGP` : "—", icon: <TrendingUp className="w-4 h-4" strokeWidth={1.8} />, tone: "emerald" as const, caption: "Provider wallet balance", show: showProvider && can(OrgAction.VIEW_BILLING) },
   ].filter((c) => c.show);
 
   return (

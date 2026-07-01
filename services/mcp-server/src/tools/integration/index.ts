@@ -5,6 +5,7 @@ import { jsonResult, errorResult } from '../../result.js';
 import { analyzeRepository } from '../../analyzers/repo-analyzer.js';
 import { getProviderMetadata } from '../../knowledge/providers.js';
 import { requireScope } from '../../auth/scope.js';
+import { prepareModelUpload } from '../../analyzers/upload-preparer.js';
 
 interface PlatformModel {
   id: string;
@@ -18,6 +19,8 @@ interface PlatformModel {
   tier?: string;
   marketplaceVerified?: boolean;
   createdAt?: string;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 /**
@@ -37,6 +40,8 @@ function compactModel(m: PlatformModel): Record<string, unknown> {
     tier: m.tier ?? 'SMALL',
     marketplaceVerified: m.marketplaceVerified ?? false,
     createdAt: m.createdAt ?? null,
+    averageRating: m.averageRating !== undefined ? Number(m.averageRating) : 0.0,
+    reviewCount: m.reviewCount !== undefined ? Number(m.reviewCount) : 0,
   };
 }
 
@@ -98,7 +103,47 @@ export function integrationModule(): McpModule {
             return jsonResult(getProviderMetadata(provider, framework));
           },
         );
+
+        server.registerTool(
+          'integration_prepare_model_upload',
+          {
+            title: 'Prepare model upload',
+            description:
+              'Scan model files metadata and scripts content, execute schema/metadata checks, and generate suggested names, tags, and deployment parameters.',
+            inputSchema: {
+              files: z
+                .array(
+                  z.object({
+                    path: z.string().describe('File path relative to the model root directory'),
+                    size: z.number().describe('File size in bytes'),
+                    content: z
+                      .string()
+                      .optional()
+                      .describe('Text content of custom pre/post processing script files'),
+                  }),
+                )
+                .describe('The list of files and metadata in the model folder to prepare'),
+              modelTypeHint: z
+                .string()
+                .optional()
+                .describe('Optional hint for model type classification (e.g. NLP, TABULAR, VISION, DIFFUSION, LLM_GGUF)'),
+            },
+          },
+          async ({ files, modelTypeHint }) => {
+            const scopeError = requireScope(ctx, 'integration:read');
+            if (scopeError) return errorResult(scopeError);
+            try {
+              const prepResult = prepareModelUpload(files, modelTypeHint);
+              return jsonResult(prepResult);
+            } catch (err) {
+              return errorResult(
+                `Failed to prepare model upload: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          },
+        );
       }
+
 
       if (ctx.identity.mcpScopes?.includes('models:read')) {
         server.registerTool(

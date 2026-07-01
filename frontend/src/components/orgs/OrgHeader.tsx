@@ -1,11 +1,11 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, Bell, HelpCircle, LayoutGrid, Search, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useOrgContext } from "@/hooks/use-org-context";
+import { useWorkspace } from "@/hooks/use-workspace";
 import OrgTypeBadge from "./OrgTypeBadge";
 import { getOrgRoleMeta } from "@/lib/org-role-meta";
 
@@ -16,11 +16,18 @@ import { getOrgRoleMeta } from "@/lib/org-role-meta";
  */
 export default function OrgHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const { org, myRole } = useOrgContext();
+  const { switchToPersonalWorkspace } = useWorkspace();
 
   if (!org) {
     return null;
   }
+
+  const handleReturnToDeveloperMode = async () => {
+    await switchToPersonalWorkspace();
+    router.push("/dashboard");
+  };
 
   const currentArea = pathname.split("/").filter(Boolean).at(-1) ?? "overview";
   const normalizedArea = currentArea.replace(/-/g, " ");
@@ -29,14 +36,15 @@ export default function OrgHeader() {
   return (
     <div className="h-16 bg-card/95 backdrop-blur border-b border-border flex items-center justify-between px-4 sm:px-6 shrink-0 relative z-20 font-sans">
       <div className="flex items-center gap-3 min-w-0">
-        <Link
-          href="/dashboard"
+        <button
+          type="button"
+          onClick={handleReturnToDeveloperMode}
           className="inline-flex items-center gap-2 h-8 px-2.5 rounded-lg border border-border bg-background text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors"
           title="Return to Developer Mode"
         >
           <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.8} />
           <span className="hidden sm:inline">Developer Mode</span>
-        </Link>
+        </button>
         <div className="hidden md:flex items-center gap-2 min-w-0">
           <LayoutGrid className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.6} />
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide truncate">

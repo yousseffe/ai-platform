@@ -10,7 +10,7 @@ import { getTransactions, Transaction } from "@/lib/services/wallets.service";
  * @param limit - Count of items per page (default 10).
  * @returns State properties and handler methods for transactions history management.
  */
-export function useTransactions(limit = 10) {
+export function useTransactions(limit = 10, enabled = true) {
   const { activeWorkspace, viewMode } = useWorkspace();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
@@ -38,7 +38,7 @@ export function useTransactions(limit = 10) {
    * Refetch trigger exposing manual cache updates for page controls.
    */
   const refetch = useCallback(async () => {
-    if (!activeWorkspace) return;
+    if (!activeWorkspace || !enabled) return;
     setLoading(true);
     try {
       const res = await getTransactions(activeWorkspace.id, viewMode, page, limit, {
@@ -57,10 +57,15 @@ export function useTransactions(limit = 10) {
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspace, viewMode, page, limit, search, txType, status, startDate, endDate]);
+  }, [activeWorkspace, enabled, viewMode, page, limit, search, txType, status, startDate, endDate]);
 
   useEffect(() => {
-    if (!activeWorkspace) return;
+    if (!activeWorkspace || !enabled) {
+      setTransactions([]);
+      setTotal(0);
+      setLoading(false);
+      return;
+    }
 
     let active = true;
 
@@ -92,7 +97,7 @@ export function useTransactions(limit = 10) {
     return () => {
       active = false;
     };
-  }, [activeWorkspace, viewMode, page, limit, search, txType, status, startDate, endDate]);
+  }, [activeWorkspace, enabled, viewMode, page, limit, search, txType, status, startDate, endDate]);
 
   // Reset page to 1 when filters change
   useEffect(() => {

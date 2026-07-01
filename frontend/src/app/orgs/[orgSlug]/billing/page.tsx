@@ -1,10 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useOrgContext } from "@/hooks/use-org-context";
-import { smartFetch } from "@/lib/utils/smart-fetch";
 import {
-  ArrowRight,
   Coins,
   Info,
   Loader2,
@@ -12,25 +10,19 @@ import {
   ShieldCheck,
   TrendingUp,
   Wallet,
+  Landmark,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { redirectToCheckout } from "@/lib/services/stripe.service";
 import {
   getCreditsPerEgp,
+  getOrganizationWallets,
   getTransactions,
   Transaction,
+  WorkspaceWallet,
 } from "@/lib/services/wallets.service";
 import { OrgType, WalletType } from "@/types";
 import TransactionsTable from "@/components/dashboard/TransactionsTable";
-
-interface WalletBalance {
-  id: string;
-  balance: number;
-  currency: string;
-  walletType: string;
-}
+import OrganizationFinanceActionPanel from "@/components/orgs/OrganizationFinanceActionPanel";
 
 interface FinanceTileProps {
   label: string;
@@ -70,11 +62,9 @@ function FinanceTile({ label, value, caption, icon, tone }: FinanceTileProps) {
  */
 export default function OrgBillingPage() {
   const { org } = useOrgContext();
-  const [wallets, setWallets] = useState<WalletBalance[]>([]);
+  const [wallets, setWallets] = useState<WorkspaceWallet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [creditsPerEgp, setCreditsPerEgp] = useState(10);
-  const [depositAmount, setDepositAmount] = useState("25");
-  const [isDepositing, setIsDepositing] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transactionsTotal, setTransactionsTotal] = useState(0);
   const [transactionsPage, setTransactionsPage] = useState(1);
@@ -94,25 +84,72 @@ export default function OrgBillingPage() {
   const effectiveWalletView =
     org?.type === OrgType.PROVIDER ? WalletType.PROVIDER : walletView;
 
-  useEffect(() => {
+  const fetchWallets = useCallback(async (showLoader = true) => {
     if (!org) return;
 
-    const fetchWallets = async () => {
+    if (showLoader) {
       setIsLoading(true);
-      try {
-        const data = await smartFetch<WalletBalance[]>(`/wallets/org/${org.id}`, {
-          headers: { "X-Workspace-Id": org.id },
-        });
-        setWallets(Array.isArray(data) ? data : []);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to load wallet data");
-      } finally {
+    }
+    try {
+      const data = await getOrganizationWallets(org.id);
+      setWallets(Array.isArray(data) ? data : []);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load wallet data",
+      );
+    } finally {
+      if (showLoader) {
         setIsLoading(false);
       }
-    };
-
-    Promise.resolve().then(fetchWallets);
+    }
   }, [org]);
+
+  const fetchTransactions = useCallback(async () => {
+    if (!org) return;
+
+    setTransactionsLoading(true);
+    try {
+      const response = await getTransactions(
+        org.id,
+        effectiveWalletView,
+        transactionsPage,
+        transactionsLimit,
+        {
+          search: search || undefined,
+          txType: txType || undefined,
+          status: status || undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        }
+      );
+      setTransactions(response.data);
+      setTransactionsTotal(response.total);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load transactions",
+      );
+    } finally {
+      setTransactionsLoading(false);
+    }
+  }, [
+    org,
+    effectiveWalletView,
+    transactionsPage,
+    transactionsLimit,
+    search,
+    txType,
+    status,
+    startDate,
+    endDate,
+  ]);
+
+  const refreshFinanceData = useCallback(async () => {
+    await Promise.all([fetchWallets(false), fetchTransactions()]);
+  }, [fetchTransactions, fetchWallets]);
+
+  useEffect(() => {
+    Promise.resolve().then(fetchWallets);
+  }, [fetchWallets]);
 
   useEffect(() => {
     if (!showConsumerFinance) return;
@@ -131,51 +168,13 @@ export default function OrgBillingPage() {
   useEffect(() => {
     if (!org) return;
 
-    const fetchTransactions = async () => {
-      setTransactionsLoading(true);
-      try {
-        const response = await getTransactions(
-          org.id,
-          effectiveWalletView,
-          transactionsPage,
-          transactionsLimit,
-          {
-            search: search || undefined,
-            txType: txType || undefined,
-            status: status || undefined,
-            startDate: startDate || undefined,
-            endDate: endDate || undefined,
-          }
-        );
-        setTransactions(response.data);
-        setTransactionsTotal(response.total);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to load transactions");
-      } finally {
-        setTransactionsLoading(false);
-      }
-    };
-
     Promise.resolve().then(fetchTransactions);
-  }, [
-    org,
-    effectiveWalletView,
-    transactionsPage,
-    transactionsLimit,
-    search,
-    txType,
-    status,
-    startDate,
-    endDate,
-  ]);
+  }, [org, fetchTransactions]);
 
   if (!org) return null;
 
   const consumerWallet = wallets.find((w) => w.walletType === WalletType.CONSUMER);
   const providerWallet = wallets.find((w) => w.walletType === WalletType.PROVIDER);
-  const parsedDeposit = parseFloat(depositAmount) || 0;
-  const receivedCredits = Math.round(parsedDeposit * creditsPerEgp);
-  const presetAmounts = [10, 25, 50, 100];
 
   const pageTitle =
     org.type === OrgType.PROVIDER ? "Provider Finance" : "Billing";
@@ -200,8 +199,8 @@ export default function OrgBillingPage() {
       showProviderFinance
         ? {
           label: "Provider Earnings",
-          value: providerWallet ? `${providerWallet.balance.toLocaleString()} cr` : "No wallet",
-          caption: "Revenue earned from approved provider models and production usage.",
+          value: providerWallet ? `${providerWallet.balance.toLocaleString()} EGP` : "No wallet",
+          caption: "Revenue earned from approved provider models and available for owner-controlled payout.",
           icon: <TrendingUp className="h-4 w-4" strokeWidth={1.8} />,
           tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         }
@@ -213,6 +212,15 @@ export default function OrgBillingPage() {
           caption: "Credits added per 1 EGP deposited into the consumer wallet.",
           icon: <Receipt className="h-4 w-4" strokeWidth={1.8} />,
           tone: "border-primary/20 bg-primary/10 text-primary",
+        }
+        : null,
+      showProviderFinance
+        ? {
+          label: "Payout Currency",
+          value: providerWallet?.currency || "EGP",
+          caption: "Provider withdrawals settle from the organization earnings wallet.",
+          icon: <Landmark className="h-4 w-4" strokeWidth={1.8} />,
+          tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         }
         : null,
       {
@@ -248,29 +256,12 @@ export default function OrgBillingPage() {
     setTransactionsPage(1);
   };
 
-  const handleOrgTopUp = async () => {
-    if (parsedDeposit < 5) {
-      toast.error("Minimum deposit is 5.00 EGP");
-      return;
-    }
-
-    setIsDepositing(true);
-    try {
-      await redirectToCheckout(parsedDeposit, {
-        workspaceId: org.id,
-        returnPath: `/orgs/${org.slug}/billing`,
-      });
-    } catch (error) {
-      setIsDepositing(false);
-      toast.error(error instanceof Error ? error.message : "Failed to open Stripe Checkout");
-    }
-  };
-
   const notes =
     org.type === OrgType.PROVIDER
       ? [
         "Provider organizations do not use a consumer credit balance.",
-        "Revenue is credited to the provider wallet when approved marketplace models are used.",
+        "Revenue is credited in EGP to the provider wallet when approved marketplace models are used.",
+        "Organization owners can withdraw provider earnings directly from this finance workspace.",
         "Owners and maintainers control which versions reach production and become marketplace verified.",
       ]
       : org.type === OrgType.CONSUMER
@@ -282,7 +273,7 @@ export default function OrgBillingPage() {
         : [
           "Consumer credits and provider earnings are intentionally separated.",
           "Projects spend from the consumer wallet.",
-          "Approved provider models earn into the provider wallet.",
+          "Approved provider models earn into the provider wallet in EGP.",
         ];
 
   return (
@@ -316,98 +307,18 @@ export default function OrgBillingPage() {
             ))}
           </section>
 
-          <section className={`grid gap-4 ${showConsumerFinance ? "lg:grid-cols-[1.15fr_0.85fr]" : "lg:grid-cols-[0.9fr_1.1fr]"}`}>
-            {showConsumerFinance && (
-              <div className="rounded-lg border border-border bg-card">
-                <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                      Consumer Wallet
-                    </p>
-                    <h2 className="mt-1 text-lg font-bold text-foreground">Add organization credits</h2>
-                  </div>
-                  <div className="rounded-lg border border-primary/20 bg-primary/10 p-2 text-primary">
-                    <Coins className="h-4 w-4" strokeWidth={1.8} />
-                  </div>
-                </div>
-
-                <div className="space-y-5 p-5">
-                  <div className="grid gap-3 sm:grid-cols-4">
-                    {presetAmounts.map((amount) => {
-                      const isSelected = depositAmount === amount.toString();
-                      const creditsCount = amount * creditsPerEgp;
-
-                      return (
-                        <button
-                          key={amount}
-                          type="button"
-                          onClick={() => setDepositAmount(amount.toString())}
-                          className={`rounded-lg border p-3 text-left transition-colors ${
-                            isSelected
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border bg-background text-foreground hover:bg-secondary/50"
-                          }`}
-                        >
-                          <p className="text-sm font-black">{creditsCount.toLocaleString()}</p>
-                          <p className="mt-1 text-[10px] font-bold uppercase text-muted-foreground">Credits</p>
-                          <p className="mt-3 text-xs font-bold">{amount} EGP</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="grid gap-3 border-t border-border pt-4 md:grid-cols-[1fr_auto] md:items-end">
-                    <div className="space-y-2">
-                      <label className="block text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                        Custom deposit
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">
-                          EGP
-                        </span>
-                        <Input
-                          type="number"
-                          min="5"
-                          step="1"
-                          value={depositAmount}
-                          onChange={(event) => setDepositAmount(event.target.value)}
-                          placeholder="Enter amount"
-                          className="h-10 rounded-lg pl-11 text-sm font-semibold"
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      className="h-10 text-sm"
-                      onClick={handleOrgTopUp}
-                      disabled={isDepositing || parsedDeposit < 5}
-                    >
-                      {isDepositing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
-                      )}
-                      Checkout
-                    </Button>
-                  </div>
-
-                  {parsedDeposit > 0 && (
-                    <div className="grid gap-3 rounded-lg border border-border bg-secondary/20 p-4 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase text-muted-foreground">You pay</p>
-                        <p className="mt-1 text-sm font-black text-foreground">{parsedDeposit.toFixed(2)} EGP</p>
-                      </div>
-                      <div className="hidden h-8 w-8 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary sm:flex">
-                        <ArrowRight className="h-4 w-4" />
-                      </div>
-                      <div className="sm:text-right">
-                        <p className="text-[10px] font-bold uppercase text-muted-foreground">Organization receives</p>
-                        <p className="mt-1 text-sm font-black text-primary">{receivedCredits.toLocaleString()} credits</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+          <section className="space-y-4">
+            <OrganizationFinanceActionPanel
+              orgId={org.id}
+              orgSlug={org.slug}
+              orgName={org.name}
+              showConsumerFinance={showConsumerFinance}
+              showProviderFinance={showProviderFinance}
+              consumerBalance={consumerWallet?.balance ?? 0}
+              providerBalance={providerWallet?.balance ?? 0}
+              creditsPerEgp={creditsPerEgp}
+              onFinanceUpdated={refreshFinanceData}
+            />
 
             <div className="rounded-lg border border-border bg-card">
               <div className="border-b border-border px-5 py-4">
@@ -437,7 +348,9 @@ export default function OrgBillingPage() {
                 {showConsumerFinance && (
                   <div className="flex items-start gap-2.5 rounded-lg border border-border bg-secondary/30 px-4 py-3 text-xs leading-5 text-muted-foreground">
                     <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>Minimum deposit is 5 EGP. Credits are added to the organization consumer wallet only.</p>
+                    <p>
+                      Minimum deposit is 5 EGP. Credits are added to the organization consumer wallet only, while provider earnings stay separately withdrawable in EGP.
+                    </p>
                   </div>
                 )}
               </div>

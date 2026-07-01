@@ -14,6 +14,8 @@ export interface TrafficFeatures {
   injectionCount: number;
   trialCount: number;
   creditBurn: number;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 /** Per-model EWMA baseline used for spike comparison. */
@@ -52,7 +54,7 @@ const RECOMMENDATIONS: Record<ThreatClass, string> = {
   [ThreatClass.PROMPT_INJECTION]:
     'Prompt-injection patterns detected in inputs — review and consider input filtering.',
   [ThreatClass.API_ABUSE]:
-    'Elevated error/abuse signals on the API — review caller behavior.',
+    'Elevated error/abuse signals or severe negative user feedback on the API — review caller behavior and model reviews.',
 };
 
 /**
@@ -130,6 +132,20 @@ export function assessTraffic(f: TrafficFeatures, b: Baseline): RiskAssessment {
       threatClass: ThreatClass.RESOURCE_ABUSE,
       severity: 0.5,
       detail: `${f.requestCount} requests in ${f.windowMinutes}m`,
+    });
+  }
+
+  if (
+    f.averageRating !== undefined &&
+    f.reviewCount !== undefined &&
+    f.reviewCount >= 3 &&
+    f.averageRating < 2.0
+  ) {
+    fired.push({
+      rule: 'LOW_MODEL_RATING',
+      threatClass: ThreatClass.API_ABUSE,
+      severity: 0.45,
+      detail: `average rating is ${f.averageRating.toFixed(1)}/5.0 over ${f.reviewCount} reviews`,
     });
   }
 

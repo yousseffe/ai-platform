@@ -14,6 +14,7 @@ import { WalletType } from "@/types";
  * Handles depositing credits, cashing out withdrawable balance, and displays paginated transaction histories with advanced filters.
  */
 export default function BillingSettingsPage() {
+  const { balance, viewMode, canAccessBilling, activeWorkspace } = useWorkspace();
   const {
     transactions,
     total,
@@ -31,11 +32,34 @@ export default function BillingSettingsPage() {
     setStartDate,
     endDate,
     setEndDate,
-  } = useTransactions(10);
-
-  const { balance, viewMode } = useWorkspace();
+  } = useTransactions(10, canAccessBilling);
 
   const isConsumer = viewMode === WalletType.CONSUMER;
+
+  if (!canAccessBilling) {
+    return (
+      <div className="space-y-6 animate-fade-in text-left">
+        <div className="border-b border-border pb-4 select-none">
+          <h1 className="text-lg font-bold text-foreground flex items-center gap-2 tracking-tight font-sans">
+            <Coins className="w-5 h-5 text-primary" strokeWidth={2.5} />
+            Billing & Wallet Settings
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Shared organization billing is restricted to workspace owners.
+          </p>
+        </div>
+
+        <Card className="border border-border bg-card rounded-xl shadow-sm">
+          <CardContent className="p-6 space-y-2">
+            <p className="text-sm font-bold text-foreground">Billing access is restricted in this workspace.</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {activeWorkspace?.name || "This organization"} is currently active, and only organization owners can open balances, transactions, top-ups, and withdrawals for shared wallets.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in text-left">
@@ -131,4 +155,3 @@ export default function BillingSettingsPage() {
     </div>
   );
 }
-

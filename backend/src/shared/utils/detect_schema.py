@@ -390,12 +390,11 @@ class SklearnIntrospector:
         lower_name = filename.lower()
         if any(x in lower_name for x in ["digit", "image", "vision", "face", "cnn", "photo"]):
             return "image"
-        if any(x in lower_name for x in ["sentiment", "text", "spam", "nlp", "language"]):
+        if any(x in lower_name for x in ["sentiment", "text", "spam", "nlp", "language", "intent", "toxic", "comment", "review", "priority"]):
             return "text"
         return "tabular"
 
     def introspect(self, path: str, model_type_hint: str = "", original_filename: str = "") -> UnifiedSchema:
-        import joblib
         schema = UnifiedSchema(framework="sklearn")
         # Use the original filename for heuristics if provided, otherwise fall back to the temp path basename
         filename = original_filename if original_filename else os.path.basename(path)
@@ -404,18 +403,34 @@ class SklearnIntrospector:
         inferred_type = self._infer_type_from_name(filename)
         
         try:
+            import joblib
             model = joblib.load(path)
         except Exception as e:
-            schema.warnings.append(f"Could not fully load model due to missing custom code: {str(e)[:100]}")
+            schema.warnings.append(f"Could not fully load model: {str(e)[:100]}")
+            
+            # Detect task from filename
+            filename_lower = filename.lower()
+            is_class = "classifier" in filename_lower or "classification" in filename_lower
+            
             # If the user explicitly chose NLP or filename suggests NLP, produce a text schema even on load failure
             if model_type_hint.upper() == "NLP" or inferred_type == "text":
-                schema.task_type = "text_classification"
+                schema.task_type = "text_classification" if is_class else "text_generation"
                 schema.confidence = 0.7
                 schema.inputs.append(SchemaField(name="text", type="string", dtype="string"))
-                schema.outputs.append(SchemaField(name="prediction", type="string"))
+                if is_class:
+                    schema.outputs.append(SchemaField(name="label", type="string"))
+                    schema.outputs.append(SchemaField(name="confidence", type="float"))
+                else:
+                    schema.outputs.append(SchemaField(name="prediction", type="string"))
                 return schema
+                
+            schema.task_type = "classification" if is_class else "regression"
             schema.inputs.append(SchemaField(name="features", type=inferred_type, dtype="float64", shape=[None, 5]))
-            schema.outputs.append(SchemaField(name="prediction", type="continuous"))
+            if is_class:
+                schema.outputs.append(SchemaField(name="prediction", type="class_label"))
+                schema.outputs.append(SchemaField(name="probability", type="float"))
+            else:
+                schema.outputs.append(SchemaField(name="prediction", type="continuous"))
             return schema
             
         actual = model.steps[-1][1] if hasattr(model, 'steps') else model

@@ -142,6 +142,7 @@ export enum OrgAction {
   MANAGE_API_KEYS = 'manage_api_keys',
   VIEW_API_KEYS = 'view_api_keys',
   VIEW_PROJECT_USAGE = 'view_project_usage',
+  VIEW_USAGE = 'view_usage',
   VIEW_BILLING = 'view_billing',
   EDIT_SETTINGS = 'edit_settings',
   UPLOAD_MODEL = 'upload_model',

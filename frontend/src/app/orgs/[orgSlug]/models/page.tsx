@@ -96,7 +96,7 @@ export default function OrgModelsPage() {
     },
     {
       label: "Provider Revenue",
-      value: `${totalEarnings.toLocaleString()} cr`,
+      value: `${totalEarnings.toLocaleString()} EGP`,
       caption: "Tracked across listed models",
       icon: <Coins className="h-4 w-4" strokeWidth={1.8} />,
       tone: "text-amber-600 bg-amber-500/10 border-amber-500/20",

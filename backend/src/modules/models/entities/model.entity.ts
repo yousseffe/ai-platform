@@ -16,7 +16,8 @@ import { Framework } from '../enums/framework.enum';
 
 /**
  * Database table representation of an ML model registry.
- * Groups model versions and links ownership to a user or provider organization.
+ * Groups model versions and links ownership to either a personal user workspace
+ * or a shared organization workspace.
  */
 @Entity('models')
 export class Model {
@@ -69,13 +70,13 @@ export class Model {
   framework: Framework;
 
   /**
-   * Owner user account record who registered this model context.
+   * User account record of the member who originally created this model entry.
    */
   @ManyToOne(() => User)
   user: User;
 
   /**
-   * Optional provider organization that owns and governs this model.
+   * Optional organization workspace that owns and governs this model.
    */
   @ManyToOne(() => Organization, { nullable: true })
   organization: Organization | null;
@@ -139,6 +140,24 @@ export class Model {
    */
   @Column({ name: 'marketplace_verified', type: 'boolean', default: false })
   marketplaceVerified: boolean;
+
+  /**
+   * The average star rating calculated from user reviews.
+   */
+  @Column({
+    name: 'average_rating',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 0.0,
+  })
+  averageRating: number;
+
+  /**
+   * The total count of reviews/comments submitted for this model.
+   */
+  @Column({ name: 'review_count', type: 'integer', default: 0 })
+  reviewCount: number;
 
   /**
    * Timestamp record indicating when this model template registry was initialized.

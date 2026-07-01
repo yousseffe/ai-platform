@@ -428,14 +428,6 @@ export class BuildProcessor extends WorkerHost {
       // Phase 3: Generate Dockerfile (30% → 50%)
       await this.updateProgress(versionId, 30);
 
-      // Write output schema file if the version has an expectedResult defined
-      if (version.expectedResult) {
-        fs.writeFileSync(
-          path.join(buildDir, 'output_schema.json'),
-          version.expectedResult,
-        );
-      }
-
       let dockerfileContent = '';
 
       if (version.model.type === ModelType.LLM_GGUF) {
@@ -505,18 +497,6 @@ export class BuildProcessor extends WorkerHost {
           path.join(buildDir, 'serve.py'),
         );
 
-        // Copy shared schema enforcement utilities
-        fs.copyFileSync(
-          path.join(
-            process.cwd(),
-            'src',
-            'shared',
-            'queue',
-            'templates',
-            'schema_utils.py',
-          ),
-          path.join(buildDir, 'schema_utils.py'),
-        );
 
         const hasScaler = !!version.scalerFilePath;
         const hasPreprocess = !!version.preprocessFilePath;
@@ -746,7 +726,6 @@ ENV PREPROCESS_PATH=${hasPreprocess ? 'preprocess.py' : ''}
 ENV POSTPROCESS_PATH=${hasPostprocess ? 'postprocess.py' : ''}
 ENV FRAMEWORK=${version.model.framework}
 ENV TASK_TYPE=${version.model.taskType}
-ENV OUTPUT_SCHEMA_PATH=${version.expectedResult ? 'output_schema.json' : ''}
 EXPOSE 8000
 CMD ["python", "serve.py"]
 `;
@@ -763,7 +742,6 @@ ENV PREPROCESS_PATH=${hasPreprocess ? 'preprocess.py' : ''}
 ENV POSTPROCESS_PATH=${hasPostprocess ? 'postprocess.py' : ''}
 ENV FRAMEWORK=${version.model.framework}
 ENV TASK_TYPE=${version.model.taskType}
-ENV OUTPUT_SCHEMA_PATH=${version.expectedResult ? 'output_schema.json' : ''}
 EXPOSE 8000
 CMD ["python", "serve.py"]
 `;

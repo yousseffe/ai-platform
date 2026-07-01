@@ -31,17 +31,24 @@ import { Repository, DataSource } from 'typeorm';
 
 import { CreateModelDto } from '../dto/create-model.dto';
 import { UploadVersionDto } from '../dto/upload-version.dto';
+import { CreateReviewDto } from '../dto/create-review.dto';
 import { ModelType } from '../enums/model-type.enum';
 import { TaskType } from '../enums/task-type.enum';
 import { Framework } from '../enums/framework.enum';
 import { Model } from '../entities/model.entity';
 import { ModelVersion } from '../entities/model-version.entity';
 import { ModelLog } from '../entities/model-log.entity';
+import { ModelReview } from '../entities/model-review.entity';
 import { ApiKey } from '../../auth/entities/api-key.entity';
 import { User } from '../../users/entities/user.entity';
+import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
+import { Organization } from '../../organizations/entities/organization.entity';
+import { Project } from '../../organizations/entities/project.entity';
 import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
 import { WorkspaceInterceptor } from '../../auth/guards/workspace.interceptor';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
+import { OrgStatus } from '../../organizations/enums/org-status.enum';
+import { OrgType } from '../../organizations/enums/org-type.enum';
 import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
@@ -57,6 +64,7 @@ interface RequestWithUser {
   user: {
     id: string;
     email: string;
+    isAdmin?: boolean;
   };
   workspaceId?: string;
   workspaceType?: OwnerType;
@@ -95,6 +103,8 @@ export class ModelsController {
     private readonly modelLogRepository: Repository<ModelLog>,
     @InjectRepository(ApiKey)
     private readonly apiKeyRepository: Repository<ApiKey>,
+    @InjectRepository(OrgApiKey)
+    private readonly orgApiKeyRepository: Repository<OrgApiKey>,
     private readonly inferenceClient: InferenceClient,
   ) {}
 
@@ -220,16 +230,24 @@ export class ModelsController {
   }
 
   /**
-   * Retrieves prediction logs received on models owned by the authenticated user (Provider).
+   * Retrieves recent prediction logs for the active publishing workspace.
+   * Personal workspaces read user-owned models, while organization workspaces
+   * read organization-owned models.
    *
    * @param req - Authenticated user request context.
    */
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(WorkspaceInterceptor)
   @Get('logs/provider')
   async getProviderLogs(@Request() req: RequestWithUser): Promise<ModelLog[]> {
+    const where =
+      req.workspaceType === OwnerType.ORG
+        ? { model: { organization: { id: req.workspaceId } } }
+        : { model: { user: { id: req.user.id } } };
+
     return this.modelLogRepository.find({
-      where: { model: { user: { id: req.user.id } } },
-      relations: ['model'],
+      where,
+      relations: ['model', 'model.organization'],
       order: { createdAt: 'DESC' },
       take: 50,
     });
@@ -487,7 +505,10 @@ export class ModelsController {
     req: Record<string, unknown> & PredictionRequestContext,
     @Res() res: Response,
   ): Promise<void> {
-    const model = await this.modelsService.getModel(id, req.user.id);
+    const model = await this.modelsService.getModel(
+      id,
+      req.user.orgApiKeyId ? undefined : req.user.id,
+    );
     const { url, deploymentId } = await this.inferenceClient.resolveDeploymentUrl(model);
     await this.respondWithPrediction(model, url, deploymentId, data, req, res);
   }
@@ -512,12 +533,106 @@ export class ModelsController {
       throw new BadRequestException('Invalid version number');
     }
 
-    const model = await this.modelsService.getModel(id);
+    const model = await this.modelsService.getModel(
+      id,
+      req.user.orgApiKeyId ? undefined : req.user.id,
+    );
     const { url, deploymentId } = await this.inferenceClient.resolveDeploymentUrl(
       model,
       versionNumber,
     );
     await this.respondWithPrediction(model, url, deploymentId, data, req, res);
+  }
+
+  /**
+   * Validates that an organization API key is active, scoped to an active
+   * project, and authorized to call the target model (a public marketplace
+   * model, or one owned by the same organization, and not scoped to a
+   * different model). No-op for JWT sessions and personal `ml_sk_*` keys.
+   *
+   * @param model - The model being predicted against.
+   * @param req - The authenticated prediction request context.
+   * @returns The validated {@link OrgApiKey}, or `null` if the caller isn't using one.
+   */
+  private async assertOrgApiKeyPredictionAccess(
+    model: Model,
+    req: PredictionRequestContext,
+  ): Promise<OrgApiKey | null> {
+    if (!req.user.orgApiKeyId) {
+      return null;
+    }
+
+    const orgApiKey = await this.orgApiKeyRepository.findOne({
+      where: {
+        id: req.user.orgApiKeyId,
+        orgId: req.user.orgId,
+        projectId: req.user.projectId,
+        isActive: true,
+      },
+      relations: ['model'],
+    });
+
+    if (!orgApiKey) {
+      throw new ForbiddenException(
+        'This organization API key is invalid or has been revoked',
+      );
+    }
+
+    const organization = await this.dataSource
+      .getRepository(Organization)
+      .findOne({
+        where: { id: orgApiKey.orgId },
+      });
+
+    if (!organization) {
+      throw new ForbiddenException(
+        'The organization attached to this API key no longer exists',
+      );
+    }
+
+    if (organization.status !== OrgStatus.ACTIVE) {
+      throw new ForbiddenException(
+        'This organization is inactive and cannot use API keys',
+      );
+    }
+
+    if (
+      organization.type !== OrgType.CONSUMER &&
+      organization.type !== OrgType.HYBRID
+    ) {
+      throw new ForbiddenException(
+        'This organization API key can only be used from consumer-capable workspaces',
+      );
+    }
+
+    const project = await this.dataSource.getRepository(Project).findOne({
+      where: {
+        id: orgApiKey.projectId,
+        orgId: orgApiKey.orgId,
+        isActive: true,
+      },
+    });
+
+    if (!project) {
+      throw new ForbiddenException(
+        'The project attached to this API key is inactive or no longer exists',
+      );
+    }
+
+    const isSameOrgModel = model.organization?.id === organization.id;
+    if (!model.isPublic && !isSameOrgModel) {
+      throw new ForbiddenException(
+        'This organization API key can only call public marketplace models or models owned by the same organization',
+      );
+    }
+
+    if (orgApiKey.model && orgApiKey.model.id !== model.id) {
+      throw new ForbiddenException(
+        `This organization API key is scoped to model "${orgApiKey.model.name}" only`,
+      );
+    }
+
+    return orgApiKey;
   }
 
   /**
@@ -542,7 +657,9 @@ export class ModelsController {
 
   /**
    * Dispatches a resolved deployment call to either the streaming SSE path
-   * (LLM `stream: true` requests) or the standard JSON {@link InferenceClient.runInference} path.
+   * (LLM `stream: true` requests) or the standard JSON
+   * {@link InferenceClient.runInference} path. Validates organization API key
+   * scoping first when the caller authenticated with one.
    */
   private async respondWithPrediction(
     model: Model,
@@ -552,11 +669,13 @@ export class ModelsController {
     req: Record<string, unknown> & PredictionRequestContext,
     res: Response,
   ): Promise<void> {
+    const orgApiKey = await this.assertOrgApiKeyPredictionAccess(model, req);
     const actor = this.buildActor(req);
     const clientMeta = extractClientMeta(req);
 
     if (data.stream === true) {
       await this.streamPrediction(model, url, deploymentId, data, actor, clientMeta, res);
+      this.touchOrgApiKeyUsage(orgApiKey);
       return;
     }
 
@@ -572,7 +691,18 @@ export class ModelsController {
       res.status(result.statusCode).json({ error: `Prediction failed: ${result.errorMessage}` });
       return;
     }
+    this.touchOrgApiKeyUsage(orgApiKey);
     res.json(result.output);
+  }
+
+  /** Fire-and-forget freshness update for a successfully used organization API key. */
+  private touchOrgApiKeyUsage(orgApiKey: OrgApiKey | null): void {
+    if (!orgApiKey) {
+      return;
+    }
+    this.orgApiKeyRepository
+      .update(orgApiKey.id, { lastUsedAt: new Date() })
+      .catch(() => undefined);
   }
 
   /**
@@ -713,14 +843,14 @@ export class ModelsController {
   async getBuildLogs(
     @Param('id') id: string,
     @Param('versionId') versionId: string,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ): Promise<{ buildLogs: string | null }> {
-    const model = await this.modelsService.getModel(id);
+    const model = await this.modelsService.getModel(id, req.user.id);
     if (!model) {
       throw new NotFoundException('Model not found');
     }
-    // Check ownership
-    if (model.user?.id !== req.user.id && !req.user.isAdmin) {
+
+    if (!model.organization && model.user?.id !== req.user.id && !req.user.isAdmin) {
       throw new ForbiddenException('You do not have access to this model');
     }
 
@@ -732,5 +862,40 @@ export class ModelsController {
     }
 
     return { buildLogs: version.buildLogs };
+  }
+
+  /**
+   * Submits or updates a consumer rating and comment for a public model.
+   * Only consumers who have generated at least one API key for this model can review.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/reviews')
+  async createOrUpdateReview(
+    @Request() req: RequestWithUser,
+    @Param('id') id: string,
+    @Body() dto: CreateReviewDto,
+  ): Promise<ModelReview> {
+    return this.modelsService.createOrUpdateReview(req.user.id, id, dto);
+  }
+
+  /**
+   * Deletes a user's review for a model.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/reviews')
+  async deleteReview(
+    @Request() req: RequestWithUser,
+    @Param('id') id: string,
+  ): Promise<{ success: boolean }> {
+    await this.modelsService.deleteReview(req.user.id, id);
+    return { success: true };
+  }
+
+  /**
+   * Retrieves all user reviews and ratings for a specific model.
+   */
+  @Get(':id/reviews')
+  async getReviews(@Param('id') id: string): Promise<ModelReview[]> {
+    return this.modelsService.getReviews(id);
   }
 }

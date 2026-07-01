@@ -23,7 +23,7 @@ interface HeaderProps {
  */
 export default function Header({ session }: HeaderProps) {
   const pathname = usePathname();
-  const { activeWorkspace, viewMode, balance } = useWorkspace();
+  const { activeWorkspace, viewMode, balance, canAccessBilling } = useWorkspace();
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [mounted, setMounted] = useState(false);
 
@@ -75,7 +75,7 @@ export default function Header({ session }: HeaderProps) {
       {/* Header Actions */}
       <div className="flex items-center gap-3">
         {/* Wallet stats badge */}
-        {activeWorkspace && (
+        {activeWorkspace && canAccessBilling && (
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-semibold select-none ${
             viewMode === WalletType.PROVIDER
               ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"

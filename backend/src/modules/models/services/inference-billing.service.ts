@@ -97,11 +97,21 @@ export class InferenceBillingService {
         [providerShareEgp, model.id],
       );
 
+      const providerWalletOwnerId = model.organization?.id ?? model.user.id;
+      const providerWalletOwnerType = model.organization
+        ? OwnerType.ORG
+        : OwnerType.USER;
+      const revenueRecipientLabel =
+        model.organization?.name ??
+        model.user.email ??
+        'Personal publishing workspace';
+
       await this.creditWallet(
         queryRunner.manager,
-        model.user.id,
+        providerWalletOwnerId,
+        providerWalletOwnerType,
         providerShareEgp,
-        `Inference credit share for model: ${model.name} by user ${callerEmail} (EGP ${providerShareEgp.toFixed(4)})`,
+        `Inference revenue share for model: ${model.name} to ${revenueRecipientLabel} from ${callerEmail} (EGP ${providerShareEgp.toFixed(4)})`,
       );
 
       const platformShareEgp = costInEgp - providerShareEgp;
@@ -109,6 +119,7 @@ export class InferenceBillingService {
         await this.creditWallet(
           queryRunner.manager,
           SYSTEM_OWNER_ID,
+          OwnerType.USER,
           platformShareEgp,
           `Platform commission for model: ${model.name} from call by user ${callerEmail} (EGP ${platformShareEgp.toFixed(4)})`,
         );
@@ -129,20 +140,21 @@ export class InferenceBillingService {
   private async creditWallet(
     manager: EntityManager,
     ownerId: string,
+    ownerType: OwnerType,
     amountEgp: number,
     reference: string,
   ): Promise<void> {
     let wallet = await manager.findOne(Wallet, {
       where: {
         ownerId,
-        ownerType: OwnerType.USER,
+        ownerType,
         walletType: WalletType.PROVIDER,
       },
     });
     if (!wallet) {
       wallet = manager.create(Wallet, {
         ownerId,
-        ownerType: OwnerType.USER,
+        ownerType,
         walletType: WalletType.PROVIDER,
         balance: 0.0,
         currency: 'EGP',

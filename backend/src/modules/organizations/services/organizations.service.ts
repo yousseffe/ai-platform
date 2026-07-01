@@ -153,21 +153,25 @@ export class OrganizationsService {
 
       // 3. Pay Platform Admin
       const systemOwnerId = '00000000-0000-0000-0000-000000000000';
+      const platformWalletType = isPaidViaStripe
+        ? WalletType.PROVIDER
+        : WalletType.CONSUMER;
+      const platformWalletCurrency = isPaidViaStripe ? 'EGP' : 'CREDITS';
       let systemWallet = await queryRunner.manager.findOne(Wallet, {
         where: {
           ownerId: systemOwnerId,
           ownerType: OwnerType.USER,
-          walletType: WalletType.CONSUMER,
+          walletType: platformWalletType,
         },
       });
 
       if (!systemWallet) {
         systemWallet = queryRunner.manager.create(Wallet, {
-          walletType: WalletType.CONSUMER,
+          walletType: platformWalletType,
           ownerType: OwnerType.USER,
           ownerId: systemOwnerId,
           balance: 0.0,
-          currency: 'CREDITS',
+          currency: platformWalletCurrency,
         });
         await queryRunner.manager.save(Wallet, systemWallet);
       }
@@ -184,7 +188,7 @@ export class OrganizationsService {
         type: TransactionType.CREDIT,
         amount: orgCreationFee,
         reference: isPaidViaStripe
-          ? `Platform commission for organization creation (Stripe payment): ${name}`
+          ? `Platform commission for organization creation (Stripe payment): ${name} (EGP ${orgCreationFee.toFixed(2)})`
           : `Platform commission for organization creation: ${name}`,
         status: TransactionStatus.COMPLETED,
         stripeEventId: stripeEventId || null,
@@ -225,7 +229,7 @@ export class OrganizationsService {
           ownerType: OwnerType.ORG,
           ownerId: savedOrg.id,
           balance: 0.0,
-          currency: 'CREDITS',
+          currency: 'EGP',
         });
         await queryRunner.manager.save(Wallet, providerWallet);
       }

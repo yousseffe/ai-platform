@@ -163,9 +163,7 @@ def _to_serializable(obj):
         return obj.tolist()
     return obj
 
-# Load output schema for response formatting
-from schema_utils import load_output_schema, apply_schema
-output_schema = load_output_schema()
+
 
 @app.post("/predict")
 async def predict(request: Request):
@@ -320,12 +318,7 @@ async def predict(request: Request):
     # Serialize the result
     prediction = _to_serializable(prediction)
 
-    # Apply output schema enforcement if defined
-    schema_result = apply_schema(prediction, output_schema)
-    if schema_result is not None:
-        return schema_result
-
-    # Fallback: no schema defined — return raw prediction
+    # Return prediction
     return prediction
 
 if __name__ == "__main__":

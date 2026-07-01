@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutGrid,
   FolderKanban,
@@ -12,8 +12,10 @@ import {
   Settings,
   ChevronLeft,
   Activity,
+  BarChart3,
 } from "lucide-react";
 import { useOrgContext } from "@/hooks/use-org-context";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { OrgType, OrgAction } from "@/types";
 import OrgTypeBadge from "./OrgTypeBadge";
 import { getOrgRoleMeta } from "@/lib/org-role-meta";
@@ -38,8 +40,12 @@ function OrgSidebarLink({ href, active, icon, children }: OrgSidebarLinkProps) {
           : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
       }`}
     >
-      {active && <span className="absolute left-1 top-2.5 bottom-2.5 w-0.5 rounded-full bg-primary" />}
-      <span className={`transition-colors ${active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}>
+      {active && (
+        <span className="absolute left-1 top-2.5 bottom-2.5 w-0.5 rounded-full bg-primary" />
+      )}
+      <span
+        className={`transition-colors ${active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}
+      >
         {icon}
       </span>
       {children}
@@ -63,16 +69,30 @@ function OrgSidebarLink({ href, active, icon, children }: OrgSidebarLinkProps) {
  */
 export default function OrgSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { org, can, myRole } = useOrgContext();
+  const { switchToPersonalWorkspace } = useWorkspace();
 
   if (!org) return null;
+
+  const handleReturnToDeveloperMode = async () => {
+    await switchToPersonalWorkspace();
+    router.push("/dashboard");
+  };
 
   const base = `/orgs/${org.slug}`;
   const isActive = (path: string) =>
     pathname === path || pathname.startsWith(`${path}/`);
 
-  const showProjects = (org.type === OrgType.CONSUMER || org.type === OrgType.HYBRID) && can(OrgAction.VIEW_PROJECTS);
-  const showModels = (org.type === OrgType.PROVIDER || org.type === OrgType.HYBRID) && can(OrgAction.VIEW_MODELS);
+  const showProjects =
+    (org.type === OrgType.CONSUMER || org.type === OrgType.HYBRID) &&
+    can(OrgAction.VIEW_PROJECTS);
+  const showModels =
+    (org.type === OrgType.PROVIDER || org.type === OrgType.HYBRID) &&
+    can(OrgAction.VIEW_MODELS);
+  const showUsage =
+    (org.type === OrgType.CONSUMER || org.type === OrgType.HYBRID) &&
+    can(OrgAction.VIEW_USAGE);
   const orgModeLabel =
     org.type === OrgType.HYBRID
       ? "Consume + Publish"
@@ -85,29 +105,33 @@ export default function OrgSidebar() {
       {/* Org Header */}
       <div className="px-4 py-4 border-b border-border space-y-3">
         <div className="flex items-center gap-3 min-w-0">
-        {org.avatarUrl ? (
-          <img
-            src={org.avatarUrl}
-            alt={`${org.name} logo`}
-            className="h-8 w-8 rounded-lg border border-primary/20 object-cover shrink-0"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 text-primary font-extrabold text-sm flex items-center justify-center shrink-0">
-            {org.name.slice(0, 2).toUpperCase()}
+          {org.avatarUrl ? (
+            <img
+              src={org.avatarUrl}
+              alt={`${org.name} logo`}
+              className="h-8 w-8 rounded-lg border border-primary/20 object-cover shrink-0"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 text-primary font-extrabold text-sm flex items-center justify-center shrink-0">
+              {org.name.slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <div className="flex flex-col overflow-hidden min-w-0">
+            <span className="text-sm font-semibold text-foreground truncate leading-none">
+              {org.name}
+            </span>
+            <div className="mt-1">
+              <OrgTypeBadge type={org.type} size="xs" />
+            </div>
           </div>
-        )}
-        <div className="flex flex-col overflow-hidden min-w-0">
-          <span className="text-sm font-semibold text-foreground truncate leading-none">
-            {org.name}
-          </span>
-          <div className="mt-1">
-            <OrgTypeBadge type={org.type} size="xs" />
-          </div>
-        </div>
         </div>
         <div className="rounded-lg border border-border bg-background px-3 py-2.5">
-          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Workspace Mode</p>
-          <p className="text-xs font-semibold text-foreground mt-0.5">{orgModeLabel}</p>
+          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+            Workspace Mode
+          </p>
+          <p className="text-xs font-semibold text-foreground mt-0.5">
+            {orgModeLabel}
+          </p>
           {myRole && (
             <p className="mt-1 text-[11px] text-muted-foreground">
               Your role: {getOrgRoleMeta(myRole, org.type).longLabel}
@@ -116,7 +140,9 @@ export default function OrgSidebar() {
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/8 px-3 py-2 text-emerald-700 dark:text-emerald-300">
           <Activity className="h-3.5 w-3.5" strokeWidth={1.8} />
-          <span className="text-[11px] font-semibold">Operational workspace</span>
+          <span className="text-[11px] font-semibold">
+            Operational workspace
+          </span>
         </div>
       </div>
 
@@ -151,6 +177,16 @@ export default function OrgSidebar() {
             icon={<Layers className="w-4 h-4" strokeWidth={1.5} />}
           >
             Models Registry
+          </OrgSidebarLink>
+        )}
+
+        {showUsage && (
+          <OrgSidebarLink
+            href={`${base}/usage`}
+            active={isActive(`${base}/usage`)}
+            icon={<BarChart3 className="w-4 h-4" strokeWidth={1.5} />}
+          >
+            Usage Tracking
           </OrgSidebarLink>
         )}
 
@@ -193,14 +229,15 @@ export default function OrgSidebar() {
 
       {/* Back to personal dashboard */}
       <div className="p-3 border-t border-border">
-        <Link
-          href="/dashboard"
+        <button
+          type="button"
+          onClick={handleReturnToDeveloperMode}
           className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-all font-semibold"
           title="Return to Developer Mode"
         >
           <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2} />
           Return to Developer Mode
-        </Link>
+        </button>
       </div>
     </div>
   );

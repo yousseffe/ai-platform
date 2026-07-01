@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import type { Request as ExpressRequest } from 'express';
 import { ApiKey } from '../entities/api-key.entity';
+import { McpToken } from '../entities/mcp-token.entity';
 import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
 import { getRsaKeys } from '../utils/keys';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
@@ -38,6 +39,16 @@ interface JwtPayload {
   jti?: string;
 }
 
+function getHeaderString(
+  value: string | string[] | undefined,
+): string | undefined {
+  if (Array.isArray(value)) {
+    return typeof value[0] === 'string' ? value[0] : undefined;
+  }
+
+  return typeof value === 'string' ? value : undefined;
+}
+
 /**
  * Guard that permits request execution if a valid API Key OR a valid JWT token
  * is supplied via the Authorization header.
@@ -50,6 +61,8 @@ export class ApiKeyOrJwtGuard implements CanActivate {
     private readonly apiKeyRepository: Repository<ApiKey>,
     @InjectRepository(OrgApiKey)
     private readonly orgApiKeyRepository: Repository<OrgApiKey>,
+    @InjectRepository(McpToken)
+    private readonly mcpTokenRepository: Repository<McpToken>,
   ) {}
 
   /**
@@ -63,19 +76,52 @@ export class ApiKeyOrJwtGuard implements CanActivate {
     const request = context
       .switchToHttp()
       .getRequest<AuthenticatedApiRequest>();
-    const authHeaderValue = request.headers.authorization;
-    const authHeader = Array.isArray(authHeaderValue)
-      ? authHeaderValue[0]
-      : authHeaderValue;
+    const authHeader = getHeaderString(request.headers.authorization);
+    const apiKeyHeader = getHeaderString(request.headers['x-api-key']);
 
-    if (!authHeader) {
-      throw new UnauthorizedException('Missing Authorization header');
+    let token = apiKeyHeader?.trim() || '';
+
+    if (!token && authHeader) {
+      const [type, authToken] = authHeader.split(' ');
+      if (type !== 'Bearer' || !authToken) {
+        throw new UnauthorizedException('Invalid Authorization format');
+      }
+      token = authToken.trim();
     }
 
-    const [type, token] = authHeader.split(' ');
+    if (!token) {
+      throw new UnauthorizedException(
+        'Missing API credentials. Use Authorization: Bearer <token> or x-api-key.',
+      );
+    }
 
-    if (type !== 'Bearer' || !token) {
-      throw new UnauthorizedException('Invalid Authorization format');
+    // MCP access tokens (mcp_...) — issued by the platform's MCP token service.
+    // Forwarded by the MCP server when it calls backend admin endpoints on behalf
+    // of an authenticated admin caller.
+    if (token.startsWith('mcp_')) {
+      const keyHash = crypto.createHash('sha256').update(token).digest('hex');
+      const mcpToken = await this.mcpTokenRepository.findOne({
+        where: { keyHash, isActive: true },
+        relations: ['user'],
+      });
+
+      if (!mcpToken) {
+        throw new UnauthorizedException('Invalid or revoked MCP token');
+      }
+
+      if (mcpToken.expiresAt && mcpToken.expiresAt.getTime() < Date.now()) {
+        throw new UnauthorizedException('MCP token has expired');
+      }
+
+      this.mcpTokenRepository
+        .update(mcpToken.id, { lastUsedAt: new Date() })
+        .catch(() => undefined);
+
+      request.user = {
+        id: mcpToken.user.id,
+        email: mcpToken.user.email,
+      };
+      return true;
     }
 
     if (token.startsWith('sk_live_')) {
@@ -89,10 +135,6 @@ export class ApiKeyOrJwtGuard implements CanActivate {
           'Invalid or revoked organization API Key',
         );
       }
-
-      this.orgApiKeyRepository
-        .update(orgApiKey.id, { lastUsedAt: new Date() })
-        .catch(() => undefined);
 
       request.user = {
         id: `org-key:${orgApiKey.id}`,

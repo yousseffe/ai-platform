@@ -12,7 +12,15 @@ interface StepWalletReviewProps {
   /**
    * The organization creation fee amount.
    */
-  orgFee: number;
+  orgFee: number | null;
+  /**
+   * Whether the fee is currently loading from backend config.
+   */
+  isFeeLoading: boolean;
+  /**
+   * Optional error shown when fee loading fails.
+   */
+  feeLoadError?: string;
   /**
    * The currently selected workspace type.
    */
@@ -40,6 +48,8 @@ interface StepWalletReviewProps {
  */
 export default function StepWalletReview({
   orgFee,
+  isFeeLoading,
+  feeLoadError = "",
   orgType,
   orgName,
   orgSlug,
@@ -125,8 +135,14 @@ export default function StepWalletReview({
             <span className="text-muted-foreground font-semibold flex items-center gap-1">
               <CreditCard className="w-3.5 h-3.5 text-slate-400" /> Workspace Creation Fee:
             </span>
-            <span className="font-bold text-foreground text-sm">{Math.round(orgFee)} EGP</span>
+            <span className="font-bold text-foreground text-sm">
+              {isFeeLoading ? "Loading..." : orgFee !== null ? `${Math.round(orgFee)} EGP` : "Unavailable"}
+            </span>
           </div>
+
+          {feeLoadError ? (
+            <p className="text-[10px] text-red-500 font-sans">{feeLoadError}</p>
+          ) : null}
 
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-border/60 text-[10px] leading-relaxed flex items-start gap-2.5">
             <Lock className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />

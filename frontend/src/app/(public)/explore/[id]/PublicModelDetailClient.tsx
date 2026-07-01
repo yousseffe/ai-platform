@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   ArrowLeft,
   Brain,
@@ -35,7 +36,9 @@ import {
   Key,
   Eye,
   EyeOff,
-  Loader2
+  Loader2,
+  Star,
+  Trash2
 } from "lucide-react";
 import { smartFetch } from "@/lib/utils/smart-fetch";
 import { toast } from "react-hot-toast";
@@ -311,8 +314,99 @@ print(response.json())`;
 const data = await response.json();
 console.log(data);`;
 
-  const [activeTab, setActiveTab] = useState<"overview" | "playground" | "api" | "versions">("overview");
+  const { data: session } = useSession();
+  const [activeTab, setActiveTab] = useState<"overview" | "playground" | "api" | "versions" | "reviews">("overview");
   const [activeTabApi, setActiveTabApi] = useState<"curl" | "python" | "javascript">("curl");
+
+  // Reviews states
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [localAvgRating, setLocalAvgRating] = useState<number>(parseFloat(model.averageRating as any || 0));
+  const [localReviewCount, setLocalReviewCount] = useState<number>(model.reviewCount || 0);
+
+  // Form states
+  const [userRating, setUserRating] = useState<number>(5);
+  const [userComment, setUserComment] = useState<string>("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [isDeletingReview, setIsDeletingReview] = useState(false);
+  const [isEditingReview, setIsEditingReview] = useState(false);
+
+  const fetchReviews = async () => {
+    setIsLoadingReviews(true);
+    try {
+      const data = await smartFetch<any[]>(`/models/${model.id}/reviews`);
+      const reviewList = data || [];
+      setReviews(reviewList);
+      
+      const count = reviewList.length;
+      const avg = count > 0 ? reviewList.reduce((sum: number, r: any) => sum + r.rating, 0) / count : 0.0;
+      setLocalAvgRating(avg);
+      setLocalReviewCount(count);
+
+      // Prepopulate form if user has a review
+      const myReview = reviewList.find((r: any) => r.user?.email === session?.user?.email);
+      if (myReview) {
+        setUserRating(myReview.rating);
+        setUserComment(myReview.comment || "");
+        setIsEditingReview(true);
+      } else {
+        setUserRating(5);
+        setUserComment("");
+        setIsEditingReview(false);
+      }
+    } catch (err) {
+      console.error("Failed to fetch reviews", err);
+    } finally {
+      setIsLoadingReviews(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchReviews();
+  }, [model.id, session?.user?.email]);
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingReview(true);
+    try {
+      await smartFetch(`/models/${model.id}/reviews`, {
+        method: "POST",
+        body: JSON.stringify({ rating: userRating, comment: userComment }),
+      });
+      toast.success(isEditingReview ? "Review updated successfully!" : "Review submitted successfully!");
+      await fetchReviews();
+    } catch (err: any) {
+      console.error("Review submit error:", err);
+      const message = err.message || "Failed to submit review";
+      if (message.toLowerCase().includes("api key") || message.toLowerCase().includes("forbidden")) {
+        toast.error("You must generate an API key for this model first. Click 'Subscribe & Generate API Key' above.");
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const handleDeleteReview = async () => {
+    if (!confirm("Are you sure you want to delete your review?")) return;
+    setIsDeletingReview(true);
+    try {
+      await smartFetch(`/models/${model.id}/reviews`, {
+        method: "DELETE",
+      });
+      toast.success("Review deleted successfully!");
+      setUserRating(5);
+      setUserComment("");
+      setIsEditingReview(false);
+      await fetchReviews();
+    } catch (err: any) {
+      console.error("Review delete error:", err);
+      toast.error(err.message || "Failed to delete review");
+    } finally {
+      setIsDeletingReview(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground animate-fade-in">
@@ -430,15 +524,25 @@ console.log(data);`;
                 </p>
               )}
 
-              {/* Publisher */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+              {/* Publisher & Rating */}
+              <div className="flex items-center flex-wrap gap-2 text-sm text-muted-foreground pt-2">
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
                   <User className="w-3.5 h-3.5 text-primary" />
                 </div>
-                <span>Published by <strong className="text-foreground">{model.user?.username ?? model.user?.email?.split("@")[0] ?? "MLHub Community"}</strong></span>
+                <span>Published by <strong className="text-foreground">{model.organization?.name ?? model.user?.username ?? model.user?.email?.split("@")[0] ?? "MLHub Community"}</strong></span>
                 <span className="text-border">·</span>
                 <Calendar className="w-3.5 h-3.5" />
                 <span>{formatDate(model.createdAt)}</span>
+                {localReviewCount > 0 && (
+                  <>
+                    <span className="text-border">·</span>
+                    <div className="flex items-center gap-0.5 text-amber-500 font-bold shrink-0">
+                      <span>★</span>
+                      <span className="text-foreground">{localAvgRating.toFixed(1)}</span>
+                      <span className="text-xs text-muted-foreground font-normal">({localReviewCount} review{localReviewCount !== 1 ? "s" : ""})</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -453,6 +557,7 @@ console.log(data);`;
             { id: "playground", label: "Interactive Playground", icon: <Play className="w-4 h-4" />, hide: !isLive, badge: "Live" },
             { id: "api", label: "API Reference", icon: <Terminal className="w-4 h-4" /> },
             { id: "versions", label: "Releases", icon: <Package className="w-4 h-4" />, count: versions.length },
+            { id: "reviews", label: "Reviews", icon: <Sparkles className="w-4 h-4" />, count: localReviewCount },
           ]
             .filter((tab) => !tab.hide)
             .map((tab) => (
@@ -817,6 +922,202 @@ console.log(data);`;
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "reviews" && (
+          <div className="space-y-8 animate-fade-in text-left">
+            {/* Summary Statistics */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-card border border-border rounded-2xl p-6 md:p-8">
+              <div className="flex flex-col items-center justify-center text-center p-4 border-b md:border-b-0 md:border-r border-border/80">
+                <span className="text-5xl font-extrabold text-foreground tracking-tight font-mono">{localAvgRating.toFixed(1)}</span>
+                <div className="flex items-center gap-0.5 text-amber-500 my-2.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`w-5 h-5 ${star <= Math.round(localAvgRating) ? "fill-amber-500" : "text-border"}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">
+                  Based on {localReviewCount} review{localReviewCount !== 1 ? "s" : ""}
+                </span>
+              </div>
+
+              <div className="md:col-span-2 flex flex-col justify-center gap-2 p-4">
+                {[5, 4, 3, 2, 1].map((ratingVal) => {
+                  const ratingCount = reviews.filter(r => r.rating === ratingVal).length;
+                  const percent = localReviewCount > 0 ? (ratingCount / localReviewCount) * 100 : 0;
+                  return (
+                    <div key={ratingVal} className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                      <span className="w-3 text-right">{ratingVal}</span>
+                      <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500 shrink-0" />
+                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${percent}%` }} />
+                      </div>
+                      <span className="w-8 text-right text-foreground font-bold">{ratingCount}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Write a Review Section */}
+            <div className="bg-card border border-border rounded-2xl p-6 md:p-8">
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider font-mono mb-6">
+                {isEditingReview ? "Manage Your Review" : "Write a Review"}
+              </h3>
+              {isAuthenticated ? (
+                <form onSubmit={handleSubmitReview} className="space-y-6">
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-mono block mb-2">
+                      Your Rating
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setUserRating(star)}
+                          className="text-amber-500 hover:scale-110 transition-transform cursor-pointer border-none bg-transparent p-1"
+                        >
+                          <Star
+                            className={`w-8 h-8 ${star <= userRating ? "fill-amber-500" : "text-border dark:text-slate-800"}`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-mono block mb-2">
+                      Review Comment
+                    </label>
+                    <textarea
+                      value={userComment}
+                      onChange={(e) => setUserComment(e.target.value)}
+                      placeholder="Write your review here. Tell others about your experience running predictions with this model..."
+                      rows={4}
+                      className="w-full px-4 py-3 bg-background border border-border rounded-xl text-sm text-foreground placeholder-muted-foreground/50 outline-none focus:border-primary/50 transition-all font-sans"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="submit"
+                      disabled={isSubmittingReview}
+                      className="btn-primary h-10 px-5 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md select-none rounded-xl active:scale-95 transition-all text-white border-none min-w-[120px]"
+                    >
+                      {isSubmittingReview ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <span>{isEditingReview ? "Update Review" : "Submit Review"}</span>
+                      )}
+                    </button>
+                    {isEditingReview && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteReview}
+                        disabled={isDeletingReview}
+                        className="h-10 px-4 font-bold text-xs flex items-center justify-center gap-2 border border-red-200 hover:border-red-305 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-655 dark:text-red-400 cursor-pointer select-none rounded-xl transition-all"
+                      >
+                        {isDeletingReview ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete Review</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </form>
+              ) : (
+                <div className="text-center py-6 text-sm text-muted-foreground font-mono border border-dashed border-border rounded-xl bg-muted/10 p-4">
+                  Please <Link href="/login" className="text-primary hover:underline font-bold">log in</Link> to leave comments and ratings on this model.
+                </div>
+              )}
+            </div>
+
+            {/* Reviews List */}
+            <div className="space-y-5">
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider font-mono border-b border-border pb-3">
+                Reviews ({reviews.length})
+              </h3>
+              {isLoadingReviews ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="text-center py-12 border border-dashed border-border rounded-2xl bg-card text-sm text-muted-foreground font-mono">
+                  No reviews submitted yet for this model.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {reviews.map((review) => {
+                    const isMyReview = review.user?.email === session?.user?.email;
+                    const ratingStars = review.rating;
+                    const userInitials = review.user?.fullName
+                      ? review.user.fullName.substring(0, 2).toUpperCase()
+                      : review.user?.email
+                      ? review.user.email.substring(0, 2).toUpperCase()
+                      : "U";
+
+                    return (
+                      <div
+                        key={review.id}
+                        className={`bg-card border border-border rounded-2xl p-5 md:p-6 transition-all duration-200 ${
+                          isMyReview ? "ring-1 ring-primary/45 border-primary/20 bg-primary/5/10" : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-900 border border-border flex items-center justify-center text-xs font-bold font-mono text-muted-foreground">
+                              {userInitials}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm font-bold text-foreground">
+                                  {review.user?.fullName || review.user?.email?.split("@")[0]}
+                                </h4>
+                                {isMyReview && (
+                                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {formatDate(review.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-0.5 text-amber-500">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-3.5 h-3.5 ${star <= ratingStars ? "fill-amber-500" : "text-border"}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        {review.comment ? (
+                          <p className="text-sm text-muted-foreground leading-relaxed pl-12 whitespace-pre-wrap">
+                            {review.comment}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground/60 italic leading-relaxed pl-12">
+                            Rated {review.rating} out of 5 stars with no comment left.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}

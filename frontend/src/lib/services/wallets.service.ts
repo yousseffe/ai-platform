@@ -2,6 +2,23 @@ import { smartFetch } from "@/lib/utils/smart-fetch";
 import { WalletType } from "@/types";
 
 /**
+ * Lightweight wallet balance shape returned by workspace finance endpoints.
+ */
+export interface WorkspaceWallet {
+  id: string;
+  balance: number;
+  currency: string;
+  walletType: WalletType;
+}
+
+interface WorkspaceWalletApiResponse {
+  id: string;
+  balance: number | string;
+  currency: string;
+  walletType: WalletType;
+}
+
+/**
  * Interface representing a wallet ledger transaction record.
  */
 export interface Transaction {
@@ -24,6 +41,24 @@ export interface PaginatedTransactions {
   total: number;
   page: number;
   limit: number;
+}
+
+/**
+ * Normalizes wallet payloads coming from decimal-backed database responses.
+ *
+ * @param wallet - Raw wallet payload returned by the backend.
+ * @returns Wallet object with a guaranteed numeric balance.
+ */
+function normalizeWorkspaceWallet(
+  wallet: WorkspaceWalletApiResponse,
+): WorkspaceWallet {
+  return {
+    ...wallet,
+    balance:
+      typeof wallet.balance === "string"
+        ? parseFloat(wallet.balance)
+        : wallet.balance,
+  };
 }
 
 /**
@@ -65,6 +100,49 @@ export async function getTransactions(
 }
 
 /**
+ * Retrieves every wallet ledger associated with an organization workspace.
+ *
+ * @param orgId - Organization UUID.
+ * @returns A promise resolving to the organization wallets collection.
+ */
+export async function getOrganizationWallets(
+  orgId: string,
+): Promise<WorkspaceWallet[]> {
+  const wallets = await smartFetch<WorkspaceWalletApiResponse[]>(
+    `/wallets/org/${orgId}`,
+    {
+      headers: {
+        "X-Workspace-Id": orgId,
+      },
+    },
+  );
+
+  return wallets.map(normalizeWorkspaceWallet);
+}
+
+/**
+ * Withdraws funds from the active provider wallet of a workspace.
+ *
+ * @param workspaceId - Active workspace UUID.
+ * @param amount - Amount in EGP to withdraw.
+ * @returns A promise resolving to the updated wallet ledger.
+ */
+export async function withdrawWorkspaceFunds(
+  workspaceId: string,
+  amount: number,
+): Promise<WorkspaceWallet> {
+  const wallet = await smartFetch<WorkspaceWalletApiResponse>("/wallets/withdraw", {
+    method: "POST",
+    headers: {
+      "X-Workspace-Id": workspaceId,
+    },
+    body: JSON.stringify({ amount }),
+  });
+
+  return normalizeWorkspaceWallet(wallet);
+}
+
+/**
  * Fetches the global configuration for the credits-to-EGP conversion multiplier.
  *
  * @returns A promise resolving to the credits per EGP multiplier coefficient.
@@ -73,4 +151,3 @@ export async function getCreditsPerEgp(): Promise<number> {
   const res = await smartFetch<{ credits_per_egp: number }>("/wallets/config/credits-per-egp");
   return res.credits_per_egp;
 }
-

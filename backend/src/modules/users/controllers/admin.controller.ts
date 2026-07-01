@@ -66,6 +66,52 @@ export class AdminController {
   }
 
   /**
+   * Attaches wallet metadata so admin clients can format ledger amounts using
+   * the real wallet currency instead of guessing from the transaction text.
+   */
+  private async enrichTransactions(
+    transactions: Transaction[],
+  ): Promise<
+    Array<
+      Transaction & {
+        walletType: WalletType | null;
+        walletCurrency: string | null;
+      }
+    >
+  > {
+    const walletIds = [...new Set(transactions.map((tx) => tx.walletId))];
+    if (walletIds.length === 0) {
+      return transactions.map((tx) => ({
+        ...tx,
+        walletType: null,
+        walletCurrency: null,
+      }));
+    }
+
+    const wallets = await this.walletRepository.find({
+      where: { id: In(walletIds) },
+    });
+    const walletMap = new Map(
+      wallets.map((wallet) => [
+        wallet.id,
+        {
+          walletType: wallet.walletType,
+          walletCurrency: wallet.currency,
+        },
+      ]),
+    );
+
+    return transactions.map((tx) => {
+      const walletMeta = walletMap.get(tx.walletId);
+      return {
+        ...tx,
+        walletType: walletMeta?.walletType ?? null,
+        walletCurrency: walletMeta?.walletCurrency ?? null,
+      };
+    });
+  }
+
+  /**
    * Retrieves all registered platform models with deployment stats and container metrics.
    *
    * @returns Detailed models registry list.
@@ -243,6 +289,7 @@ export class AdminController {
 
   /**
    * Retrieves global default pricing for each model type and trial usage configuration.
+   * LLM_GGUF models use token-based billing (separate input/output prices per 1M tokens).
    *
    * @returns Current defaults configuration dictionary.
    */
@@ -251,35 +298,30 @@ export class AdminController {
     const configs = await this.systemConfigRepository.find();
     const configMap = new Map(configs.map((c) => [c.key, c.value]));
 
+    const float = (key: string, fallback: number): number =>
+      configMap.has(key) ? parseFloat(configMap.get(key)!) : fallback;
+    const int = (key: string, fallback: number): number =>
+      configMap.has(key) ? parseInt(configMap.get(key)!, 10) : fallback;
+
     return {
-      price_tabular: configMap.has('price_tabular')
-        ? parseFloat(configMap.get('price_tabular')!)
-        : 0.1,
-      price_nlp: configMap.has('price_nlp')
-        ? parseFloat(configMap.get('price_nlp')!)
-        : 0.2,
-      price_vision: configMap.has('price_vision')
-        ? parseFloat(configMap.get('price_vision')!)
-        : 0.3,
-      price_llm_gguf: configMap.has('price_llm_gguf')
-        ? parseFloat(configMap.get('price_llm_gguf')!)
-        : 0.5,
-      price_diffusion: configMap.has('price_diffusion')
-        ? parseFloat(configMap.get('price_diffusion')!)
-        : 1.0,
-      default_provider_share_percent: configMap.has(
-        'default_provider_share_percent',
-      )
-        ? parseInt(configMap.get('default_provider_share_percent')!, 10)
-        : 80,
-      playground_trial_limit: configMap.has('playground_trial_limit')
-        ? parseInt(configMap.get('playground_trial_limit')!, 10)
-        : 50,
+      // Per-prediction / per-image rates
+      price_tabular: float('price_tabular', 0.00005),
+      price_nlp: float('price_nlp', 0.2),
+      price_vision: float('price_vision', 0.01),
+      price_diffusion: float('price_diffusion', 0.04),
+      // LLM token-based rates (credits per 1M tokens)
+      price_llm_gguf_input: float('price_llm_gguf_input', 2.0),
+      price_llm_gguf_output: float('price_llm_gguf_output', 8.0),
+      // Revenue split & economy settings
+      default_provider_share_percent: int('default_provider_share_percent', 80),
+      playground_trial_limit: int('playground_trial_limit', 50),
       credits_per_egp: configMap.has('credits_per_egp')
-        ? parseInt(configMap.get('credits_per_egp')!, 10)
-        : configMap.has('credits_per_usd')
-          ? parseInt(configMap.get('credits_per_usd')!, 10)
-          : 10,
+        ? int('credits_per_egp', 10)
+        : int('credits_per_usd', 10),
+      // Commission tier schedule (platform cut %)
+      commission_tier_free: int('commission_tier_free', 20),
+      commission_tier_professional: int('commission_tier_professional', 15),
+      commission_tier_enterprise: int('commission_tier_enterprise', 10),
     };
   }
 
@@ -296,28 +338,26 @@ export class AdminController {
       price_tabular?: number;
       price_nlp?: number;
       price_vision?: number;
-      price_llm_gguf?: number;
+      price_llm_gguf_input?: number;
+      price_llm_gguf_output?: number;
       price_diffusion?: number;
       default_provider_share_percent?: number;
       playground_trial_limit?: number;
       credits_per_egp?: number;
+      commission_tier_free?: number;
+      commission_tier_professional?: number;
+      commission_tier_enterprise?: number;
     },
   ) {
-    const keys = Object.keys(body);
-    for (const key of keys) {
-      const val = body[key];
+    const entries = Object.entries(body) as [string, number | undefined][];
+    for (const [key, val] of entries) {
       if (val === undefined || val < 0) {
         throw new BadRequestException(`Invalid value for config field: ${key}`);
       }
 
-      let config = await this.systemConfigRepository.findOne({
-        where: { key },
-      });
+      let config = await this.systemConfigRepository.findOne({ where: { key } });
       if (!config) {
-        config = this.systemConfigRepository.create({
-          key,
-          value: val.toString(),
-        });
+        config = this.systemConfigRepository.create({ key, value: val.toString() });
       } else {
         config.value = val.toString();
       }
@@ -346,6 +386,7 @@ export class AdminController {
     const platformBalance = platformWallet
       ? parseFloat(platformWallet.balance as any) || 0.0
       : 0.0;
+    const platformCurrency = platformWallet?.currency || 'EGP';
 
     const recentTransactions = await this.dataSource
       .getRepository(Transaction)
@@ -353,13 +394,16 @@ export class AdminController {
         order: { createdAt: 'DESC' },
         take: 15,
       });
+    const enrichedRecentTransactions =
+      await this.enrichTransactions(recentTransactions);
 
     return {
       totalUsers,
       totalModels,
       totalOrgs,
       platformBalance,
-      recentTransactions,
+      platformCurrency,
+      recentTransactions: enrichedRecentTransactions,
     };
   }
 
@@ -445,10 +489,11 @@ export class AdminController {
         skip: (pageNum - 1) * limitNum,
         take: limitNum,
       });
+    const enrichedTransactions = await this.enrichTransactions(transactions);
 
     return {
       success: true,
-      data: transactions,
+      data: enrichedTransactions,
       total,
       page: pageNum,
       limit: limitNum,
@@ -796,38 +841,5 @@ export class AdminController {
     await this.dataSource.getRepository(Transaction).save(transaction);
 
     return savedWallet;
-  }
-
-  /**
-   * Deletes a model repository as an admin.
-   *
-   * @param id - Model UUID.
-   * @returns Success receipt.
-   */
-  @Delete('models/:id')
-  async deleteModel(@Param('id') id: string) {
-    const model = await this.modelRepository.findOneBy({ id });
-    if (!model) {
-      throw new NotFoundException('Model not found');
-    }
-    await this.modelRepository.remove(model);
-    return { success: true };
-  }
-
-  /**
-   * Toggles the marketplace visibility of a model.
-   *
-   * @param id - Model UUID.
-   * @returns Receipt confirming updated state.
-   */
-  @Patch('models/:id/toggle-visibility')
-  async toggleModelVisibility(@Param('id') id: string) {
-    const model = await this.modelRepository.findOneBy({ id });
-    if (!model) {
-      throw new NotFoundException('Model not found');
-    }
-    model.isPublic = !model.isPublic;
-    await this.modelRepository.save(model);
-    return { success: true, isPublic: model.isPublic };
   }
 }

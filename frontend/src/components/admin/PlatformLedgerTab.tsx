@@ -86,7 +86,7 @@ export default function PlatformLedgerTab({ stats, loading }: PlatformLedgerTabP
             </div>
             <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-0.5 font-mono">System Admin Wallet</p>
             <CardTitle className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 border-none p-0 h-auto font-mono">
-              ${stats.platformBalance.toFixed(2)}
+              {stats.platformBalance.toFixed(2)} {stats.platformCurrency || "EGP"}
             </CardTitle>
           </CardContent>
         </Card>
@@ -117,6 +117,10 @@ export default function PlatformLedgerTab({ stats, loading }: PlatformLedgerTabP
                   {stats.recentTransactions.map((tx) => {
                     const isCredit = tx.type === "CREDIT";
                     const valFloat = typeof tx.amount === "string" ? parseFloat(tx.amount) : tx.amount;
+                    const isCreditsWallet = tx.walletCurrency === "CREDITS";
+                    const displayAmount = isCreditsWallet
+                      ? `${Math.round(valFloat)} Credits`
+                      : `${valFloat.toFixed(2)} ${tx.walletCurrency || "EGP"}`;
                     return (
                       <TableRow key={tx.id} className="hover:bg-accent/40 border-b border-border">
                         <TableCell className="px-5 py-3 font-bold text-foreground max-w-xs truncate">
@@ -139,7 +143,7 @@ export default function PlatformLedgerTab({ stats, loading }: PlatformLedgerTabP
                           </span>
                         </TableCell>
                         <TableCell className={`px-5 py-3 font-bold ${isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                          {isCredit ? "+" : "-"}${valFloat.toFixed(2)}
+                          {isCredit ? "+" : "-"}{displayAmount}
                         </TableCell>
                         <TableCell className="px-5 py-3 text-muted-foreground select-all">
                           {tx.id}
