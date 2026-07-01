@@ -143,9 +143,7 @@ export class ModelIntegrationService {
     const ready = versions
       .filter((v) => v.status === VersionStatus.READY)
       .sort((a, b) => b.versionNumber - a.versionNumber);
-    const withSample = ready.find(
-      (v) => v.examplePayload || v.expectedResult,
-    );
+    const withSample = ready.find((v) => v.examplePayload || v.expectedResult);
     return withSample ?? ready[0] ?? null;
   }
 
@@ -159,7 +157,11 @@ export class ModelIntegrationService {
     exampleRaw: string | null;
   } {
     if (!raw) {
-      return { contentType: 'application/json', example: null, exampleRaw: null };
+      return {
+        contentType: 'application/json',
+        example: null,
+        exampleRaw: null,
+      };
     }
     try {
       return {
@@ -168,7 +170,11 @@ export class ModelIntegrationService {
         exampleRaw: null,
       };
     } catch {
-      return { contentType: 'application/json', example: null, exampleRaw: raw };
+      return {
+        contentType: 'application/json',
+        example: null,
+        exampleRaw: raw,
+      };
     }
   }
 
@@ -206,13 +212,21 @@ export class ModelIntegrationService {
 
     if (isLlm) {
       const [inputConfig, outputConfig] = await Promise.all([
-        this.systemConfigRepository.findOne({ where: { key: 'price_llm_gguf_input' } }),
-        this.systemConfigRepository.findOne({ where: { key: 'price_llm_gguf_output' } }),
+        this.systemConfigRepository.findOne({
+          where: { key: 'price_llm_gguf_input' },
+        }),
+        this.systemConfigRepository.findOne({
+          where: { key: 'price_llm_gguf_output' },
+        }),
       ]);
       return {
         billingUnit,
-        inputCreditsPerMToken: inputConfig ? parseFloat(inputConfig.value) : 2.0,
-        outputCreditsPerMToken: outputConfig ? parseFloat(outputConfig.value) : 8.0,
+        inputCreditsPerMToken: inputConfig
+          ? parseFloat(inputConfig.value)
+          : 2.0,
+        outputCreditsPerMToken: outputConfig
+          ? parseFloat(outputConfig.value)
+          : 8.0,
         currency: 'CREDITS',
         note: 'Input and output tokens billed at separate rates per 1M tokens processed.',
       };
@@ -235,7 +249,9 @@ export class ModelIntegrationService {
    */
   private async getDefaultPrice(modelType: string): Promise<number> {
     const key = 'price_' + modelType.toLowerCase();
-    const config = await this.systemConfigRepository.findOne({ where: { key } });
+    const config = await this.systemConfigRepository.findOne({
+      where: { key },
+    });
     return config ? parseFloat(config.value) : 0.1;
   }
 }

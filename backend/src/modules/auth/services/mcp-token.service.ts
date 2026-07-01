@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
@@ -64,7 +68,9 @@ export class McpTokenService {
     // 5. Calculate expiration date if specified
     let expiresAt: Date | null = null;
     if (dto.expiresInDays) {
-      expiresAt = new Date(Date.now() + dto.expiresInDays * 24 * 60 * 60 * 1000);
+      expiresAt = new Date(
+        Date.now() + dto.expiresInDays * 24 * 60 * 60 * 1000,
+      );
     }
 
     const newMcpToken = this.mcpTokenRepository.create({

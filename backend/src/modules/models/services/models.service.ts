@@ -104,7 +104,7 @@ export class ModelsService {
     const event = this.reviewEventRepository.create({
       model: params.model,
       version: params.version ?? null,
-      actor: params.actorId ? ({ id: params.actorId } as any) : null,
+      actor: params.actorId ? { id: params.actorId } : null,
       action: params.action,
       message: params.message ?? null,
       metadata: params.metadata ?? null,
@@ -335,11 +335,11 @@ export class ModelsService {
       if (!uploaderUserId) {
         throw new ForbiddenException('Missing authenticated uploader');
       }
-      await this.assertProviderOrgAccess(model.organization.id, uploaderUserId, [
-        OrgRole.OWNER,
-        OrgRole.MAINTAINER,
-        OrgRole.CONTRIBUTOR,
-      ]);
+      await this.assertProviderOrgAccess(
+        model.organization.id,
+        uploaderUserId,
+        [OrgRole.OWNER, OrgRole.MAINTAINER, OrgRole.CONTRIBUTOR],
+      );
     } else if (uploaderUserId && model.user?.id !== uploaderUserId) {
       throw new ForbiddenException('Only the model owner can upload versions');
     }
@@ -442,9 +442,11 @@ export class ModelsService {
 
     const modelVersion = this.modelVersionsRepository.create({
       model,
-      uploadedBy: uploaderUserId ? ({ id: uploaderUserId } as any) : null,
+      uploadedBy: uploaderUserId ? { id: uploaderUserId } : null,
       versionNumber,
-      status: model.organization ? VersionStatus.UPLOADED : VersionStatus.UPLOADED,
+      status: model.organization
+        ? VersionStatus.UPLOADED
+        : VersionStatus.UPLOADED,
       reviewStatus: model.organization
         ? VersionReviewStatus.PENDING
         : VersionReviewStatus.NOT_REQUIRED,
@@ -464,7 +466,8 @@ export class ModelsService {
         detectedExpectedResult ||
         prevVersion?.expectedResult ||
         null,
-      classLabels: parseJsonSafely(classLabels) || prevVersion?.classLabels || null,
+      classLabels:
+        parseJsonSafely(classLabels) || prevVersion?.classLabels || null,
     });
 
     const savedVersion = await this.modelVersionsRepository.save(modelVersion);
@@ -514,12 +517,15 @@ export class ModelsService {
       throw new NotFoundException('Model version not found');
     }
     if (version.model.organization) {
-      await this.assertProviderOrgAccess(version.model.organization.id, actorId);
+      await this.assertProviderOrgAccess(
+        version.model.organization.id,
+        actorId,
+      );
     }
 
     const testCase = this.testCaseRepository.create({
       version,
-      createdBy: { id: actorId } as any,
+      createdBy: { id: actorId },
       name: body.name,
       payload: body.payload,
       expectedResult: body.expectedResult ?? null,
@@ -548,12 +554,16 @@ export class ModelsService {
       throw new NotFoundException('Model version not found');
     }
     if (version.model.organization) {
-      await this.assertProviderOrgAccess(version.model.organization.id, actorId, [
-        OrgRole.OWNER,
-        OrgRole.MAINTAINER,
-        OrgRole.CONTRIBUTOR,
-        OrgRole.VIEWER,
-      ]);
+      await this.assertProviderOrgAccess(
+        version.model.organization.id,
+        actorId,
+        [
+          OrgRole.OWNER,
+          OrgRole.MAINTAINER,
+          OrgRole.CONTRIBUTOR,
+          OrgRole.VIEWER,
+        ],
+      );
     }
     return this.testCaseRepository.find({
       where: { version: { id: versionId } },
@@ -577,7 +587,9 @@ export class ModelsService {
     }
     const orgId = version.model.organization?.id;
     if (!orgId) {
-      throw new BadRequestException('Personal model versions do not need review');
+      throw new BadRequestException(
+        'Personal model versions do not need review',
+      );
     }
     await this.assertProviderOrgAccess(orgId, reviewerId, [
       OrgRole.OWNER,
@@ -675,12 +687,16 @@ export class ModelsService {
       throw new NotFoundException('Model version not found');
     }
     if (version.model.organization) {
-      await this.assertProviderOrgAccess(version.model.organization.id, actorId, [
-        OrgRole.OWNER,
-        OrgRole.MAINTAINER,
-        OrgRole.CONTRIBUTOR,
-        OrgRole.VIEWER,
-      ]);
+      await this.assertProviderOrgAccess(
+        version.model.organization.id,
+        actorId,
+        [
+          OrgRole.OWNER,
+          OrgRole.MAINTAINER,
+          OrgRole.CONTRIBUTOR,
+          OrgRole.VIEWER,
+        ],
+      );
     }
 
     const entries = [
@@ -694,12 +710,14 @@ export class ModelsService {
       entries.map(async ([kind, artifactPath]) => ({
         kind,
         path: artifactPath,
-        url: artifactPath ? await this.minioService.getFileUrl(artifactPath) : null,
+        url: artifactPath
+          ? await this.minioService.getFileUrl(artifactPath)
+          : null,
         previewable: Boolean(
           artifactPath &&
-            (artifactPath.endsWith('.py') ||
-              artifactPath.endsWith('.json') ||
-              artifactPath.endsWith('.txt')),
+          (artifactPath.endsWith('.py') ||
+            artifactPath.endsWith('.json') ||
+            artifactPath.endsWith('.txt')),
         ),
       })),
     );
@@ -753,7 +771,10 @@ export class ModelsService {
       0,
     );
 
-    const byUploader = new Map<string, { name: string; models: number; versions: number }>();
+    const byUploader = new Map<
+      string,
+      { name: string; models: number; versions: number }
+    >();
     for (const model of models) {
       const creatorKey = model.user?.id ?? 'unknown';
       const creatorName = model.user?.email ?? 'Unknown';
@@ -825,7 +846,9 @@ export class ModelsService {
       throw new NotFoundException(`Model version ${versionId} not found.`);
     }
 
-    const parseJsonSafely = (val?: string | Record<string, any>): Record<string, any> | null => {
+    const parseJsonSafely = (
+      val?: string | Record<string, any>,
+    ): Record<string, any> | null => {
       if (!val) return null;
       if (typeof val !== 'string') return val;
       try {
@@ -934,7 +957,9 @@ export class ModelsService {
       try {
         fs.unlinkSync(ggufPath);
       } catch (e: any) {
-        console.warn(`Failed to delete local GGUF file ${ggufPath}: ${e.message || e}`);
+        console.warn(
+          `Failed to delete local GGUF file ${ggufPath}: ${e.message || e}`,
+        );
       }
     }
 
@@ -1056,7 +1081,7 @@ export class ModelsService {
       review = this.modelReviewRepository.create({
         rating: dto.rating,
         comment: dto.comment ?? null,
-        user: { id: userId } as any,
+        user: { id: userId },
         model,
       });
     }
@@ -1123,7 +1148,9 @@ export class ModelsService {
       try {
         await this.modelsSearchService.indexModel(fullModel);
       } catch (err: any) {
-        console.error(`Failed to index model ${modelId} after review update: ${err.message}`);
+        console.error(
+          `Failed to index model ${modelId} after review update: ${err.message}`,
+        );
       }
     }
   }

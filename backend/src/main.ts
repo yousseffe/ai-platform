@@ -35,7 +35,7 @@ const dashboardOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3001')
 const nestContextFormat = winston.format((info) => {
   // nest-winston stores the class context in info.context
   if (info.context) {
-    info['logger'] = info.context as string;
+    info['logger'] = info.context;
   }
   return info;
 })();

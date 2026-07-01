@@ -171,14 +171,14 @@ export class StripeService {
    */
   private getWebhookSecret(webhookKind: StripeWebhookKind): string {
     const secretMap: Record<StripeWebhookKind, string | undefined> = {
-      payments: process.env.STRIPE_PAYMENTS_WEBHOOK_SECRET,
-      wallets: process.env.STRIPE_WALLETS_WEBHOOK_SECRET,
+      payments: process.env.STRIPE_PAYMENTS_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET,
+      wallets: process.env.STRIPE_WALLETS_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET,
     };
 
     const webhookSecret = secretMap[webhookKind];
     if (!webhookSecret) {
       throw new Error(
-        `Stripe webhook secret is missing for "${webhookKind}" endpoint`,
+        `Stripe webhook secret is missing for "${webhookKind}" endpoint (checked STRIPE_PAYMENTS_WEBHOOK_SECRET, STRIPE_WALLETS_WEBHOOK_SECRET, and STRIPE_WEBHOOK_SECRET)`,
       );
     }
 

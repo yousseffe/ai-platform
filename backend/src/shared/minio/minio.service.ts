@@ -144,6 +144,56 @@ export class MinioService implements OnModuleInit {
   }
 
   /**
+   * Reports aggregate storage usage for the model artifact bucket: object count
+   * and total size in bytes. Returns zeros (with `fallback: true`) when running
+   * on the local filesystem fallback, since that path has no listing API here.
+   *
+   * @returns Storage usage summary.
+   */
+  async getStorageStats(): Promise<{
+    bucket: string;
+    fallback: boolean;
+    objectCount: number;
+    totalSizeBytes: number;
+  }> {
+    if (this.useLocalFallback) {
+      return {
+        bucket: this.bucketName,
+        fallback: true,
+        objectCount: 0,
+        totalSizeBytes: 0,
+      };
+    }
+
+    return new Promise((resolve) => {
+      let objectCount = 0;
+      let totalSizeBytes = 0;
+      const stream = this.minioClient.listObjectsV2(this.bucketName, '', true);
+      stream.on('data', (obj) => {
+        objectCount += 1;
+        totalSizeBytes += obj.size ?? 0;
+      });
+      stream.on('end', () => {
+        resolve({
+          bucket: this.bucketName,
+          fallback: false,
+          objectCount,
+          totalSizeBytes,
+        });
+      });
+      stream.on('error', (error: Error) => {
+        this.logger.error(`Failed to list bucket objects: ${error.message}`);
+        resolve({
+          bucket: this.bucketName,
+          fallback: false,
+          objectCount,
+          totalSizeBytes,
+        });
+      });
+    });
+  }
+
+  /**
    * Deletes an object from the MinIO bucket or local storage fallback.
    *
    * @param objectName - Key identifying the object to remove.

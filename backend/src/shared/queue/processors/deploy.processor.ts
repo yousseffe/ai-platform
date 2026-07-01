@@ -120,7 +120,11 @@ export class DeployProcessor extends WorkerHost {
         const apiKeyEntity = await this.dataSource
           .getRepository(ApiKey)
           .findOne({
-            where: { user: { id: ownerId }, type: ApiKeyType.LIVE, isActive: true },
+            where: {
+              user: { id: ownerId },
+              type: ApiKeyType.LIVE,
+              isActive: true,
+            },
           });
         ownerApiKey = apiKeyEntity?.key || '';
       }
@@ -130,7 +134,10 @@ export class DeployProcessor extends WorkerHost {
       const hasNetwork = networks.some((n) => n.Name === 'ai-platform_models');
       if (!hasNetwork) {
         this.logger.log('Creating network ai-platform_models...');
-        await this.docker.createNetwork({ Name: 'ai-platform_models', Driver: 'bridge' });
+        await this.docker.createNetwork({
+          Name: 'ai-platform_models',
+          Driver: 'bridge',
+        });
       }
 
       // Memory-based eviction check
@@ -216,11 +223,14 @@ export class DeployProcessor extends WorkerHost {
         try {
           await this.docker.getImage(imageName).inspect();
         } catch (e) {
-          this.logger.log(`Base image ${imageName} not found locally. Pulling from registry...`);
+          this.logger.log(
+            `Base image ${imageName} not found locally. Pulling from registry...`,
+          );
           await new Promise<void>((resolve, reject) => {
             this.docker.pull(imageName, {}, (err, stream) => {
               if (err) return reject(err);
-              if (!stream) return reject(new Error('Docker pull stream is undefined'));
+              if (!stream)
+                return reject(new Error('Docker pull stream is undefined'));
               this.docker.modem.followProgress(stream, (followErr) => {
                 if (followErr) return reject(followErr);
                 resolve();
@@ -246,11 +256,12 @@ export class DeployProcessor extends WorkerHost {
         const ggufStorageDir = storageDirEnv
           ? path.resolve(storageDirEnv)
           : path.join(process.cwd(), 'uploads', 'gguf-models');
-        const ggufPath = path.join(ggufStorageDir, `${deployment.modelVersion.id}.gguf`);
-        
-        hostConfig.Binds = [
-          `${ggufPath}:/models/model.gguf:ro`
-        ];
+        const ggufPath = path.join(
+          ggufStorageDir,
+          `${deployment.modelVersion.id}.gguf`,
+        );
+
+        hostConfig.Binds = [`${ggufPath}:/models/model.gguf:ro`];
       }
 
       const containerOptions: any = {
@@ -376,14 +387,18 @@ export class DeployProcessor extends WorkerHost {
   private async stopDeployment(deploymentId: string): Promise<void> {
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },
-      relations: ['modelVersion', 'modelVersion.model', 'modelVersion.model.user'],
+      relations: [
+        'modelVersion',
+        'modelVersion.model',
+        'modelVersion.model.user',
+      ],
     });
     if (!deployment) return;
 
     if (deployment.containerId) {
       try {
         const container = this.docker.getContainer(deployment.containerId);
-        
+
         // Remove Prometheus target before stopping container
         const containerName = this.getContainerName(deployment);
         await this.removePrometheusTarget(containerName);
@@ -417,25 +432,28 @@ export class DeployProcessor extends WorkerHost {
     });
   }
 
-  private async verifyDeploymentHealth(job: Job<any, void, string>): Promise<void> {
+  private async verifyDeploymentHealth(
+    job: Job<any, void, string>,
+  ): Promise<void> {
     const { deploymentId, attempt = 1 } = job.data;
 
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },
-      relations: [
-        'modelVersion',
-        'modelVersion.model',
-      ],
+      relations: ['modelVersion', 'modelVersion.model'],
     });
 
     if (!deployment) {
-      this.logger.warn(`verifyDeploymentHealth: Deployment ${deploymentId} not found.`);
+      this.logger.warn(
+        `verifyDeploymentHealth: Deployment ${deploymentId} not found.`,
+      );
       return;
     }
 
     // If it's already running or stopped/failed, we don't need to do anything
     if (deployment.status !== DeploymentStatus.STARTING) {
-      this.logger.log(`verifyDeploymentHealth: Deployment ${deploymentId} is in status ${deployment.status}. Skipping.`);
+      this.logger.log(
+        `verifyDeploymentHealth: Deployment ${deploymentId} is in status ${deployment.status}. Skipping.`,
+      );
       return;
     }
 
@@ -443,7 +461,9 @@ export class DeployProcessor extends WorkerHost {
     const url = deployment.url;
 
     if (!url) {
-      this.logger.error(`verifyDeploymentHealth: Deployment ${deploymentId} has no URL.`);
+      this.logger.error(
+        `verifyDeploymentHealth: Deployment ${deploymentId} has no URL.`,
+      );
       await this.deploymentsRepository.update(deploymentId, {
         status: DeploymentStatus.FAILED,
         errorMessage: 'Deployment URL not set.',
@@ -451,21 +471,25 @@ export class DeployProcessor extends WorkerHost {
       return;
     }
 
-    this.logger.log(`Checking health of deployment ${deploymentId} at ${url} (Attempt ${attempt})...`);
+    this.logger.log(
+      `Checking health of deployment ${deploymentId} at ${url} (Attempt ${attempt})...`,
+    );
 
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout for health probe
-      
+
       const response = await fetch(`${url}/health`, {
         signal: controller.signal,
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
       });
       clearTimeout(timeoutId);
 
-      this.logger.log(`Health check response status for ${deploymentId}: ${response.status}`);
+      this.logger.log(
+        `Health check response status for ${deploymentId}: ${response.status}`,
+      );
 
       let isHealthy = false;
       if (isLlm) {
@@ -482,7 +506,9 @@ export class DeployProcessor extends WorkerHost {
       }
 
       if (isHealthy) {
-        this.logger.log(`Deployment ${deploymentId} is healthy! Flipping status to RUNNING.`);
+        this.logger.log(
+          `Deployment ${deploymentId} is healthy! Flipping status to RUNNING.`,
+        );
         await this.deploymentsRepository.update(deploymentId, {
           status: DeploymentStatus.RUNNING,
         });
@@ -496,19 +522,23 @@ export class DeployProcessor extends WorkerHost {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.log(`Health check failed for deployment ${deploymentId}: ${message}`);
+      this.logger.log(
+        `Health check failed for deployment ${deploymentId}: ${message}`,
+      );
     }
 
     // If health check failed/loading, decide to retry or fail
     const maxAttempts = isLlm ? 60 : 15; // 60 attempts for LLM (5 mins), 15 for others (75s)
     if (attempt >= maxAttempts) {
-      this.logger.error(`Deployment ${deploymentId} failed to become healthy after ${attempt} attempts. Marking as FAILED.`);
-      
+      this.logger.error(
+        `Deployment ${deploymentId} failed to become healthy after ${attempt} attempts. Marking as FAILED.`,
+      );
+
       await this.stopDeployment(deploymentId);
 
       await this.deploymentsRepository.update(deploymentId, {
         status: DeploymentStatus.FAILED,
-        errorMessage: isLlm 
+        errorMessage: isLlm
           ? 'LLM server failed to load the model within 5 minutes.'
           : 'Model container failed to start responding within 75 seconds.',
       });
@@ -523,7 +553,13 @@ export class DeployProcessor extends WorkerHost {
   }
 
   private getTargetsFilePath(): string {
-    return path.join(process.cwd(), '..', 'docker', 'observability', 'targets.json');
+    return path.join(
+      process.cwd(),
+      '..',
+      'docker',
+      'observability',
+      'targets.json',
+    );
   }
 
   private async addPrometheusTarget(
@@ -543,7 +579,9 @@ export class DeployProcessor extends WorkerHost {
       const targets = JSON.parse(content || '[]');
 
       // Remove existing target for this container name if any
-      const filtered = targets.filter((t: any) => t.labels?.container_name !== containerName);
+      const filtered = targets.filter(
+        (t: any) => t.labels?.container_name !== containerName,
+      );
 
       // Add new target
       filtered.push({
@@ -558,9 +596,13 @@ export class DeployProcessor extends WorkerHost {
       });
 
       fs.writeFileSync(filePath, JSON.stringify(filtered, null, 2), 'utf8');
-      this.logger.log(`Added Prometheus scrape target for container: ${containerName}`);
+      this.logger.log(
+        `Added Prometheus scrape target for container: ${containerName}`,
+      );
     } catch (err: any) {
-      this.logger.error(`Failed to update Prometheus targets.json (add): ${err.message}`);
+      this.logger.error(
+        `Failed to update Prometheus targets.json (add): ${err.message}`,
+      );
     }
   }
 
@@ -571,21 +613,30 @@ export class DeployProcessor extends WorkerHost {
       const content = fs.readFileSync(filePath, 'utf8');
       const targets = JSON.parse(content || '[]');
 
-      const filtered = targets.filter((t: any) => t.labels?.container_name !== containerName);
+      const filtered = targets.filter(
+        (t: any) => t.labels?.container_name !== containerName,
+      );
 
       fs.writeFileSync(filePath, JSON.stringify(filtered, null, 2), 'utf8');
-      this.logger.log(`Removed Prometheus scrape target for container: ${containerName}`);
+      this.logger.log(
+        `Removed Prometheus scrape target for container: ${containerName}`,
+      );
     } catch (err: any) {
-      this.logger.error(`Failed to update Prometheus targets.json (remove): ${err.message}`);
+      this.logger.error(
+        `Failed to update Prometheus targets.json (remove): ${err.message}`,
+      );
     }
   }
 
   private getContainerName(deployment: any): string {
-    const userEmail = deployment.modelVersion?.model?.user?.email || 'unknown@unknown.com';
+    const userEmail =
+      deployment.modelVersion?.model?.user?.email || 'unknown@unknown.com';
     const emailPrefix = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-    const modelName = (deployment.modelVersion?.model?.name || '').replace(/[^a-zA-Z0-9]/g, '');
+    const modelName = (deployment.modelVersion?.model?.name || '').replace(
+      /[^a-zA-Z0-9]/g,
+      '',
+    );
     const shortDeployId = deployment.id.split('-')[0];
     return `${emailPrefix}_${modelName}_v${deployment.modelVersion?.versionNumber}_${shortDeployId}`.toLowerCase();
   }
 }
-

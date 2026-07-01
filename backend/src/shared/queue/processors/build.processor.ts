@@ -66,7 +66,11 @@ export class BuildProcessor extends WorkerHost {
   /**
    * Helper to persist build progress percentage (0-100) for real-time UI updates.
    */
-  private async updateProgress(versionId: string, progress: number, logs?: string): Promise<void> {
+  private async updateProgress(
+    versionId: string,
+    progress: number,
+    logs?: string,
+  ): Promise<void> {
     const updateData: any = { buildProgress: progress };
     if (logs !== undefined) {
       updateData.buildLogs = logs;
@@ -88,7 +92,9 @@ export class BuildProcessor extends WorkerHost {
 
     const logError = async (msg: string, stack?: string) => {
       this.logger.error(msg, stack);
-      logsBuffer.push(`[${new Date().toISOString()}] ERROR: ${msg}${stack ? `\n${stack}` : ''}`);
+      logsBuffer.push(
+        `[${new Date().toISOString()}] ERROR: ${msg}${stack ? `\n${stack}` : ''}`,
+      );
       await this.modelVersionsRepository.update(versionId, {
         buildLogs: logsBuffer.join('\n'),
       });
@@ -107,7 +113,9 @@ export class BuildProcessor extends WorkerHost {
     }
 
     if (version.status === VersionStatus.READY) {
-      await logInfo(`Model version ${versionId} is already READY. Skipping build.`);
+      await logInfo(
+        `Model version ${versionId} is already READY. Skipping build.`,
+      );
       return;
     }
 
@@ -284,14 +292,26 @@ export class BuildProcessor extends WorkerHost {
       let detectedType = version.model.type;
 
       // 1. Analyze by original filename
-      const originalFileName = version.modelFilePath ? path.basename(version.modelFilePath).toLowerCase() : '';
-      if (originalFileName.endsWith('.pt') || originalFileName.endsWith('.pth')) {
+      const originalFileName = version.modelFilePath
+        ? path.basename(version.modelFilePath).toLowerCase()
+        : '';
+      if (
+        originalFileName.endsWith('.pt') ||
+        originalFileName.endsWith('.pth')
+      ) {
         detectedFramework = Framework.PYTORCH;
-      } else if (originalFileName.endsWith('.h5') || originalFileName.endsWith('.keras') || originalFileName.endsWith('.pb')) {
+      } else if (
+        originalFileName.endsWith('.h5') ||
+        originalFileName.endsWith('.keras') ||
+        originalFileName.endsWith('.pb')
+      ) {
         detectedFramework = Framework.TENSORFLOW;
       } else if (originalFileName.endsWith('.onnx')) {
         detectedFramework = Framework.ONNX;
-      } else if (originalFileName.endsWith('.pkl') || originalFileName.endsWith('.joblib')) {
+      } else if (
+        originalFileName.endsWith('.pkl') ||
+        originalFileName.endsWith('.joblib')
+      ) {
         detectedFramework = Framework.SKLEARN;
       } else if (originalFileName.endsWith('.gguf')) {
         detectedFramework = Framework.LLAMA_CPP;
@@ -300,19 +320,37 @@ export class BuildProcessor extends WorkerHost {
 
       // Check filename keyword clues for task type
       if (detectedType !== ModelType.LLM_GGUF) {
-        if (originalFileName.includes('diffusion') || originalFileName.includes('stable-diffusion') || originalFileName.includes('sdxl')) {
+        if (
+          originalFileName.includes('diffusion') ||
+          originalFileName.includes('stable-diffusion') ||
+          originalFileName.includes('sdxl')
+        ) {
           detectedType = ModelType.DIFFUSION;
-        } else if (/mobilenet|resnet|vgg|efficientnet|vit|yolo|inception|convnext|densenet/i.test(originalFileName)) {
+        } else if (
+          /mobilenet|resnet|vgg|efficientnet|vit|yolo|inception|convnext|densenet/i.test(
+            originalFileName,
+          )
+        ) {
           detectedType = ModelType.VISION;
-        } else if (/bert|gpt|llama|roberta|t5|distilbert|sentiment|text|nlp|translation/i.test(originalFileName)) {
+        } else if (
+          /bert|gpt|llama|roberta|t5|distilbert|sentiment|text|nlp|translation/i.test(
+            originalFileName,
+          )
+        ) {
           detectedType = ModelType.NLP;
         }
       }
 
       // 2. Check extracted ZIP directory structure if applicable
       const unzippedDir = path.join(buildDir, 'unzipped_model');
-      if (fs.existsSync(unzippedDir) && fs.statSync(unzippedDir).isDirectory()) {
-        const findFileRecursive = (dir: string, filename: string): string | null => {
+      if (
+        fs.existsSync(unzippedDir) &&
+        fs.statSync(unzippedDir).isDirectory()
+      ) {
+        const findFileRecursive = (
+          dir: string,
+          filename: string,
+        ): string | null => {
           const files = fs.readdirSync(dir);
           for (const file of files) {
             const fullPath = path.join(dir, file);
@@ -327,7 +365,10 @@ export class BuildProcessor extends WorkerHost {
         };
 
         // Check for Stable Diffusion index
-        const modelIndexJson = findFileRecursive(unzippedDir, 'model_index.json');
+        const modelIndexJson = findFileRecursive(
+          unzippedDir,
+          'model_index.json',
+        );
         if (modelIndexJson) {
           detectedType = ModelType.DIFFUSION;
           detectedFramework = Framework.PYTORCH;
@@ -337,14 +378,26 @@ export class BuildProcessor extends WorkerHost {
         const configJsonPath = findFileRecursive(unzippedDir, 'config.json');
         if (configJsonPath) {
           try {
-            const configData = JSON.parse(fs.readFileSync(configJsonPath, 'utf8'));
-            const archs = (configData.architectures || []).map((a: string) => a.toLowerCase()).join(' ');
+            const configData = JSON.parse(
+              fs.readFileSync(configJsonPath, 'utf8'),
+            );
+            const archs = (configData.architectures || [])
+              .map((a: string) => a.toLowerCase())
+              .join(' ');
             const modelTypeField = (configData.model_type || '').toLowerCase();
-            
-            if (/vit|resnet|mobilenet|convnext|yolo|swin|deit|clip/i.test(archs + ' ' + modelTypeField)) {
+
+            if (
+              /vit|resnet|mobilenet|convnext|yolo|swin|deit|clip/i.test(
+                archs + ' ' + modelTypeField,
+              )
+            ) {
               detectedType = ModelType.VISION;
               detectedFramework = Framework.PYTORCH;
-            } else if (/bert|gpt|llama|t5|bart|roberta|distilbert|bloom|opt|mpt|falcon/i.test(archs + ' ' + modelTypeField)) {
+            } else if (
+              /bert|gpt|llama|t5|bart|roberta|distilbert|bloom|opt|mpt|falcon/i.test(
+                archs + ' ' + modelTypeField,
+              )
+            ) {
               detectedType = ModelType.NLP;
               detectedFramework = Framework.PYTORCH;
             }
@@ -354,9 +407,15 @@ export class BuildProcessor extends WorkerHost {
         }
 
         // Check for specific weight files
-        if (findFileRecursive(unzippedDir, 'pytorch_model.bin') || findFileRecursive(unzippedDir, 'model.safetensors')) {
+        if (
+          findFileRecursive(unzippedDir, 'pytorch_model.bin') ||
+          findFileRecursive(unzippedDir, 'model.safetensors')
+        ) {
           detectedFramework = Framework.PYTORCH;
-        } else if (findFileRecursive(unzippedDir, 'tf_model.h5') || findFileRecursive(unzippedDir, 'saved_model.pb')) {
+        } else if (
+          findFileRecursive(unzippedDir, 'tf_model.h5') ||
+          findFileRecursive(unzippedDir, 'saved_model.pb')
+        ) {
           detectedFramework = Framework.TENSORFLOW;
         } else if (findFileRecursive(unzippedDir, 'model.onnx')) {
           detectedFramework = Framework.ONNX;
@@ -371,7 +430,11 @@ export class BuildProcessor extends WorkerHost {
           // Framework clues
           if (/import\s+torch\b|from\s+torch\b/i.test(content)) {
             detectedFramework = Framework.PYTORCH;
-          } else if (/import\s+tensorflow\b|from\s+tensorflow\b|import\s+keras\b|from\s+keras\b/i.test(content)) {
+          } else if (
+            /import\s+tensorflow\b|from\s+tensorflow\b|import\s+keras\b|from\s+keras\b/i.test(
+              content,
+            )
+          ) {
             detectedFramework = Framework.TENSORFLOW;
           } else if (/import\s+onnxruntime\b|import\s+onnx\b/i.test(content)) {
             detectedFramework = Framework.ONNX;
@@ -380,9 +443,15 @@ export class BuildProcessor extends WorkerHost {
           }
 
           // Type clues
-          if (/cv2\b|PIL\b|Image\b|torchvision|skimage|matplotlib/i.test(content)) {
+          if (
+            /cv2\b|PIL\b|Image\b|torchvision|skimage|matplotlib/i.test(content)
+          ) {
             detectedType = ModelType.VISION;
-          } else if (/transformers\b|nltk\b|spacy\b|tokenizers\b|sentencepiece\b|gensim\b/i.test(content)) {
+          } else if (
+            /transformers\b|nltk\b|spacy\b|tokenizers\b|sentencepiece\b|gensim\b/i.test(
+              content,
+            )
+          ) {
             detectedType = ModelType.NLP;
           } else if (/diffusers\b/i.test(content)) {
             detectedType = ModelType.DIFFUSION;
@@ -396,19 +465,29 @@ export class BuildProcessor extends WorkerHost {
       checkCodeHeuristics(path.join(buildDir, 'postprocess.py'));
 
       // If mismatch detected, apply corrections
-      if (detectedFramework !== version.model.framework || detectedType !== version.model.type) {
+      if (
+        detectedFramework !== version.model.framework ||
+        detectedType !== version.model.type
+      ) {
         let detectedTaskType = version.model.taskType;
         if (detectedType === ModelType.DIFFUSION) {
           detectedTaskType = TaskType.GENERATION;
         } else if (detectedType === ModelType.LLM_GGUF) {
           detectedTaskType = TaskType.CHAT;
-        } else if (detectedType === ModelType.VISION && (detectedTaskType as string) === 'OTHER') {
+        } else if (
+          detectedType === ModelType.VISION &&
+          (detectedTaskType as string) === 'OTHER'
+        ) {
           detectedTaskType = TaskType.CLASSIFICATION;
-        } else if (detectedType === ModelType.NLP && (detectedTaskType as string) === 'OTHER') {
+        } else if (
+          detectedType === ModelType.NLP &&
+          (detectedTaskType as string) === 'OTHER'
+        ) {
           detectedTaskType = TaskType.CLASSIFICATION;
         }
 
-        const warnMsg = `Mismatch detected! Registered as framework: ${version.model.framework}, type: ${version.model.type}. ` +
+        const warnMsg =
+          `Mismatch detected! Registered as framework: ${version.model.framework}, type: ${version.model.type}. ` +
           `Auto-corrected to framework: ${detectedFramework}, type: ${detectedType}. Updating model metadata.`;
         await logInfo(warnMsg);
 
@@ -451,7 +530,9 @@ export class BuildProcessor extends WorkerHost {
         if (fs.existsSync(sourcePath)) {
           fs.renameSync(sourcePath, destPath);
         } else {
-          throw new Error('GGUF model weights file not found in build directory after download.');
+          throw new Error(
+            'GGUF model weights file not found in build directory after download.',
+          );
         }
 
         await this.updateProgress(versionId, 90);
@@ -468,11 +549,14 @@ export class BuildProcessor extends WorkerHost {
             fs.rmSync(buildDir, { recursive: true, force: true });
           }
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           this.logger.warn(`Failed to cleanup build directory: ${message}`);
         }
 
-        this.logger.log(`Bypassed Docker image build for GGUF model version: ${versionId}. GGUF model saved to ${destPath}`);
+        this.logger.log(
+          `Bypassed Docker image build for GGUF model version: ${versionId}. GGUF model saved to ${destPath}`,
+        );
         return;
       } else {
         let templateName = 'serve_tabular.py';
@@ -496,7 +580,6 @@ export class BuildProcessor extends WorkerHost {
           ),
           path.join(buildDir, 'serve.py'),
         );
-
 
         const hasScaler = !!version.scalerFilePath;
         const hasPreprocess = !!version.preprocessFilePath;
@@ -816,23 +899,34 @@ numpy
             if (event?.stream) {
               const cleanStream = event.stream.trim();
               if (cleanStream) {
-                this.logger.log(`[ModelBuild] [Version ${versionId}] ${cleanStream}`);
+                this.logger.log(
+                  `[ModelBuild] [Version ${versionId}] ${cleanStream}`,
+                );
               }
               logsBuffer.push(cleanStream);
               if (event.stream.startsWith('Step ')) {
                 stepCount++;
                 // Estimate progress: each step advances from 50% toward 90%
                 const buildProgress = Math.min(90, 50 + stepCount * 5);
-                this.updateProgress(versionId, buildProgress, logsBuffer.join('\n')).catch(() => {});
+                this.updateProgress(
+                  versionId,
+                  buildProgress,
+                  logsBuffer.join('\n'),
+                ).catch(() => {});
               } else if (logsBuffer.length % 15 === 0) {
-                this.modelVersionsRepository.update(versionId, {
-                  buildLogs: logsBuffer.join('\n'),
-                }).catch(() => {});
+                this.modelVersionsRepository
+                  .update(versionId, {
+                    buildLogs: logsBuffer.join('\n'),
+                  })
+                  .catch(() => {});
               }
             } else if (event?.status) {
-              const statusLine = `${event.status} ${event.progress || ''}`.trim();
+              const statusLine =
+                `${event.status} ${event.progress || ''}`.trim();
               if (statusLine) {
-                this.logger.log(`[ModelBuild] [Version ${versionId}] ${statusLine}`);
+                this.logger.log(
+                  `[ModelBuild] [Version ${versionId}] ${statusLine}`,
+                );
               }
               logsBuffer.push(statusLine);
             }
@@ -840,7 +934,9 @@ numpy
         );
       });
 
-      await logInfo(`Successfully built docker image for version: ${versionId}`);
+      await logInfo(
+        `Successfully built docker image for version: ${versionId}`,
+      );
 
       // Phase 5: Cleanup (90% → 95%)
       await this.updateProgress(versionId, 90, logsBuffer.join('\n'));
@@ -849,9 +945,12 @@ numpy
       try {
         const { execSync } = require('child_process');
         execSync('docker image prune -f', { timeout: 30000 });
-        await logInfo('Successfully pruned dangling/intermediate docker images');
+        await logInfo(
+          'Successfully pruned dangling/intermediate docker images',
+        );
       } catch (pruneError: unknown) {
-        const pruneMsg = pruneError instanceof Error ? pruneError.message : String(pruneError);
+        const pruneMsg =
+          pruneError instanceof Error ? pruneError.message : String(pruneError);
         await logInfo(`Failed to prune dangling images: ${pruneMsg}`);
       }
 

@@ -846,7 +846,10 @@ export class ModelsController {
     try {
       const serialized = JSON.stringify(data ?? {});
       requestSizeBytes = Buffer.byteLength(serialized);
-      payloadHash = crypto.createHash('sha256').update(serialized).digest('hex');
+      payloadHash = crypto
+        .createHash('sha256')
+        .update(serialized)
+        .digest('hex');
       injectionMatch = detectInjection(serialized);
     } catch {
       /* non-serializable payload — leave fingerprints null */
@@ -854,7 +857,8 @@ export class ModelsController {
 
     let cost = 0;
     let providerSharePercent = model.providerSharePercent || 80;
-    let tokenUsage: { promptTokens: number; completionTokens: number } | null = null;
+    let tokenUsage: { promptTokens: number; completionTokens: number } | null =
+      null;
     let inputPricePerMToken = 0;
     let outputPricePerMToken = 0;
     const isLlmModel = model.type === ModelType.LLM_GGUF;
@@ -864,22 +868,40 @@ export class ModelsController {
         if (isLlmModel) {
           // Token-based billing: fetch separate input/output prices (credits per 1M tokens)
           const [inputConfig, outputConfig, shareConfig] = await Promise.all([
-            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'price_llm_gguf_input' } }),
-            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'price_llm_gguf_output' } }),
-            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'default_provider_share_percent' } }),
+            this.dataSource
+              .getRepository(SystemConfig)
+              .findOne({ where: { key: 'price_llm_gguf_input' } }),
+            this.dataSource
+              .getRepository(SystemConfig)
+              .findOne({ where: { key: 'price_llm_gguf_output' } }),
+            this.dataSource
+              .getRepository(SystemConfig)
+              .findOne({ where: { key: 'default_provider_share_percent' } }),
           ]);
-          inputPricePerMToken = inputConfig ? parseFloat(inputConfig.value) : 2.0;
-          outputPricePerMToken = outputConfig ? parseFloat(outputConfig.value) : 8.0;
-          providerSharePercent = shareConfig ? parseInt(shareConfig.value, 10) : 80;
+          inputPricePerMToken = inputConfig
+            ? parseFloat(inputConfig.value)
+            : 2.0;
+          outputPricePerMToken = outputConfig
+            ? parseFloat(outputConfig.value)
+            : 8.0;
+          providerSharePercent = shareConfig
+            ? parseInt(shareConfig.value, 10)
+            : 80;
           cost = 0; // Computed after response from actual token counts
         } else {
           const configKey = 'price_' + model.type.toLowerCase();
           const [priceConfig, shareConfig] = await Promise.all([
-            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: configKey } }),
-            this.dataSource.getRepository(SystemConfig).findOne({ where: { key: 'default_provider_share_percent' } }),
+            this.dataSource
+              .getRepository(SystemConfig)
+              .findOne({ where: { key: configKey } }),
+            this.dataSource
+              .getRepository(SystemConfig)
+              .findOne({ where: { key: 'default_provider_share_percent' } }),
           ]);
           cost = priceConfig ? parseFloat(priceConfig.value) : 0.1;
-          providerSharePercent = shareConfig ? parseInt(shareConfig.value, 10) : 80;
+          providerSharePercent = shareConfig
+            ? parseInt(shareConfig.value, 10)
+            : 80;
         }
       } else {
         cost =
@@ -889,7 +911,11 @@ export class ModelsController {
       }
     }
 
-    if (isLlmModel && !isTrial && (inputPricePerMToken > 0 || outputPricePerMToken > 0)) {
+    if (
+      isLlmModel &&
+      !isTrial &&
+      (inputPricePerMToken > 0 || outputPricePerMToken > 0)
+    ) {
       // For token-based LLM billing, verify caller has at least the cost of 1K input tokens
       const minCost = (1000 / 1_000_000) * inputPricePerMToken;
       if (minCost > 0) {
@@ -1005,7 +1031,12 @@ export class ModelsController {
       const responseTimeMs = endTime - startTime;
 
       // For LLM models, compute actual cost from token counts in the response
-      if (isLlmModel && !isTrial && tokenUsage && (inputPricePerMToken > 0 || outputPricePerMToken > 0)) {
+      if (
+        isLlmModel &&
+        !isTrial &&
+        tokenUsage &&
+        (inputPricePerMToken > 0 || outputPricePerMToken > 0)
+      ) {
         cost =
           (tokenUsage.promptTokens / 1_000_000) * inputPricePerMToken +
           (tokenUsage.completionTokens / 1_000_000) * outputPricePerMToken;
@@ -1310,7 +1341,11 @@ export class ModelsController {
       throw new NotFoundException('Model not found');
     }
 
-    if (!model.organization && model.user?.id !== req.user.id && !req.user.isAdmin) {
+    if (
+      !model.organization &&
+      model.user?.id !== req.user.id &&
+      !req.user.isAdmin
+    ) {
       throw new ForbiddenException('You do not have access to this model');
     }
 

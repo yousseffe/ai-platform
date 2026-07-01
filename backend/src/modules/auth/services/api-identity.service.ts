@@ -75,7 +75,9 @@ export class ApiIdentityService {
     });
 
     if (!orgApiKey) {
-      throw new UnauthorizedException('Invalid or revoked organization API Key');
+      throw new UnauthorizedException(
+        'Invalid or revoked organization API Key',
+      );
     }
 
     this.orgApiKeyRepository

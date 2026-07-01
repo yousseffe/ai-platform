@@ -7,14 +7,18 @@ import { PrometheusExporter } from '@opentelemetry/exporter-prometheus';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 
-const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
+const otelEndpoint =
+  process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
 
 // Create a Prometheus exporter to expose self metrics
-const prometheusExporter = new PrometheusExporter({
-  port: 9464,
-}, () => {
-  console.log('Prometheus metrics exporter started on port 9464');
-});
+const prometheusExporter = new PrometheusExporter(
+  {
+    port: 9464,
+  },
+  () => {
+    console.log('Prometheus metrics exporter started on port 9464');
+  },
+);
 
 const sdk = new NodeSDK({
   resource: resourceFromAttributes({
@@ -26,7 +30,7 @@ const sdk = new NodeSDK({
   logRecordProcessor: new SimpleLogRecordProcessor(
     new OTLPLogExporter({
       url: `${otelEndpoint}/v1/logs`,
-    })
+    }),
   ),
   metricReader: prometheusExporter,
   instrumentations: [
@@ -44,7 +48,8 @@ console.log('OpenTelemetry SDK initialized');
 
 // Gracefully shut down the SDK on process exit
 process.on('SIGTERM', () => {
-  sdk.shutdown()
+  sdk
+    .shutdown()
     .then(() => console.log('OTel SDK shut down successfully'))
     .catch((err) => console.log('Error shutting down OTel SDK', err))
     .finally(() => process.exit(0));
@@ -52,4 +57,3 @@ process.on('SIGTERM', () => {
 
 // Now import the main entry point to start the NestJS application
 require('./main');
-

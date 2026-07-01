@@ -74,7 +74,13 @@ export function observabilityModule(): McpModule {
             title: 'Get model metrics',
             description:
               'Live instant metrics for a model: CPU%, RAM, p50/p95 latency, request rate, error rate.',
-            inputSchema: { modelId: z.string().describe('Model UUID') },
+            inputSchema: {
+              modelId: z
+                .string()
+                .describe(
+                  'Real model UUID obtained from admin_list_models or integration_list_platform_models — never a placeholder string.',
+                ),
+            },
           },
           async ({ modelId }) => {
             const scopeError = requireScope(ctx, 'observability:read');
@@ -98,7 +104,11 @@ export function observabilityModule(): McpModule {
             description:
               'Windowed request statistics from request logs: counts, error rate, latency percentiles, status-code distribution, and per-minute buckets.',
             inputSchema: {
-              modelId: z.string().describe('Model UUID'),
+              modelId: z
+                .string()
+                .describe(
+                  'Real model UUID obtained from admin_list_models or integration_list_platform_models — never a placeholder string.',
+                ),
               minutes: z
                 .number()
                 .int()
@@ -129,7 +139,11 @@ export function observabilityModule(): McpModule {
             description:
               "Fetch a model container's recent logs from Loki, optionally filtered to error-like lines.",
             inputSchema: {
-              modelId: z.string().describe('Model UUID'),
+              modelId: z
+                .string()
+                .describe(
+                  'Real model UUID obtained from admin_list_models or integration_list_platform_models — never a placeholder string.',
+                ),
               limit: z.number().int().optional().describe('Max log lines (default 100)'),
               errorsOnly: z
                 .boolean()
@@ -160,13 +174,53 @@ export function observabilityModule(): McpModule {
         );
 
         server.registerTool(
+          'observability_search_platform_logs',
+          {
+            title: 'Search platform-wide logs',
+            description:
+              'Searches system-wide logs across every service (backend, database, cache, storage, gateway, model containers), optionally filtered by service or severity. Use this for open-ended questions like "any suspicious/error logs recently?" instead of the per-model log tool, which requires a specific model. Requires admin scope.',
+            inputSchema: {
+              service: z
+                .enum(['nestjs', 'postgres', 'redis', 'minio', 'nginx', 'fastapi'])
+                .optional()
+                .describe('Restrict to one platform service (omit for all services)'),
+              level: z
+                .enum(['info', 'warn', 'error', 'debug'])
+                .optional()
+                .describe('Restrict to one severity level'),
+              limit: z.number().int().optional().describe('Max log lines (default 100)'),
+            },
+          },
+          async ({ service, level, limit }) => {
+            const scopeError = requireScope(ctx, 'observability:read');
+            if (scopeError) return errorResult(scopeError);
+
+            try {
+              const data = await ctx.backend.get<LogsResponse>(
+                'analytics/admin/logs',
+                { service, level, limit },
+              );
+              return jsonResult(data);
+            } catch (err) {
+              return errorResult(
+                `Failed to search platform logs (admin scope required): ${msg(err)}`,
+              );
+            }
+          },
+        );
+
+        server.registerTool(
           'observability_correlate',
           {
             title: 'Correlate model telemetry',
             description:
               'Gather request stats + live metrics + error logs for a model and time window, run deterministic spike detection, and return a descriptive summary plus the raw evidence. Root-cause reasoning is left to the agent.',
             inputSchema: {
-              modelId: z.string().describe('Model UUID'),
+              modelId: z
+                .string()
+                .describe(
+                  'Real model UUID obtained from admin_list_models or integration_list_platform_models — never a placeholder string.',
+                ),
               minutes: z
                 .number()
                 .int()
@@ -250,6 +304,75 @@ export function observabilityModule(): McpModule {
             } catch (err) {
               return errorResult(
                 `Failed to list alerts (admin scope required): ${msg(err)}`,
+              );
+            }
+          },
+        );
+
+        server.registerTool(
+          'observability_get_queue_status',
+          {
+            title: 'Get background job queue status',
+            description:
+              'BullMQ job counts (waiting/active/completed/failed/delayed) for the build and deploy queues. Requires admin scope.',
+            inputSchema: {},
+          },
+          async () => {
+            const scopeError = requireScope(ctx, 'observability:read');
+            if (scopeError) return errorResult(scopeError);
+
+            try {
+              const data = await ctx.backend.get('admin-mcp/queue-status');
+              return jsonResult(data);
+            } catch (err) {
+              return errorResult(
+                `Failed to get queue status (admin scope required): ${msg(err)}`,
+              );
+            }
+          },
+        );
+
+        server.registerTool(
+          'observability_list_containers',
+          {
+            title: 'List Docker containers',
+            description:
+              'Every Docker container visible to the host (running or stopped): image, status, uptime, ports. Requires admin scope.',
+            inputSchema: {},
+          },
+          async () => {
+            const scopeError = requireScope(ctx, 'observability:read');
+            if (scopeError) return errorResult(scopeError);
+
+            try {
+              const data = await ctx.backend.get('admin-mcp/containers');
+              return jsonResult(data);
+            } catch (err) {
+              return errorResult(
+                `Failed to list containers (admin scope required): ${msg(err)}`,
+              );
+            }
+          },
+        );
+
+        server.registerTool(
+          'observability_get_storage_stats',
+          {
+            title: 'Get object storage stats',
+            description:
+              'Aggregate MinIO object storage usage for the model artifact bucket: object count and total size. Requires admin scope.',
+            inputSchema: {},
+          },
+          async () => {
+            const scopeError = requireScope(ctx, 'observability:read');
+            if (scopeError) return errorResult(scopeError);
+
+            try {
+              const data = await ctx.backend.get('admin-mcp/storage');
+              return jsonResult(data);
+            } catch (err) {
+              return errorResult(
+                `Failed to get storage stats (admin scope required): ${msg(err)}`,
               );
             }
           },

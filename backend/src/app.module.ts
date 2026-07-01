@@ -41,6 +41,7 @@ import { FraudModule } from './modules/fraud/fraud.module';
 import { RiskBaseline } from './modules/fraud/entities/risk-baseline.entity';
 import { RiskEvent } from './modules/fraud/entities/risk-event.entity';
 import { McpToken } from './modules/auth/entities/mcp-token.entity';
+import { AdminMcpModule } from './modules/admin-mcp/admin-mcp.module';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -105,6 +106,7 @@ import { McpToken } from './modules/auth/entities/mcp-token.entity';
     MailModule,
     AnalyticsModule,
     FraudModule,
+    AdminMcpModule,
   ],
   controllers: [AppController],
   providers: [AppService],

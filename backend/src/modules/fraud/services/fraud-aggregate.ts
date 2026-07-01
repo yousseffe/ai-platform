@@ -40,7 +40,10 @@ export function aggregateFeatures(
   for (const log of logs) {
     if ((log.statusCode ?? 0) >= 400) errorCount += 1;
     if (log.injectionMatch) injectionCount += 1;
-    if (typeof log.apiKey === 'string' && log.apiKey.startsWith('ml_sk_trial_')) {
+    if (
+      typeof log.apiKey === 'string' &&
+      log.apiKey.startsWith('ml_sk_trial_')
+    ) {
       trialCount += 1;
     }
     creditBurn += Number(log.creditsCharged) || 0;
