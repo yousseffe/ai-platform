@@ -6,13 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a multi-tenant ML model management platform (ModelOps) organized as a monorepo with three services:
 
-- **`backend/`** — NestJS REST API (port 5000). See [`backend/CLAUDE.md`](backend/CLAUDE.md) for module-level rules.
+- **`backend/`** — NestJS REST API (port 3000). See [`backend/CLAUDE.md`](backend/CLAUDE.md) for module-level rules.
 - **`frontend/`** — Next.js 16 App Router dashboard (port 3001). See [`frontend/CLAUDE.md`](frontend/CLAUDE.md) for component-level rules.
-- **`services/mcp-server/`** — Model Context Protocol server (port 7000) exposing backend tools to AI assistants.
+- **`services/mcp-server/`** — Model Context Protocol server (port 3030) exposing backend tools to AI assistants.
 
 ## Development Setup
 
 ### Prerequisites
+
 - Native Windows PostgreSQL 18 service running on port 5432 (`postgresql-x64-18`)
   - Credentials: `postgres` / `khalid` / database `aidb`
 - Docker Desktop (for Redis, MinIO, observability stack)
@@ -20,6 +21,7 @@ This is a multi-tenant ML model management platform (ModelOps) organized as a mo
 ### Running the project
 
 **Option A — Backend in Docker (easiest):**
+
 ```bash
 # From repo root
 docker compose up -d --build
@@ -29,6 +31,7 @@ cd frontend && npm run dev
 ```
 
 **Option B — Full local development (hot-reload for backend changes):**
+
 ```bash
 # Start Docker services, then stop the dockerized backend
 docker compose up -d
@@ -43,29 +46,29 @@ cd frontend && npm run dev
 
 ### Per-service commands
 
-| Task | Backend | Frontend | MCP Server |
-|------|---------|----------|------------|
-| Dev (watch) | `npm run dev` | `npm run dev` | `npm run dev` |
-| Build | `npm run build` | `npm run build` | `npm run build` |
-| Lint | `npm run lint` | `npm run lint` | — |
-| Type check | — | `npx tsc --noEmit` | `npm run typecheck` |
-| Unit tests | `npm run test` | — | — |
-| E2E tests | `npm run test:e2e` | — | — |
-| Format | `npm run format` | — | — |
+| Task        | Backend            | Frontend           | MCP Server          |
+| ----------- | ------------------ | ------------------ | ------------------- |
+| Dev (watch) | `npm run dev`      | `npm run dev`      | `npm run dev`       |
+| Build       | `npm run build`    | `npm run build`    | `npm run build`     |
+| Lint        | `npm run lint`     | `npm run lint`     | —                   |
+| Type check  | —                  | `npx tsc --noEmit` | `npm run typecheck` |
+| Unit tests  | `npm run test`     | —                  | —                   |
+| E2E tests   | `npm run test:e2e` | —                  | —                   |
+| Format      | `npm run format`   | —                  | —                   |
 
 ### Service ports
 
-| Service | Port |
-|---------|------|
-| Frontend | 3001 |
-| Backend API | 5000 |
-| PostgreSQL (native) | 5432 |
-| Redis | 6380 |
+| Service             | Port        |
+| ------------------- | ----------- |
+| Frontend            | 3001        |
+| Backend API         | 3000        |
+| PostgreSQL (native) | 5432        |
+| Redis               | 6380        |
 | MinIO API / Console | 9000 / 9001 |
-| Grafana | 3005 |
-| Prometheus | 9090 |
-| Loki | 3100 |
-| MCP Server | 7000 |
+| Grafana             | 3005        |
+| Prometheus          | 9090        |
+| Loki                | 3100        |
+| MCP Server          | 3030        |
 
 ## Architecture
 

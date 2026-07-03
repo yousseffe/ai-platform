@@ -1,7 +1,22 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Key, Copy, Check, Eye, EyeOff, Trash2, Plus, Loader2, Sparkles, Terminal, Activity, BarChart3, ShieldCheck, AlertCircle } from "lucide-react";
+import {
+  Key,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+  Trash2,
+  Plus,
+  Loader2,
+  Sparkles,
+  Terminal,
+  Activity,
+  BarChart3,
+  ShieldCheck,
+  AlertCircle,
+} from "lucide-react";
 import { smartFetch } from "@/lib/utils/smart-fetch";
 import { Model } from "@/types";
 import { toast } from "react-hot-toast";
@@ -93,8 +108,12 @@ export default function ApiSettingsPage() {
 
       // Fetch usage stats and logs
       const [statsData, logsData] = await Promise.all([
-        smartFetch<ConsumerModelStats[]>("/models/logs/consumer/stats").catch(() => []),
-        smartFetch<ConsumerInferenceLog[]>("/models/logs/consumer").catch(() => []),
+        smartFetch<ConsumerModelStats[]>("/models/logs/consumer/stats").catch(
+          () => [],
+        ),
+        smartFetch<ConsumerInferenceLog[]>("/models/logs/consumer").catch(
+          () => [],
+        ),
       ]);
       setConsumerStats(statsData);
       setConsumerLogs(logsData);
@@ -135,7 +154,7 @@ export default function ApiSettingsPage() {
 
   const handleRevokeKey = async (keyId: string) => {
     const confirmation = window.confirm(
-      "Are you sure you want to revoke this API key? Applications using this credential will fail immediately."
+      "Are you sure you want to revoke this API key? Applications using this credential will fail immediately.",
     );
     if (!confirmation) return;
 
@@ -175,7 +194,6 @@ export default function ApiSettingsPage() {
   return (
     <div className="space-y-6 animate-fade-in text-left">
       <div className="flex flex-col lg:flex-row gap-6">
-        
         {/* Left side: Subscriptions & keys listing */}
         <div className="flex-1 card p-5 rounded-xl border border-border bg-card shadow-sm space-y-4">
           <div className="flex items-center gap-3 border-b border-border/60 pb-4 select-none">
@@ -183,19 +201,27 @@ export default function ApiSettingsPage() {
               <Key className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="font-bold text-foreground text-xs">Active Subscriptions & Keys</h2>
-              <p className="text-[10px] text-muted-foreground">Manage your credentials and API access tokens split by registered models.</p>
+              <h2 className="font-bold text-foreground text-xs">
+                Active Subscriptions & Keys
+              </h2>
+              <p className="text-[10px] text-muted-foreground">
+                Manage your credentials and API access tokens split by
+                registered models.
+              </p>
             </div>
           </div>
 
           {loading ? (
             <div className="py-12 flex items-center justify-center text-muted-foreground">
               <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
-              <span className="font-mono text-xs">Loading active credentials...</span>
+              <span className="font-mono text-xs">
+                Loading active credentials...
+              </span>
             </div>
           ) : apiKeys.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground font-mono text-xs border border-dashed border-border rounded-lg bg-secondary/10">
-              No API keys generated. Subscribe to a model on the right to generate credentials.
+              No API keys generated. Subscribe to a model on the right to
+              generate credentials.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -211,9 +237,15 @@ export default function ApiSettingsPage() {
                 <tbody>
                   {apiKeys.map((key) => {
                     const isVisible = !!visibleKeys[key.id];
-                    const maskedKey = key.key.substring(0, 11) + "•".repeat(24) + key.key.substring(key.key.length - 4);
+                    const maskedKey =
+                      key.key.substring(0, 11) +
+                      "•".repeat(24) +
+                      key.key.substring(key.key.length - 4);
                     return (
-                      <tr key={key.id} className="border-b border-border/40 hover:bg-secondary/20 transition-colors">
+                      <tr
+                        key={key.id}
+                        className="border-b border-border/40 hover:bg-secondary/20 transition-colors"
+                      >
                         <td className="py-3 px-2 font-sans font-bold text-foreground">
                           {key.model?.name || "Deleted Model"}
                         </td>
@@ -230,7 +262,11 @@ export default function ApiSettingsPage() {
                               className="text-muted-foreground hover:text-foreground cursor-pointer p-0.5 rounded hover:bg-secondary transition-colors"
                               title={isVisible ? "Hide Key" : "Show Key"}
                             >
-                              {isVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              {isVisible ? (
+                                <EyeOff className="w-3.5 h-3.5" />
+                              ) : (
+                                <Eye className="w-3.5 h-3.5" />
+                              )}
                             </button>
                             <button
                               onClick={() => handleCopy(key.key, key.id)}
@@ -275,8 +311,12 @@ export default function ApiSettingsPage() {
               <Sparkles className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="font-bold text-foreground text-xs">Subscribe & Generate</h2>
-              <p className="text-[10px] text-muted-foreground">Generate environment keys for models.</p>
+              <h2 className="font-bold text-foreground text-xs">
+                Subscribe & Generate
+              </h2>
+              <p className="text-[10px] text-muted-foreground">
+                Generate environment keys for models.
+              </p>
             </div>
           </div>
 
@@ -336,7 +376,6 @@ export default function ApiSettingsPage() {
 
       {/* Model Usage Statistics Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         {/* Model Statistics List */}
         <div className="lg:col-span-1 card p-5 rounded-xl border border-border bg-card shadow-sm space-y-4">
           <div className="flex items-center gap-3 border-b border-border/60 pb-4 select-none">
@@ -344,8 +383,12 @@ export default function ApiSettingsPage() {
               <BarChart3 className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="font-bold text-foreground text-xs">Model Call Metrics</h2>
-              <p className="text-[10px] text-muted-foreground">Cumulative prediction requests and credit spends per model.</p>
+              <h2 className="font-bold text-foreground text-xs">
+                Model Call Metrics
+              </h2>
+              <p className="text-[10px] text-muted-foreground">
+                Cumulative prediction requests and credit spends per model.
+              </p>
             </div>
           </div>
 
@@ -356,23 +399,37 @@ export default function ApiSettingsPage() {
             </div>
           ) : consumerStats.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground font-mono text-xs border border-dashed border-border rounded-lg bg-secondary/10">
-              No API calls recorded yet. Run model prediction to generate metrics.
+              No API calls recorded yet. Run model prediction to generate
+              metrics.
             </div>
           ) : (
             <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
               {consumerStats.map((stat) => (
-                <div key={stat.modelId} className="p-3.5 rounded-xl border border-border/60 bg-secondary/10 hover:bg-secondary/20 transition-all font-mono text-xs">
+                <div
+                  key={stat.modelId}
+                  className="p-3.5 rounded-xl border border-border/60 bg-secondary/10 hover:bg-secondary/20 transition-all font-mono text-xs"
+                >
                   <div className="flex justify-between items-center select-none mb-2">
-                    <span className="font-sans font-bold text-foreground truncate max-w-[120px]">{stat.modelName}</span>
-                    <span className="bg-secondary/60 px-1.5 py-0.5 rounded text-[8px] border border-border/40 font-semibold">{stat.modelFramework}</span>
+                    <span className="font-sans font-bold text-foreground truncate max-w-[120px]">
+                      {stat.modelName}
+                    </span>
+                    <span className="bg-secondary/60 px-1.5 py-0.5 rounded text-[8px] border border-border/40 font-semibold">
+                      {stat.modelFramework}
+                    </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
                     <div>
-                      <span className="block text-[8px] text-muted-foreground/60 uppercase">Call Volume</span>
-                      <span className="font-bold text-foreground text-xs">{stat.callCount} calls</span>
+                      <span className="block text-[8px] text-muted-foreground/60 uppercase">
+                        Call Volume
+                      </span>
+                      <span className="font-bold text-foreground text-xs">
+                        {stat.callCount} calls
+                      </span>
                     </div>
                     <div className="text-right">
-                      <span className="block text-[8px] text-muted-foreground/60 uppercase">Credits Spent</span>
+                      <span className="block text-[8px] text-muted-foreground/60 uppercase">
+                        Credits Spent
+                      </span>
                       <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
                         {Math.round(stat.totalSpent)} Credits
                       </span>
@@ -391,15 +448,21 @@ export default function ApiSettingsPage() {
               <Activity className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="font-bold text-foreground text-xs">Live Inference Audits</h2>
-              <p className="text-[10px] text-muted-foreground">Real-time log tracing of last 50 inference execution results.</p>
+              <h2 className="font-bold text-foreground text-xs">
+                Live Inference Audits
+              </h2>
+              <p className="text-[10px] text-muted-foreground">
+                Real-time log tracing of last 50 inference execution results.
+              </p>
             </div>
           </div>
 
           {loadingUsage ? (
             <div className="py-12 flex items-center justify-center text-muted-foreground">
               <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
-              <span className="font-mono text-xs">Loading execution logs...</span>
+              <span className="font-mono text-xs">
+                Loading execution logs...
+              </span>
             </div>
           ) : consumerLogs.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground font-mono text-xs border border-dashed border-border rounded-lg bg-secondary/10">
@@ -420,21 +483,31 @@ export default function ApiSettingsPage() {
                 <tbody>
                   {consumerLogs.map((log) => {
                     const isSuccess = log.status === "SUCCESS";
-                    const formattedLogTime = new Date(log.createdAt).toLocaleString([], {
+                    const formattedLogTime = new Date(
+                      log.createdAt,
+                    ).toLocaleString([], {
                       month: "short",
                       day: "numeric",
                       hour: "2-digit",
                       minute: "2-digit",
                       second: "2-digit",
                     });
-                    const authText = log.apiKey && log.apiKey.startsWith("ml_sk_") ? "API Key" : "JWT Session";
+                    const authText =
+                      log.apiKey && log.apiKey.startsWith("ml_sk_")
+                        ? "API Key"
+                        : "JWT Session";
 
                     return (
-                      <tr key={log.id} className="border-b border-border/40 hover:bg-secondary/20 transition-colors">
+                      <tr
+                        key={log.id}
+                        className="border-b border-border/40 hover:bg-secondary/20 transition-colors"
+                      >
                         <td className="py-2 px-2 select-none">
-                          <span className={`inline-flex items-center gap-1 font-bold ${
-                            isSuccess ? "text-emerald-500" : "text-red-500"
-                          }`}>
+                          <span
+                            className={`inline-flex items-center gap-1 font-bold ${
+                              isSuccess ? "text-emerald-500" : "text-red-500"
+                            }`}
+                          >
                             {isSuccess ? (
                               <ShieldCheck className="w-3.5 h-3.5" />
                             ) : (
@@ -469,16 +542,24 @@ export default function ApiSettingsPage() {
       <div className="card p-5 rounded-xl border border-border bg-card shadow-sm space-y-3.5">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
           <Terminal className="w-4 h-4" />
-          <span className="font-semibold text-foreground text-[11px] font-mono">Integration Code Example</span>
+          <span className="font-semibold text-foreground text-[11px] font-mono">
+            Integration Code Example
+          </span>
         </div>
         <p className="text-[10px] text-muted-foreground font-sans">
-          To run inference, send authenticated HTTP requests to the target model ID execution endpoint:
+          To run inference, send authenticated HTTP requests to the target model
+          ID execution endpoint:
         </p>
         <pre className="bg-[#121316] text-[#ededed] border border-[#222326] p-3.5 rounded-lg text-[10px] font-mono overflow-x-auto font-medium leading-relaxed">
-          curl -X POST &quot;http://localhost:5000/models/<span className="text-emerald-400">MODEL_ID</span>/predict&quot; \<br />
-          &nbsp;&nbsp;-H &quot;Authorization: Bearer <span className="text-indigo-400">YOUR_PER_MODEL_API_KEY</span>&quot; \<br />
+          curl -X POST &quot;http://localhost:3000/models/
+          <span className="text-emerald-400">MODEL_ID</span>/predict&quot; \
+          <br />
+          &nbsp;&nbsp;-H &quot;Authorization: Bearer{" "}
+          <span className="text-indigo-400">YOUR_PER_MODEL_API_KEY</span>&quot;
+          \<br />
           &nbsp;&nbsp;-H &quot;Content-Type: application/json&quot; \<br />
-          &nbsp;&nbsp;-d &apos;&#123;&quot;features&quot;: [1.2, 3.4, 5.6]&#125;&apos;
+          &nbsp;&nbsp;-d &apos;&#123;&quot;features&quot;: [1.2, 3.4,
+          5.6]&#125;&apos;
         </pre>
       </div>
     </div>

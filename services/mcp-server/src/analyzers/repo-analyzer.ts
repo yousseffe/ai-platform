@@ -292,7 +292,7 @@ function buildSuggestions(
       return [
         'Call the platform API from a Server Action or Route Handler (app/api/...) to keep the API key safe from the client browser.',
         'Store secrets in .env.local; only prefix with NEXT_PUBLIC_ if you intend to expose the key to the browser (not recommended for live production keys).',
-        'Use native fetch() server-side to proxy calls to the platform predict URL (default: http://localhost:5000).',
+        'Use native fetch() server-side to proxy calls to the platform predict URL (default: http://localhost:3000).',
       ];
     case 'React':
     case 'Vue':
@@ -301,7 +301,7 @@ function buildSuggestions(
     case 'Angular':
       return [
         'WARNING: Calling the platform API directly from a static browser app exposes your API key and raises CORS errors in development.',
-        'DEV SOLUTION: Configure a proxy in your dev server. For Vite, add to vite.config.ts: server: { proxy: { "/api": "http://localhost:5000" } }.',
+        'DEV SOLUTION: Configure a proxy in your dev server. For Vite, add to vite.config.ts: server: { proxy: { "/api": "http://localhost:3000" } }.',
         'PROD SOLUTION: Deploy a lightweight serverless function or API route as a proxy, and store the API key there.',
         'Store your development API key in `.env` using your framework prefix (e.g. `VITE_MODEL_API_KEY=ml_sk_live_...` for Vite).',
       ];

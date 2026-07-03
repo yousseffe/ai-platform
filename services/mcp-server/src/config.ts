@@ -8,7 +8,7 @@
 export interface Config {
   /** Port the MCP HTTP transport listens on. */
   port: number;
-  /** Base URL of the NestJS backend (no trailing prefix), e.g. `http://backend:5000`. */
+  /** Base URL of the NestJS backend (no trailing prefix), e.g. `http://backend:3000`. */
   backendUrl: string;
   /** Global API prefix exposed by the backend. */
   apiPrefix: string;
@@ -30,8 +30,8 @@ export interface Config {
  */
 export function loadConfig(): Config {
   return {
-    port: parseInt(process.env.MCP_PORT ?? '7000', 10),
-    backendUrl: process.env.BACKEND_URL ?? 'http://localhost:5000',
+    port: parseInt(process.env.MCP_PORT ?? '3030', 10),
+    backendUrl: process.env.BACKEND_URL ?? 'http://localhost:3000',
     apiPrefix: process.env.BACKEND_API_PREFIX ?? '/api/v1',
     prometheusUrl: process.env.PROMETHEUS_URL ?? 'http://localhost:9090',
     lokiUrl: process.env.LOKI_URL ?? 'http://localhost:3100',

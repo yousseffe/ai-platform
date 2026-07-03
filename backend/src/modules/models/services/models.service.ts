@@ -38,6 +38,8 @@ import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import { OrganizationsService } from '../../organizations/services/organizations.service';
 import { OrgType } from '../../organizations/enums/org-type.enum';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
+import { OwnerType } from '../../../shared/enums/owner-type.enum';
+import { ProviderLimitsService } from '../../provider-accounts/services/provider-limits.service';
 
 /**
  * Service managing model registration, listing, version uploads, MinIO storage sync,
@@ -63,6 +65,7 @@ export class ModelsService {
     private readonly apiKeyRepository: Repository<ApiKey>,
     @Inject(forwardRef(() => OrganizationsService))
     private readonly organizationsService: OrganizationsService,
+    private readonly providerLimitsService: ProviderLimitsService,
   ) {}
 
   private async assertProviderOrgAccess(
@@ -138,6 +141,12 @@ export class ModelsService {
     if (organizationId) {
       await this.assertProviderOrgAccess(organizationId, userId);
     }
+    await this.providerLimitsService.assertCanCreateModel(
+      organizationId ? OwnerType.ORG : OwnerType.USER,
+      organizationId ?? userId,
+      type,
+      isPublic,
+    );
     // Retrieve global type price default
     const configKey = 'price_' + type.toLowerCase();
     const priceConfig = await this.systemConfigRepository.findOne({
@@ -340,8 +349,19 @@ export class ModelsService {
         OrgRole.MAINTAINER,
         OrgRole.CONTRIBUTOR,
       ]);
+      await this.providerLimitsService.assertCanCreateModelVersion(
+        OwnerType.ORG,
+        model.organization.id,
+        model.id,
+      );
     } else if (uploaderUserId && model.user?.id !== uploaderUserId) {
       throw new ForbiddenException('Only the model owner can upload versions');
+    } else {
+      await this.providerLimitsService.assertCanCreateModelVersion(
+        OwnerType.USER,
+        model.user.id,
+        model.id,
+      );
     }
 
     const versionNumber = model.versions.length + 1;

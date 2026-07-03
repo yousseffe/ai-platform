@@ -104,7 +104,7 @@ export function useUploadVersion(modelId: string, modelType?: string) {
 
       const session = await getSession();
       const token = session?.accessToken;
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
 
       const headers: Record<string, string> = {};
       if (token) {

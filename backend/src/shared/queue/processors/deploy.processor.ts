@@ -247,7 +247,7 @@ export class DeployProcessor extends WorkerHost {
           ? path.resolve(storageDirEnv)
           : path.join(process.cwd(), 'uploads', 'gguf-models');
         const ggufPath = path.join(ggufStorageDir, `${deployment.modelVersion.id}.gguf`);
-        
+
         hostConfig.Binds = [
           `${ggufPath}:/models/model.gguf:ro`
         ];
@@ -383,7 +383,7 @@ export class DeployProcessor extends WorkerHost {
     if (deployment.containerId) {
       try {
         const container = this.docker.getContainer(deployment.containerId);
-        
+
         // Remove Prometheus target before stopping container
         const containerName = this.getContainerName(deployment);
         await this.removePrometheusTarget(containerName);
@@ -456,7 +456,7 @@ export class DeployProcessor extends WorkerHost {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout for health probe
-      
+
       const response = await fetch(`${url}/health`, {
         signal: controller.signal,
         headers: {
@@ -503,12 +503,12 @@ export class DeployProcessor extends WorkerHost {
     const maxAttempts = isLlm ? 60 : 15; // 60 attempts for LLM (5 mins), 15 for others (75s)
     if (attempt >= maxAttempts) {
       this.logger.error(`Deployment ${deploymentId} failed to become healthy after ${attempt} attempts. Marking as FAILED.`);
-      
+
       await this.stopDeployment(deploymentId);
 
       await this.deploymentsRepository.update(deploymentId, {
         status: DeploymentStatus.FAILED,
-        errorMessage: isLlm 
+        errorMessage: isLlm
           ? 'LLM server failed to load the model within 5 minutes.'
           : 'Model container failed to start responding within 75 seconds.',
       });
@@ -517,7 +517,7 @@ export class DeployProcessor extends WorkerHost {
       await this.deployQueue.add(
         'verify-deployment-health',
         { deploymentId, attempt: attempt + 1 },
-        { delay: 5000 },
+        { delay: 3000 },
       );
     }
   }

@@ -57,13 +57,21 @@ export function VersionHistoryTable({
                   v.deployments && v.deployments.length > 0
                     ? [...v.deployments].sort(
                         (a: Deployment, b: Deployment) =>
-                          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                          new Date(b.createdAt).getTime() -
+                          new Date(a.createdAt).getTime(),
                       )[0]
                     : null;
 
                 let displayStatus = v.status as string;
-                if (latestDeployment && v.status !== VersionStatus.BUILDING && v.status !== VersionStatus.UPLOADED) {
-                  displayStatus = latestDeployment.status === DeploymentStatus.RUNNING ? "deployed" : latestDeployment.status;
+                if (
+                  latestDeployment &&
+                  v.status !== VersionStatus.BUILDING &&
+                  v.status !== VersionStatus.UPLOADED
+                ) {
+                  displayStatus =
+                    latestDeployment.status === DeploymentStatus.RUNNING
+                      ? "deployed"
+                      : latestDeployment.status;
                 }
 
                 // If the version is deprecated, force displayStatus to deprecated (since active deployments should have been stopped)
@@ -71,45 +79,75 @@ export function VersionHistoryTable({
                   displayStatus = VersionStatus.DEPRECATED;
                 }
 
-                const isBuilding = v.status === VersionStatus.BUILDING || v.status === VersionStatus.UPLOADED;
-                const hasError = v.status === VersionStatus.FAILED || (!isBuilding && latestDeployment && latestDeployment.status === DeploymentStatus.FAILED);
-                const errorMessage = v.errorMessage || (!isBuilding && latestDeployment && latestDeployment.errorMessage);
+                const isBuilding =
+                  v.status === VersionStatus.BUILDING ||
+                  v.status === VersionStatus.UPLOADED;
+                const hasError =
+                  v.status === VersionStatus.FAILED ||
+                  (!isBuilding &&
+                    latestDeployment &&
+                    latestDeployment.status === DeploymentStatus.FAILED);
+                const errorMessage =
+                  v.errorMessage ||
+                  (!isBuilding &&
+                    latestDeployment &&
+                    latestDeployment.errorMessage);
 
                 let badgeClass = "badge-neutral";
-                if (displayStatus === "deployed" || displayStatus === VersionStatus.READY) {
-                   badgeClass = "bg-emerald-950/40 text-emerald-400 border-emerald-500/20";
-                } else if (displayStatus === VersionStatus.BUILDING || displayStatus === DeploymentStatus.STARTING) {
-                  badgeClass = "bg-blue-950/40 text-blue-400 border-blue-500/20";
+                if (
+                  displayStatus === "deployed" ||
+                  displayStatus === VersionStatus.READY
+                ) {
+                  badgeClass =
+                    "bg-emerald-950/40 text-emerald-400 border-emerald-500/20";
+                } else if (
+                  displayStatus === VersionStatus.BUILDING ||
+                  displayStatus === DeploymentStatus.STARTING
+                ) {
+                  badgeClass =
+                    "bg-blue-950/40 text-blue-400 border-blue-500/20";
                 } else if (displayStatus === VersionStatus.DEPRECATED) {
-                  badgeClass = "bg-amber-950/40 text-amber-450 border-amber-500/20";
+                  badgeClass =
+                    "bg-amber-950/40 text-amber-450 border-amber-500/20";
                 } else if (hasError) {
                   badgeClass = "badge-danger";
                 }
 
-                const endpointUrl = `http://localhost:5000/api/v1/models/${modelId}/v${v.versionNumber}/predict`;
+                const endpointUrl = `http://localhost:3000/api/v1/models/${modelId}/v${v.versionNumber}/predict`;
 
                 return (
                   <React.Fragment key={i}>
                     <tr className="hover:bg-accent/40 transition-colors">
                       <td className="px-6 py-4 font-bold">
-                        <span className="text-primary mr-2 font-bold">v{v.versionNumber}</span>
-                        <span className="text-muted-foreground text-[10px]">({v.id.substring(0, 8)})</span>
+                        <span className="text-primary mr-2 font-bold">
+                          v{v.versionNumber}
+                        </span>
+                        <span className="text-muted-foreground text-[10px]">
+                          ({v.id.substring(0, 8)})
+                        </span>
                       </td>
                       <td className="px-6 py-4 select-none">
                         {displayStatus === VersionStatus.BUILDING ? (
                           <div className="flex items-center gap-3">
                             {/* Circular progress gauge */}
                             <div className="relative w-7 h-7 shrink-0">
-                              <svg className="w-7 h-7 -rotate-90" viewBox="0 0 28 28">
+                              <svg
+                                className="w-7 h-7 -rotate-90"
+                                viewBox="0 0 28 28"
+                              >
                                 <circle
-                                  cx="14" cy="14" r="11"
+                                  cx="14"
+                                  cy="14"
+                                  r="11"
                                   fill="none"
                                   stroke="currentColor"
                                   strokeWidth="2.5"
                                   className="text-blue-950/40"
                                 />
                                 <circle
-                                  cx="14" cy="14" r="11"
+                                  cx="14"
+                                  cy="14"
+                                  r="11"
                                   fill="none"
                                   stroke="currentColor"
                                   strokeWidth="2.5"
@@ -158,22 +196,27 @@ export function VersionHistoryTable({
                           <div className="flex items-center gap-2">
                             <div
                               className={`w-2 h-2 rounded-full ${
-                                displayStatus === VersionStatus.READY || displayStatus === "deployed"
+                                displayStatus === VersionStatus.READY ||
+                                displayStatus === "deployed"
                                   ? "bg-emerald-500 animate-pulse"
                                   : displayStatus === VersionStatus.DEPRECATED
-                                  ? "bg-amber-500"
-                                  : hasError
-                                  ? "bg-red-50"
-                                  : "bg-muted-foreground"
+                                    ? "bg-amber-500"
+                                    : hasError
+                                      ? "bg-red-50"
+                                      : "bg-muted-foreground"
                               }`}
                             ></div>
-                            <span className={`badge ${badgeClass} text-[9px] font-bold tracking-wider uppercase font-mono`}>
+                            <span
+                              className={`badge ${badgeClass} text-[9px] font-bold tracking-wider uppercase font-mono`}
+                            >
                               {displayStatus}
                             </span>
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-muted-foreground">{new Date(v.createdAt).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {new Date(v.createdAt).toLocaleDateString()}
+                      </td>
                       <td className="px-6 py-4 text-muted-foreground">
                         {displayStatus === "deployed" ? (
                           <div className="flex items-center gap-2 bg-slate-105 dark:bg-slate-900/60 border border-border px-2.5 py-1 rounded-lg w-fit max-w-50 select-none">
@@ -192,56 +235,80 @@ export function VersionHistoryTable({
                             </button>
                           </div>
                         ) : (
-                          <span className="text-muted-foreground/40 font-sans font-medium">--</span>
+                          <span className="text-muted-foreground/40 font-sans font-medium">
+                            --
+                          </span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          {isOwner && (v.status === VersionStatus.FAILED || v.status === VersionStatus.READY) && onRebuild && (
-                            <button
-                              onClick={() => onRebuild(v.id)}
-                              className="btn-outline px-3 py-1 text-[11px] border-blue-900/50 bg-blue-950/20 text-blue-400 hover:bg-blue-950/40 hover:text-blue-300"
-                            >
-                              Rebuild
-                            </button>
-                          )}
-                          {isOwner && v.status === VersionStatus.READY && (!latestDeployment || (latestDeployment.status !== DeploymentStatus.RUNNING && latestDeployment.status !== DeploymentStatus.STARTING)) && (
-                            <button
-                              onClick={() => onDeploy(v.id)}
-                              className="btn-primary px-3 py-1 text-[11px]"
-                            >
-                              Deploy
-                            </button>
-                          )}
-                          {isOwner && latestDeployment && (latestDeployment.status === DeploymentStatus.RUNNING || latestDeployment.status === DeploymentStatus.STARTING) && (
-                            <button
-                              onClick={() => onStop(latestDeployment.id)}
-                              className="btn-outline px-3 py-1 text-[11px] border-red-900/50 bg-red-950/20 text-red-400 hover:bg-red-950/40 hover:text-red-300"
-                            >
-                              Stop Container
-                            </button>
-                          )}
-                          {isOwner && v.status === VersionStatus.DEPRECATED && onUndeprecate && (
-                            <button
-                              onClick={() => onUndeprecate(v.id)}
-                              className="btn-outline px-3 py-1 text-[11px] border-emerald-900/50 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300"
-                            >
-                              Activate
-                            </button>
-                          )}
-                          {isOwner && (v.status === VersionStatus.READY || displayStatus === "deployed" || displayStatus === DeploymentStatus.STARTING) && onDeprecate && (
-                            <button
-                              onClick={() => onDeprecate(v.id)}
-                              className="btn-outline px-3 py-1 text-[11px] border-amber-900/50 bg-amber-950/20 text-amber-400 hover:bg-amber-950/40 hover:text-amber-300"
-                            >
-                              Deprecate
-                            </button>
-                          )}
+                          {isOwner &&
+                            (v.status === VersionStatus.FAILED ||
+                              v.status === VersionStatus.READY) &&
+                            onRebuild && (
+                              <button
+                                onClick={() => onRebuild(v.id)}
+                                className="btn-outline px-3 py-1 text-[11px] border-blue-900/50 bg-blue-950/20 text-blue-400 hover:bg-blue-950/40 hover:text-blue-300"
+                              >
+                                Rebuild
+                              </button>
+                            )}
+                          {isOwner &&
+                            v.status === VersionStatus.READY &&
+                            (!latestDeployment ||
+                              (latestDeployment.status !==
+                                DeploymentStatus.RUNNING &&
+                                latestDeployment.status !==
+                                  DeploymentStatus.STARTING)) && (
+                              <button
+                                onClick={() => onDeploy(v.id)}
+                                className="btn-primary px-3 py-1 text-[11px]"
+                              >
+                                Deploy
+                              </button>
+                            )}
+                          {isOwner &&
+                            latestDeployment &&
+                            (latestDeployment.status ===
+                              DeploymentStatus.RUNNING ||
+                              latestDeployment.status ===
+                                DeploymentStatus.STARTING) && (
+                              <button
+                                onClick={() => onStop(latestDeployment.id)}
+                                className="btn-outline px-3 py-1 text-[11px] border-red-900/50 bg-red-950/20 text-red-400 hover:bg-red-950/40 hover:text-red-300"
+                              >
+                                Stop Container
+                              </button>
+                            )}
+                          {isOwner &&
+                            v.status === VersionStatus.DEPRECATED &&
+                            onUndeprecate && (
+                              <button
+                                onClick={() => onUndeprecate(v.id)}
+                                className="btn-outline px-3 py-1 text-[11px] border-emerald-900/50 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300"
+                              >
+                                Activate
+                              </button>
+                            )}
+                          {isOwner &&
+                            (v.status === VersionStatus.READY ||
+                              displayStatus === "deployed" ||
+                              displayStatus === DeploymentStatus.STARTING) &&
+                            onDeprecate && (
+                              <button
+                                onClick={() => onDeprecate(v.id)}
+                                className="btn-outline px-3 py-1 text-[11px] border-amber-900/50 bg-amber-950/20 text-amber-400 hover:bg-amber-950/40 hover:text-amber-300"
+                              >
+                                Deprecate
+                              </button>
+                            )}
                           <button
                             onClick={() => onNavigateToTest(v)}
                             disabled={displayStatus !== "deployed"}
                             className={`btn-outline px-3 py-1 text-[11px] ${
-                              displayStatus !== "deployed" ? "opacity-30 cursor-not-allowed border-border text-muted-foreground/50 bg-background" : ""
+                              displayStatus !== "deployed"
+                                ? "opacity-30 cursor-not-allowed border-border text-muted-foreground/50 bg-background"
+                                : ""
                             }`}
                           >
                             Playground
@@ -251,8 +318,13 @@ export function VersionHistoryTable({
                     </tr>
                     {hasError && errorMessage && (
                       <tr className="bg-red-950/25 border-b border-red-900/35">
-                        <td colSpan={5} className="px-6 py-3 text-xs text-red-400 font-mono wrap-break-word leading-relaxed">
-                          <span className="font-bold mr-2 text-[10px] uppercase tracking-wider text-red-300">Run Failure:</span>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-3 text-xs text-red-400 font-mono wrap-break-word leading-relaxed"
+                        >
+                          <span className="font-bold mr-2 text-[10px] uppercase tracking-wider text-red-300">
+                            Run Failure:
+                          </span>
                           {errorMessage}
                         </td>
                       </tr>

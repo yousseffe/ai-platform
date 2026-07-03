@@ -5,7 +5,9 @@ This guide outlines how to start and run the AI-Platform project. The project is
 ---
 
 ## Database Configuration (Shared)
+
 Both backend modes connect to:
+
 - **Host:** `localhost` (locally) or `host.docker.internal` (from Docker)
 - **Port:** `5432`
 - **Username:** `postgres`
@@ -17,10 +19,12 @@ Ensure your native Windows PostgreSQL service (`postgresql-x64-18`) is running.
 ---
 
 ## Option A: Run the Backend in Docker (Easiest)
+
 All services (except the database, which is native on your host) run inside Docker. The frontend runs locally.
 
 1. **Start all containers (including backend):**
    Open a terminal in the project root (`ai-platform/`) and run:
+
    ```bash
    docker compose up -d --build
    ```
@@ -30,15 +34,17 @@ All services (except the database, which is native on your host) run inside Dock
    ```bash
    npm run dev
    ```
-   The frontend connects to the backend at `http://localhost:5000`.
+   The frontend connects to the backend at `http://localhost:3000`.
 
 ---
 
 ## Option B: Run the Backend Locally (For active backend development)
+
 Use this if you are actively editing NestJS code and want hot-reloads.
 
 1. **Start Docker services, but stop the dockerized backend & gateway:**
    Open a terminal in the project root (`ai-platform/`) and run:
+
    ```bash
    docker compose up -d
    docker compose stop backend gateway
@@ -46,10 +52,12 @@ Use this if you are actively editing NestJS code and want hot-reloads.
 
 2. **Start the Backend locally:**
    Open a terminal in the `backend/` directory and run:
+
    ```bash
    npm run dev
    ```
-   The backend runs locally on **`http://localhost:5000`**.
+
+   The backend runs locally on **`http://localhost:3000`**.
 
 3. **Start the Frontend locally:**
    Open a terminal in the `frontend/` directory and run:
@@ -61,8 +69,9 @@ Use this if you are actively editing NestJS code and want hot-reloads.
 ---
 
 ## Summary of Active Ports
+
 - **Frontend Dashboard:** [http://localhost:3001](http://localhost:3001)
-- **Backend API:** [http://localhost:5000](http://localhost:5000)
+- **Backend API:** [http://localhost:3000](http://localhost:3000)
 - **Postgres Database:** `localhost:5432` (Native Windows Service)
 - **Redis Cache/Queues:** `localhost:6380` (Dockerized)
 - **Minio Console (Object Storage):** [http://localhost:9001](http://localhost:9001) (Dockerized)
@@ -73,9 +82,10 @@ Use this if you are actively editing NestJS code and want hot-reloads.
 ---
 
 ## Stopping the Project
+
 - To stop local backend/frontend processes, press `Ctrl + C` in their terminals.
 - To shut down all Docker containers, run:
   ```bash
   docker compose down
   ```
-  *(Note: This will not affect your native Windows PostgreSQL database).*
+  _(Note: This will not affect your native Windows PostgreSQL database)._

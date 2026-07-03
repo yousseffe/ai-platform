@@ -19,10 +19,12 @@ import {
   Coins,
   Shield,
   CreditCard,
+  Crown,
   User,
   Key,
   Plug,
   Workflow,
+  ReceiptText,
 } from "lucide-react";
 import { useWorkspace, Workspace } from "@/hooks/use-workspace";
 import { smartFetch } from "@/lib/utils/smart-fetch";
@@ -364,9 +366,19 @@ export default function Sidebar() {
           </SidebarLink>
         )}
         {viewMode === WalletType.PROVIDER && (
-        <SidebarLink href="/pipelines" active={isActive("/pipelines")} icon={<Workflow className="w-4 h-4" strokeWidth={1.5} />}>
-          Pipelines
-        </SidebarLink>
+          <SidebarLink href="/pipelines" active={isActive("/pipelines")} icon={<Workflow className="w-4 h-4" strokeWidth={1.5} />}>
+            Pipelines
+          </SidebarLink>
+        )}
+        {viewMode === WalletType.PROVIDER && (
+          <SidebarLink href="/provider/subscriptions" active={isActive("/provider/subscriptions")} icon={<Crown className="w-4 h-4" strokeWidth={1.5} />}>
+            Subscriptions
+          </SidebarLink>
+        )}
+        {viewMode === WalletType.PROVIDER && (
+          <SidebarLink href="/provider/payments" active={isActive("/provider/payments")} icon={<ReceiptText className="w-4 h-4" strokeWidth={1.5} />}>
+            Subscription Payments
+          </SidebarLink>
         )}
         {/* Collapsible settings button link */}
         <div className="flex flex-col">

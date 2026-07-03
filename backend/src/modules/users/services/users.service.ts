@@ -16,6 +16,7 @@ import { UsersRepository } from '../repositories/users.repository';
 import { WalletsService } from '../../wallets/services/wallets.service';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
 
 /**
  * Service providing methods for user profile querying, creation, update, and role changes.
@@ -25,6 +26,7 @@ export class UsersService {
   constructor(
     public readonly usersRepository: UsersRepository,
     private readonly walletsService: WalletsService,
+    private readonly providerAccountsService: ProviderAccountsService,
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
     @InjectRepository(ApiKey)
@@ -101,8 +103,13 @@ export class UsersService {
     await this.walletsService.createWallet(
       userId,
       OwnerType.USER,
-      WalletType.CONSUMER,
+      WalletType.PROVIDER,
       0.0,
+    );
+    await this.providerAccountsService.ensureProviderAccount(
+      OwnerType.USER,
+      userId,
+      userId,
     );
 
     const updated = await this.usersRepository.findOneBy({ id: userId });

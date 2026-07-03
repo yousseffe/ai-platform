@@ -29,7 +29,7 @@ export function useContainerLogs(deploymentId: string) {
           return;
         }
 
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
         const socket = io(`${backendUrl}/logs`, {
           query: { token },
           auth: { token },

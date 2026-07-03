@@ -32,6 +32,7 @@ import { Project } from '../entities/project.entity';
 import { Model } from '../../models/entities/model.entity';
 import { MinioService } from '../../../shared/minio/minio.service';
 import * as fs from 'fs';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
 
 /**
  * Service managing workspaces / organizations creation, collaborator enrollment,
@@ -55,6 +56,7 @@ export class OrganizationsService {
     private readonly mailService: MailService,
     private readonly stripeService: StripeService,
     private readonly minioService: MinioService,
+    private readonly providerAccountsService: ProviderAccountsService,
   ) {}
 
   /**
@@ -287,6 +289,14 @@ export class OrganizationsService {
       }
 
       await queryRunner.commitTransaction();
+
+      if (type === OrgType.PROVIDER || type === OrgType.HYBRID) {
+        await this.providerAccountsService.ensureProviderAccount(
+          OwnerType.ORG,
+          savedOrg.id,
+          ownerUserId,
+        );
+      }
 
       // Log audit
       const log = this.auditLogRepository.create({
