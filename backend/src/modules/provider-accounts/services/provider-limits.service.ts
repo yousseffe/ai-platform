@@ -39,12 +39,10 @@ export class ProviderLimitsService {
     }
     const limits = this.utilizationService.resolveEffectiveLimits(account);
     if (!isPublic && !limits.allowPrivateModels) {
-      throw new BadRequestException('Current provider tier does not allow private models');
+      throw new BadRequestException(
+        'Current provider tier does not allow private models',
+      );
     }
-    if (ownerType === OwnerType.ORG && !limits.allowOrgPublishing) {
-      throw new BadRequestException('Current provider tier does not allow organization publishing');
-    }
-
     const utilization = await this.utilizationService.getUtilization(account);
     assertWithinLimit(
       utilization.totalModels.used,
@@ -118,14 +116,22 @@ export class ProviderLimitsService {
    */
   private assertTypeLimit(
     modelType: ModelType,
-    utilization: Awaited<ReturnType<ProviderUtilizationService['getUtilization']>>,
+    utilization: Awaited<
+      ReturnType<ProviderUtilizationService['getUtilization']>
+    >,
     limits: ReturnType<ProviderUtilizationService['resolveEffectiveLimits']>,
   ): void {
     const limitByType: Partial<Record<ModelType, [number, number | null]>> = {
       [ModelType.LLM_GGUF]: [utilization.llmModels.used, limits.maxLLMModels],
-      [ModelType.VISION]: [utilization.visionModels.used, limits.maxVisionModels],
+      [ModelType.VISION]: [
+        utilization.visionModels.used,
+        limits.maxVisionModels,
+      ],
       [ModelType.NLP]: [utilization.nlpModels.used, limits.maxNLPModels],
-      [ModelType.TABULAR]: [utilization.tabularModels.used, limits.maxTabularModels],
+      [ModelType.TABULAR]: [
+        utilization.tabularModels.used,
+        limits.maxTabularModels,
+      ],
       [ModelType.DIFFUSION]: [
         utilization.diffusionModels.used,
         limits.maxDiffusionModels,
@@ -140,6 +146,10 @@ export class ProviderLimitsService {
     if (!typeLimit) {
       return;
     }
-    assertWithinLimit(typeLimit[0], typeLimit[1], `${modelType} model limit reached`);
+    assertWithinLimit(
+      typeLimit[0],
+      typeLimit[1],
+      `${modelType} model limit reached`,
+    );
   }
 }

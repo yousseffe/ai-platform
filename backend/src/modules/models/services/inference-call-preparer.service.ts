@@ -7,6 +7,7 @@ import { ApiKey } from '../../auth/entities/api-key.entity';
 import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
 import { WalletsService } from '../../wallets/services/wallets.service';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
+import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { RedisService } from '../../../shared/redis/redis.service';
 import { InferencePricingService } from './inference-pricing.service';
 import {
@@ -50,11 +51,22 @@ export class InferenceCallPreparerService {
       await this.pricingService.computeCost(model, isTrial);
 
     if (cost > 0) {
-      const balance = await this.walletsService.getBalance(
+      let balance = await this.walletsService.getBalance(
         actor.workspaceId,
         actor.workspaceType,
         WalletType.CONSUMER,
       );
+      if (
+        balance < cost &&
+        !actor.orgApiKeyId &&
+        actor.workspaceId !== actor.userId
+      ) {
+        balance = await this.walletsService.getBalance(
+          actor.userId,
+          OwnerType.USER,
+          WalletType.CONSUMER,
+        );
+      }
       if (balance < cost) {
         throw new BadRequestException(
           'Insufficient credits to perform prediction',

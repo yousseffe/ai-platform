@@ -209,6 +209,8 @@ export class ApiKeyOrJwtGuard implements CanActivate {
         apiKey: apiKeyEntity.key,
         apiKeyType: apiKeyEntity.type,
       };
+      request.workspaceId = apiKeyEntity.user.id;
+      request.workspaceType = OwnerType.USER;
       return true;
     }
 
