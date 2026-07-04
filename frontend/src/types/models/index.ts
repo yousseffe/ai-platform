@@ -1,5 +1,5 @@
 import { User } from "../user";
-import { DeploymentStatus, VersionStatus, VersionReviewStatus, PredictionStatus, ModelType, Framework } from "../enums";
+import { DeploymentStatus, VersionStatus, VersionReviewStatus, SchemaDetectionStatus, PredictionStatus, ModelType, Framework } from "../enums";
 
 export interface Deployment {
   id: string;
@@ -27,6 +27,7 @@ export interface ModelVersion {
   postprocessFilePath?: string;
   examplePayload?: string;
   expectedResult?: string;
+  schemaDetectionStatus?: SchemaDetectionStatus;
   errorMessage?: string;
   buildProgress?: number;
   buildLogs?: string;

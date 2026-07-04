@@ -150,7 +150,12 @@ export function assessTraffic(f: TrafficFeatures, b: Baseline): RiskAssessment {
   }
 
   if (fired.length === 0) {
-    return { riskScore: 0, threatClass: null, firedRules: [], recommendations: [] };
+    return {
+      riskScore: 0,
+      threatClass: null,
+      firedRules: [],
+      recommendations: [],
+    };
   }
 
   const maxSeverity = Math.max(...fired.map((r) => r.severity));

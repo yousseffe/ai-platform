@@ -72,9 +72,7 @@ export class AdminController {
    * Attaches wallet metadata so admin clients can format ledger amounts using
    * the real wallet currency instead of guessing from the transaction text.
    */
-  private async enrichTransactions(
-    transactions: Transaction[],
-  ): Promise<
+  private async enrichTransactions(transactions: Transaction[]): Promise<
     Array<
       Transaction & {
         walletType: WalletType | null;
@@ -176,7 +174,9 @@ export class AdminController {
             const usageBytes = stats.memory_stats.usage || 0;
             ram = (usageBytes / (1024 * 1024)).toFixed(0) + ' MB';
           } catch (err: any) {
-            this.logger.error(`Failed to collect Docker container stats: ${err.message}`);
+            this.logger.error(
+              `Failed to collect Docker container stats: ${err.message}`,
+            );
             cpu = '0.0%';
             ram = '0 MB';
           }
@@ -358,9 +358,14 @@ export class AdminController {
         throw new BadRequestException(`Invalid value for config field: ${key}`);
       }
 
-      let config = await this.systemConfigRepository.findOne({ where: { key } });
+      let config = await this.systemConfigRepository.findOne({
+        where: { key },
+      });
       if (!config) {
-        config = this.systemConfigRepository.create({ key, value: val.toString() });
+        config = this.systemConfigRepository.create({
+          key,
+          value: val.toString(),
+        });
       } else {
         config.value = val.toString();
       }

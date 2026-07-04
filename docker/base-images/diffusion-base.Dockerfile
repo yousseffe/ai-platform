@@ -1,2 +1,2 @@
 FROM ai-platform-pytorch-base:latest
-RUN pip install --no-cache-dir diffusers transformers accelerate protobuf
+RUN --mount=type=cache,target=/root/.cache/pip pip install diffusers transformers accelerate protobuf

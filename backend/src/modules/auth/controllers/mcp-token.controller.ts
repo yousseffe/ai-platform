@@ -34,7 +34,9 @@ export class McpTokenController {
    */
   private async checkAdmin(userId: string): Promise<boolean> {
     const user = await this.userRepository.findOneBy({ id: userId });
-    return !!user && (user.isAdmin || user.email.toLowerCase().includes('admin'));
+    return (
+      !!user && (user.isAdmin || user.email.toLowerCase().includes('admin'))
+    );
   }
 
   /**

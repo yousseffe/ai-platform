@@ -42,6 +42,7 @@ interface StepInterfaceConfigProps {
   isDetectingSchema: boolean;
   handleDetectSchema: () => void;
   hasModelFile: boolean;
+  isLargeModel: boolean;
   hasDetected: boolean;
   detectedType: string;
   detectedFramework: string;
@@ -64,6 +65,7 @@ export default function StepInterfaceConfig({
   isDetectingSchema,
   handleDetectSchema,
   hasModelFile,
+  isLargeModel,
   hasDetected,
   detectedType,
   detectedFramework,
@@ -208,7 +210,12 @@ export default function StepInterfaceConfig({
         {/* Example Payload Code Input */}
         <div className="space-y-2 flex flex-col">
           <Label htmlFor="examplePayload" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 font-sans">
-            <Terminal className="w-3.5 h-3.5 text-primary" /> Example Payload Input <span className="text-red-500 font-extrabold uppercase text-[9px] tracking-wider">(required)</span>
+            <Terminal className="w-3.5 h-3.5 text-primary" /> Example Payload Input{" "}
+            {isLargeModel ? (
+              <span className="text-amber-500 font-extrabold uppercase text-[9px] tracking-wider">(auto-detected during build)</span>
+            ) : (
+              <span className="text-red-500 font-extrabold uppercase text-[9px] tracking-wider">(required)</span>
+            )}
           </Label>
           <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm flex-1 flex flex-col bg-slate-950">
             <div className="bg-slate-900/60 border-b border-border/40 px-4 py-2 flex items-center justify-between text-[8px] font-bold text-slate-500 tracking-wider">
@@ -238,7 +245,12 @@ export default function StepInterfaceConfig({
         {/* Expected Result Code Input */}
         <div className="space-y-2 flex flex-col">
           <Label htmlFor="expectedResult" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 font-sans">
-            <Terminal className="w-3.5 h-3.5 text-primary" /> Expected Prediction Result <span className="text-red-500 font-extrabold uppercase text-[9px] tracking-wider">(required)</span>
+            <Terminal className="w-3.5 h-3.5 text-primary" /> Expected Prediction Result{" "}
+            {isLargeModel ? (
+              <span className="text-amber-500 font-extrabold uppercase text-[9px] tracking-wider">(auto-detected during build)</span>
+            ) : (
+              <span className="text-red-500 font-extrabold uppercase text-[9px] tracking-wider">(required)</span>
+            )}
           </Label>
           <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm flex-1 flex flex-col bg-slate-950">
             <div className="bg-slate-900/60 border-b border-border/40 px-4 py-2 flex items-center justify-between text-[8px] font-bold text-slate-500 tracking-wider">

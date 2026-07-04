@@ -15,11 +15,13 @@ import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
 import { getRsaKeys } from '../utils/keys';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
+import { User } from '../../users/entities/user.entity';
 
 interface AuthenticatedApiRequest extends ExpressRequest {
   user?: {
     id: string;
     email: string;
+    isAdmin?: boolean;
     apiKey?: string;
     apiKeyType?: string;
     jti?: string;
@@ -31,6 +33,15 @@ interface AuthenticatedApiRequest extends ExpressRequest {
   };
   workspaceId?: string;
   workspaceType?: OwnerType;
+}
+
+/**
+ * Computes whether a user has administrator privileges, mirroring the check
+ * already used by {@link AdminGuard} (`isAdmin` column, with an email-contains
+ * fallback for local dev convenience).
+ */
+function computeIsAdmin(user: { isAdmin: boolean; email: string }): boolean {
+  return user.isAdmin || user.email.toLowerCase().includes('admin');
 }
 
 interface JwtPayload {
@@ -63,6 +74,8 @@ export class ApiKeyOrJwtGuard implements CanActivate {
     private readonly orgApiKeyRepository: Repository<OrgApiKey>,
     @InjectRepository(McpToken)
     private readonly mcpTokenRepository: Repository<McpToken>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   /**
@@ -120,6 +133,7 @@ export class ApiKeyOrJwtGuard implements CanActivate {
       request.user = {
         id: mcpToken.user.id,
         email: mcpToken.user.email,
+        isAdmin: computeIsAdmin(mcpToken.user),
       };
       return true;
     }
@@ -206,6 +220,7 @@ export class ApiKeyOrJwtGuard implements CanActivate {
       request.user = {
         id: apiKeyEntity.user.id,
         email: apiKeyEntity.user.email,
+        isAdmin: computeIsAdmin(apiKeyEntity.user),
         apiKey: apiKeyEntity.key,
         apiKeyType: apiKeyEntity.type,
       };
@@ -221,9 +236,12 @@ export class ApiKeyOrJwtGuard implements CanActivate {
         algorithms: ['RS256'],
       });
 
+      const dbUser = await this.userRepository.findOneBy({ id: payload.sub });
+
       request.user = {
         id: payload.sub,
         email: payload.email,
+        isAdmin: dbUser ? computeIsAdmin(dbUser) : false,
         jti: payload.jti,
       };
       return true;

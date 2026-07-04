@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
 import { FraudService } from '../services/fraud.service';
@@ -25,7 +33,7 @@ export class FraudController {
   @Get('models/:id/risk-report')
   @UseGuards(ApiKeyOrJwtGuard)
   async getRiskReport(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Req() req: ActorRequest,
   ): Promise<unknown> {
     return this.fraudService.getRiskReport(id, req.user.id);
@@ -39,10 +47,10 @@ export class FraudController {
    */
   @Get('admin/events')
   @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
-  async getAdminRiskEvents(
-    @Query('limit') limit?: string,
-  ): Promise<unknown[]> {
-    return this.fraudService.getAdminRiskEvents(limit ? parseInt(limit, 10) : 50);
+  async getAdminRiskEvents(@Query('limit') limit?: string): Promise<unknown[]> {
+    return this.fraudService.getAdminRiskEvents(
+      limit ? parseInt(limit, 10) : 50,
+    );
   }
 
   /**
@@ -53,7 +61,9 @@ export class FraudController {
    */
   @Get('admin/models/:id/risk-report')
   @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
-  async getAdminRiskReport(@Param('id') id: string): Promise<unknown> {
+  async getAdminRiskReport(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<unknown> {
     return this.fraudService.getAdminRiskReport(id);
   }
 }

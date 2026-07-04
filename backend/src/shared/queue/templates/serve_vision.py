@@ -3,6 +3,7 @@ import os
 import sys
 import uvicorn
 import importlib.util
+import threading
 import numpy as np
 
 otel_available = False
@@ -58,104 +59,126 @@ if postprocess_path and os.path.exists(postprocess_path):
     except Exception as e:
         print(f"Warning: Failed to load postprocess script: {e}")
 
-# Load model
+# C3: Lazy framework import / model load — see serve_tabular.py for the full
+# rationale. Importing torch/tensorflow and loading weights is deferred to
+# the first /predict call instead of blocking process startup, so /health
+# can return 200 as soon as uvicorn is bound.
 model_path = os.getenv("MODEL_PATH", "model.pkl")
 framework = os.getenv("FRAMEWORK", "SKLEARN")
 task_type = os.getenv("TASK_TYPE", "OTHER")
 
-model = None
-try:
-    if framework == "SKLEARN" or framework == "CUSTOM":
-        import joblib
-        model = joblib.load(model_path)
-    elif framework == "ONNX":
-        import onnxruntime
-        model = onnxruntime.InferenceSession(model_path)
-    elif framework == "PYTORCH":
-        import torch
-        loaded = torch.load(model_path, map_location="cpu")
-        if isinstance(loaded, dict) or type(loaded).__name__ == "OrderedDict":
-            if preprocess_module and hasattr(preprocess_module, "load_model"):
-                model = preprocess_module.load_model(model_path)
-            else:
-                import torchvision.models as models
-                model_name = os.getenv("MODEL_NAME", "").lower() or os.path.basename(model_path).lower()
-                model_instantiated = False
-                
-                if "mobilenet_v3" in model_name:
-                    for arch in [models.mobilenet_v3_small, models.mobilenet_v3_large]:
-                        try:
-                            model = arch()
-                            model.load_state_dict(loaded)
-                            model_instantiated = True
-                            break
-                        except Exception:
-                            continue
-                elif "mobilenet_v2" in model_name:
-                    try:
-                        model = models.mobilenet_v2()
-                        model.load_state_dict(loaded)
-                        model_instantiated = True
-                    except Exception:
-                        pass
-                elif "resnet50" in model_name:
-                    try:
-                        model = models.resnet50()
-                        model.load_state_dict(loaded)
-                        model_instantiated = True
-                    except Exception:
-                        pass
-                elif "resnet18" in model_name:
-                    try:
-                        model = models.resnet18()
-                        model.load_state_dict(loaded)
-                        model_instantiated = True
-                    except Exception:
-                        pass
-                elif "resnet34" in model_name:
-                    try:
-                        model = models.resnet34()
-                        model.load_state_dict(loaded)
-                        model_instantiated = True
-                    except Exception:
-                        pass
-                elif "resnet101" in model_name:
-                    try:
-                        model = models.resnet101()
-                        model.load_state_dict(loaded)
-                        model_instantiated = True
-                    except Exception:
-                        pass
-                
-                if not model_instantiated:
-                    raise ValueError(
-                        f"Loaded object is a state_dict (OrderedDict). "
-                        f"No matching architecture was auto-detected for name '{model_name}'. "
-                        f"Please define a 'load_model' function in preprocess.py to instantiate the model."
-                    )
-        else:
-            model = loaded
-        model.eval()
-    elif framework == "TENSORFLOW":
-        import tensorflow as tf
-        # Patch Keras 3.x Layer base class to accept and ignore quantization_config
+_model = None
+_model_lock = threading.Lock()
+_model_load_error = None
+
+
+def _load_model():
+    """Loads (and caches) the model on first use. Thread-safe via _model_lock."""
+    global _model, _model_load_error
+    if _model is not None or _model_load_error is not None:
+        return
+    with _model_lock:
+        if _model is not None or _model_load_error is not None:
+            return
         try:
-            from keras.src.layers.layer import Layer as _KerasLayer
-            _orig_layer_init = _KerasLayer.__init__
-            def _patched_layer_init(self, *args, **kwargs):
-                kwargs.pop("quantization_config", None)
-                return _orig_layer_init(self, *args, **kwargs)
-            _KerasLayer.__init__ = _patched_layer_init
-        except Exception:
-            pass
-        try:
-            model = tf.keras.models.load_model(model_path)
-        except Exception:
-            import joblib
-            model = joblib.load(model_path)
-except Exception as e:
-    print(f"Error loading {framework} model from {model_path}: {e}")
-    sys.exit(1)
+            if framework == "SKLEARN" or framework == "CUSTOM":
+                import joblib
+                _model = joblib.load(model_path)
+            elif framework == "ONNX":
+                import onnxruntime
+                _model = onnxruntime.InferenceSession(model_path)
+            elif framework == "PYTORCH":
+                import torch
+                loaded = torch.load(model_path, map_location="cpu")
+                if isinstance(loaded, dict) or type(loaded).__name__ == "OrderedDict":
+                    if preprocess_module and hasattr(preprocess_module, "load_model"):
+                        _model = preprocess_module.load_model(model_path)
+                    else:
+                        import torchvision.models as models
+                        model_name = os.getenv("MODEL_NAME", "").lower() or os.path.basename(model_path).lower()
+                        model_instantiated = False
+
+                        if "mobilenet_v3" in model_name:
+                            for arch in [models.mobilenet_v3_small, models.mobilenet_v3_large]:
+                                try:
+                                    candidate = arch()
+                                    candidate.load_state_dict(loaded)
+                                    _model = candidate
+                                    model_instantiated = True
+                                    break
+                                except Exception:
+                                    continue
+                        elif "mobilenet_v2" in model_name:
+                            try:
+                                _model = models.mobilenet_v2()
+                                _model.load_state_dict(loaded)
+                                model_instantiated = True
+                            except Exception:
+                                pass
+                        elif "resnet50" in model_name:
+                            try:
+                                _model = models.resnet50()
+                                _model.load_state_dict(loaded)
+                                model_instantiated = True
+                            except Exception:
+                                pass
+                        elif "resnet18" in model_name:
+                            try:
+                                _model = models.resnet18()
+                                _model.load_state_dict(loaded)
+                                model_instantiated = True
+                            except Exception:
+                                pass
+                        elif "resnet34" in model_name:
+                            try:
+                                _model = models.resnet34()
+                                _model.load_state_dict(loaded)
+                                model_instantiated = True
+                            except Exception:
+                                pass
+                        elif "resnet101" in model_name:
+                            try:
+                                _model = models.resnet101()
+                                _model.load_state_dict(loaded)
+                                model_instantiated = True
+                            except Exception:
+                                pass
+
+                        if not model_instantiated:
+                            raise ValueError(
+                                f"Loaded object is a state_dict (OrderedDict). "
+                                f"No matching architecture was auto-detected for name '{model_name}'. "
+                                f"Please define a 'load_model' function in preprocess.py to instantiate the model."
+                            )
+                else:
+                    _model = loaded
+                _model.eval()
+            elif framework == "TENSORFLOW":
+                import tensorflow as tf
+                # Patch Keras 3.x Layer base class to accept and ignore quantization_config
+                try:
+                    from keras.src.layers.layer import Layer as _KerasLayer
+                    _orig_layer_init = _KerasLayer.__init__
+                    def _patched_layer_init(self, *args, **kwargs):
+                        kwargs.pop("quantization_config", None)
+                        return _orig_layer_init(self, *args, **kwargs)
+                    _KerasLayer.__init__ = _patched_layer_init
+                except Exception:
+                    pass
+                try:
+                    _model = tf.keras.models.load_model(model_path)
+                except Exception:
+                    import joblib
+                    _model = joblib.load(model_path)
+        except Exception as e:
+            _model_load_error = str(e)
+            print(f"Error loading {framework} model from {model_path}: {e}")
+
+
+@app.get("/health")
+async def health():
+    # Process liveness only — not gated on model load. See C3 comment above.
+    return {"status": "ok"}
 
 
 @app.post("/predict")
@@ -173,25 +196,30 @@ async def predict(request: Request):
             from fastapi import HTTPException
             raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
 
+    _load_model()
+    if _model_load_error is not None:
+        return {"error": f"Model failed to load: {_model_load_error}"}
+    model = _model
+
     data = await request.json()
-    
+
     # Preprocess must convert JSON to image array format (e.g. 3D/4D numpy array)
     if preprocess_func:
         data = preprocess_func(data)
-    
+
     # Vision models expect a batch dimension (e.g., [batch, height, width, channels])
     if isinstance(data, list):
         data = np.array(data)
-        
+
     # Inference
     try:
         prediction_proba = None
-        
+
         if framework == "SKLEARN" or framework == "CUSTOM":
             prediction = model.predict(data)
             if task_type == "CLASSIFICATION" and hasattr(model, "predict_proba"):
                 prediction_proba = model.predict_proba(data)
-                
+
         elif framework == "ONNX":
             input_name = model.get_inputs()[0].name
             np_data = np.array(data).astype(np.float32)
@@ -199,7 +227,7 @@ async def predict(request: Request):
             prediction = outputs[0]
             if task_type == "CLASSIFICATION" and len(outputs) > 1:
                 prediction_proba = outputs[1]
-                
+
         elif framework == "PYTORCH":
             import torch
             tensor_data = torch.tensor(data, dtype=torch.float32)
@@ -210,24 +238,24 @@ async def predict(request: Request):
                     prediction = torch.argmax(prediction, dim=1).numpy()
                 else:
                     prediction = prediction.numpy()
-                    
+
         elif framework == "TENSORFLOW":
             np_data = np.array(data).astype(np.float32)
             prediction = model.predict(np_data)
             if task_type == "CLASSIFICATION":
                 prediction_proba = prediction
                 prediction = np.argmax(prediction, axis=1)
-                
+
     except Exception as e:
         return {"error": str(e)}
-    
+
     # Postprocess
     if postprocess_func:
         prediction = postprocess_func(prediction)
-    
+
     if hasattr(prediction, "tolist"):
         prediction = prediction.tolist()
-        
+
     if prediction_proba is not None and hasattr(prediction_proba, "tolist"):
         prediction_proba = prediction_proba.tolist()
 
@@ -236,7 +264,7 @@ async def predict(request: Request):
         result = prediction
     else:
         result = {"prediction": prediction}
-        
+
     if prediction_proba is not None and not postprocess_func:
         result["probabilities"] = prediction_proba
 

@@ -41,6 +41,7 @@ import { FraudModule } from './modules/fraud/fraud.module';
 import { RiskBaseline } from './modules/fraud/entities/risk-baseline.entity';
 import { RiskEvent } from './modules/fraud/entities/risk-event.entity';
 import { McpToken } from './modules/auth/entities/mcp-token.entity';
+import { AdminMcpModule } from './modules/admin-mcp/admin-mcp.module';
 import { PipelinesModule } from './modules/pipelines/pipelines.module';
 import { Pipeline } from './modules/pipelines/entities/pipeline.entity';
 import { PipelineStep } from './modules/pipelines/entities/pipeline-step.entity';
@@ -127,6 +128,7 @@ import { ProviderOfferRedemption } from './modules/provider-accounts/entities/pr
     MailModule,
     AnalyticsModule,
     FraudModule,
+    AdminMcpModule,
     PipelinesModule,
     BillingModule,
     ProviderAccountsModule,

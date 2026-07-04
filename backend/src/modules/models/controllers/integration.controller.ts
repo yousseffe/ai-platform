@@ -1,4 +1,10 @@
-import { Controller, Get, Param, Req, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ApiIdentityService } from '../../auth/services/api-identity.service';
 import { Request } from 'express';
 import {
@@ -40,7 +46,9 @@ export class IntegrationController {
         // If it's an MCP token, verify it carries the 'models:read' scope
         if (identity.keyType === 'mcp') {
           if (!identity.mcpScopes?.includes('models:read')) {
-            throw new UnauthorizedException('MCP Access Token lacks models:read scope');
+            throw new UnauthorizedException(
+              'MCP Access Token lacks models:read scope',
+            );
           }
         }
 
@@ -48,7 +56,10 @@ export class IntegrationController {
       } catch (err) {
         // If credentials are invalid, we let it fall back to unauthenticated (actorId = undefined)
         // unless it's a scope error which we want to surface.
-        if (err instanceof UnauthorizedException && err.message.includes('scope')) {
+        if (
+          err instanceof UnauthorizedException &&
+          err.message.includes('scope')
+        ) {
           throw err;
         }
       }
