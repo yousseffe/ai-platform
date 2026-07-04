@@ -16,7 +16,7 @@ interface PageProps {
  * Static metadata configuration for the Pipeline detail/builder page.
  */
 export const metadata: Metadata = {
-  title: "Pipeline Builder - MLHub",
+  title: "Pipeline Builder - Qantara",
 };
 
 /**

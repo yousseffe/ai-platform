@@ -290,7 +290,7 @@ export default function PublicModelDetailClient({ model, isAuthenticated }: Publ
     ? latestVersion.examplePayload
     : `{\n  "features": [12, 65.0, 780.0, 1]\n}`;
 
-  const curlSnippet = `curl -X POST https://api.mlhub.io/v1/models/${model.id}/predict \\
+  const curlSnippet = `curl -X POST https://api.qantara.io/v1/models/${model.id}/predict \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '${examplePayload.replace(/\n/g, "\n  ")}'`;
@@ -298,13 +298,13 @@ export default function PublicModelDetailClient({ model, isAuthenticated }: Publ
   const pythonSnippet = `import requests
 
 response = requests.post(
-    "https://api.mlhub.io/v1/models/${model.id}/predict",
+    "https://api.qantara.io/v1/models/${model.id}/predict",
     headers={"Authorization": "Bearer YOUR_API_KEY"},
     json=${examplePayload}
 )
 print(response.json())`;
 
-  const jsSnippet = `const response = await fetch("https://api.mlhub.io/v1/models/${model.id}/predict", {
+  const jsSnippet = `const response = await fetch("https://api.qantara.io/v1/models/${model.id}/predict", {
   method: "POST",
   headers: {
     "Authorization": "Bearer YOUR_API_KEY",
@@ -530,7 +530,7 @@ console.log(data);`;
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
                   <User className="w-3.5 h-3.5 text-primary" />
                 </div>
-                <span>Published by <strong className="text-foreground">{model.organization?.name ?? model.user?.username ?? model.user?.email?.split("@")[0] ?? "MLHub Community"}</strong></span>
+                <span>Published by <strong className="text-foreground">{model.organization?.name ?? model.user?.username ?? model.user?.email?.split("@")[0] ?? "Qantara Community"}</strong></span>
                 <span className="text-border">·</span>
                 <Calendar className="w-3.5 h-3.5" />
                 <span>{formatDate(model.createdAt)}</span>

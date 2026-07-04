@@ -95,7 +95,7 @@ export default function StepProfileDetails({
           </Label>
           <div className="flex rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-sm overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200">
             <span className="px-3 py-2 border-r border-slate-200 bg-slate-100/80 select-none text-xs flex items-center font-semibold text-slate-500">
-              mlhub.com/
+              qantara.com/
             </span>
             <input
               id="slug"

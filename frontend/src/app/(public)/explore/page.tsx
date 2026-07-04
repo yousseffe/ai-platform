@@ -5,8 +5,8 @@ import MarketplaceExploreClient from "./MarketplaceExploreClient";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "Explore Models Catalog - MLHub",
-  description: "Browse, filter, and search community machine learning models in the MLHub catalog.",
+  title: "Explore Models Catalog - Qantara",
+  description: "Browse, filter, and search community machine learning models in the Qantara catalog.",
 };
 
 /**

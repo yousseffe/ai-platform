@@ -6,7 +6,7 @@ import { Session } from "next-auth";
 const isServer = typeof window === "undefined";
 
 /**
- * Fetches data from the MLHub backend API, resolving credentials automatically.
+ * Fetches data from the Qantara backend API, resolving credentials automatically.
  * On the server, it reads authentication details from NextAuth server-side options.
  * On the client, it retrieves the active user session token via NextAuth react utilities.
  * If a session accessToken is present, it is attached as a Bearer authorization header.

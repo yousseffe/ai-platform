@@ -15,8 +15,8 @@ export const revalidate = 0;
  * Static metadata configuration for the Models Registry page.
  */
 export const metadata: Metadata = {
-  title: "Models Registry - MLHub",
-  description: "Browse, version, and manage machine learning models, preprocess scalers, and custom scripts in the MLHub model catalog.",
+  title: "Models Registry - Qantara",
+  description: "Browse, version, and manage machine learning models, preprocess scalers, and custom scripts in the Qantara model catalog.",
 };
 
 /**

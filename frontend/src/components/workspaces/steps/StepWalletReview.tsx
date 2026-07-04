@@ -73,7 +73,7 @@ export default function StepWalletReview({
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground font-semibold">URL Endpoint:</span>
-            <span className="font-semibold text-primary">mlhub.com/{orgSlug || "—"}</span>
+            <span className="font-semibold text-primary">qantara.com/{orgSlug || "—"}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground font-semibold">Workspace Profile:</span>

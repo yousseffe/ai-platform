@@ -60,14 +60,21 @@ export default function PublicHeader({ session }: PublicHeaderProps) {
         <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
           <div className="w-7 h-7 relative flex items-center justify-center shrink-0">
             <Image
-              src="/logo.png"
-              alt="MLHub Logo"
+              src="/qantara-assets/dark-normal.svg"
+              alt="Qantara Logo"
               width={26}
               height={26}
-              className="object-contain"
+              className="object-contain hidden dark:block"
+            />
+            <Image
+              src="/qantara-assets/light-normal.svg"
+              alt="Qantara Logo"
+              width={26}
+              height={26}
+              className="object-contain block dark:hidden"
             />
           </div>
-          <span className="font-sans text-sm font-bold text-foreground tracking-tight">MLHub</span>
+          <span className="font-sans text-sm font-bold text-foreground tracking-tight">Qantara</span>
         </Link>
 
         {/* AI Gateway active pill */}

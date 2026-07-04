@@ -25,15 +25,23 @@ export default function CreateWorkspacePage() {
         <div className="relative z-10 flex items-center gap-2.5 text-primary font-bold text-lg">
           <div className="w-8 h-8 relative flex items-center justify-center shrink-0">
             <Image
-              src="/logo.png"
-              alt="MLHub Logo"
+              src="/qantara-assets/dark-normal.svg"
+              alt="Qantara Logo"
               width={30}
               height={30}
-              className="object-contain animate-pulse"
+              className="object-contain animate-pulse hidden dark:block"
+              style={{ width: "auto" }}
+            />
+            <Image
+              src="/qantara-assets/light-normal.svg"
+              alt="Qantara Logo"
+              width={30}
+              height={30}
+              className="object-contain animate-pulse block dark:hidden"
               style={{ width: "auto" }}
             />
           </div>
-          <span className="font-mono text-base font-extrabold text-white">MLHub Cloud</span>
+          <span className="font-mono text-base font-extrabold text-white">Qantara Cloud</span>
         </div>
 
         {/* Illustration */}

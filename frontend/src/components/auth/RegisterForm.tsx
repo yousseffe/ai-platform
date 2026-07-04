@@ -1,7 +1,5 @@
-"use client";
-
-import React from "react";
-import { Mail, User, Lock, ArrowRight } from "lucide-react";
+import React, { useState } from "react";
+import { ArrowRight, Mail, User, Lock, Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, RegisterInput } from "@/lib/schemas";
@@ -14,15 +12,13 @@ interface RegisterFormProps {
   loading: boolean;
 }
 
-/**
- * Registration form component handling user profile details onboarding.
- * Implements inline validation using Zod and react-hook-form.
- * Redesigned in the premium Expo Go console theme.
- *
- * @param props - Component properties containing submission trigger and loading state.
- * @returns The React component rendering the registration input fields.
- */
+const authInputClassName =
+  "h-[44px] rounded-lg border border-slate-200 bg-white pl-10 pr-10 text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-sm transition-all duration-150 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 outline-none w-full";
+
 export default function RegisterForm({ onSubmit, loading }: RegisterFormProps) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -33,106 +29,119 @@ export default function RegisterForm({ onSubmit, loading }: RegisterFormProps) {
   });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 font-sans">
-      <div className="space-y-1.5 text-left">
-        <Label htmlFor="reg-email" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Email Address
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left select-none">
+      <div className="space-y-1.5">
+        <Label htmlFor="reg-email" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+          Email address
         </Label>
         <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground select-none" />
+          <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
           <Input
             id="reg-email"
             type="email"
-            className={`pl-10 w-full h-9 bg-background border border-border rounded-lg text-xs text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-all ${
-              errors.email ? "border-destructive focus-visible:ring-destructive/20 focus-visible:border-destructive" : ""
-            }`}
-            style={{ paddingLeft: "2.25rem" }}
             placeholder="name@company.com"
+            autoComplete="email"
             {...register("email")}
             disabled={loading}
+            aria-invalid={!!errors.email}
+            className={authInputClassName}
           />
         </div>
         {errors.email && (
-          <p className="text-[10px] text-destructive mt-1 font-semibold">{errors.email.message}</p>
+          <p className="text-[11px] font-medium text-destructive/90 animate-fade-in">{errors.email.message}</p>
         )}
       </div>
 
-      <div className="space-y-1.5 text-left">
-        <Label htmlFor="reg-full-name" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Full Name
+      <div className="space-y-1.5">
+        <Label htmlFor="reg-full-name" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+          Full name
         </Label>
         <div className="relative">
-          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground select-none" />
+          <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
           <Input
             id="reg-full-name"
             type="text"
-            className={`pl-10 w-full h-9 bg-background border border-border rounded-lg text-xs text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-all ${
-              errors.full_name ? "border-destructive focus-visible:ring-destructive/20 focus-visible:border-destructive" : ""
-            }`}
-            style={{ paddingLeft: "2.25rem" }}
             placeholder="Ahmed Amr"
+            autoComplete="name"
             {...register("full_name")}
             disabled={loading}
+            aria-invalid={!!errors.full_name}
+            className={authInputClassName}
           />
         </div>
         {errors.full_name && (
-          <p className="text-[10px] text-destructive mt-1 font-semibold">{errors.full_name.message}</p>
+          <p className="text-[11px] font-medium text-destructive/90 animate-fade-in">{errors.full_name.message}</p>
         )}
       </div>
 
-      <div className="space-y-1.5 text-left">
-        <Label htmlFor="reg-password" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="space-y-1.5">
+        <Label htmlFor="reg-password" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
           Password
         </Label>
         <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground select-none" />
+          <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
           <Input
             id="reg-password"
-            type="password"
-            className={`pl-10 w-full h-9 bg-background border border-border rounded-lg text-xs text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-all ${
-              errors.password ? "border-destructive focus-visible:ring-destructive/20 focus-visible:border-destructive" : ""
-            }`}
-            style={{ paddingLeft: "2.25rem" }}
+            type={showPassword ? "text" : "password"}
             placeholder="••••••••"
+            autoComplete="new-password"
             {...register("password")}
             disabled={loading}
+            aria-invalid={!!errors.password}
+            className={authInputClassName}
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword((current) => !current)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition hover:text-slate-600 dark:hover:text-slate-300"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
         {errors.password && (
-          <p className="text-[10px] text-destructive mt-1 font-semibold">{errors.password.message}</p>
+          <p className="text-[11px] font-medium text-destructive/90 animate-fade-in">{errors.password.message}</p>
         )}
       </div>
 
-      <div className="space-y-1.5 text-left">
-        <Label htmlFor="reg-confirm-password" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Confirm Password
+      <div className="space-y-1.5">
+        <Label htmlFor="reg-confirm-password" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+          Confirm password
         </Label>
         <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground select-none" />
+          <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
           <Input
             id="reg-confirm-password"
-            type="password"
-            className={`pl-10 w-full h-9 bg-background border border-border rounded-lg text-xs text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-all ${
-              errors.confirmPassword ? "border-destructive focus-visible:ring-destructive/20 focus-visible:border-destructive" : ""
-            }`}
-            style={{ paddingLeft: "2.25rem" }}
+            type={showConfirmPassword ? "text" : "password"}
             placeholder="••••••••"
+            autoComplete="new-password"
             {...register("confirmPassword")}
             disabled={loading}
+            aria-invalid={!!errors.confirmPassword}
+            className={authInputClassName}
           />
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword((current) => !current)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition hover:text-slate-600 dark:hover:text-slate-300"
+            aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+          >
+            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
         {errors.confirmPassword && (
-          <p className="text-[10px] text-destructive mt-1 font-semibold">{errors.confirmPassword.message}</p>
+          <p className="text-[11px] font-medium text-destructive/90 animate-fade-in">{errors.confirmPassword.message}</p>
         )}
       </div>
 
       <Button
         type="submit"
         disabled={loading || !isValid}
-        className="btn-primary w-full py-2 flex justify-center mt-3 cursor-pointer rounded-lg text-xs font-semibold shadow-sm h-9"
+        size="lg"
+        className="group relative mt-2 h-[44px] w-full rounded-lg bg-primary text-xs font-medium text-white shadow-sm transition-all duration-150 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/95 flex items-center justify-center gap-1.5"
       >
-        {loading ? "Creating Account..." : "Create Account"}{" "}
-        <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+        {loading ? "Creating Account..." : "Create Account"}
+        {!loading && <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />}
       </Button>
     </form>
   );

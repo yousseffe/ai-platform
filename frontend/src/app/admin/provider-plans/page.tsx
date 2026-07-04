@@ -646,7 +646,7 @@ export default function AdminProviderPlansPage() {
               <div className="rounded-2xl border border-border bg-secondary/20 p-3">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Current draft</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
-                  {String(form.displayName).trim() || "Untitled plan"} · {formatMoney(form.monthlyPriceEgp)} / month
+                  {String(form.displayName).trim() || "Untitled plan"} · {formatMoney(String(form.monthlyPriceEgp))} / month
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {String(form.providerSharePercent)}% provider share / {String(form.platformCommissionPercent)}% platform cut

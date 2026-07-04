@@ -539,7 +539,7 @@ export class DeployProcessor extends WorkerHost {
    */
   private getHealthCheckBackoffMs(attempt: number): number {
     if (attempt <= 5) return 2000;
-    if (attempt <= 15) return 5000;
+    if (attempt <= 15) return 3000;
     return 10000;
   }
 
@@ -589,7 +589,7 @@ export class DeployProcessor extends WorkerHost {
     try {
       const controller = new AbortController();
       const probeTimeoutMs = parseInt(
-        process.env.HEALTH_PROBE_TIMEOUT_MS || '5000',
+        process.env.HEALTH_PROBE_TIMEOUT_MS || '3000',
         10,
       );
       const timeoutId = setTimeout(() => controller.abort(), probeTimeoutMs);

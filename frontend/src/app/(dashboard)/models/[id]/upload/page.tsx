@@ -20,13 +20,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!model) {
     return {
-      title: "Model Not Found | MLHub",
+      title: "Model Not Found | Qantara",
       description: "The requested machine learning model could not be found.",
     };
   }
 
   return {
-    title: `Push Version - ${model.name} | MLHub`,
+    title: `Push Version - ${model.name} | Qantara`,
     description: `Publish an updated checkpoint run or preprocessing script to ${model.name}.`,
   };
 }

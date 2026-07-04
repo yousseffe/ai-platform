@@ -246,7 +246,7 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
             
             {/* Description — no font-mono */}
             <p className="hero-desc-el text-base md:text-lg text-muted-foreground/90 mb-8 font-normal leading-relaxed max-w-2xl">
-              Upload pre-trained weights, bundle configurations, and custom scripts. MLHub containerizes, runs security scans, and deploys serverless prediction endpoints instantly.
+              Upload pre-trained weights, bundle configurations, and custom scripts. Qantara containerizes, runs security scans, and deploys serverless prediction endpoints instantly.
             </p>
 
             {/* Search bar inside Hero */}
@@ -335,7 +335,7 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
               <div className="bg-slate-900/90 border-b border-border/60 px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Terminal className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest font-mono">mlhub-sdk.py</span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest font-mono">qantara-sdk.py</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500/60 border border-red-500/10"></span>
@@ -345,8 +345,8 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
               </div>
               {/* Code Box */}
               <div className="p-5 space-y-2.5 select-none leading-relaxed text-slate-300 font-mono">
-                <p><span className="text-pink-400 font-semibold">import</span> mlhub</p>
-                <p>client = mlhub.Client(api_key=<span className="text-emerald-400">&quot;ml_sk_live_8f3d...&quot;</span>)</p>
+                <p><span className="text-pink-400 font-semibold">import</span> qantara</p>
+                <p>client = qantara.Client(api_key=<span className="text-emerald-400">&quot;ml_sk_live_8f3d...&quot;</span>)</p>
                 <p className="text-slate-500 font-normal mt-2"># Spin container & predict instantly</p>
                 <p>
                   prediction = client.predict(<br />
@@ -363,7 +363,7 @@ export default function MarketplaceLandingClient({ publicModels }: MarketplaceLa
               <div className="bg-slate-900/50 border-t border-border/50 p-5 font-mono text-[10px] space-y-1.5 text-slate-400">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold">
                   <Play className="w-3 h-3 fill-current shrink-0" />
-                  <span>$ python mlhub-sdk.py</span>
+                  <span>$ python qantara-sdk.py</span>
                 </div>
                 <div className="text-slate-400 pl-5 mt-1 font-mono leading-relaxed">
                   {"{"}<br />

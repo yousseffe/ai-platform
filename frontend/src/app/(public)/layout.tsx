@@ -32,14 +32,21 @@ export default async function PublicLayout({
               <Link href="/" className="flex items-center gap-2.5 text-primary font-bold text-lg tracking-tight hover:opacity-90 transition-opacity">
                 <div className="w-7 h-7 relative flex items-center justify-center shrink-0">
                   <Image
-                    src="/logo.png"
-                    alt="MLHub Logo"
+                    src="/qantara-assets/dark-normal.svg"
+                    alt="Qantara Logo"
                     width={26}
                     height={26}
-                    className="object-contain"
+                    className="object-contain hidden dark:block"
+                  />
+                  <Image
+                    src="/qantara-assets/light-normal.svg"
+                    alt="Qantara Logo"
+                    width={26}
+                    height={26}
+                    className="object-contain block dark:hidden"
                   />
                 </div>
-                <span className="font-mono text-base font-extrabold text-foreground tracking-tight">MLHub</span>
+                <span className="font-mono text-base font-extrabold text-foreground tracking-tight">Qantara</span>
               </Link>
               <p className="text-xs text-muted-foreground leading-relaxed max-w-sm">
                 The serverless model registry and automated execution environment. Scans, containerizes, and deploys machine learning models to production-ready sandbox endpoints instantly.
@@ -78,7 +85,7 @@ export default async function PublicLayout({
                   <a href="/CLAUDE.md" className="hover:text-primary transition-colors">Platform Docs</a>
                 </li>
                 <li>
-                  <span className="hover:text-primary cursor-pointer transition-colors">MLHub SDK (Python)</span>
+                  <span className="hover:text-primary cursor-pointer transition-colors">Qantara SDK (Python)</span>
                 </li>
                 <li>
                   <span className="hover:text-primary cursor-pointer transition-colors">Container Spec</span>
@@ -107,7 +114,7 @@ export default async function PublicLayout({
           {/* Bottom Bar */}
           <div className="max-w-7xl mx-auto pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[9px] text-muted-foreground">
             <div>
-              &copy; {new Date().getFullYear()} ModelOps MLHub Inc. All rights reserved.
+              &copy; {new Date().getFullYear()} ModelOps Qantara Inc. All rights reserved.
             </div>
             <div className="flex items-center gap-6">
               <span className="hover:text-foreground cursor-pointer transition-colors">Terms of Service</span>

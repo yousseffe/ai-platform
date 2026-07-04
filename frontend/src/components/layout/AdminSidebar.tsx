@@ -81,16 +81,24 @@ export default function AdminSidebar() {
       <div className="h-16 px-6 border-b border-border flex items-center gap-2.5 select-none bg-secondary/5 backdrop-blur-xs">
         <div className="w-7 h-7 relative flex items-center justify-center shrink-0">
           <Image
-            src="/logo.png"
-            alt="MLHub Logo"
+            src="/qantara-assets/dark-normal.svg"
+            alt="Qantara Logo"
             width={26}
             height={26}
-            className="object-contain"
+            className="object-contain hidden dark:block"
+            style={{ width: "auto" }}
+          />
+          <Image
+            src="/qantara-assets/light-normal.svg"
+            alt="Qantara Logo"
+            width={26}
+            height={26}
+            className="object-contain block dark:hidden"
             style={{ width: "auto" }}
           />
         </div>
         <span className="font-sans text-sm font-extrabold tracking-tight text-foreground flex items-center gap-1.5">
-          MLHub
+          Qantara
           <span className="text-primary text-[9px] px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 font-bold font-mono">
             ADMIN
           </span>

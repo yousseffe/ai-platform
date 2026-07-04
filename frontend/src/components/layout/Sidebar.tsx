@@ -277,15 +277,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <Link href="/dashboard" className="flex items-center gap-2 text-primary font-bold text-sm tracking-tight hover:opacity-90 transition-opacity">
           <div className="w-7 h-7 relative flex items-center justify-center shrink-0">
             <Image
-              src="/logo.png"
-              alt="MLHub Logo"
+              src="/qantara-assets/dark-normal.svg"
+              alt="Qantara Logo"
               width={26}
               height={26}
-              className="object-contain"
+              className="object-contain hidden dark:block"
+              style={{ width: "auto" }}
+            />
+            <Image
+              src="/qantara-assets/light-normal.svg"
+              alt="Qantara Logo"
+              width={26}
+              height={26}
+              className="object-contain block dark:hidden"
               style={{ width: "auto" }}
             />
           </div>
-          <span className="font-sans text-sm font-bold text-foreground tracking-tight">MLHub Console</span>
+          <span className="font-sans text-sm font-bold text-foreground tracking-tight">Qantara Console</span>
         </Link>
         <button
           type="button"

@@ -11,7 +11,7 @@ export const revalidate = 0;
  * Static metadata configuration for the Pipelines listing page.
  */
 export const metadata: Metadata = {
-  title: "Pipelines - MLHub",
+  title: "Pipelines - Qantara",
   description: "Chain deployed models together, mapping each step's output into the next step's input.",
 };
 

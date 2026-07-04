@@ -116,16 +116,16 @@ export class MinioService implements OnModuleInit {
       if (!exposedHeaders.toLowerCase().includes('etag')) {
         this.logger.warn(
           `MinIO CORS preflight to ${endpoint}:${port} did not expose the ETag header ` +
-            `(Access-Control-Expose-Headers: "${exposedHeaders}"). Browser clients performing ` +
-            'direct presigned PUT uploads will be unable to read part ETags, which will cause ' +
-            'multipart upload completion to fail. Ensure MINIO_API_CORS_ALLOW_ORIGIN is set on the MinIO server.',
+          `(Access-Control-Expose-Headers: "${exposedHeaders}"). Browser clients performing ` +
+          'direct presigned PUT uploads will be unable to read part ETags, which will cause ' +
+          'multipart upload completion to fail. Ensure MINIO_API_CORS_ALLOW_ORIGIN is set on the MinIO server.',
         );
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(
         `Could not verify MinIO CORS configuration via preflight request: ${message}. ` +
-          'Ensure MINIO_API_CORS_ALLOW_ORIGIN is set on the MinIO server so browser clients can read the ETag header during multipart uploads.',
+        'Ensure MINIO_API_CORS_ALLOW_ORIGIN is set on the MinIO server so browser clients can read the ETag header during multipart uploads.',
       );
     }
   }
@@ -208,7 +208,7 @@ export class MinioService implements OnModuleInit {
    */
   async getFileUrl(objectName: string): Promise<string> {
     if (this.useLocalFallback) {
-      const backendUrl = process.env.PUBLIC_API_URL || 'http://localhost:5000';
+      const backendUrl = process.env.PUBLIC_API_URL || 'http://localhost:3000';
       return `${backendUrl}/uploads/local-s3/${this.bucketName}/${objectName}`;
     }
     return this.minioClient.presignedGetObject(
@@ -453,7 +453,7 @@ export class MinioService implements OnModuleInit {
     partNumber?: number,
   ): Promise<string> {
     if (this.useLocalFallback) {
-      const backendUrl = process.env.PUBLIC_API_URL || 'http://localhost:5000';
+      const backendUrl = process.env.PUBLIC_API_URL || 'http://localhost:3000';
       let url = `${backendUrl}/api/v1/models/local-upload/${objectName}`;
       const queryParams: string[] = [];
       if (uploadId) queryParams.push(`uploadId=${uploadId}`);

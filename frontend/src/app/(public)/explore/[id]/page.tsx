@@ -20,13 +20,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const model = await getPublicModelById(id);
   if (!model) {
-    return { title: "Model Not Found — MLHub" };
+    return { title: "Model Not Found — Qantara" };
   }
   return {
-    title: `${model.name} — MLHub Model Registry`,
-    description: model.description || `Explore ${model.name} on MLHub. Deploy and run this model via the serverless inference API.`,
+    title: `${model.name} — Qantara Model Registry`,
+    description: model.description || `Explore ${model.name} on Qantara. Deploy and run this model via the serverless inference API.`,
     openGraph: {
-      title: `${model.name} on MLHub`,
+      title: `${model.name} on Qantara`,
       description: model.description || `Run ${model.name} via serverless ML API`,
       type: "website",
     },

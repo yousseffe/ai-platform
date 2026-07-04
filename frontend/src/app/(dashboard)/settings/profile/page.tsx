@@ -14,7 +14,7 @@ import { useMyProfile, derivePlatformRoleLabel } from "@/hooks/use-my-profile";
 export default function ProfileSettingsPage() {
   const { data: session } = useSession();
   const { profile } = useMyProfile();
-  const userEmail = session?.user?.email || "user@mlhub.ai";
+  const userEmail = session?.user?.email || "user@qantara.ai";
   const platformRole = derivePlatformRoleLabel(profile);
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(
     userEmail

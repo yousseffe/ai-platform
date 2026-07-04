@@ -5,7 +5,7 @@ import ThemeScript from "@/components/ThemeScript";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MLHub - Model Registry & Deployment Platform",
+  title: "Qantara - Model Registry & Deployment Platform",
   description: "Enterprise model registry, version control, and containerized deployment infrastructure.",
 };
 

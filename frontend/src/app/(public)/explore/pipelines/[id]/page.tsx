@@ -18,11 +18,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const pipeline = await getPublicPipelineById(id);
   if (!pipeline) {
-    return { title: "Pipeline Not Found — MLHub" };
+    return { title: "Pipeline Not Found — Qantara" };
   }
   return {
-    title: `${pipeline.name} — MLHub Pipeline Catalog`,
-    description: pipeline.description || `Explore the "${pipeline.name}" model chain on MLHub.`,
+    title: `${pipeline.name} — Qantara Pipeline Catalog`,
+    description: pipeline.description || `Explore the "${pipeline.name}" model chain on Qantara.`,
   };
 }
 
