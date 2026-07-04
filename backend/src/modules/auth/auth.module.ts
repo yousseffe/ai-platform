@@ -7,6 +7,7 @@ import { McpToken } from './entities/mcp-token.entity';
 import { AuthService } from './services/auth.service';
 import { ApiIdentityService } from './services/api-identity.service';
 import { McpTokenService } from './services/mcp-token.service';
+import { KeyQuotaService } from './services/key-quota.service';
 import { AuthController } from './controllers/auth.controller';
 import { McpTokenController } from './controllers/mcp-token.controller';
 import { UsersModule } from '../users/users.module';
@@ -49,6 +50,7 @@ import { getRsaKeys } from './utils/keys';
     AuthService,
     ApiIdentityService,
     McpTokenService,
+    KeyQuotaService,
     JwtStrategy,
     OrgRoleGuard,
     ApiKeyOrJwtGuard,
@@ -59,6 +61,7 @@ import { getRsaKeys } from './utils/keys';
     AuthService,
     ApiIdentityService,
     McpTokenService,
+    KeyQuotaService,
     OrgRoleGuard,
     ApiKeyOrJwtGuard,
     AdminGuard,

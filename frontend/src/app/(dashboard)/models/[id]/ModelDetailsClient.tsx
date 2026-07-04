@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { 
+import { toast } from "react-hot-toast";
+import {
   GitBranch, 
   Settings, 
   Layers, 
@@ -27,6 +28,11 @@ import ActionsTerminal from "@/components/models/ActionsTerminal";
 import { ModelAnalytics } from "@/components/models/ModelAnalytics";
 import { ModelRequestHistoryTable } from "@/components/models/ModelRequestHistoryTable";
 import { ModelLogsConsole } from "@/components/models/ModelLogsConsole";
+import { CacheSettingsCard } from "@/components/models/CacheSettingsCard";
+import { NetworkSecurityCard } from "@/components/models/NetworkSecurityCard";
+import { VisibilityToggleCard } from "@/components/models/VisibilityToggleCard";
+import { FirewallPolicyCard } from "@/components/models/FirewallPolicyCard";
+import { CanaryTrafficPanel } from "@/components/models/CanaryTrafficPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { deprecateModelVersion, undeprecateModelVersion } from "@/lib/actions/models.actions";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface ModelDetailsClientProps {
   initialModel: Model;
@@ -63,14 +70,14 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
     try {
       const res = await deprecateModelVersion(modelId, versionId);
       if (res.success) {
-        alert("Version deprecated successfully!");
+        toast.success("Version deprecated successfully!");
         router.refresh();
       } else {
-        alert(res.error || "Failed to deprecate version");
+        toast.error(res.error || "Failed to deprecate version");
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to deprecate version");
+      toast.error("Failed to deprecate version");
     }
   };
 
@@ -78,16 +85,19 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
     try {
       const res = await undeprecateModelVersion(modelId, versionId);
       if (res.success) {
-        alert("Version activated successfully!");
+        toast.success("Version activated successfully!");
         router.refresh();
       } else {
-        alert(res.error || "Failed to activate version");
+        toast.error(res.error || "Failed to activate version");
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to activate version");
+      toast.error("Failed to activate version");
     }
   };
+
+  // Confirmation gate for the Danger Zone's model deletion — replaces window.confirm().
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Track active version in terminal build log viewer
   const [activeVersion, setActiveVersion] = useState<ModelVersion | null>(() => {
@@ -325,6 +335,8 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
 
         {/* Tab 2: Version History & Actions Log Terminal */}
         <TabsContent value="versions" className="space-y-6">
+          {isOwner && <CanaryTrafficPanel versions={versions} modelId={modelId} />}
+
           <div className="border border-border bg-card rounded-xl p-0 overflow-hidden shadow-sm">
             <div className="p-4 border-b border-border bg-background flex items-center justify-between select-none">
               <h3 className="font-bold text-foreground text-xs font-mono">Deployment Checkpoint Runs</h3>
@@ -386,6 +398,11 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
         {/* Tab 5: Settings (Danger Zone Card) */}
         {isOwner && (
           <TabsContent value="settings" className="space-y-6">
+            <VisibilityToggleCard model={model} modelId={modelId} />
+            <CacheSettingsCard model={model} modelId={modelId} />
+            <NetworkSecurityCard model={model} modelId={modelId} />
+            <FirewallPolicyCard modelId={modelId} />
+
             <div className="border border-red-500/20 bg-red-500/5 rounded-2xl p-6 space-y-6 shadow-sm">
               <div className="flex items-center gap-3 text-red-500 font-bold text-sm select-none">
                 <AlertTriangle className="w-5 h-5" />
@@ -406,7 +423,7 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
                   </p>
                 </div>
                 <Button
-                  onClick={handleDeleteModel}
+                  onClick={() => setShowDeleteConfirm(true)}
                   variant="outline"
                   className="border-red-500/30 hover:border-red-500 text-red-500 hover:bg-red-500/10 flex items-center gap-1.5 shrink-0 font-bold text-xs cursor-pointer shadow-sm rounded-lg"
                 >
@@ -418,7 +435,14 @@ export default function ModelDetailsClient({ initialModel, modelId, isOwner = tr
         )}
       </Tabs>
 
-
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete this model repository"
+        description={`Permanently delete "${model.name}", all version histories, and weight checkpoints, and terminate any active deployments. This can't be undone.`}
+        confirmLabel="Delete repository"
+        onConfirm={handleDeleteModel}
+      />
     </div>
   );
 }

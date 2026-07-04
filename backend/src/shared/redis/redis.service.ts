@@ -139,6 +139,116 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Atomically increments a numeric counter key, creating it at 1 if absent.
+   *
+   * @param key - Target storage key.
+   * @returns The counter's new value.
+   */
+  async incr(key: string): Promise<number> {
+    if (!this.isFallbackMode && this.client) {
+      try {
+        return await this.client.incr(key);
+      } catch (err) {
+        console.warn('Redis incr failed, switching to memory fallback:', err);
+        this.isFallbackMode = true;
+      }
+    }
+
+    const cached = this.fallbackCache.get(key);
+    const current =
+      cached && Date.now() <= cached.expiresAt ? parseInt(cached.value, 10) || 0 : 0;
+    const next = current + 1;
+    this.fallbackCache.set(key, {
+      value: next.toString(),
+      expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+    });
+    return next;
+  }
+
+  /**
+   * Atomically increments a counter and applies a TTL only on its first
+   * increment, so repeated calls don't keep pushing the expiry back. Used for
+   * fixed-window counters (e.g. per-minute rate limits) where the window
+   * boundary is encoded in the key itself.
+   *
+   * @param key - Target storage key.
+   * @param ttlSeconds - Expiry to apply the first time this key is created.
+   * @returns The counter's new value.
+   */
+  async incrWithExpiry(key: string, ttlSeconds: number): Promise<number> {
+    if (!this.isFallbackMode && this.client) {
+      try {
+        const value = await this.client.incr(key);
+        if (value === 1) {
+          await this.client.expire(key, ttlSeconds);
+        }
+        return value;
+      } catch (err) {
+        console.warn(
+          'Redis incrWithExpiry failed, switching to memory fallback:',
+          err,
+        );
+        this.isFallbackMode = true;
+      }
+    }
+
+    const now = Date.now();
+    const cached = this.fallbackCache.get(key);
+    if (!cached || now > cached.expiresAt) {
+      this.fallbackCache.set(key, {
+        value: '1',
+        expiresAt: now + ttlSeconds * 1000,
+      });
+      return 1;
+    }
+    const next = (parseInt(cached.value, 10) || 0) + 1;
+    this.fallbackCache.set(key, { value: next.toString(), expiresAt: cached.expiresAt });
+    return next;
+  }
+
+  /**
+   * Atomically adds a floating-point amount to a counter, creating it at
+   * `amount` if absent. Used for cumulative spend counters.
+   *
+   * @param key - Target storage key.
+   * @param amount - Amount to add (may be fractional).
+   * @param ttlSeconds - Expiry to (re-)apply after this increment, for cleanup.
+   * @returns The counter's new value.
+   */
+  async incrByFloat(
+    key: string,
+    amount: number,
+    ttlSeconds?: number,
+  ): Promise<number> {
+    if (!this.isFallbackMode && this.client) {
+      try {
+        const value = await this.client.incrbyfloat(key, amount);
+        if (ttlSeconds) {
+          await this.client.expire(key, ttlSeconds);
+        }
+        return parseFloat(value);
+      } catch (err) {
+        console.warn(
+          'Redis incrByFloat failed, switching to memory fallback:',
+          err,
+        );
+        this.isFallbackMode = true;
+      }
+    }
+
+    const now = Date.now();
+    const cached = this.fallbackCache.get(key);
+    const current =
+      cached && now <= cached.expiresAt ? parseFloat(cached.value) || 0 : 0;
+    const next = current + amount;
+    this.fallbackCache.set(key, {
+      value: next.toString(),
+      expiresAt: now + (ttlSeconds ? ttlSeconds * 1000 : 365 * 24 * 60 * 60 * 1000),
+    });
+    return next;
+  }
+
+  /**
    * Retrieves the remaining time to live of a cache key.
    *
    * @param key - Target storage key.

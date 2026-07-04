@@ -9,6 +9,7 @@ import { InferenceBillingService } from './services/inference-billing.service';
 import { InferenceLogService } from './services/inference-log.service';
 import { InferenceDeploymentResolverService } from './services/inference-deployment-resolver.service';
 import { InferenceCallPreparerService } from './services/inference-call-preparer.service';
+import { InferenceCacheService } from './services/inference-cache.service';
 import { InferenceClient } from './services/inference-client.service';
 import { ModelsController } from './controllers/models.controller';
 import { UploadCleanupProcessor } from '../../shared/queue/processors/upload-cleanup.processor';
@@ -35,6 +36,7 @@ import { UsersModule } from '../users/users.module';
 import { WalletsModule } from '../wallets/wallets.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { ProviderAccountsModule } from '../provider-accounts/provider-accounts.module';
+import { FirewallModule } from '../firewall/firewall.module';
 
 /**
  * Module responsible for model cataloging, version tracking, file uploading,
@@ -67,6 +69,7 @@ import { ProviderAccountsModule } from '../provider-accounts/provider-accounts.m
     WalletsModule,
     ProviderAccountsModule,
     forwardRef(() => OrganizationsModule),
+    FirewallModule,
   ],
   providers: [
     ModelsService,
@@ -79,6 +82,7 @@ import { ProviderAccountsModule } from '../provider-accounts/provider-accounts.m
     InferenceLogService,
     InferenceDeploymentResolverService,
     InferenceCallPreparerService,
+    InferenceCacheService,
     InferenceClient,
     UploadCleanupProcessor,
   ],

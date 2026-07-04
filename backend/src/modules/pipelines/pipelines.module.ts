@@ -17,6 +17,7 @@ import { PipelineStepLoopService } from './services/pipeline-step-loop.service';
 import { PipelineRunnerService } from './services/pipeline-runner.service';
 import { PipelineProcessor } from './processors/pipeline.processor';
 import { PipelinesController } from './controllers/pipelines.controller';
+import { PublicPipelinesController } from './controllers/public-pipelines.controller';
 import { PipelineStepsController } from './controllers/pipeline-steps.controller';
 import { PipelineRunsController } from './controllers/pipeline-runs.controller';
 import { ModelsModule } from '../models/models.module';
@@ -54,6 +55,7 @@ import { AuthModule } from '../auth/auth.module';
     PipelineProcessor,
   ],
   controllers: [
+    PublicPipelinesController,
     PipelinesController,
     PipelineStepsController,
     PipelineRunsController,

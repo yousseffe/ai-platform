@@ -1,10 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { Pipeline, PipelineRun, PipelineEdge, PipelineStatus, PipelineType } from "@/types";
 import { usePipelineBuilder } from "@/hooks/use-pipeline-builder";
 import { usePipelineRuns } from "@/hooks/use-pipeline-runs";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PipelineStepsPanel } from "@/components/pipelines/PipelineStepsPanel";
 import { PipelineEdgesPanel } from "@/components/pipelines/PipelineEdgesPanel";
 import { PipelineRunPanel } from "@/components/pipelines/PipelineRunPanel";
@@ -42,11 +44,7 @@ export function PipelineDetailsClient({ pipeline, runs, edges, readyVersionOptio
 
   const steps = [...(pipeline.steps ?? [])].sort((a, b) => a.order - b.order);
 
-  const handleDelete = () => {
-    if (window.confirm(`Delete pipeline "${pipeline.name}"? This cannot be undone.`)) {
-      builder.handleDeletePipeline();
-    }
-  };
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (
     <div className="w-full space-y-6">
@@ -69,10 +67,22 @@ export function PipelineDetailsClient({ pipeline, runs, edges, readyVersionOptio
           )}
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={() => builder.handleUpdateVisibility(!pipeline.isPublic)}
+            disabled={builder.isSubmitting}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold font-mono border cursor-pointer transition-colors ${
+              pipeline.isPublic
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                : "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+            }`}
+          >
+            {pipeline.isPublic ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            {pipeline.isPublic ? "PUBLIC MARKETPLACE" : "PRIVATE REGISTRY"}
+          </button>
           <Button variant="outline" onClick={builder.handleValidate} disabled={builder.isSubmitting}>
             Validate
           </Button>
-          <Button variant="destructive" onClick={handleDelete} disabled={builder.isSubmitting}>
+          <Button variant="destructive" onClick={() => setShowDeleteConfirm(true)} disabled={builder.isSubmitting}>
             Delete
           </Button>
         </div>
@@ -107,6 +117,15 @@ export function PipelineDetailsClient({ pipeline, runs, edges, readyVersionOptio
         isTriggering={runHook.isTriggering}
         runError={runHook.error}
         onTriggerRun={runHook.handleTriggerRun}
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete this pipeline"
+        description={`Permanently delete "${pipeline.name}" and all its steps, mappers, and run history. This can't be undone.`}
+        confirmLabel="Delete pipeline"
+        onConfirm={builder.handleDeletePipeline}
       />
     </div>
   );

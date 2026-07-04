@@ -119,15 +119,26 @@ export class DeploymentsService implements OnModuleInit {
    * Triggers a new deployment for a specific model version.
    *
    * Creates a deployment record in STARTING state and schedules container creation
-   * in the deployment queue.
+   * in the deployment queue. Does not stop any other version's already-RUNNING
+   * deployment for the same model — deploying a second version alongside an
+   * existing one is how canary/traffic-split rollouts are started; pass a low
+   * `trafficWeight` to send it only a fraction of unpinned prediction traffic.
    *
    * @param versionId - The UUID of the model version.
+   * @param trafficWeight - Share (0-100) of unpinned traffic this deployment
+   *   should receive once running, when co-existing with other RUNNING
+   *   deployments for the same model. Defaults to 100 (full traffic, or the
+   *   only deployment for its model).
    * @returns A promise resolving to the created Deployment entity.
    * @throws {NotFoundException} If the model version does not exist.
    */
-  async deployVersion(versionId: string): Promise<Deployment> {
+  async deployVersion(
+    versionId: string,
+    trafficWeight = 100,
+  ): Promise<Deployment> {
     const version = await this.modelVersionsRepository.findOne({
       where: { id: versionId },
+      relations: ['model', 'model.organization'],
     });
     if (!version) {
       throw new NotFoundException('Model version not found');
@@ -136,6 +147,8 @@ export class DeploymentsService implements OnModuleInit {
     const deployment = this.deploymentsRepository.create({
       modelVersion: version,
       status: DeploymentStatus.STARTING,
+      trafficWeight: Math.min(100, Math.max(0, trafficWeight)),
+      rlsOrgId: version.model?.organization?.id ?? null,
     });
 
     const savedDeployment = await this.deploymentsRepository.save(deployment);
@@ -145,6 +158,62 @@ export class DeploymentsService implements OnModuleInit {
     });
 
     return savedDeployment;
+  }
+
+  /**
+   * Updates the traffic-split weight of an existing deployment.
+   *
+   * @param deploymentId - The UUID of the deployment to update.
+   * @param trafficWeight - New weight (0-100).
+   * @throws {NotFoundException} If the deployment does not exist.
+   */
+  async updateTrafficWeight(
+    deploymentId: string,
+    trafficWeight: number,
+  ): Promise<Deployment> {
+    const deployment = await this.deploymentsRepository.findOne({
+      where: { id: deploymentId },
+    });
+    if (!deployment) {
+      throw new NotFoundException('Deployment not found');
+    }
+    deployment.trafficWeight = Math.min(100, Math.max(0, trafficWeight));
+    return this.deploymentsRepository.save(deployment);
+  }
+
+  /**
+   * Promotes a deployment to receive 100% of its model's unpinned traffic,
+   * stopping every other RUNNING deployment for the same model. Used both to
+   * promote a canary to full rollout and to roll back to a previous version
+   * (by promoting that version's still-RUNNING deployment).
+   *
+   * @param deploymentId - The UUID of the deployment to promote.
+   * @returns A promise resolving to the promoted Deployment entity.
+   * @throws {NotFoundException} If the deployment does not exist.
+   */
+  async promoteDeployment(deploymentId: string): Promise<Deployment> {
+    const deployment = await this.deploymentsRepository.findOne({
+      where: { id: deploymentId },
+      relations: ['modelVersion', 'modelVersion.model'],
+    });
+    if (!deployment) {
+      throw new NotFoundException('Deployment not found');
+    }
+
+    const siblings = await this.deploymentsRepository.find({
+      where: {
+        status: DeploymentStatus.RUNNING,
+        modelVersion: { model: { id: deployment.modelVersion.model.id } },
+      },
+    });
+
+    for (const sibling of siblings) {
+      if (sibling.id === deploymentId) continue;
+      await this.stopDeployment(sibling.id);
+    }
+
+    deployment.trafficWeight = 100;
+    return this.deploymentsRepository.save(deployment);
   }
 
   /**

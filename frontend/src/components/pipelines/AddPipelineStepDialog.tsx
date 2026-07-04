@@ -74,6 +74,7 @@ export function AddPipelineStepDialog({
     register,
     handleSubmit,
     setValue,
+    setError,
     watch,
     formState: { errors },
     reset,
@@ -93,6 +94,25 @@ export function AddPipelineStepDialog({
   };
 
   const onSubmit = async (data: CreateStepInput) => {
+    // Joining an existing stage as a parallel branch requires a role so the
+    // pipeline can later validate — see PipelinesService.assertStageRolesAreUnambiguous,
+    // which permanently rejects (and blocks running) a stage where any
+    // parallel step's role is missing or duplicated.
+    if (roleRequired && !data.role?.trim()) {
+      setError("role", {
+        type: "required",
+        message: "Role is required — this stage already has another step.",
+      });
+      return;
+    }
+    if (roleRequired && targetStage!.some((s) => s.role === data.role?.trim())) {
+      setError("role", {
+        type: "duplicate",
+        message: "Another step in this stage already uses that role.",
+      });
+      return;
+    }
+
     const order = targetStage
       ? targetStage[0].order
       : stages.length === 0
@@ -161,10 +181,14 @@ export function AddPipelineStepDialog({
               Role {roleRequired ? "(required — this stage has other steps)" : "(optional)"}
             </Label>
             <Input id="step-role" placeholder="summarizer" {...register("role")} />
-            <p className="text-[10px] text-muted-foreground">
-              Names this branch for mappers, e.g.{" "}
-              <code className="bg-secondary/50 px-1 rounded">steps.{targetStage?.[0].order ?? "N"}.summarizer</code>.
-            </p>
+            {errors.role ? (
+              <p className="text-[10px] text-destructive font-semibold">{errors.role.message}</p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">
+                Names this branch for mappers, e.g.{" "}
+                <code className="bg-secondary/50 px-1 rounded">steps.{targetStage?.[0].order ?? "N"}.summarizer</code>.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">

@@ -9,6 +9,7 @@ import {
   removePipelineEdge,
   validatePipeline,
   deletePipeline,
+  updatePipeline,
 } from "@/lib/actions/pipelines.actions";
 import { CreateStepInput } from "@/lib/schemas";
 import { MapperRule } from "@/types";
@@ -143,6 +144,26 @@ export function usePipelineBuilder(pipelineId: string) {
   };
 
   /**
+   * Toggles whether the pipeline is listed in the public marketplace.
+   *
+   * @param isPublic - The new visibility state to persist.
+   */
+  const handleUpdateVisibility = async (isPublic: boolean) => {
+    setError("");
+    setIsSubmitting(true);
+    try {
+      const res = await updatePipeline(pipelineId, { isPublic });
+      if (!res.success) {
+        setError(res.error);
+        return;
+      }
+      router.refresh();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /**
    * Deletes the pipeline and navigates back to the pipelines list.
    */
   const handleDeletePipeline = async () => {
@@ -168,6 +189,7 @@ export function usePipelineBuilder(pipelineId: string) {
     handleUpsertEdge,
     handleRemoveEdge,
     handleValidate,
+    handleUpdateVisibility,
     handleDeletePipeline,
   };
 }

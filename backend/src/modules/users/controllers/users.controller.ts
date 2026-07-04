@@ -156,4 +156,22 @@ export class UsersController {
     await this.usersService.revokeUserApiKey(req.user.id, id);
     return { success: true };
   }
+
+  /**
+   * Updates the rate limit and daily spend budget quota for a specific API key.
+   *
+   * @param req - Request containing user context.
+   * @param id - API Key ID parameter.
+   * @param body - Quota fields to update.
+   * @returns The updated API key.
+   */
+  @Patch('me/api-keys/:id/quota')
+  async updateMyApiKeyQuota(
+    @Req() req: Record<string, unknown> & { user: { id: string } },
+    @Param('id') id: string,
+    @Body()
+    body: { maxRequestsPerMinute?: number | null; maxDailySpendCredits?: number | null },
+  ) {
+    return this.usersService.updateApiKeyQuota(req.user.id, id, body);
+  }
 }

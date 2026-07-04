@@ -31,6 +31,7 @@ import {
   Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "react-hot-toast";
 import ApiKeyRow from "@/components/orgs/ApiKeyRow";
 import CreateApiKeyModal from "@/components/orgs/CreateApiKeyModal";
@@ -81,14 +82,18 @@ export default function ProjectDetailPage() {
     Promise.resolve().then(fetchData);
   }, [fetchData]);
 
+  const [revokeTargetId, setRevokeTargetId] = useState<string | null>(null);
+
   const handleRevoke = async (keyId: string) => {
-    if (!org || !projectId || !confirm("Revoke this API key? Apps using it will lose access immediately.")) return;
+    if (!org || !projectId) return;
     try {
       await revokeApiKey(org.id, projectId, keyId);
       toast.success("API key revoked");
       setApiKeys((prev) => prev.map((k) => (k.id === keyId ? { ...k, isActive: false } : k)));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to revoke key");
+    } finally {
+      setRevokeTargetId(null);
     }
   };
 
@@ -445,13 +450,24 @@ export default function ProjectDetailPage() {
                       <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Label & Model</th>
                       <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Key</th>
                       <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Status</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Consumption Limits</th>
                       <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Last Used</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {apiKeys.map((key) => (
-                      <ApiKeyRow key={key.id} apiKey={key} onRevoke={handleRevoke} canRevoke={can(OrgAction.MANAGE_API_KEYS)} />
+                      <ApiKeyRow
+                        key={key.id}
+                        orgId={org.id}
+                        apiKey={key}
+                        onRevoke={setRevokeTargetId}
+                        onQuotaUpdated={(updated) =>
+                          setApiKeys((prev) => prev.map((k) => (k.id === updated.id ? updated : k)))
+                        }
+                        canRevoke={can(OrgAction.MANAGE_API_KEYS)}
+                        canManageQuota={can(OrgAction.MANAGE_API_KEYS)}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -464,6 +480,17 @@ export default function ProjectDetailPage() {
       {org && project && (
         <CreateApiKeyModal orgId={org.id} projectId={project.id} open={createKeyOpen} onClose={() => setCreateKeyOpen(false)} onCreated={fetchData} />
       )}
+
+      <ConfirmDialog
+        open={!!revokeTargetId}
+        onOpenChange={(open) => !open && setRevokeTargetId(null)}
+        title="Revoke API key"
+        description="Apps using this key will lose access immediately. This can't be undone."
+        confirmLabel="Revoke key"
+        onConfirm={async () => {
+          if (revokeTargetId) await handleRevoke(revokeTargetId);
+        }}
+      />
     </div>
   );
 }

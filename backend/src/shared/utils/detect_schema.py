@@ -1086,6 +1086,35 @@ def scan_directory_for_models(models_dir: str) -> List[str]:
     return model_files
 
 
+def apply_postprocess_script(expected_result_json: str, postprocess_path: str) -> tuple[str, list]:
+    """
+    Runs the user's `postprocess(prediction)` function — the same entrypoint
+    serve.py loads via POSTPROCESS_PATH at inference time — against the
+    synthetic expected_result sample, so schema detection reflects what
+    callers actually receive after post-processing rather than the raw
+    model output.
+
+    Returns the (possibly transformed) expected_result JSON string plus any
+    warnings raised while loading or invoking the script.
+    """
+    warnings = []
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("postprocess", postprocess_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        if not hasattr(module, "postprocess"):
+            warnings.append("Postprocess script has no postprocess(prediction) function — expected_result reflects the raw model output only.")
+            return expected_result_json, warnings
+
+        raw_result = json.loads(expected_result_json)
+        transformed = module.postprocess(raw_result)
+        return json.dumps(transformed, indent=2, default=str), warnings
+    except Exception as e:
+        warnings.append(f"Postprocess script failed during schema detection, expected_result reflects the raw model output only: {e}")
+        return expected_result_json, warnings
+
+
 def generate_schema(path: str, model_type_hint: str = "", original_filename: str = ""):
     is_gguf = path.lower().endswith('.gguf') or original_filename.lower().endswith('.gguf') or model_type_hint.upper() == "LLM_GGUF"
     if is_gguf:
@@ -1108,11 +1137,13 @@ if __name__ == '__main__':
     parser.add_argument("model_path", help="Path to the model file or directory")
     parser.add_argument("--model-type", dest="model_type", default="", help="Model type hint (e.g. NLP, TABULAR, VISION, DIFFUSION)")
     parser.add_argument("--filename", dest="filename", default="", help="Original filename of the uploaded model")
+    parser.add_argument("--postprocess", dest="postprocess_path", default="", help="Path to a postprocess.py script defining postprocess(prediction), applied to the synthetic expected_result sample")
     args = parser.parse_args()
 
     model_path = args.model_path
     model_type_hint = args.model_type
     original_filename = args.filename
+    postprocess_path = args.postprocess_path
     temp_dir = None
     
     try:
@@ -1163,7 +1194,12 @@ if __name__ == '__main__':
             # Single model file/directory
             schema = generate_schema(model_path, model_type_hint, original_filename)
             if schema:
-                print(schema.to_json())
+                result = schema.to_dict()
+                if postprocess_path and os.path.exists(postprocess_path):
+                    transformed, pp_warnings = apply_postprocess_script(result["expected_result"], postprocess_path)
+                    result["expected_result"] = transformed
+                    result["warnings"] = list(result.get("warnings") or []) + pp_warnings
+                print(json.dumps(result, indent=2))
             else:
                 print(json.dumps({"error": "Failed to generate schema"}))
                 

@@ -53,7 +53,11 @@ export function useUploadVersion(modelId: string, modelType?: string) {
 
     setIsDetectingSchema(true);
     try {
-      const result = await detectSchema(modelFile, modelType);
+      const postprocess =
+        postprocessMode === "file"
+          ? { file: postprocessFile }
+          : { code: postprocessCode };
+      const result = await detectSchema(modelFile, modelType, postprocess);
       if (result.example_payload) {
         setExamplePayload(result.example_payload);
       }

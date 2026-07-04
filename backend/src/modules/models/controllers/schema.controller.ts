@@ -2,7 +2,7 @@ import {
   Controller,
   Post,
   UseInterceptors,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   BadRequestException,
   Logger,
@@ -10,7 +10,7 @@ import {
   Param,
   Request,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { exec } from 'child_process';
@@ -44,32 +44,59 @@ export class SchemaController {
   constructor(private readonly modelsService: ModelsService) {}
 
   /**
-   * Accepts a model file, writes it temporarily, executes detect_schema.py to inspect the model features/task,
-   * and returns the auto-generated JSON schema and sample templates.
+   * Accepts a model file (and, optionally, a postprocessing script), writes
+   * them temporarily, executes detect_schema.py to inspect the model
+   * features/task, and returns the auto-generated JSON schema and sample
+   * templates. When a postprocessing script is provided — as an uploaded
+   * file or inline code — its `postprocess(prediction)` function is applied
+   * to the synthetic expected-result sample, matching the same script
+   * serve.py runs at inference time, so the returned `expected_result`
+   * reflects what callers actually receive rather than the raw model output.
    *
-   * @param file - The model file binary uploaded via Multer.
+   * @param files - The uploaded `model` and optional `postprocess` files.
+   * @param body - Form fields: `modelType`, `originalFilename`, and optional inline `postprocessCode`.
    * @returns A promise resolving to the schema detection result object.
-   * @throws {BadRequestException} If no file is provided or if schema generation execution fails.
+   * @throws {BadRequestException} If no model file is provided or if schema generation execution fails.
    */
   @UseGuards(JwtAuthGuard)
   @Post('detect-schema')
   @UseInterceptors(
-    FileInterceptor('model', {
-      limits: { fileSize: 15 * 1024 * 1024 * 1024 }, // 15GB limit for schema detection
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, 'temp-detect-' + uniqueSuffix + extname(file.originalname));
-        },
-      }),
-    }),
+    FileFieldsInterceptor(
+      [
+        { name: 'model', maxCount: 1 },
+        { name: 'postprocess', maxCount: 1 },
+      ],
+      {
+        limits: { fileSize: 15 * 1024 * 1024 * 1024 }, // 15GB limit for schema detection
+        storage: diskStorage({
+          destination: './uploads',
+          filename: (req, file, cb) => {
+            const uniqueSuffix =
+              Date.now() + '-' + Math.round(Math.random() * 1e9);
+            const prefix =
+              file.fieldname === 'postprocess'
+                ? 'temp-detect-postprocess-'
+                : 'temp-detect-';
+            cb(null, prefix + uniqueSuffix + extname(file.originalname));
+          },
+        }),
+      },
+    ),
   )
   async detectSchema(
-    @UploadedFile() file?: Express.Multer.File,
-    @Body() body?: { modelType?: string; originalFilename?: string },
+    @UploadedFiles()
+    files?: {
+      model?: Express.Multer.File[];
+      postprocess?: Express.Multer.File[];
+    },
+    @Body()
+    body?: {
+      modelType?: string;
+      originalFilename?: string;
+      postprocessCode?: string;
+    },
   ): Promise<Record<string, unknown>> {
+    const file = files?.model?.[0];
     if (!file) {
       throw new BadRequestException('No model file uploaded.');
     }
@@ -83,6 +110,20 @@ export class SchemaController {
       'detect_schema.py',
     );
 
+    // Resolve the postprocessing script to a temp file path, if any was
+    // supplied — either as an uploaded file or inline code.
+    let postprocessPath = files?.postprocess?.[0]?.path;
+    let inlinePostprocessPath: string | undefined;
+    if (!postprocessPath && body?.postprocessCode?.trim()) {
+      inlinePostprocessPath = join(
+        process.cwd(),
+        'uploads',
+        `temp-detect-postprocess-inline-${Date.now()}-${Math.round(Math.random() * 1e9)}.py`,
+      );
+      fs.writeFileSync(inlinePostprocessPath, body.postprocessCode);
+      postprocessPath = inlinePostprocessPath;
+    }
+
     try {
       // Execute the python schema generator
       let command = `python "${scriptPath}" "${tempFilePath}"`;
@@ -91,6 +132,9 @@ export class SchemaController {
       }
       if (body?.modelType) {
         command += ` --model-type "${body.modelType}"`;
+      }
+      if (postprocessPath) {
+        command += ` --postprocess "${postprocessPath}"`;
       }
       const { stdout, stderr } = await execPromise(command);
 
@@ -116,19 +160,26 @@ export class SchemaController {
       this.logger.error(`Schema detection failed: ${message}`);
       throw new BadRequestException(`Schema detection failed: ${message}`);
     } finally {
-      // Ensure the temporary file is deleted
-      try {
-        if (fs.existsSync(tempFilePath)) {
-          fs.unlinkSync(tempFilePath);
+      // Ensure the temporary files are deleted
+      for (const path of [
+        tempFilePath,
+        files?.postprocess?.[0]?.path,
+        inlinePostprocessPath,
+      ]) {
+        if (!path) continue;
+        try {
+          if (fs.existsSync(path)) {
+            fs.unlinkSync(path);
+          }
+        } catch (cleanupError: unknown) {
+          this.logger.error(
+            `Failed to clean up temp file ${path}: ${
+              cleanupError instanceof Error
+                ? cleanupError.message
+                : String(cleanupError)
+            }`,
+          );
         }
-      } catch (cleanupError: unknown) {
-        this.logger.error(
-          `Failed to clean up temp model file ${tempFilePath}: ${
-            cleanupError instanceof Error
-              ? cleanupError.message
-              : String(cleanupError)
-          }`,
-        );
       }
     }
   }

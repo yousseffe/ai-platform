@@ -216,6 +216,39 @@ export class ProjectsService {
   }
 
   /**
+   * Updates the rate limit and daily spend budget quota for a project API key.
+   *
+   * @param orgId - UUID of the organization.
+   * @param projectId - UUID of the project.
+   * @param keyId - UUID of the API key.
+   * @param updates - Partial quota fields.
+   * @throws {NotFoundException} If key not found.
+   */
+  async updateApiKeyQuota(
+    orgId: string,
+    projectId: string,
+    keyId: string,
+    updates: {
+      maxRequestsPerMinute?: number | null;
+      maxDailySpendCredits?: number | null;
+    },
+  ): Promise<OrgApiKey> {
+    const key = await this.apiKeyRepository.findOne({
+      where: { id: keyId, projectId, orgId },
+    });
+    if (!key) throw new NotFoundException('API key not found');
+
+    if (updates.maxRequestsPerMinute !== undefined) {
+      key.maxRequestsPerMinute = updates.maxRequestsPerMinute;
+    }
+    if (updates.maxDailySpendCredits !== undefined) {
+      key.maxDailySpendCredits = updates.maxDailySpendCredits;
+    }
+
+    return this.apiKeyRepository.save(key);
+  }
+
+  /**
    * Resolves an organization UUID from a raw API key string.
    * Used by ApiKeyGuard to authenticate prediction API requests.
    * Updates lastUsedAt on successful resolution.

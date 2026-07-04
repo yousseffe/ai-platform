@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -220,6 +221,37 @@ export class ProjectsController {
     @Param('keyId') keyId: string,
   ) {
     return this.projectsService.revokeApiKey(orgId, projectId, keyId);
+  }
+
+  /**
+   * Updates the rate limit and daily spend budget quota for a project API key.
+   * Requires OWNER or MAINTAINER role.
+   *
+   * @param orgId - UUID of the organization.
+   * @param projectId - UUID of the project.
+   * @param keyId - UUID of the API key to update.
+   * @param body - Quota fields to update.
+   * @returns The updated OrgApiKey entity.
+   */
+  @Patch(':projectId/api-keys/:keyId/quota')
+  @UseGuards(OrgRoleGuard)
+  @RequireOrgRole(OrgRole.OWNER, OrgRole.MAINTAINER)
+  async updateApiKeyQuota(
+    @Param('orgId') orgId: string,
+    @Param('projectId') projectId: string,
+    @Param('keyId') keyId: string,
+    @Body()
+    body: { maxRequestsPerMinute?: number | null; maxDailySpendCredits?: number | null },
+  ) {
+    const key = await this.projectsService.updateApiKeyQuota(
+      orgId,
+      projectId,
+      keyId,
+      body,
+    );
+    const { keyHash, ...safeKey } = key;
+    void keyHash;
+    return safeKey;
   }
 
   /**

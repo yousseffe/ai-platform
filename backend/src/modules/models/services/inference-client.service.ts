@@ -9,10 +9,13 @@ import {
 } from './inference-call-preparer.service';
 import { InferenceBillingService } from './inference-billing.service';
 import { InferenceLogService } from './inference-log.service';
+import { InferenceCacheService } from './inference-cache.service';
+import { KeyQuotaService } from '../../auth/services/key-quota.service';
 import {
   ClientRequestMeta,
   InferenceResult,
   PredictionActor,
+  RequestFingerprint,
 } from '../interfaces/inference.interface';
 
 /** Parameters for {@link InferenceClient.recordOutcome}. */
@@ -28,6 +31,8 @@ export interface RecordOutcomeParams {
   responseTimeMs: number;
   errorMessage: string | null;
   responseSizeBytes: number | null;
+  /** Precomputed fingerprint, reused from `runInference` to avoid re-hashing the payload. */
+  fingerprint?: RequestFingerprint;
 }
 
 /**
@@ -47,6 +52,8 @@ export class InferenceClient {
     private readonly callPreparer: InferenceCallPreparerService,
     private readonly billingService: InferenceBillingService,
     private readonly logService: InferenceLogService,
+    private readonly cacheService: InferenceCacheService,
+    private readonly keyQuotaService: KeyQuotaService,
   ) {}
 
   /** @see InferenceDeploymentResolverService.resolveDeploymentUrl */
@@ -76,15 +83,28 @@ export class InferenceClient {
    * non-fatal inside {@link InferenceLogService}.
    */
   async recordOutcome(params: RecordOutcomeParams): Promise<void> {
-    const fingerprint = this.logService.computeRequestFingerprint(params.data);
+    const fingerprint =
+      params.fingerprint ??
+      this.logService.computeRequestFingerprint(params.data);
 
     if (params.cost > 0 && params.status === 'SUCCESS') {
-      await this.billingService.chargeForInference(
-        params.model,
-        params.cost,
-        params.providerSharePercent,
-        params.actor,
-      );
+      try {
+        await this.billingService.chargeForInference(
+          params.model,
+          params.cost,
+          params.providerSharePercent,
+          params.actor,
+        );
+      } catch (error) {
+        console.error('[Billing Error]', error);
+      }
+
+      const quotaKeyId = params.actor.orgApiKeyId ?? params.actor.apiKeyId;
+      if (quotaKeyId) {
+        await this.keyQuotaService
+          .recordSpend(quotaKeyId, params.cost)
+          .catch((error) => console.error('[Quota Spend Error]', error));
+      }
     }
 
     await this.logService.writeModelLog({
@@ -105,11 +125,13 @@ export class InferenceClient {
    * Runs a complete non-streaming prediction call: validates affordability,
    * proxies the request to the container, then charges and logs the outcome.
    * This is the single call path both `POST /models/:id/predict` and pipeline
-   * steps use.
+   * steps use. When the model has response caching enabled, an identical
+   * prior request to the same deployment is replayed from cache instead of
+   * re-invoking the container.
    *
    * @param model - The model being called.
    * @param url - The resolved deployment base URL.
-   * @param deploymentId - The deployment ID, for idle tracking.
+   * @param deploymentId - The deployment ID, for idle tracking and cache scoping.
    * @param data - The request payload (already mapped, for pipeline steps).
    * @param actor - The caller identity for billing/logging.
    * @param clientMeta - Client network metadata for fraud analysis.
@@ -122,6 +144,27 @@ export class InferenceClient {
     actor: PredictionActor,
     clientMeta: ClientRequestMeta,
   ): Promise<InferenceResult> {
+    const fingerprint = this.logService.computeRequestFingerprint(data);
+
+    if (model.cacheEnabled && deploymentId && fingerprint.payloadHash) {
+      const cached = await this.cacheService.get(
+        model.id,
+        deploymentId,
+        fingerprint.payloadHash,
+      );
+      if (cached) {
+        return this.serveCachedResult(
+          model,
+          deploymentId,
+          data,
+          actor,
+          clientMeta,
+          fingerprint,
+          cached,
+        );
+      }
+    }
+
     const prepared = await this.callPreparer.prepareCall(model, actor);
     if (deploymentId) {
       await this.callPreparer.markActive(deploymentId);
@@ -178,6 +221,22 @@ export class InferenceClient {
 
     const responseTimeMs = Date.now() - startTime;
 
+    if (
+      status === 'SUCCESS' &&
+      model.cacheEnabled &&
+      deploymentId &&
+      fingerprint.payloadHash
+    ) {
+      await this.cacheService.set(
+        model.id,
+        deploymentId,
+        fingerprint.payloadHash,
+        { output, cost, responseSizeBytes },
+        model.cacheTtlSeconds,
+      );
+      await this.cacheService.recordMiss(model.id);
+    }
+
     await this.recordOutcome({
       model,
       actor,
@@ -190,6 +249,7 @@ export class InferenceClient {
       responseTimeMs,
       errorMessage,
       responseSizeBytes,
+      fingerprint,
     });
 
     return {
@@ -198,7 +258,59 @@ export class InferenceClient {
       cost: status === 'SUCCESS' ? cost : 0,
       responseTimeMs,
       status,
+      cacheHit: false,
       errorMessage,
+      deploymentId,
+    };
+  }
+
+  /**
+   * Serves a prediction from the response cache instead of invoking the
+   * container, still validating affordability and charging/logging the
+   * (discounted) outcome exactly like a normal call.
+   */
+  private async serveCachedResult(
+    model: Model,
+    deploymentId: string,
+    data: Record<string, unknown>,
+    actor: PredictionActor,
+    clientMeta: ClientRequestMeta,
+    fingerprint: RequestFingerprint,
+    cached: { output: unknown; cost: number; responseSizeBytes: number | null },
+  ): Promise<InferenceResult> {
+    const startTime = Date.now();
+    const prepared = await this.callPreparer.prepareCall(model, actor);
+    await this.callPreparer.markActive(deploymentId);
+
+    const discountPercent = model.cacheHitDiscountPercent ?? 100;
+    const cost = cached.cost * (1 - discountPercent / 100);
+    const responseTimeMs = Date.now() - startTime;
+
+    await this.cacheService.recordHit(model.id);
+
+    await this.recordOutcome({
+      model,
+      actor,
+      clientMeta,
+      data,
+      cost,
+      providerSharePercent: prepared.providerSharePercent,
+      statusCode: 200,
+      status: 'SUCCESS',
+      responseTimeMs,
+      errorMessage: null,
+      responseSizeBytes: cached.responseSizeBytes,
+      fingerprint,
+    });
+
+    return {
+      output: cached.output,
+      statusCode: 200,
+      cost,
+      responseTimeMs,
+      status: 'SUCCESS',
+      cacheHit: true,
+      errorMessage: null,
       deploymentId,
     };
   }

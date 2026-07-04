@@ -35,21 +35,39 @@ export class InferenceDeploymentResolverService {
     model: Model,
     versionNumber?: number,
   ): Promise<{ url: string; deploymentId: string }> {
-    const running = await this.dataSource.getRepository(Deployment).findOne({
-      where: versionNumber
-        ? {
-            modelVersion: { model: { id: model.id }, versionNumber },
-            status: DeploymentStatus.RUNNING,
-          }
-        : {
+    if (versionNumber) {
+      // Pinned requests always target that exact version's own deployment —
+      // never subject to canary traffic splitting.
+      const running = await this.dataSource.getRepository(Deployment).findOne({
+        where: {
+          modelVersion: { model: { id: model.id }, versionNumber },
+          status: DeploymentStatus.RUNNING,
+        },
+        order: { createdAt: 'DESC' },
+        relations: ['modelVersion'],
+      });
+      if (running && running.url) {
+        return { url: running.url, deploymentId: running.id };
+      }
+    } else {
+      // Unpinned requests: if multiple versions of this model are RUNNING
+      // concurrently (a canary/traffic-split rollout), weighted-randomly pick
+      // one by trafficWeight. A single RUNNING deployment always gets 100%
+      // regardless of its stored weight.
+      const runningDeployments = await this.dataSource
+        .getRepository(Deployment)
+        .find({
+          where: {
             modelVersion: { model: { id: model.id } },
             status: DeploymentStatus.RUNNING,
           },
-      order: { createdAt: 'DESC' },
-      relations: ['modelVersion'],
-    });
-    if (running && running.url) {
-      return { url: running.url, deploymentId: running.id };
+          relations: ['modelVersion'],
+        });
+      const withUrl = runningDeployments.filter((d) => d.url);
+      const selected = this.pickWeighted(withUrl);
+      if (selected) {
+        return { url: selected.url as string, deploymentId: selected.id };
+      }
     }
 
     const targetVersion = versionNumber
@@ -90,6 +108,32 @@ export class InferenceDeploymentResolverService {
       isLlm ? 300000 : 30000,
     );
     return { url, deploymentId: pending.id };
+  }
+
+  /**
+   * Picks one RUNNING deployment by weighted random selection over
+   * `trafficWeight`. A single deployment is always selected outright
+   * (its weight is irrelevant when there's nothing to split against). Falls
+   * back to uniform selection if every candidate's weight is zero.
+   */
+  private pickWeighted(deployments: Deployment[]): Deployment | null {
+    if (deployments.length === 0) return null;
+    if (deployments.length === 1) return deployments[0];
+
+    const totalWeight = deployments.reduce(
+      (sum, d) => sum + Math.max(0, d.trafficWeight ?? 100),
+      0,
+    );
+    if (totalWeight <= 0) {
+      return deployments[Math.floor(Math.random() * deployments.length)];
+    }
+
+    let roll = Math.random() * totalWeight;
+    for (const d of deployments) {
+      roll -= Math.max(0, d.trafficWeight ?? 100);
+      if (roll <= 0) return d;
+    }
+    return deployments[deployments.length - 1];
   }
 
   /**

@@ -6,9 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a multi-tenant ML model management platform (ModelOps) organized as a monorepo with three services:
 
-- **`backend/`** — NestJS REST API (port 3000). See [`backend/CLAUDE.md`](backend/CLAUDE.md) for module-level rules.
-- **`frontend/`** — Next.js 16 App Router dashboard (port 3001). See [`frontend/CLAUDE.md`](frontend/CLAUDE.md) for component-level rules.
+- **`backend/`** — NestJS REST API (port 3000).
+- **`frontend/`** — Next.js 16 App Router dashboard (port 3001). See [`frontend/CLAUDE.md`](frontend/CLAUDE.md) for component-level rules (roles, JSDoc standards, file layout).
 - **`services/mcp-server/`** — Model Context Protocol server (port 3030) exposing backend tools to AI assistants.
+
+Additional docs: `RUNNING.md` (run guide), `PIPELINE.md` / `docs/pipelines.md` (pipeline feature), `MINIO.md`.
 
 ## Development Setup
 
@@ -16,7 +18,8 @@ This is a multi-tenant ML model management platform (ModelOps) organized as a mo
 
 - Native Windows PostgreSQL 18 service running on port 5432 (`postgresql-x64-18`)
   - Credentials: `postgres` / `khalid` / database `aidb`
-- Docker Desktop (for Redis, MinIO, observability stack)
+  - There is **no postgres service in `docker-compose.yml`** — the database is always the native Windows service.
+- Docker Desktop (for Redis, MinIO, OpenSearch, LLM sidecar, observability stack)
 
 ### Running the project
 
@@ -56,19 +59,30 @@ cd frontend && npm run dev
 | E2E tests   | `npm run test:e2e` | —                  | —                   |
 | Format      | `npm run format`   | —                  | —                   |
 
+Backend extras:
+
+- Single test file: `npm run test -- path/to/file.spec.ts` (Jest matches `*.spec.ts` under `src/`)
+- Watch / coverage: `npm run test:watch` / `npm run test:cov`
+- Seed an admin user: `npm run create:admin`
+
 ### Service ports
 
-| Service             | Port        |
-| ------------------- | ----------- |
-| Frontend            | 3001        |
-| Backend API         | 3000        |
-| PostgreSQL (native) | 5432        |
-| Redis               | 6380        |
-| MinIO API / Console | 9000 / 9001 |
-| Grafana             | 3005        |
-| Prometheus          | 9090        |
-| Loki                | 3100        |
-| MCP Server          | 3030        |
+| Service              | Port        |
+| -------------------- | ----------- |
+| Frontend             | 3001        |
+| Backend API          | 3000        |
+| Nginx gateway        | 80          |
+| PostgreSQL (native)  | 5432        |
+| Redis                | 6380        |
+| MinIO API / Console  | 9000 / 9001 |
+| OpenSearch           | 9200        |
+| llama.cpp LLM server | 8080        |
+| Grafana              | 3005        |
+| Prometheus           | 9090        |
+| Alertmanager         | 9093        |
+| Loki                 | 3100        |
+| OTLP (gRPC / HTTP)   | 4317 / 4318 |
+| MCP Server           | 3030        |
 
 ## Architecture
 
@@ -76,14 +90,23 @@ cd frontend && npm run dev
 
 Code lives under `backend/src/` in two trees:
 
-- **`modules/`** — bounded feature domains: `auth`, `users`, `models`, `deployments`, `wallets`, `organizations`, `analytics`, `fraud`. Each module owns its controllers, services, entities, enums, and interfaces.
-- **`shared/`** — infrastructure: `queue` (BullMQ), `docker`, `minio`, `redis`, `opensearch`, `mail`, `stripe`, `security`, `utils`.
+- **`modules/`** — bounded feature domains: `auth`, `users`, `models`, `deployments`, `pipelines`, `wallets`, `billing`, `organizations`, `provider-accounts`, `analytics`, `fraud`, `admin-dashboard`, `admin-mcp`. Each module owns its controllers, services, entities, enums, and interfaces.
+- **`shared/`** — infrastructure: `queue` (BullMQ processors + the Python `serve.py` template baked into model containers), `docker`, `minio`, `redis`, `opensearch`, `mail`, `stripe`, `security`, `middleware`, `enums`, `utils`.
 
-All routes are prefixed `/api/v1`. Authentication uses JWT (Bearer) for dashboard users and `ml_sk_*` API keys for model prediction endpoints. Organization-level access uses `org_*` keys.
+All routes are prefixed `/api/v1` (set in `main.ts`).
 
-**Model build/deploy flow:** Creating a model version enqueues a BullMQ job → the job pulls the Python artifact from MinIO, selects the right base Docker image (PyTorch, TensorFlow, scikit-learn, Diffusion), builds the container, and registers it. Deployments route prediction requests to versioned containers.
+**Authentication** (resolved in `modules/auth/services/api-identity.service.ts` by token prefix):
 
-**Billing:** Credit-based wallet system in EGP. CONSUMER wallets (users) are debited per prediction; PROVIDER wallets (organizations) receive earnings. Stripe webhooks handle credit top-ups.
+- JWT Bearer tokens — dashboard users
+- `ml_sk_live_*` / `ml_sk_trial_*` — personal/trial model prediction keys
+- `sk_live_*` — organization API keys
+- `mcp_*` — MCP server tokens
+
+**Model build/deploy flow:** Creating a model version enqueues a BullMQ job → the job pulls the Python artifact from MinIO, selects the right base Docker image (PyTorch, TensorFlow, scikit-learn, Diffusion — Dockerfiles in `docker/base-images/`, prebuilt via `build-base-images.bat`/`.sh`), builds the container via the mounted Docker socket, and registers it. Deployments route prediction requests to versioned containers on the `ai-platform_models` Docker network.
+
+**Billing:** Credit-based wallet system in EGP. CONSUMER wallets (users) are debited per prediction; PROVIDER wallets (organizations) receive earnings. Stripe webhooks handle credit top-ups and one-off purposes like org creation fees. Provider account tiers live in `provider-accounts`.
+
+**Database schema:** TypeORM currently runs with `synchronize: true` (MVP setting in `app.module.ts`) — entity changes auto-apply to the database; there is no migration workflow yet. The only SQL under `shared/migrations/` is a pricing-config seed.
 
 ### Frontend (Next.js App Router)
 
@@ -101,23 +124,22 @@ src/
 └── auth.ts            # NextAuth config + JWT refresh callbacks
 ```
 
-`smartFetch<T>()` is the canonical HTTP utility — auto-attaches JWT, uniform error handling. All API calls must go through the service layer, not inline in components or pages.
+`smartFetch<T>()` is the canonical HTTP utility — auto-attaches JWT, uniform error handling. All API calls must go through the service layer (`lib/services/*.service.ts`), not inline in components, pages, or server actions. Global client state uses Zustand (not React Context).
 
 ### MCP Server
 
-Exposes backend capabilities (model management, analytics, organization context) as MCP tools for AI assistants. Token-based auth with rate limiting. Built as ESM TypeScript with Express HTTP transport.
+Exposes backend capabilities (model management, analytics, organization context) as MCP tools for AI assistants. Deterministic/zero-LLM; token-based auth with rate limiting. Built as ESM TypeScript with Express HTTP transport, proxying to the backend at `/api/v1`.
 
 ### Observability Stack (Docker)
 
-OpenTelemetry → collector → Prometheus (metrics) + Loki (logs). Grafana at port 3005 unifies both. Winston log transport includes `trace_id` and `span_id` for log-trace correlation.
+OpenTelemetry → collector → Prometheus (metrics) + Loki (logs). Grafana at port 3005 unifies both. Winston log transport includes `trace_id` and `span_id` for log-trace correlation. Backend dev entrypoint loads `instrumentation.ts` first (`nest start --entryFile instrumentation`).
 
 ## Cross-cutting Rules
 
-Both `backend/CLAUDE.md` and `frontend/CLAUDE.md` enforce:
+Enforced here and in `frontend/CLAUDE.md`:
 
-1. **Zero `any`** — use `unknown`, explicit generics, or `Record<string, unknown>` for dynamic shapes.
+1. **Zero `any`** — use `unknown`, explicit generics, or `Record<string, unknown>` for dynamic shapes; narrow errors in catch blocks with `instanceof Error`.
 2. **JSDoc on everything** — every class, public method, hook, server action, and component.
-3. **File size limits** — backend controllers/services ≤ 200 lines; frontend pages/components ≤ 250 lines.
+3. **File size limits** — backend controllers/services ≤ 200 lines; frontend pages/components ≤ 250 lines. Extract sub-components into `src/components/[domain]/` and logic into hooks/services.
 4. **Early returns** — guard clauses over nested `if/else`.
 5. **No direct cross-module imports** — import a module's public exports, never its internal subdirectories.
-6. **TypeORM migrations** — never use `synchronize: true`; all schema changes go through migrations.

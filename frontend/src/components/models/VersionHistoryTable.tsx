@@ -1,4 +1,5 @@
 import React from "react";
+import { toast } from "react-hot-toast";
 import { GitBranch } from "lucide-react";
 import type { ModelVersion, Deployment } from "@/types";
 import { DeploymentStatus, VersionStatus } from "@/types";
@@ -230,7 +231,7 @@ export function VersionHistoryTable({
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(endpointUrl);
-                                alert("Copied full endpoint URL to clipboard!");
+                                toast.success("Copied full endpoint URL to clipboard!");
                               }}
                               className="text-[9px] text-primary hover:text-primary/80 cursor-pointer font-bold shrink-0 font-sans"
                               title={endpointUrl}

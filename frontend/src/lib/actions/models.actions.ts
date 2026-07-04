@@ -290,3 +290,88 @@ export async function undeprecateModelVersion(
   }
 }
 
+/**
+ * Updates a model's response cache policy (enabled, TTL, cache-hit discount).
+ *
+ * @param modelId - The model UUID.
+ * @param settings - Partial cache policy fields to update.
+ * @returns A promise resolving to a discriminated union with the updated Model or an error.
+ */
+export async function updateCacheSettings(
+  modelId: string,
+  settings: {
+    cacheEnabled?: boolean;
+    cacheTtlSeconds?: number;
+    cacheHitDiscountPercent?: number;
+  }
+): Promise<{ success: true; data: Model } | { success: false; error: string }> {
+  try {
+    const res = await modelsService.updateCacheSettings(modelId, settings);
+    revalidatePath(`/models/${modelId}`);
+    return { success: true, data: res };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to update cache settings";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Retrieves cache hit/miss counters for a model's response cache.
+ *
+ * @param modelId - The model UUID.
+ * @returns A promise resolving to the cache stats, or null on failure.
+ */
+export async function getCacheStats(
+  modelId: string
+): Promise<modelsService.CacheStats | null> {
+  try {
+    return await modelsService.getCacheStats(modelId);
+  } catch (error) {
+    console.error(`getCacheStats error for ${modelId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Updates a model's container network policy (outbound internet access for
+ * future deployments).
+ *
+ * @param modelId - The model UUID.
+ * @param allowEgress - Whether future deployments may reach the internet.
+ * @returns A promise resolving to a discriminated union with the updated Model or an error.
+ */
+export async function updateNetworkSettings(
+  modelId: string,
+  allowEgress: boolean
+): Promise<{ success: true; data: Model } | { success: false; error: string }> {
+  try {
+    const res = await modelsService.updateNetworkSettings(modelId, allowEgress);
+    revalidatePath(`/models/${modelId}`);
+    return { success: true, data: res };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to update network settings";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Server action wrapper to update a model's marketplace visibility.
+ *
+ * @param modelId - The model UUID.
+ * @param isPublic - Whether the model should be listed in the public marketplace.
+ * @returns A promise resolving to a discriminated union with the updated Model or an error.
+ */
+export async function updateVisibilitySettings(
+  modelId: string,
+  isPublic: boolean
+): Promise<{ success: true; data: Model } | { success: false; error: string }> {
+  try {
+    const res = await modelsService.updateVisibilitySettings(modelId, isPublic);
+    revalidatePath(`/models/${modelId}`);
+    return { success: true, data: res };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to update visibility settings";
+    return { success: false, error: errorMessage };
+  }
+}
+

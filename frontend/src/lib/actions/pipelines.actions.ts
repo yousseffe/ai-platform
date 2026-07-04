@@ -34,6 +34,37 @@ export async function getPipeline(id: string): Promise<Pipeline | null> {
 }
 
 /**
+ * Retrieves every publicly-listed, runnable pipeline for the marketplace
+ * catalog — no authentication required.
+ *
+ * @returns A promise resolving to an array of Pipeline instances. Returns empty array on failure.
+ */
+export async function getPublicPipelines(): Promise<Pipeline[]> {
+  try {
+    return await pipelinesService.getPublicPipelines();
+  } catch (error) {
+    console.error("getPublicPipelines error:", error);
+    return [];
+  }
+}
+
+/**
+ * Retrieves a single publicly-listed pipeline by ID — no authentication required.
+ * Returns null if the pipeline does not exist or is not public.
+ *
+ * @param id - The pipeline UUID.
+ * @returns A promise resolving to the Pipeline or null.
+ */
+export async function getPublicPipelineById(id: string): Promise<Pipeline | null> {
+  try {
+    return await pipelinesService.getPublicPipelineById(id);
+  } catch (error) {
+    console.error(`getPublicPipelineById error for ${id}:`, error);
+    return null;
+  }
+}
+
+/**
  * Creates a new, empty pipeline in DRAFT status.
  *
  * @param name - The pipeline's display name.
@@ -65,7 +96,7 @@ export async function createPipeline(
  */
 export async function updatePipeline(
   id: string,
-  body: { name?: string; description?: string; type?: PipelineType }
+  body: { name?: string; description?: string; type?: PipelineType; isPublic?: boolean }
 ): Promise<{ success: true; data: Pipeline } | { success: false; error: string }> {
   try {
     const res = await pipelinesService.updatePipeline(id, body);

@@ -55,6 +55,9 @@ import { ProviderAccount } from './modules/provider-accounts/entities/provider-a
 import { ProviderTierDefinition } from './modules/provider-accounts/entities/provider-tier-definition.entity';
 import { ProviderOffer } from './modules/provider-accounts/entities/provider-offer.entity';
 import { ProviderOfferRedemption } from './modules/provider-accounts/entities/provider-offer-redemption.entity';
+import { FirewallModule } from './modules/firewall/firewall.module';
+import { FirewallPolicy } from './modules/firewall/entities/firewall-policy.entity';
+import { TenantScopeModule } from './shared/security/tenant-scope.module';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -102,6 +105,7 @@ import { ProviderOfferRedemption } from './modules/provider-accounts/entities/pr
         ProviderTierDefinition,
         ProviderOffer,
         ProviderOfferRedemption,
+        FirewallPolicy,
       ],
       synchronize: true, // For MVP only
       logging: ['query', 'error', 'schema', 'warn'],
@@ -133,6 +137,8 @@ import { ProviderOfferRedemption } from './modules/provider-accounts/entities/pr
     BillingModule,
     ProviderAccountsModule,
     AdminDashboardModule,
+    FirewallModule,
+    TenantScopeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

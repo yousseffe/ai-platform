@@ -15,6 +15,8 @@ import { WalletsModule } from '../wallets/wallets.module';
 import { StripeModule } from '../../shared/stripe/stripe.module';
 import { MinioModule } from '../../shared/minio/minio.module';
 import { ProviderAccountsModule } from '../provider-accounts/provider-accounts.module';
+import { AuthModule } from '../auth/auth.module';
+import { TenantIsolationController } from './controllers/tenant-isolation.controller';
 
 /**
  * Module responsible for workspace organizations, membership tracking,
@@ -35,9 +37,14 @@ import { ProviderAccountsModule } from '../provider-accounts/provider-accounts.m
     StripeModule,
     MinioModule,
     forwardRef(() => ProviderAccountsModule),
+    forwardRef(() => AuthModule),
   ],
   providers: [OrganizationsService, ProjectsService],
-  controllers: [OrganizationsController, ProjectsController],
+  controllers: [
+    OrganizationsController,
+    ProjectsController,
+    TenantIsolationController,
+  ],
   exports: [OrganizationsService, ProjectsService],
 })
 export class OrganizationsModule {}

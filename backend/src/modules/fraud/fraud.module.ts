@@ -12,6 +12,7 @@ import { RiskEvent } from './entities/risk-event.entity';
 import { FraudService } from './services/fraud.service';
 import { FraudProcessor } from './fraud.processor';
 import { FraudController } from './controllers/fraud.controller';
+import { FirewallModule } from '../firewall/firewall.module';
 
 /**
  * Deterministic fraud/abuse detection module: enriched-log aggregation, EWMA
@@ -24,6 +25,7 @@ import { FraudController } from './controllers/fraud.controller';
     MailModule,
     AuthModule,
     UsersModule,
+    FirewallModule,
   ],
   controllers: [FraudController],
   providers: [FraudService, FraudProcessor],

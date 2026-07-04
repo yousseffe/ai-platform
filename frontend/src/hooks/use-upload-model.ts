@@ -116,6 +116,19 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
   const detectedTaskType = watch("taskType");
 
   /**
+   * Resolves the currently configured postprocessing script (file or inline
+   * code) so schema detection can apply it to the synthetic expected-result
+   * sample, matching what serve.py actually runs at inference time.
+   */
+  const getPostprocessSource = () => {
+    const mode = form.getValues("postprocessMode") || "file";
+    if (mode === "file") {
+      return { file: form.getValues("postprocessFile") as File | null };
+    }
+    return { code: form.getValues("postprocessCode") };
+  };
+
+  /**
    * Uploads model artifacts and scripts to the backend in draft mode (triggerBuild=false)
    * and auto-populates the schema templates returned by the Python introspector.
    */
@@ -136,7 +149,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       }
 
       setUploadProgress(50);
-      const result = await detectSchema(model);
+      const result = await detectSchema(model, undefined, getPostprocessSource());
       setUploadProgress(90);
 
       // Auto-populate examplePayload and expectedResult if detected
@@ -388,7 +401,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
 
     setIsDetectingSchema(true);
     try {
-      const result = await detectSchema(model);
+      const result = await detectSchema(model, undefined, getPostprocessSource());
 
       // Update form values
       if (result.example_payload) {

@@ -95,11 +95,16 @@ export class UsersService {
       throw new NotFoundException('User profile not found');
     }
 
-    if (user.providerMode) {
-      return user;
+    if (!user.providerMode) {
+      await this.update(userId, { providerMode: true });
     }
 
-    await this.update(userId, { providerMode: true });
+    // Always ensure the wallet and provider account exist, even if
+    // providerMode was already true: it's possible for a prior enrollment to
+    // have set the flag but failed before provisioning these records (e.g. a
+    // transient error), leaving the user flagged as a provider with no
+    // provider account. Both calls below are idempotent no-ops when the
+    // records already exist.
     await this.walletsService.createWallet(
       userId,
       OwnerType.USER,
@@ -292,5 +297,39 @@ export class UsersService {
     }
     apiKey.isActive = false;
     await this.apiKeyRepository.save(apiKey);
+  }
+
+  /**
+   * Updates a user's API key rate limit and daily spend budget quota fields.
+   * Leaves any field not present in `updates` unchanged.
+   *
+   * @param userId - User UUID (must own the key).
+   * @param keyId - API Key UUID.
+   * @param updates - Partial quota fields.
+   * @throws {NotFoundException} If the key does not exist or isn't owned by the user.
+   */
+  async updateApiKeyQuota(
+    userId: string,
+    keyId: string,
+    updates: {
+      maxRequestsPerMinute?: number | null;
+      maxDailySpendCredits?: number | null;
+    },
+  ): Promise<ApiKey> {
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { id: keyId, user: { id: userId } },
+    });
+    if (!apiKey) {
+      throw new NotFoundException('API Key not found or access denied');
+    }
+
+    if (updates.maxRequestsPerMinute !== undefined) {
+      apiKey.maxRequestsPerMinute = updates.maxRequestsPerMinute;
+    }
+    if (updates.maxDailySpendCredits !== undefined) {
+      apiKey.maxDailySpendCredits = updates.maxDailySpendCredits;
+    }
+
+    return this.apiKeyRepository.save(apiKey);
   }
 }

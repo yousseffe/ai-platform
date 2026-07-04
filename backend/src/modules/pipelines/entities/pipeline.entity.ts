@@ -83,6 +83,13 @@ export class Pipeline {
   version: number;
 
   /**
+   * Visibility flag indicating whether this pipeline is listed in the
+   * public marketplace, mirroring {@link Model.isPublic}.
+   */
+  @Column({ type: 'boolean', default: false })
+  isPublic: boolean;
+
+  /**
    * Ordered steps belonging to this pipeline.
    */
   @OneToMany(() => PipelineStep, (step) => step.pipeline)

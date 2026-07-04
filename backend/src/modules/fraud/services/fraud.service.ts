@@ -14,6 +14,7 @@ import { RiskBaseline } from '../entities/risk-baseline.entity';
 import { RiskEvent } from '../entities/risk-event.entity';
 import { assessTraffic, TrafficFeatures } from '../fraud-rules';
 import { aggregateFeatures } from './fraud-aggregate';
+import { FirewallService } from '../../firewall/services/firewall.service';
 
 const WINDOW_MINUTES = 5;
 const EWMA_ALPHA = 0.3;
@@ -39,6 +40,7 @@ export class FraudService {
     @InjectRepository(Alert)
     private readonly alertRepository: Repository<Alert>,
     private readonly mailService: MailService,
+    private readonly firewallService: FirewallService,
   ) {}
 
   /**
@@ -130,6 +132,20 @@ export class FraudService {
     const owner = modelLogs.find((l) => l.model?.user)?.model?.user ?? null;
     await this.persistFinding(modelId, owner?.id ?? null, features, assessment);
     await this.notify(owner?.email ?? null, modelId, features, assessment);
+
+    const blockReason = `${assessment.threatClass}: ${assessment.firedRules
+      .map((r) => r.rule)
+      .join(', ')}`;
+    await this.firewallService
+      .maybeAutoBlock(modelId, assessment.riskScore, blockReason)
+      .catch((err) =>
+        this.logger.warn(
+          `Firewall auto-block check failed for model ${modelId}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        ),
+      );
+
     return true;
   }
 

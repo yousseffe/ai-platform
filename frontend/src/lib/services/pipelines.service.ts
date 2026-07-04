@@ -25,6 +25,30 @@ export async function getPipeline(id: string): Promise<Pipeline> {
 }
 
 /**
+ * Fetches every publicly-listed, runnable pipeline for the marketplace
+ * catalog — no authentication required.
+ *
+ * @returns A promise resolving to an array of public Pipeline instances.
+ */
+export async function getPublicPipelines(): Promise<Pipeline[]> {
+  return smartFetch<Pipeline[]>("/pipelines/marketplace", {
+    cache: "no-store",
+  });
+}
+
+/**
+ * Fetches a single publicly-listed pipeline by ID — no authentication required.
+ *
+ * @param id - The pipeline UUID.
+ * @returns A promise resolving to the public Pipeline object.
+ */
+export async function getPublicPipelineById(id: string): Promise<Pipeline> {
+  return smartFetch<Pipeline>(`/pipelines/marketplace/${id}`, {
+    cache: "no-store",
+  });
+}
+
+/**
  * Creates a new, empty pipeline in DRAFT status.
  *
  * @param name - The pipeline's display name.
@@ -52,7 +76,7 @@ export async function createPipeline(
  */
 export async function updatePipeline(
   id: string,
-  body: { name?: string; description?: string; type?: PipelineType }
+  body: { name?: string; description?: string; type?: PipelineType; isPublic?: boolean }
 ): Promise<Pipeline> {
   return smartFetch<Pipeline>(`/pipelines/${id}`, {
     method: "PATCH",
