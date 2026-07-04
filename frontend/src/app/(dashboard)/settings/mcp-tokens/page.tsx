@@ -30,6 +30,11 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
 
 enum McpScope {
   INTEGRATION_READ = "integration:read",
@@ -100,6 +105,7 @@ export default function McpAccessTokensPage() {
   const [visibleTokens, setVisibleTokens] = useState<Record<string, boolean>>(
     {},
   );
+  const [tokenPendingAction, setTokenPendingAction] = useState<{ token: McpTokenInfo; action: "revoke" | "delete" } | null>(null);
 
   useEffect(() => {
     fetchTokens();
@@ -159,11 +165,6 @@ export default function McpAccessTokensPage() {
   };
 
   const handleRevokeToken = async (tokenId: string) => {
-    const confirm = window.confirm(
-      "Are you sure you want to revoke this MCP token? Clients using this token will fail to authenticate immediately.",
-    );
-    if (!confirm) return;
-
     try {
       await smartFetch(`/auth/mcp-tokens/${tokenId}/revoke`, {
         method: "POST",
@@ -179,11 +180,6 @@ export default function McpAccessTokensPage() {
   };
 
   const handleDeleteToken = async (tokenId: string) => {
-    const confirm = window.confirm(
-      "Are you sure you want to permanently delete this MCP token? This action cannot be undone.",
-    );
-    if (!confirm) return;
-
     try {
       await smartFetch(`/auth/mcp-tokens/${tokenId}`, {
         method: "DELETE",
@@ -194,6 +190,20 @@ export default function McpAccessTokensPage() {
       const msg = err instanceof Error ? err.message : "Failed to delete token";
       toast.error(msg);
     }
+  };
+
+  /**
+   * Runs whichever destructive action (revoke or delete) is currently pending
+   * confirmation, then clears the pending state.
+   */
+  const handleConfirmPendingAction = async () => {
+    if (!tokenPendingAction) return;
+    if (tokenPendingAction.action === "revoke") {
+      await handleRevokeToken(tokenPendingAction.token.id);
+    } else {
+      await handleDeleteToken(tokenPendingAction.token.id);
+    }
+    setTokenPendingAction(null);
   };
 
   const handleCopyRaw = async (raw: string) => {
@@ -243,14 +253,11 @@ export default function McpAccessTokensPage() {
 
   return (
     <div className="space-y-6 animate-fade-in text-left">
-      <div className="flex flex-col gap-3 select-none">
-        <h1 className="text-xl font-bold text-foreground">MCP Access Tokens</h1>
-        <p className="text-xs text-muted-foreground max-w-2xl">
-          Personal access credentials used to securely connect external AI
-          clients (Claude Code, Cursor, Antigravity) to the platform context
-          services.
-        </p>
-      </div>
+      <PageHeader
+        title="MCP Access Tokens"
+        description="Personal access credentials used to securely connect external AI clients (Claude Code, Cursor, Antigravity) to the platform context services."
+        className="mb-0"
+      />
 
       {/* Security Warnings */}
       {(tokensWithNoExpiration.length > 0 || staleTokens.length > 0) && (
@@ -304,10 +311,11 @@ export default function McpAccessTokensPage() {
               <span className="font-mono text-xs">Loading tokens...</span>
             </div>
           ) : tokens.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground font-mono text-xs border border-dashed border-border rounded-lg bg-secondary/10">
-              No MCP Access Tokens generated. Use the panel on the right to
-              create your first token.
-            </div>
+            <EmptyState
+              icon={<Plug />}
+              title="No MCP access tokens yet"
+              description="Use the panel on the right to create your first token."
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full font-mono text-[10px] text-left border-collapse">
@@ -404,7 +412,7 @@ export default function McpAccessTokensPage() {
                           <div className="flex items-center justify-end gap-1.5">
                             {token.isActive && !isExpired && (
                               <button
-                                onClick={() => handleRevokeToken(token.id)}
+                                onClick={() => setTokenPendingAction({ token, action: "revoke" })}
                                 className="text-red-500 hover:text-red-600 hover:bg-red-500/10 px-2 py-1 rounded cursor-pointer transition-colors text-[9px] font-semibold font-sans border border-transparent"
                                 title="Revoke access"
                               >
@@ -412,7 +420,7 @@ export default function McpAccessTokensPage() {
                               </button>
                             )}
                             <button
-                              onClick={() => handleDeleteToken(token.id)}
+                              onClick={() => setTokenPendingAction({ token, action: "delete" })}
                               className="text-muted-foreground hover:text-red-500 p-1.5 rounded cursor-pointer transition-colors"
                               title="Delete token permanently"
                             >
@@ -506,17 +514,18 @@ export default function McpAccessTokensPage() {
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
                 Expiration
               </label>
-              <select
-                value={expiresInDays}
-                onChange={(e) => setExpiresInDays(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-sans font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
-              >
-                <option value="7">7 Days</option>
-                <option value="30">30 Days</option>
-                <option value="60">60 Days</option>
-                <option value="90">90 Days (Recommended)</option>
-                <option value="never">No Expiration (⚠️ Risk Warning)</option>
-              </select>
+              <Select value={expiresInDays} onValueChange={(value) => setExpiresInDays(value ?? "90")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 Days</SelectItem>
+                  <SelectItem value="30">30 Days</SelectItem>
+                  <SelectItem value="60">60 Days</SelectItem>
+                  <SelectItem value="90">90 Days (Recommended)</SelectItem>
+                  <SelectItem value="never">No Expiration (Risk Warning)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <button
@@ -553,12 +562,13 @@ export default function McpAccessTokensPage() {
           <div className="space-y-4 my-2">
             {/* The raw token container */}
             <div className="p-3 bg-secondary/40 border border-border/80 rounded-lg flex items-center justify-between gap-3 font-mono text-xs">
-              <span className="text-foreground font-bold break-all">
-                {newRawToken}
-              </span>
-              <button
+              <span className="text-foreground font-bold break-all">{newRawToken}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => handleCopyRaw(newRawToken || "")}
-                className="btn hover:bg-secondary text-muted-foreground hover:text-foreground p-2 rounded-lg cursor-pointer shrink-0 transition-colors"
+                className="shrink-0 cursor-pointer"
                 title="Copy token secret"
               >
                 {copiedRawText ? (
@@ -566,7 +576,7 @@ export default function McpAccessTokensPage() {
                 ) : (
                   <Copy className="w-4.5 h-4.5" />
                 )}
-              </button>
+              </Button>
             </div>
 
             {/* Quick config installation tabs */}
@@ -629,6 +639,19 @@ export default function McpAccessTokensPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!tokenPendingAction}
+        onOpenChange={(open) => !open && setTokenPendingAction(null)}
+        title={tokenPendingAction?.action === "delete" ? "Delete MCP token" : "Revoke MCP token"}
+        description={
+          tokenPendingAction?.action === "delete"
+            ? `Permanently delete "${tokenPendingAction.token.name}"? This can't be undone.`
+            : `Clients using "${tokenPendingAction?.token.name}" will fail to authenticate immediately.`
+        }
+        confirmLabel={tokenPendingAction?.action === "delete" ? "Delete token" : "Revoke token"}
+        onConfirm={handleConfirmPendingAction}
+      />
     </div>
   );
 }

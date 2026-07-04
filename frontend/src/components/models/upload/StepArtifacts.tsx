@@ -119,7 +119,7 @@ export default function StepArtifacts({
               className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 mt-6 group-hover:scale-105 transition-transform duration-300 ${
                 scalerFile 
                   ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 shadow-sm shadow-emerald-500/10" 
-                  : "bg-slate-50 text-slate-400 dark:bg-slate-850 dark:text-slate-500"
+                  : "bg-slate-50 text-slate-400 dark:bg-slate-800 dark:text-slate-500"
               }`}
             >
               {scalerFile ? <ShieldCheck className="w-7 h-7" /> : <FileJson className="w-7 h-7" />}

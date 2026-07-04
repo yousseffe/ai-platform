@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -50,9 +51,12 @@ export default function InviteMemberModal({
   const [role, setRole] = useState<OrgRole>(OrgRole.CONTRIBUTOR);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const emailCheck = z.string().trim().email().safeParse(email);
+  const isEmailValid = email.trim().length > 0 && emailCheck.success;
+
   const handleInvite = async () => {
-    if (!email.trim()) {
-      toast.error("Please enter an email address");
+    if (!isEmailValid) {
+      toast.error("Please enter a valid email address");
       return;
     }
     setIsSubmitting(true);
@@ -113,7 +117,11 @@ export default function InviteMemberModal({
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleInvite()}
               disabled={isSubmitting}
+              aria-invalid={email.trim().length > 0 && !isEmailValid}
             />
+            {email.trim().length > 0 && !isEmailValid && (
+              <p className="text-xs text-destructive">Enter a valid email address.</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">Role</Label>
@@ -133,7 +141,7 @@ export default function InviteMemberModal({
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={handleClose} disabled={isSubmitting}>Cancel</Button>
-          <Button size="sm" onClick={handleInvite} disabled={isSubmitting || !email.trim()}>
+          <Button size="sm" onClick={handleInvite} disabled={isSubmitting || !isEmailValid}>
             {isSubmitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Inviting...</> : "Send Invitation"}
           </Button>
         </DialogFooter>

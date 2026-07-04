@@ -49,12 +49,15 @@ export default function AdjustBalanceModal({
 
   if (!user) return null;
 
+  // Plain decimal amounts only (no scientific notation, no more than 2 decimal places).
+  const isValidAmount = /^\d+(\.\d{1,2})?$/.test(amount.trim()) && parseFloat(amount) > 0;
+
   const handleSubmit = async () => {
-    const amtFloat = parseFloat(amount);
-    if (isNaN(amtFloat) || amtFloat <= 0) {
-      toast.error("Please enter a valid positive amount");
+    if (!isValidAmount) {
+      toast.error("Enter a positive amount with up to 2 decimal places");
       return;
     }
+    const amtFloat = parseFloat(amount);
 
     setSubmitting(true);
     try {
@@ -162,7 +165,13 @@ export default function AdjustBalanceModal({
               className="font-mono text-xs bg-background border-border text-foreground h-9"
               step="0.01"
               min="0.01"
+              aria-invalid={amount.length > 0 && !isValidAmount}
             />
+            {amount.length > 0 && !isValidAmount && (
+              <p className="text-[10px] text-destructive mt-1 font-sans">
+                Enter a positive amount with up to 2 decimal places (e.g. 50 or 50.25).
+              </p>
+            )}
           </div>
         </div>
 
@@ -170,7 +179,7 @@ export default function AdjustBalanceModal({
           <Button variant="ghost" onClick={onClose} disabled={submitting} className="h-8 text-xs cursor-pointer">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting} className="h-8 text-xs cursor-pointer font-bold bg-primary text-primary-foreground hover:bg-primary/95">
+          <Button onClick={handleSubmit} disabled={submitting || !isValidAmount} className="h-8 text-xs cursor-pointer font-bold bg-primary text-primary-foreground hover:bg-primary/95">
             {submitting ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />

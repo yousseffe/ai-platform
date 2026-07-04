@@ -1,6 +1,8 @@
 import React from "react";
+import { GitBranch } from "lucide-react";
 import type { ModelVersion, Deployment } from "@/types";
 import { DeploymentStatus, VersionStatus } from "@/types";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface VersionHistoryTableProps {
   versions: ModelVersion[];
@@ -35,9 +37,11 @@ export function VersionHistoryTable({
   return (
     <div className="overflow-x-auto">
       {versions.length === 0 ? (
-        <div className="p-8 text-center text-muted-foreground font-mono text-xs select-none">
-          No versions uploaded yet. Click Upload New Version above.
-        </div>
+        <EmptyState
+          icon={<GitBranch />}
+          title="No versions uploaded yet"
+          description="Click Upload New Version above to push the first build of this model."
+        />
       ) : (
         <table className="w-full text-left border-collapse font-mono text-xs text-foreground">
           <thead>

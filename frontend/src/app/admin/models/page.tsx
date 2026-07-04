@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Loader2, Globe, EyeOff, Trash2, Eye, Server, RefreshCw, Layers, Database, Sparkles, Coins } from "lucide-react";
+import { Shield, Loader2, Globe, EyeOff, Trash2, Eye, Server, RefreshCw, Database, Coins } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { smartFetch } from "@/lib/utils/smart-fetch";
@@ -10,6 +10,10 @@ import { toast } from "react-hot-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
 import { AdminModel } from "@/types";
 
 /**
@@ -27,6 +31,7 @@ export default function AdminModelsPage() {
   const [models, setModels] = useState<AdminModel[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [modelPendingDelete, setModelPendingDelete] = useState<AdminModel | null>(null);
 
   // Load workspace context on mount
   useEffect(() => {
@@ -82,9 +87,6 @@ export default function AdminModelsPage() {
   };
 
   const deleteModel = async (model: AdminModel) => {
-    if (!confirm(`Are you absolutely sure you want to delete model "${model.name}" from the system registry? This will permanently delete the model record and its version history.`)) {
-      return;
-    }
     try {
       const res = await smartFetch<{ success: boolean }>(`/admin/models/${model.id}`, {
         method: "DELETE",
@@ -95,6 +97,8 @@ export default function AdminModelsPage() {
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to delete model");
+    } finally {
+      setModelPendingDelete(null);
     }
   };
 
@@ -125,84 +129,29 @@ export default function AdminModelsPage() {
 
   return (
     <div className="w-full space-y-6 text-foreground font-mono text-xs animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border pb-5">
-        <div className="text-left">
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2 font-mono">
-            <Shield className="w-5 h-5 text-primary" />
-            Model Registry Console
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1 font-sans">
-            Overseeing registered Machine Learning model artifacts, editing public marketplace listings, and deleting model entries.
-          </p>
-        </div>
-        <button
-          onClick={() => loadModels(true)}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 text-foreground font-bold"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          <span>Refresh</span>
-        </button>
-      </div>
+      <PageHeader
+        title={<><Shield /> Model Registry Console</>}
+        description="Overseeing registered Machine Learning model artifacts, editing public marketplace listings, and deleting model entries."
+        className="mb-0"
+        actions={
+          <Button
+            variant="outline"
+            onClick={() => loadModels(true)}
+            disabled={loading}
+            className="gap-1.5 cursor-pointer font-bold"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </Button>
+        }
+      />
 
       {/* Model Catalog Statistics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Total Catalog */}
-        <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden group hover:border-primary/20 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-muted-foreground/15">
-              <Database className="w-8 h-8" />
-            </div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Catalog Registrations</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-foreground">{totalModels}</span>
-              <span className="text-[10px] text-muted-foreground">ML Artifacts</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Public Models */}
-        <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden group hover:border-primary/20 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-muted-foreground/15">
-              <Globe className="w-8 h-8" />
-            </div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Public Listings</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-foreground">{publicModels}</span>
-              <span className="text-[10px] text-muted-foreground">In Marketplace</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Live Telemetries */}
-        <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden group hover:border-primary/20 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-muted-foreground/15">
-              <Server className="w-8 h-8" />
-            </div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Active Telemetry</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-foreground">{activeServers}</span>
-              <span className="text-[10px] text-muted-foreground">Containers live</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Average Cost */}
-        <Card className="border border-primary/20 bg-primary/[0.02] p-0 shadow-xs relative overflow-hidden group hover:border-primary/30 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-primary/20">
-              <Coins className="w-8 h-8" />
-            </div>
-            <p className="text-[9px] font-bold text-primary uppercase tracking-wider mb-1">Average Pricing Rate</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-primary">${avgCost.toFixed(2)}</span>
-              <span className="text-[9px] text-muted-foreground">Per prediction request</span>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard icon={<Database />} label="Catalog Registrations" value={totalModels} caption="ML Artifacts" />
+        <StatCard icon={<Globe />} label="Public Listings" value={publicModels} caption="In Marketplace" />
+        <StatCard icon={<Server />} label="Active Telemetry" value={activeServers} caption="Containers live" />
+        <StatCard icon={<Coins />} label="Average Pricing Rate" value={`$${avgCost.toFixed(2)}`} caption="Per prediction request" tone="primary" />
       </div>
 
       {/* Models Directory Card */}
@@ -323,7 +272,7 @@ export default function AdminModelsPage() {
                               variant="ghost"
                               size="icon"
                               title="Delete Model Registry"
-                              onClick={() => deleteModel(model)}
+                              onClick={() => setModelPendingDelete(model)}
                               className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -337,12 +286,27 @@ export default function AdminModelsPage() {
               </Table>
             </div>
           ) : (
-            <div className="p-8 text-center text-muted-foreground">
-              No registered model registries found matching your query.
-            </div>
+            <EmptyState
+              icon={<Database />}
+              title="No matching models"
+              description="No registered model registries found matching your search query."
+            />
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!modelPendingDelete}
+        onOpenChange={(open) => !open && setModelPendingDelete(null)}
+        title="Delete model registry entry"
+        description={`Permanently delete "${modelPendingDelete?.name}" and its full version history? This can't be undone.`}
+        confirmLabel="Delete model"
+        onConfirm={async () => {
+          if (modelPendingDelete) {
+            await deleteModel(modelPendingDelete);
+          }
+        }}
+      />
     </div>
   );
 }

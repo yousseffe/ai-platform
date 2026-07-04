@@ -25,6 +25,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PageHeader } from "@/components/ui/page-header";
 
 /**
  * Projects list page — all projects in the org.
@@ -40,6 +42,7 @@ export default function OrgProjectsPage() {
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [projectPendingDelete, setProjectPendingDelete] = useState<Project | null>(null);
 
   const fetchProjects = useCallback(async () => {
     if (!org) return;
@@ -74,14 +77,16 @@ export default function OrgProjectsPage() {
     }
   };
 
-  const handleDelete = async (projectId: string, projectName: string) => {
-    if (!org || !confirm(`Delete "${projectName}" and revoke all its API keys?`)) return;
+  const handleDelete = async (projectId: string) => {
+    if (!org) return;
     try {
       await deleteProject(org.id, projectId);
       toast.success("Project deleted");
       setProjects((prev) => prev.filter((p) => p.id !== projectId));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete project");
+    } finally {
+      setProjectPendingDelete(null);
     }
   };
 
@@ -89,25 +94,24 @@ export default function OrgProjectsPage() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-5 animate-fade-in">
-      <div className="flex items-center justify-between gap-4 border-b border-border pb-5">
-        <div>
-          <h1 className="text-xl font-bold text-foreground tracking-tight">Projects</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Organize consumer applications, API keys, and model access by project.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="hidden sm:flex h-9 items-center rounded-lg border border-border bg-card px-3 text-xs font-semibold text-muted-foreground">
-            {projects.length} active
+      <PageHeader
+        title="Projects"
+        description="Organize consumer applications, API keys, and model access by project."
+        className="mb-0"
+        actions={
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex h-9 items-center rounded-lg border border-border bg-card px-3 text-xs font-semibold text-muted-foreground">
+              {projects.length} active
+            </div>
+            {can(OrgAction.CREATE_PROJECT) && (
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="w-3.5 h-3.5" strokeWidth={2} />
+                New Project
+              </Button>
+            )}
           </div>
-          {can(OrgAction.CREATE_PROJECT) && (
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="w-3.5 h-3.5" strokeWidth={2} />
-              New Project
-            </Button>
-          )}
-        </div>
-      </div>
+        }
+      />
 
       <section className="rounded-xl border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -169,7 +173,7 @@ export default function OrgProjectsPage() {
                     <div className="flex flex-col gap-3 lg:min-w-[320px] lg:items-end">
                       {can(OrgAction.DELETE_PROJECT) && (
                         <button
-                          onClick={() => handleDelete(project.id, project.name)}
+                          onClick={() => setProjectPendingDelete(project)}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-all hover:border-destructive/20 hover:bg-destructive/8 hover:text-destructive"
                           title="Delete project"
                         >
@@ -266,6 +270,19 @@ export default function OrgProjectsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!projectPendingDelete}
+        onOpenChange={(open) => !open && setProjectPendingDelete(null)}
+        title="Delete project"
+        description={`Delete "${projectPendingDelete?.name}" and revoke all its API keys? This can't be undone.`}
+        confirmLabel="Delete project"
+        onConfirm={async () => {
+          if (projectPendingDelete) {
+            await handleDelete(projectPendingDelete.id);
+          }
+        }}
+      />
     </div>
   );
 }
