@@ -68,6 +68,35 @@ services:
       retries: 10
     restart: always
 
+  # Optional, fully self-contained Postgres for on-premise/air-gapped
+  # deployments that don't want to manage a separate native Postgres
+  # install. Disabled by default (matches the native-Postgres dev workflow
+  # in RUNNING.md). Enable with `docker compose --profile onprem up -d` and
+  # set DB_HOST=postgres in a root .env file. See docs/on-premise.md.
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    profiles: ["onprem"]
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-password}
+      - POSTGRES_DB=${DB_NAME:-aidb}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Host-side port 5433 to avoid clashing with the native Postgres
+      # service already bound to 5432 on the host. Internal container port
+      # stays 5432 — other containers (e.g. backend, when DB_HOST=postgres)
+      # reach it over the Docker network at postgres:5432 regardless of this
+      # host mapping.
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
   backend:
     build:
       context: ./backend
@@ -77,6 +106,17 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      # Defaults target the native Postgres service documented in RUNNING.md
+      # (reachable from inside Docker via host.docker.internal). Set DB_HOST
+      # in a root .env file to `postgres` (and enable the `onprem` profile) to
+      # use the bundled Postgres container instead — see docs/on-premise.md.
+      - DB_HOST=${DB_HOST:-host.docker.internal}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - DB_NAME=${DB_NAME:-aidb}
+      - OFFLINE_MODE=${OFFLINE_MODE:-false}
+      - MODEL_SANDBOX_HARDENING_ENABLED=${MODEL_SANDBOX_HARDENING_ENABLED:-true}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - MINIO_ENDPOINT=minio
@@ -116,6 +156,12 @@ services:
     networks:
       - default
       - models
+      # Model containers with allowEgress=false (the default, see F3) run on
+      # this isolated network instead of `models` — the backend must be
+      # attached here too, or it can't reach the container to run health
+      # checks or proxy prediction requests, and the deployment will sit in
+      # STARTING (container running, app never sees it become healthy).
+      - models-isolated
     # Resource ceiling for the backend container itself (not the model-serving
     # containers it spawns via the Docker socket). Host has 10c/16 logical
     # cores; this leaves ample headroom for BUILD_QUEUE_CONCURRENCY / model
@@ -128,12 +174,18 @@ services:
   llm-init:
     image: alpine:latest
     container_name: llm-init
+    environment:
+      - OFFLINE_MODE=${OFFLINE_MODE:-false}
     volumes:
       - llm_models:/models
     entrypoint: >
       /bin/sh -c "
       if [ -f /models/model.gguf ]; then
         echo 'Model already cached, skipping download.';
+        exit 0;
+      fi;
+      if [ \"$$OFFLINE_MODE\" = \"true\" ]; then
+        echo 'OFFLINE_MODE=true and no /models/model.gguf found. Place a GGUF file in the llm_models volume as model.gguf before starting the llm service. Skipping download.';
         exit 0;
       fi;
       apk add --no-cache wget &&
@@ -227,6 +279,7 @@ services:
     networks:
       - default
       - models
+      - models-isolated
     restart: always
 
   loki:
@@ -262,6 +315,7 @@ services:
     networks:
       - default
       - models
+      - models-isolated
     restart: always
 
   alertmanager:
@@ -326,3 +380,7 @@ networks:
   models:
     name: ai-platform_models
     driver: bridge
+  models-isolated:
+    name: ai-platform_models_isolated
+    driver: bridge
+    internal: true

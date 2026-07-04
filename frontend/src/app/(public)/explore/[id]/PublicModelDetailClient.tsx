@@ -43,6 +43,7 @@ import {
 import { smartFetch } from "@/lib/utils/smart-fetch";
 import { toast } from "react-hot-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Model, ModelVersion } from "@/types";
 import { DeploymentStatus, Framework, ModelType, TaskType, VersionStatus } from "@/types/enums";
 import ModelPlayground from "@/components/models/ModelPlayground";
@@ -330,6 +331,7 @@ console.log(data);`;
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [isDeletingReview, setIsDeletingReview] = useState(false);
   const [isEditingReview, setIsEditingReview] = useState(false);
+  const [showDeleteReviewConfirm, setShowDeleteReviewConfirm] = useState(false);
 
   const fetchReviews = async () => {
     setIsLoadingReviews(true);
@@ -389,7 +391,6 @@ console.log(data);`;
   };
 
   const handleDeleteReview = async () => {
-    if (!confirm("Are you sure you want to delete your review?")) return;
     setIsDeletingReview(true);
     try {
       await smartFetch(`/models/${model.id}/reviews`, {
@@ -1018,7 +1019,7 @@ console.log(data);`;
                     {isEditingReview && (
                       <button
                         type="button"
-                        onClick={handleDeleteReview}
+                        onClick={() => setShowDeleteReviewConfirm(true)}
                         disabled={isDeletingReview}
                         className="h-10 px-4 font-bold text-xs flex items-center justify-center gap-2 border border-red-200 hover:border-red-305 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-655 dark:text-red-400 cursor-pointer select-none rounded-xl transition-all"
                       >
@@ -1175,6 +1176,18 @@ console.log(data);`;
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={showDeleteReviewConfirm}
+        onOpenChange={setShowDeleteReviewConfirm}
+        title="Delete your review"
+        description="This will permanently remove your review from this model."
+        confirmLabel="Delete review"
+        onConfirm={async () => {
+          await handleDeleteReview();
+          setShowDeleteReviewConfirm(false);
+        }}
+      />
     </div>
   );
 }

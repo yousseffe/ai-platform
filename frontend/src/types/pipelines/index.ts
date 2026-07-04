@@ -118,6 +118,7 @@ export interface Pipeline {
   status: PipelineStatus;
   type: PipelineType;
   version: number;
+  isPublic: boolean;
   steps?: PipelineStep[];
   createdAt: string;
   updatedAt: string;

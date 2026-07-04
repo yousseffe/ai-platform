@@ -1,6 +1,8 @@
 import {
   CanActivate,
   ExecutionContext,
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -16,6 +18,8 @@ import { getRsaKeys } from '../utils/keys';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { User } from '../../users/entities/user.entity';
+import { AuditLog } from '../../users/entities/audit-log.entity';
+import { KeyQuotaService } from '../services/key-quota.service';
 
 interface AuthenticatedApiRequest extends ExpressRequest {
   user?: {
@@ -30,6 +34,7 @@ interface AuthenticatedApiRequest extends ExpressRequest {
     orgApiKeyPrefix?: string;
     orgId?: string;
     projectId?: string;
+    apiKeyId?: string;
   };
   workspaceId?: string;
   workspaceType?: OwnerType;
@@ -76,7 +81,44 @@ export class ApiKeyOrJwtGuard implements CanActivate {
     private readonly mcpTokenRepository: Repository<McpToken>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepository: Repository<AuditLog>,
+    private readonly keyQuotaService: KeyQuotaService,
   ) {}
+
+  /**
+   * Checks a key's per-minute rate limit and daily spend budget. On a budget
+   * breach the key is automatically suspended (`isActive = false`) so it
+   * can't keep failing this check on every subsequent request.
+   *
+   * @throws {HttpException} 429 on rate limit breach, 402 on budget breach.
+   */
+  private async enforceKeyQuota(params: {
+    keyId: string;
+    maxRequestsPerMinute: number | null;
+    maxDailySpendCredits: number | null;
+    suspend: (reason: string) => Promise<void>;
+  }): Promise<void> {
+    await this.keyQuotaService.checkRateLimit(
+      params.keyId,
+      params.maxRequestsPerMinute,
+    );
+
+    try {
+      await this.keyQuotaService.assertWithinDailyBudget(
+        params.keyId,
+        params.maxDailySpendCredits,
+      );
+    } catch (err) {
+      if (
+        err instanceof HttpException &&
+        err.getStatus() === HttpStatus.PAYMENT_REQUIRED
+      ) {
+        await params.suspend('Daily spend budget exceeded').catch(() => undefined);
+      }
+      throw err;
+    }
+  }
 
   /**
    * Asserts whether the request is authorized.
@@ -150,6 +192,18 @@ export class ApiKeyOrJwtGuard implements CanActivate {
         );
       }
 
+      await this.enforceKeyQuota({
+        keyId: orgApiKey.id,
+        maxRequestsPerMinute: orgApiKey.maxRequestsPerMinute,
+        maxDailySpendCredits: orgApiKey.maxDailySpendCredits,
+        suspend: async (reason) => {
+          await this.orgApiKeyRepository.update(orgApiKey.id, {
+            isActive: false,
+            suspendedReason: reason,
+          });
+        },
+      });
+
       request.user = {
         id: `org-key:${orgApiKey.id}`,
         email: `org:${orgApiKey.orgId}`,
@@ -216,6 +270,25 @@ export class ApiKeyOrJwtGuard implements CanActivate {
         await this.apiKeyRepository.save(apiKeyEntity);
       }
 
+      await this.enforceKeyQuota({
+        keyId: apiKeyEntity.id,
+        maxRequestsPerMinute: apiKeyEntity.maxRequestsPerMinute,
+        maxDailySpendCredits: apiKeyEntity.maxDailySpendCredits,
+        suspend: async (reason) => {
+          await this.apiKeyRepository.update(apiKeyEntity.id, {
+            isActive: false,
+            suspendedReason: reason,
+          });
+          await this.auditLogRepository.save(
+            this.auditLogRepository.create({
+              userId: apiKeyEntity.user.id,
+              action: 'api_key.auto_suspended',
+              metadata: { apiKeyId: apiKeyEntity.id, reason },
+            }),
+          );
+        },
+      });
+
       // Populate request user
       request.user = {
         id: apiKeyEntity.user.id,
@@ -223,6 +296,7 @@ export class ApiKeyOrJwtGuard implements CanActivate {
         isAdmin: computeIsAdmin(apiKeyEntity.user),
         apiKey: apiKeyEntity.key,
         apiKeyType: apiKeyEntity.type,
+        apiKeyId: apiKeyEntity.id,
       };
       request.workspaceId = apiKeyEntity.user.id;
       request.workspaceType = OwnerType.USER;

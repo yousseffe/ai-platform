@@ -27,6 +27,12 @@ export interface OrgApiKey {
   isActive: boolean;
   lastUsedAt: string | null;
   createdAt: string;
+  /** Max prediction requests this key may make per minute. Null means unlimited. */
+  maxRequestsPerMinute: number | null;
+  /** Max credits this key may spend per calendar day before auto-suspension. Null means unlimited. */
+  maxDailySpendCredits: number | null;
+  /** Set when quota enforcement auto-suspended the key, distinct from a manual revoke. */
+  suspendedReason: string | null;
 }
 
 /** Returned once at creation time — includes the full raw key. */
@@ -274,6 +280,32 @@ export async function revokeApiKey(
   return smartFetch<{ message: string }>(
     `/organizations/${orgId}/projects/${projectId}/api-keys/${keyId}`,
     { method: "DELETE" },
+  );
+}
+
+/**
+ * Updates the rate limit and/or daily spend budget quota for a project API key —
+ * lets an org OWNER or MAINTAINER cap how much a team's key can consume.
+ *
+ * @param orgId - UUID of the organization.
+ * @param projectId - UUID of the project.
+ * @param keyId - UUID of the API key.
+ * @param updates - The quota fields to change. Omitted fields are left unchanged; pass null to clear a cap.
+ * @returns The updated OrgApiKey entity.
+ */
+export async function updateApiKeyQuota(
+  orgId: string,
+  projectId: string,
+  keyId: string,
+  updates: { maxRequestsPerMinute?: number | null; maxDailySpendCredits?: number | null },
+): Promise<OrgApiKey> {
+  return smartFetch<OrgApiKey>(
+    `/organizations/${orgId}/projects/${projectId}/api-keys/${keyId}/quota`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    },
   );
 }
 

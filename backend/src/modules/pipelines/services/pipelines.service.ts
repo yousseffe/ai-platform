@@ -86,6 +86,37 @@ export class PipelinesService {
     return pipeline;
   }
 
+  /**
+   * Lists every publicly-listed, runnable pipeline for the marketplace
+   * catalog — no authentication required. Only `VALIDATED` pipelines are
+   * shown, mirroring the models marketplace's intent of only surfacing
+   * things a visitor could actually try.
+   */
+  async getPublicPipelines(): Promise<Pipeline[]> {
+    return this.pipelineRepository.find({
+      where: { isPublic: true, status: PipelineStatus.VALIDATED },
+      relations: DETAIL_RELATIONS,
+      order: { updatedAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Fetches a single publicly-listed pipeline by ID — no authentication
+   * required.
+   *
+   * @throws {NotFoundException} If the pipeline doesn't exist or isn't public.
+   */
+  async getPublicPipeline(pipelineId: string): Promise<Pipeline> {
+    const pipeline = await this.pipelineRepository.findOne({
+      where: { id: pipelineId, isPublic: true },
+      relations: DETAIL_RELATIONS,
+    });
+    if (!pipeline) {
+      throw new NotFoundException('Pipeline not found');
+    }
+    return pipeline;
+  }
+
   /** Updates a pipeline's name/description. Does not affect its status. */
   async updatePipeline(
     pipelineId: string,
@@ -96,6 +127,7 @@ export class PipelinesService {
     if (dto.name !== undefined) pipeline.name = dto.name;
     if (dto.description !== undefined) pipeline.description = dto.description;
     if (dto.type !== undefined) pipeline.type = dto.type;
+    if (dto.isPublic !== undefined) pipeline.isPublic = dto.isPublic;
     return this.pipelineRepository.save(pipeline);
   }
 

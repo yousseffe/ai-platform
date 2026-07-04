@@ -8,6 +8,7 @@ import { AdminStatusBadge } from "@/components/admin/common/AdminStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   AdminProviderTier,
   AdminProviderTierPayload,
@@ -227,17 +228,15 @@ export default function AdminProviderPlansPage() {
     }
   };
 
-  const handleDelete = async (tier: AdminProviderTier) => {
-    const confirmed = window.confirm(
-      `Delete or deactivate provider plan "${tier.displayName}"? Assigned plans will be deactivated instead of removed.`,
-    );
-    if (!confirmed) return;
+  const [deleteTarget, setDeleteTarget] = React.useState<AdminProviderTier | null>(null);
 
+  const handleDelete = async (tier: AdminProviderTier) => {
     try {
       const result = await deleteAdminProviderPlan(tier.id);
       toast.success(result.deleted ? "Provider plan deleted." : "Provider plan deactivated.");
       await loadTiers();
       if (editingId === tier.id) resetForm();
+      setDeleteTarget(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to delete provider plan";
       toast.error(message);
@@ -468,7 +467,7 @@ export default function AdminProviderPlansPage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDelete(tier)}
+                            onClick={() => setDeleteTarget(tier)}
                             className="h-9 gap-1.5 rounded-xl border-rose-500/30 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -667,6 +666,17 @@ export default function AdminProviderPlansPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete provider plan"
+        description={`Delete or deactivate provider plan "${deleteTarget?.displayName}"? Assigned plans will be deactivated instead of removed.`}
+        confirmLabel="Delete plan"
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget);
+        }}
+      />
     </div>
   );
 }

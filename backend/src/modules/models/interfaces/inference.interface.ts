@@ -10,6 +10,7 @@ export interface PredictionActor {
   email: string;
   apiKey?: string;
   apiKeyType?: ApiKeyType;
+  apiKeyId?: string;
   orgApiKeyId?: string;
   orgApiKeyLabel?: string;
   orgApiKeyPrefix?: string;
@@ -35,6 +36,8 @@ export interface InferenceResult {
   status: 'SUCCESS' | 'FAILED';
   errorMessage: string | null;
   deploymentId: string | null;
+  /** Whether this result was served from the response cache instead of the container. */
+  cacheHit: boolean;
 }
 
 /** Pricing resolved for a single inference call. */

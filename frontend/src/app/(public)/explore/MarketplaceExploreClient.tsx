@@ -23,10 +23,12 @@ import {
   Loader2,
   AlertCircle,
   Image,
+  GitBranch,
 } from "lucide-react";
 import { DeploymentStatus, ModelType, Framework, TaskType } from "@/types";
 import type { SearchModelHit, FacetBucket, SearchResult } from "@/types";
 import { searchModels } from "@/lib/actions/models.actions";
+import { PipelinesCatalogSection } from "@/components/pipelines/PipelinesCatalogSection";
 
 // ─── Display maps ──────────────────────────────────────────────────────────────
 
@@ -236,6 +238,9 @@ export default function MarketplaceExploreClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  // Which catalog is shown — models (OpenSearch-powered) or pipelines (simple listing).
+  const [activeCatalog, setActiveCatalog] = useState<"models" | "pipelines">("models");
 
   // Filter state — initialized from URL params so deep links work
   const [searchQuery,        setSearchQuery]        = useState(searchParams.get("q") || "");
@@ -481,6 +486,34 @@ export default function MarketplaceExploreClient() {
 
       {/* ── Main Content: Sidebar + Grid ──────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-6 md:px-12 py-8">
+
+        {/* Catalog Tab Switcher */}
+        <div className="flex items-center gap-2 mb-6 border-b border-border">
+          <button
+            onClick={() => setActiveCatalog("models")}
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
+              activeCatalog === "models"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Package className="w-4 h-4" /> Models
+          </button>
+          <button
+            onClick={() => setActiveCatalog("pipelines")}
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
+              activeCatalog === "pipelines"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <GitBranch className="w-4 h-4" /> Pipelines
+          </button>
+        </div>
+
+        {activeCatalog === "pipelines" ? (
+          <PipelinesCatalogSection />
+        ) : (
         <div className="flex flex-col lg:flex-row gap-8 items-start">
 
           {/* ── Filter Sidebar ─────────────────────────────────────────────── */}
@@ -752,6 +785,7 @@ export default function MarketplaceExploreClient() {
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

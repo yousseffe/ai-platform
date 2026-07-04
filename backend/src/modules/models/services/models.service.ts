@@ -44,6 +44,7 @@ import { OrgType } from '../../organizations/enums/org-type.enum';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { ProviderLimitsService } from '../../provider-accounts/services/provider-limits.service';
+import { TenantScopeService } from '../../../shared/security/tenant-scope.service';
 
 /**
  * Service managing model registration, listing, version uploads, MinIO storage sync,
@@ -70,6 +71,7 @@ export class ModelsService {
     @Inject(forwardRef(() => OrganizationsService))
     private readonly organizationsService: OrganizationsService,
     private readonly providerLimitsService: ProviderLimitsService,
+    private readonly tenantScopeService: TenantScopeService,
   ) {}
 
   private async assertProviderOrgAccess(
@@ -172,6 +174,7 @@ export class ModelsService {
       framework,
       user: { id: userId },
       organization: organizationId ? { id: organizationId } : null,
+      rlsOrgId: organizationId ?? null,
       isPublic,
       marketplaceVerified: false,
       tier: type === ModelType.DIFFUSION ? 'LARGE' : 'SMALL',
@@ -216,19 +219,25 @@ export class ModelsService {
         OrgRole.CONTRIBUTOR,
         OrgRole.VIEWER,
       ]);
-      return this.modelsRepository.find({
-        where: { organization: { id: orgId } },
-        relations: [
-          'organization',
-          'user',
-          'versions',
-          'versions.uploadedBy',
-          'versions.reviewedBy',
-          'versions.testCases',
-          'versions.deployments',
-        ],
-        order: { createdAt: 'DESC' },
-      });
+      // Defense-in-depth: run the org-scoped listing under Postgres RLS (see
+      // shared/migrations/enable-row-level-security.sql) in addition to the
+      // WHERE clause below, so a future bug in this filter still can't leak
+      // another organization's models.
+      return this.tenantScopeService.runScoped(orgId, (manager) =>
+        manager.getRepository(Model).find({
+          where: { organization: { id: orgId } },
+          relations: [
+            'organization',
+            'user',
+            'versions',
+            'versions.uploadedBy',
+            'versions.reviewedBy',
+            'versions.testCases',
+            'versions.deployments',
+          ],
+          order: { createdAt: 'DESC' },
+        }),
+      );
     }
 
     return this.modelsRepository.find({
@@ -307,6 +316,88 @@ export class ModelsService {
       throw new ForbiddenException('You cannot access this private model');
     }
     return model;
+  }
+
+  /**
+   * Updates a model's response cache policy fields, leaving any field not
+   * present in `updates` unchanged.
+   *
+   * @param modelId - The UUID of the model to update.
+   * @param updates - Partial cache policy fields.
+   * @throws {NotFoundException} If the model does not exist.
+   */
+  async updateCacheSettings(
+    modelId: string,
+    updates: {
+      cacheEnabled?: boolean;
+      cacheTtlSeconds?: number;
+      cacheHitDiscountPercent?: number;
+    },
+  ): Promise<Model> {
+    const model = await this.modelsRepository.findOne({
+      where: { id: modelId },
+    });
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+
+    if (updates.cacheEnabled !== undefined) {
+      model.cacheEnabled = updates.cacheEnabled;
+    }
+    if (updates.cacheTtlSeconds !== undefined) {
+      model.cacheTtlSeconds = updates.cacheTtlSeconds;
+    }
+    if (updates.cacheHitDiscountPercent !== undefined) {
+      model.cacheHitDiscountPercent = updates.cacheHitDiscountPercent;
+    }
+
+    return this.modelsRepository.save(model);
+  }
+
+  /**
+   * Updates a model's container network policy (outbound internet access).
+   * Only takes effect on the next deployment — an already-RUNNING container
+   * keeps whichever network it was started on.
+   *
+   * @param modelId - The UUID of the model to update.
+   * @param allowEgress - Whether future deployments may reach the internet.
+   * @throws {NotFoundException} If the model does not exist.
+   */
+  async updateNetworkSettings(
+    modelId: string,
+    allowEgress: boolean,
+  ): Promise<Model> {
+    const model = await this.modelsRepository.findOne({
+      where: { id: modelId },
+    });
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+
+    model.allowEgress = allowEgress;
+    return this.modelsRepository.save(model);
+  }
+
+  /**
+   * Updates a model's marketplace visibility flag.
+   *
+   * @param modelId - The UUID of the model to update.
+   * @param isPublic - Whether the model should be listed in the public marketplace.
+   * @throws {NotFoundException} If the model does not exist.
+   */
+  async updateVisibilitySettings(
+    modelId: string,
+    isPublic: boolean,
+  ): Promise<Model> {
+    const model = await this.modelsRepository.findOne({
+      where: { id: modelId },
+    });
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+
+    model.isPublic = isPublic;
+    return this.modelsRepository.save(model);
   }
 
   /**

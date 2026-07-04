@@ -81,6 +81,34 @@ export class ApiKey {
   expiresAt: Date | null;
 
   /**
+   * Maximum number of prediction requests this key may make per minute.
+   * Null means no rate limit is enforced.
+   */
+  @Column({ name: 'max_requests_per_minute', type: 'integer', nullable: true })
+  maxRequestsPerMinute: number | null;
+
+  /**
+   * Maximum credits this key may spend per calendar day. Once reached, the
+   * key is automatically suspended (`isActive` set to false).
+   * Null means no budget cap is enforced.
+   */
+  @Column({
+    name: 'max_daily_spend_credits',
+    type: 'decimal',
+    precision: 12,
+    scale: 4,
+    nullable: true,
+  })
+  maxDailySpendCredits: number | null;
+
+  /**
+   * Explains why the key was automatically suspended by quota enforcement,
+   * distinct from a manual owner revocation.
+   */
+  @Column({ name: 'suspended_reason', type: 'varchar', nullable: true })
+  suspendedReason: string | null;
+
+  /**
    * Timestamp record indicating when this key was originally created.
    */
   @CreateDateColumn({ name: 'created_at' })

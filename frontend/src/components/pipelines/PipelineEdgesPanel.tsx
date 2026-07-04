@@ -181,14 +181,22 @@ export function PipelineEdgesPanel({
                                 : `${edge.spec.rules.length} rule${edge.spec.rules.length === 1 ? "" : "s"}`}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => onRemoveEdge(edge.id)}
-                            disabled={isSubmitting}
-                            className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <MapperEdgeDialog
+                              steps={steps}
+                              isSubmitting={isSubmitting}
+                              onUpsert={onUpsertEdge}
+                              initialEdge={edge}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => onRemoveEdge(edge.id)}
+                              disabled={isSubmitting}
+                              className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
 
                         {/* Rules */}

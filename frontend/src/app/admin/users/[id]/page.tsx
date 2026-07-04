@@ -9,6 +9,7 @@ import { toast } from "react-hot-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import AdjustBalanceModal from "@/components/admin/AdjustBalanceModal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Loader2,
   UserCheck,
@@ -191,13 +192,12 @@ export default function AdminUserDetailsPage({ params }: { params: Promise<{ id:
     }
   };
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const handleDeleteUser = async () => {
     if (!userDetails) return;
     if (userDetails.email.toLowerCase().includes("admin")) {
       toast.error("Cannot delete administrator user account");
-      return;
-    }
-    if (!confirm(`Are you absolutely sure you want to permanently delete user account "${userDetails.fullName}"? All wallets and models will be deleted. This is irreversible!`)) {
       return;
     }
     try {
@@ -412,7 +412,7 @@ export default function AdminUserDetailsPage({ params }: { params: Promise<{ id:
               <Button
                 variant="outline"
                 disabled={userDetails.email.toLowerCase().includes("admin")}
-                onClick={handleDeleteUser}
+                onClick={() => setShowDeleteConfirm(true)}
                 className="w-full justify-start gap-2 h-9 text-xs cursor-pointer border-red-500/30 hover:border-red-600 bg-red-500/5 hover:bg-red-500/15 text-red-500 hover:text-red-600 font-bold disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Trash2 className="w-4 h-4" />
@@ -638,6 +638,15 @@ export default function AdminUserDetailsPage({ params }: { params: Promise<{ id:
         onClose={() => setIsAdjustModalOpen(false)}
         user={adjustUserModalPayload}
         onSuccess={() => loadUserDetails(false)}
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Purge user account"
+        description={`Permanently delete the account "${userDetails?.fullName}", including all wallets and models. This is irreversible!`}
+        confirmLabel="Purge account"
+        onConfirm={handleDeleteUser}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Put,
+  Patch,
   Body,
   UseGuards,
   Request,
@@ -60,11 +61,17 @@ import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import * as crypto from 'crypto';
 import { InferenceClient } from '../services/inference-client.service';
+import { InferenceCacheService } from '../services/inference-cache.service';
 import {
   ClientRequestMeta,
   PredictionActor,
 } from '../interfaces/inference.interface';
 import { extractClientMeta } from '../../../shared/utils/client-meta.util';
+import { UpdateCacheSettingsDto } from '../dto/update-cache-settings.dto';
+import { UpdateNetworkSettingsDto } from '../dto/update-network-settings.dto';
+import { UpdateVisibilitySettingsDto } from '../dto/update-visibility-settings.dto';
+import { FirewallService } from '../../firewall/services/firewall.service';
+import { detectInjection } from '../../../shared/security/injection-patterns';
 
 /**
  * Interface representing a NestJS request authenticated with a JWT payload.
@@ -85,6 +92,7 @@ interface PredictionRequestContext {
     email: string;
     apiKey?: string;
     apiKeyType?: ApiKeyType;
+    apiKeyId?: string;
     orgApiKeyId?: string;
     orgApiKeyLabel?: string;
     orgApiKeyPrefix?: string;
@@ -115,6 +123,8 @@ export class ModelsController {
     @InjectRepository(OrgApiKey)
     private readonly orgApiKeyRepository: Repository<OrgApiKey>,
     private readonly inferenceClient: InferenceClient,
+    private readonly inferenceCacheService: InferenceCacheService,
+    private readonly firewallService: FirewallService,
   ) {}
 
   /**
@@ -517,6 +527,108 @@ export class ModelsController {
   }
 
   /**
+   * Updates a model's response cache policy (enabled, TTL, cache-hit discount).
+   * Restricted to the model's owner (personal user or organization member).
+   */
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/cache-settings')
+  async updateCacheSettings(
+    @Param('id') id: string,
+    @Body() body: UpdateCacheSettingsDto,
+    @Request() req: RequestWithUser,
+  ): Promise<Model> {
+    const model = await this.modelsService.getModel(id, req.user.id);
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+    if (
+      !model.organization &&
+      model.user?.id !== req.user.id &&
+      !req.user.isAdmin
+    ) {
+      throw new ForbiddenException('You do not have access to this model');
+    }
+
+    return this.modelsService.updateCacheSettings(id, body);
+  }
+
+  /**
+   * Returns cache hit/miss counters for a model's response cache.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/cache-stats')
+  async getCacheStats(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+  ) {
+    const model = await this.modelsService.getModel(id, req.user.id);
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+    if (
+      !model.organization &&
+      model.user?.id !== req.user.id &&
+      !req.user.isAdmin
+    ) {
+      throw new ForbiddenException('You do not have access to this model');
+    }
+
+    return this.inferenceCacheService.getStats(id);
+  }
+
+  /**
+   * Updates a model's container network policy (outbound internet access
+   * for future deployments). Restricted to the model's owner.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/network-settings')
+  async updateNetworkSettings(
+    @Param('id') id: string,
+    @Body() body: UpdateNetworkSettingsDto,
+    @Request() req: RequestWithUser,
+  ): Promise<Model> {
+    const model = await this.modelsService.getModel(id, req.user.id);
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+    if (
+      !model.organization &&
+      model.user?.id !== req.user.id &&
+      !req.user.isAdmin
+    ) {
+      throw new ForbiddenException('You do not have access to this model');
+    }
+
+    return this.modelsService.updateNetworkSettings(id, body.allowEgress);
+  }
+
+  /**
+   * Updates a model's marketplace visibility (public/private). Restricted
+   * to the model's owner.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/visibility-settings')
+  async updateVisibilitySettings(
+    @Param('id') id: string,
+    @Body() body: UpdateVisibilitySettingsDto,
+    @Request() req: RequestWithUser,
+  ): Promise<Model> {
+    const model = await this.modelsService.getModel(id, req.user.id);
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+    if (
+      !model.organization &&
+      model.user?.id !== req.user.id &&
+      !req.user.isAdmin
+    ) {
+      throw new ForbiddenException('You do not have access to this model');
+    }
+
+    return this.modelsService.updateVisibilitySettings(id, body.isPublic);
+  }
+
+  /**
    * Provider organization analytics for decision making and member monitoring.
    */
   @UseGuards(JwtAuthGuard)
@@ -686,6 +798,7 @@ export class ModelsController {
       email: req.user.email,
       apiKey: req.user.apiKey,
       apiKeyType: req.user.apiKeyType,
+      apiKeyId: req.user.apiKeyId,
       orgApiKeyId: req.user.orgApiKeyId,
       orgApiKeyLabel: req.user.orgApiKeyLabel,
       orgApiKeyPrefix: req.user.orgApiKeyPrefix,
@@ -713,6 +826,13 @@ export class ModelsController {
     const orgApiKey = await this.assertOrgApiKeyPredictionAccess(model, req);
     const actor = this.buildActor(req);
     const clientMeta = extractClientMeta(req);
+
+    await this.firewallService.assertRequestAllowed({
+      modelId: model.id,
+      orgId: model.organization?.id ?? req.user.orgId ?? null,
+      ipAddress: clientMeta.ipAddress,
+      injectionMatch: detectInjection(JSON.stringify(data ?? {})),
+    });
 
     if (data.stream === true) {
       await this.streamPrediction(
@@ -743,6 +863,7 @@ export class ModelsController {
       return;
     }
     this.touchOrgApiKeyUsage(orgApiKey);
+    res.setHeader('X-Cache', result.cacheHit ? 'HIT' : 'MISS');
     res.json(result.output);
   }
 

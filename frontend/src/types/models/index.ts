@@ -1,6 +1,21 @@
 import { User } from "../user";
 import { DeploymentStatus, VersionStatus, VersionReviewStatus, SchemaDetectionStatus, PredictionStatus, ModelType, Framework } from "../enums";
 
+export type FirewallMode = "MONITOR" | "ENFORCE";
+
+export interface FirewallPolicy {
+  id: string;
+  scopeType: "MODEL" | "ORG";
+  scopeId: string;
+  enforcementMode: FirewallMode;
+  ipAllowlist: string[] | null;
+  ipDenylist: string[] | null;
+  blockOnRiskScoreThreshold: number | null;
+  blockOnInjection: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Deployment {
   id: string;
   containerId?: string;
@@ -8,6 +23,7 @@ export interface Deployment {
   port?: number;
   status: DeploymentStatus;
   errorMessage?: string;
+  trafficWeight?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -74,6 +90,10 @@ export interface Model {
   costPerRequest?: number;
   providerSharePercent?: number;
   hasCustomPricing?: boolean;
+  cacheEnabled?: boolean;
+  cacheTtlSeconds?: number;
+  cacheHitDiscountPercent?: number;
+  allowEgress?: boolean;
   totalEarnings?: number;
   uniqueUsersCount?: number;
   isPublic?: boolean;

@@ -160,6 +160,49 @@ export class Model {
   reviewCount: number;
 
   /**
+   * Whether identical prediction requests to this model's active deployment
+   * are served from cache instead of re-invoking the container.
+   */
+  @Column({ name: 'cache_enabled', type: 'boolean', default: false })
+  cacheEnabled: boolean;
+
+  /**
+   * How long a cached prediction response remains valid, in seconds.
+   */
+  @Column({ name: 'cache_ttl_seconds', type: 'integer', default: 60 })
+  cacheTtlSeconds: number;
+
+  /**
+   * Percentage (0-100) of the normal cost waived when a prediction is served
+   * from cache. 100 means cache hits are free; 0 charges the full price.
+   */
+  @Column({
+    name: 'cache_hit_discount_percent',
+    type: 'integer',
+    default: 100,
+  })
+  cacheHitDiscountPercent: number;
+
+  /**
+   * Whether this model's deployed containers are allowed outbound internet
+   * access. Defaults to false (secure-by-default): containers are placed on
+   * an isolated, internal-only Docker network unless explicitly opted in.
+   */
+  @Column({ name: 'allow_egress', type: 'boolean', default: false })
+  allowEgress: boolean;
+
+  /**
+   * Denormalized copy of `organization.id`, kept in sync at creation time.
+   * Exists purely so Postgres row-level security policies (see
+   * `shared/migrations/enable-row-level-security.sql`) can scope this table
+   * by tenant without a join — RLS policies run per-row and can't cheaply
+   * traverse a relation the way application-level TypeORM queries can. Null
+   * for personal (non-organization) models.
+   */
+  @Column({ name: 'rls_org_id', type: 'uuid', nullable: true })
+  rlsOrgId: string | null;
+
+  /**
    * Timestamp record indicating when this model template registry was initialized.
    */
   @CreateDateColumn()

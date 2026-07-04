@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { HistoryItem } from "@/types";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface PredictionHistoryTableProps {
   history: HistoryItem[];
@@ -20,6 +21,8 @@ export function PredictionHistoryTable({
   onClear,
   onReplay,
 }: PredictionHistoryTableProps) {
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
   return (
     <div className="font-mono text-xs text-foreground">
       <div className="flex items-center justify-between mb-4 select-none">
@@ -31,13 +34,25 @@ export function PredictionHistoryTable({
         </div>
         {history.length > 0 && (
           <button
-            onClick={onClear}
+            onClick={() => setShowClearConfirm(true)}
             className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 cursor-pointer transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" /> Clear History
           </button>
         )}
       </div>
+
+      <ConfirmDialog
+        open={showClearConfirm}
+        onOpenChange={setShowClearConfirm}
+        title="Clear prediction history"
+        description="This model's local prediction sandbox history will be cleared. This can't be undone."
+        confirmLabel="Clear history"
+        onConfirm={() => {
+          onClear();
+          setShowClearConfirm(false);
+        }}
+      />
 
       <div className="border border-border bg-card rounded-xl p-0 overflow-hidden shadow-sm">
         {history.length === 0 ? (

@@ -64,6 +64,25 @@ export class Deployment {
   errorMessage: string | null;
 
   /**
+   * Share (0-100) of unpinned prediction traffic this deployment receives
+   * when multiple RUNNING deployments exist for the same model (canary
+   * traffic splitting). Irrelevant when it's the only RUNNING deployment for
+   * its model — that one always gets 100% of unpinned traffic.
+   */
+  @Column({ name: 'traffic_weight', type: 'integer', default: 100 })
+  trafficWeight: number;
+
+  /**
+   * Denormalized copy of the owning model's `organization.id`, set when the
+   * deployment is created. Exists purely for Postgres row-level security
+   * policies (see `shared/migrations/enable-row-level-security.sql`) to
+   * scope this table by tenant without a multi-hop join through
+   * modelVersion -> model -> organization. Null for personal (non-org) models.
+   */
+  @Column({ name: 'rls_org_id', type: 'uuid', nullable: true })
+  rlsOrgId: string | null;
+
+  /**
    * Timestamp indicating when the deployment queue job was initiated.
    */
   @CreateDateColumn()

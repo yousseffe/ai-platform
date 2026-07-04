@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus } from "lucide-react";
-import { PipelineStep, MapperRule } from "@/types";
+import { Plus, Pencil } from "lucide-react";
+import { PipelineStep, PipelineEdge, MapperRule } from "@/types";
 import { MapperRuleRow } from "@/lib/schemas";
 import { pathsFromJsonSample } from "@/lib/utils/json-paths";
 import { groupByStage, stepNamespacePath } from "@/lib/utils/pipelines";
@@ -71,6 +71,67 @@ function serialiseRow(row: MapperRuleRow): MapperRule | null {
 }
 
 /**
+ * Builds the list of selectable source namespaces for a mapper targeting
+ * `toStepOrder` — every step's context is available except steps at or after
+ * the target, since those haven't run yet.
+ *
+ * @param sortedSteps - All pipeline steps, ordered by stage.
+ * @param toStepOrder - The order of the edge's target step, or `Infinity` for the pipeline output.
+ * @returns The namespace dropdown options.
+ */
+function buildNamespaceOptions(sortedSteps: PipelineStep[], toStepOrder: number): NamespaceOption[] {
+  const stages = groupByStage(sortedSteps);
+  const stageSizeByOrder = new Map(stages.map((stage) => [stage[0].order, stage.length]));
+  return [
+    { value: "input", label: "Pipeline Input" },
+    { value: "previous", label: "Previous Step" },
+    ...sortedSteps
+      .filter((s) => s.order < toStepOrder)
+      .map((s) => {
+        const path = stepNamespacePath(s, stageSizeByOrder.get(s.order) ?? 1);
+        return {
+          value: path,
+          label: `${path} — ${s.modelVersion?.model?.name ?? `Step ${s.order}`}`,
+        };
+      }),
+  ];
+}
+
+/**
+ * Reconstructs a form row from a persisted {@link MapperRule}, splitting its
+ * combined `namespace.path` source string back into the two form fields by
+ * matching the longest known namespace value.
+ *
+ * @param rule - The persisted mapper rule.
+ * @param namespaceOptions - The namespace options valid for this rule's edge target.
+ * @returns The equivalent MapperRuleRow for the rule-builder form.
+ */
+function deserialiseRule(rule: MapperRule, namespaceOptions: NamespaceOption[]): MapperRuleRow {
+  const row: MapperRuleRow = { ...EMPTY_RULE, op: rule.op, to: rule.to };
+
+  if (rule.op === "default") {
+    row.value = typeof rule.value === "string" ? rule.value : JSON.stringify(rule.value);
+    return row;
+  }
+  if (rule.op === "template") {
+    row.template = rule.template;
+    return row;
+  }
+
+  // copy / cast: `from` is a combined "namespace.path" string.
+  const from = rule.from;
+  const matchingNamespaces = namespaceOptions
+    .map((opt) => opt.value)
+    .filter((ns) => from === ns || from.startsWith(`${ns}.`))
+    .sort((a, b) => b.length - a.length);
+  const namespace = matchingNamespaces[0] ?? "input";
+  row.namespace = namespace;
+  row.fromPath = from === namespace ? "" : from.slice(namespace.length + 1);
+  if (rule.op === "cast") row.as = rule.as;
+  return row;
+}
+
+/**
  * Builds a human-readable step label showing the step index and model name.
  *
  * @param step - The pipeline step to label.
@@ -92,45 +153,44 @@ interface MapperEdgeDialogProps {
     toStepId: string | undefined,
     spec: { rules: MapperRule[] },
   ) => Promise<boolean>;
+  /** When provided, the dialog opens pre-filled with this edge's from/to/rules for editing instead of creating a new mapper. */
+  initialEdge?: PipelineEdge;
 }
 
 /**
  * "Add / Replace Mapper" dialog. Provides a structured rule-builder UI:
  * step-to-step selectors, per-rule operation + source namespace + field-path
  * pickers, all using native `<select>` / `<datalist>` so they work reliably
- * inside a Dialog without portal z-index conflicts.
+ * inside a Dialog without portal z-index conflicts. When `initialEdge` is
+ * given, the dialog opens in edit mode, pre-filling the form from that
+ * edge's existing configuration — including renaming a wrong output key by
+ * changing an existing rule's `to` field.
  *
  * @param props - MapperEdgeDialog component properties.
  * @returns The React component rendering the trigger button + dialog.
  */
-export function MapperEdgeDialog({ steps, isSubmitting, onUpsert }: MapperEdgeDialogProps) {
+export function MapperEdgeDialog({ steps, isSubmitting, onUpsert, initialEdge }: MapperEdgeDialogProps) {
+  const isEditMode = Boolean(initialEdge);
   const [open, setOpen] = useState(false);
-  const [fromStepId, setFromStepId] = useState<string>(BOUNDARY);
-  const [toStepId, setToStepId] = useState<string>(BOUNDARY);
-  const [rules, setRules] = useState<MapperRuleRow[]>([{ ...EMPTY_RULE }]);
+  const [fromStepId, setFromStepId] = useState<string>(initialEdge?.fromStep?.id ?? BOUNDARY);
+  const [toStepId, setToStepId] = useState<string>(initialEdge?.toStep?.id ?? BOUNDARY);
+  const [rules, setRules] = useState<MapperRuleRow[]>(() => {
+    if (!initialEdge || initialEdge.spec.rules.length === 0) return [{ ...EMPTY_RULE }];
+    const targetOrder = initialEdge.toStep
+      ? (steps.find((s) => s.id === initialEdge.toStep?.id)?.order ?? Infinity)
+      : Infinity;
+    const nsOptions = buildNamespaceOptions([...steps].sort((a, b) => a.order - b.order), targetOrder);
+    return initialEdge.spec.rules.map((rule) => deserialiseRule(rule, nsOptions));
+  });
   const [error, setError] = useState("");
 
   const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
-  const stages = groupByStage(sortedSteps);
-  const stageSizeByOrder = new Map(stages.map((stage) => [stage[0].order, stage.length]));
   const toStepOrder =
     toStepId === BOUNDARY
       ? Infinity
       : (sortedSteps.find((s) => s.id === toStepId)?.order ?? Infinity);
 
-  const namespaceOptions: NamespaceOption[] = [
-    { value: "input", label: "Pipeline Input" },
-    { value: "previous", label: "Previous Step" },
-    ...sortedSteps
-      .filter((s) => s.order < toStepOrder)
-      .map((s) => {
-        const path = stepNamespacePath(s, stageSizeByOrder.get(s.order) ?? 1);
-        return {
-          value: path,
-          label: `${path} — ${s.modelVersion?.model?.name ?? `Step ${s.order}`}`,
-        };
-      }),
-  ];
+  const namespaceOptions: NamespaceOption[] = buildNamespaceOptions(sortedSteps, toStepOrder);
 
   const fromSuggestionsForNamespace = (ns: string): string[] => {
     if (ns === "input") {
@@ -170,14 +230,31 @@ export function MapperEdgeDialog({ steps, isSubmitting, onUpsert }: MapperEdgeDi
     );
     if (ok) {
       setOpen(false);
-      setRules([{ ...EMPTY_RULE }]);
-      setFromStepId(BOUNDARY);
-      setToStepId(BOUNDARY);
+      if (!isEditMode) {
+        setRules([{ ...EMPTY_RULE }]);
+        setFromStepId(BOUNDARY);
+        setToStepId(BOUNDARY);
+      }
     }
   };
 
+  /** Restores the form to its starting point — the source edge's saved state in edit mode, or blank in create mode. */
   const resetDialog = () => {
     setError("");
+    if (isEditMode && initialEdge) {
+      setFromStepId(initialEdge.fromStep?.id ?? BOUNDARY);
+      setToStepId(initialEdge.toStep?.id ?? BOUNDARY);
+      const targetOrder = initialEdge.toStep
+        ? (steps.find((s) => s.id === initialEdge.toStep?.id)?.order ?? Infinity)
+        : Infinity;
+      const nsOptions = buildNamespaceOptions([...steps].sort((a, b) => a.order - b.order), targetOrder);
+      setRules(
+        initialEdge.spec.rules.length === 0
+          ? [{ ...EMPTY_RULE }]
+          : initialEdge.spec.rules.map((rule) => deserialiseRule(rule, nsOptions)),
+      );
+      return;
+    }
     setRules([{ ...EMPTY_RULE }]);
     setFromStepId(BOUNDARY);
     setToStepId(BOUNDARY);
@@ -191,13 +268,27 @@ export function MapperEdgeDialog({ steps, isSubmitting, onUpsert }: MapperEdgeDi
         if (!next) resetDialog();
       }}
     >
-      <DialogTrigger className="btn-outline text-xs">
-        <Plus className="w-3.5 h-3.5" /> Add Mapper
+      <DialogTrigger
+        className={
+          isEditMode
+            ? "p-1.5 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer shrink-0"
+            : "btn-outline text-xs"
+        }
+      >
+        {isEditMode ? (
+          <Pencil className="w-3.5 h-3.5" />
+        ) : (
+          <>
+            <Plus className="w-3.5 h-3.5" /> Add Mapper
+          </>
+        )}
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-[580px] bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
         <DialogHeader className="space-y-1">
-          <DialogTitle className="text-sm font-bold text-foreground">Add / Replace Mapper</DialogTitle>
+          <DialogTitle className="text-sm font-bold text-foreground">
+            {isEditMode ? "Edit Mapper" : "Add / Replace Mapper"}
+          </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             Choose which steps this edge connects, then build field rules.
             Paths use{" "}

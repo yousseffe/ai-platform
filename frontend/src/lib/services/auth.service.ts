@@ -1,3 +1,33 @@
+import { smartFetch } from "@/lib/utils/smart-fetch";
+
+/** The authenticated user's profile, wallet balances, and workspace memberships, as returned by `GET /auth/me`. */
+export interface MyProfileResponse {
+  user: {
+    id: string;
+    email: string;
+    fullName: string | null;
+    providerMode: boolean;
+    status: string;
+    isAdmin: boolean;
+    apiKey: string | null;
+  };
+  wallets: {
+    consumer: number;
+    provider: number;
+  };
+  workspaces: unknown[];
+}
+
+/**
+ * Fetches the authenticated user's profile details, wallet balances, and
+ * workspace memberships.
+ *
+ * @returns A promise resolving to the current user's profile payload.
+ */
+export async function getMyProfile(): Promise<MyProfileResponse> {
+  return smartFetch<MyProfileResponse>("/auth/me", { cache: "no-store" });
+}
+
 /**
  * Sends a registration request to the backend auth services.
  *

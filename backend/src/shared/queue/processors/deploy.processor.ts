@@ -159,6 +159,24 @@ export class DeployProcessor extends WorkerHost {
         });
       }
 
+      // Ensure the no-egress network exists for models that haven't opted
+      // into outbound internet access. `Internal: true` means Docker never
+      // attaches a default route out of this network — containers on it can
+      // still reach each other (and the otel-collector, which is dual-homed
+      // onto this network in docker-compose.yml) but cannot reach the
+      // internet or the host's other networks.
+      const hasIsolatedNetwork = networks.some(
+        (n) => n.Name === 'ai-platform_models_isolated',
+      );
+      if (!hasIsolatedNetwork) {
+        this.logger.log('Creating network ai-platform_models_isolated...');
+        await this.docker.createNetwork({
+          Name: 'ai-platform_models_isolated',
+          Driver: 'bridge',
+          Internal: true,
+        });
+      }
+
       // Memory-based eviction check
       const TIER_RAM_MAP: Record<string, number> = {
         SMALL: 512, // 512 MB
@@ -275,12 +293,36 @@ export class DeployProcessor extends WorkerHost {
         }
       }
 
+      const allowEgress = deployment.modelVersion.model.allowEgress === true;
+      const networkMode = allowEgress
+        ? 'ai-platform_models'
+        : 'ai-platform_models_isolated';
+
       const hostConfig: Docker.HostConfig = {
         PortBindings: {
           [containerPort]: [{ HostPort: nextPort.toString() }],
         },
-        NetworkMode: 'ai-platform_models',
+        NetworkMode: networkMode,
       };
+
+      // Container sandboxing: model containers execute untrusted,
+      // user-uploaded preprocess/postprocess scripts and model weights, so
+      // they get the same hardening as an untrusted-code sandbox regardless
+      // of framework. Kept behind an env kill-switch in case a specific
+      // framework's runtime needs a capability or writable path this doesn't
+      // anticipate — flip MODEL_SANDBOX_HARDENING_ENABLED=false to fall back
+      // to the previous unrestricted container config without a code change.
+      if (process.env.MODEL_SANDBOX_HARDENING_ENABLED !== 'false') {
+        hostConfig.CapDrop = ['ALL'];
+        hostConfig.SecurityOpt = ['no-new-privileges'];
+        hostConfig.PidsLimit = 256;
+        hostConfig.ReadonlyRootfs = true;
+        hostConfig.Tmpfs = {
+          '/tmp': 'size=128m',
+          '/root/.cache': 'size=256m',
+          '/root/.config': 'size=16m',
+        };
+      }
 
       if (!isLlm) {
         hostConfig.Memory = newModelRamMb * 1024 * 1024;

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 import { deployVersion, stopDeployment } from "@/lib/actions/deployments.actions";
 import { rebuildModelVersion, deleteModel } from "@/lib/actions/models.actions";
 import { Model, ModelVersion, Deployment, DeploymentStatus, VersionStatus } from "@/types";
@@ -27,14 +28,14 @@ export function useModelDetails(modelId: string, initialModel: Model) {
     try {
       const res = await deployVersion(versionId, modelId);
       if (res.success) {
-        alert("Deployment started!");
+        toast.success("Deployment started!");
         router.refresh();
       } else {
-        alert(res.error || "Failed to start deployment");
+        toast.error(res.error || "Failed to start deployment");
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to start deployment");
+      toast.error("Failed to start deployment");
     }
   };
 
@@ -47,14 +48,14 @@ export function useModelDetails(modelId: string, initialModel: Model) {
     try {
       const res = await stopDeployment(deploymentId, modelId);
       if (res.success) {
-        alert("Deployment stopped!");
+        toast.success("Deployment stopped!");
         router.refresh();
       } else {
-        alert(res.error || "Failed to stop deployment");
+        toast.error(res.error || "Failed to stop deployment");
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to stop deployment");
+      toast.error("Failed to stop deployment");
     }
   };
 
@@ -67,38 +68,36 @@ export function useModelDetails(modelId: string, initialModel: Model) {
     try {
       const res = await rebuildModelVersion(modelId, versionId);
       if (res.success) {
-        alert("Rebuild started!");
+        toast.success("Rebuild started!");
         router.refresh();
       } else {
-        alert(res.error || "Failed to start rebuild");
+        toast.error(res.error || "Failed to start rebuild");
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to start rebuild");
+      toast.error("Failed to start rebuild");
     }
   };
 
 
 
   /**
-   * Triggers the deletion of this model repository.
+   * Deletes this model repository. Confirmation is the caller's
+   * responsibility (see the Danger Zone card's ConfirmDialog).
    * Refreshes dashboard navigation on success.
    */
   const handleDeleteModel = async () => {
-    if (!confirm(`Are you sure you want to delete the model "${model.name}"? This action is irreversible.`)) {
-      return;
-    }
     try {
       const res = await deleteModel(modelId);
       if (res.success) {
-        alert("Model deleted successfully.");
+        toast.success("Model deleted successfully.");
         router.push("/models");
       } else {
-        alert(res.error || "Failed to delete model");
+        toast.error(res.error || "Failed to delete model");
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to delete model");
+      toast.error("Failed to delete model");
     }
   };
 

@@ -508,12 +508,11 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
 
   /**
    * Clears the historical request history from localStorage and state.
+   * Confirmation is the caller's responsibility (see PredictionHistoryTable's ConfirmDialog).
    */
   const handleClearHistory = () => {
-    if (confirm("Are you sure you want to clear this model's prediction history?")) {
-      setHistory([]);
-      clearPredictionHistory(model.id);
-    }
+    setHistory([]);
+    clearPredictionHistory(model.id);
   };
 
   /**

@@ -184,6 +184,80 @@ export async function runPrediction(
   });
 }
 
+export interface CacheStats {
+  hits: number;
+  misses: number;
+  hitRatePercent: number;
+}
+
+/**
+ * Updates a model's response cache policy (enabled, TTL, cache-hit discount).
+ *
+ * @param id - The model UUID.
+ * @param settings - Partial cache policy fields to update.
+ * @returns A promise resolving to the updated Model.
+ */
+export async function updateCacheSettings(
+  id: string,
+  settings: {
+    cacheEnabled?: boolean;
+    cacheTtlSeconds?: number;
+    cacheHitDiscountPercent?: number;
+  }
+): Promise<Model> {
+  return smartFetch<Model>(`/models/${id}/cache-settings`, {
+    method: "PATCH",
+    body: JSON.stringify(settings),
+  });
+}
+
+/**
+ * Fetches cache hit/miss counters for a model's response cache.
+ *
+ * @param id - The model UUID.
+ * @returns A promise resolving to the cache stats.
+ */
+export async function getCacheStats(id: string): Promise<CacheStats> {
+  return smartFetch<CacheStats>(`/models/${id}/cache-stats`, {
+    cache: "no-store",
+  });
+}
+
+/**
+ * Updates a model's container network policy (outbound internet access for
+ * future deployments).
+ *
+ * @param id - The model UUID.
+ * @param allowEgress - Whether future deployments may reach the internet.
+ * @returns A promise resolving to the updated Model.
+ */
+export async function updateNetworkSettings(
+  id: string,
+  allowEgress: boolean
+): Promise<Model> {
+  return smartFetch<Model>(`/models/${id}/network-settings`, {
+    method: "PATCH",
+    body: JSON.stringify({ allowEgress }),
+  });
+}
+
+/**
+ * Updates a model's marketplace visibility (public/private).
+ *
+ * @param id - The model UUID.
+ * @param isPublic - Whether the model should be listed in the public marketplace.
+ * @returns A promise resolving to the updated Model.
+ */
+export async function updateVisibilitySettings(
+  id: string,
+  isPublic: boolean
+): Promise<Model> {
+  return smartFetch<Model>(`/models/${id}/visibility-settings`, {
+    method: "PATCH",
+    body: JSON.stringify({ isPublic }),
+  });
+}
+
 /**
  * Deletes a registered machine learning model and cleans up versions.
  *
@@ -242,13 +316,31 @@ export interface DetectedSchema {
 }
 
 /**
+ * Optional postprocessing script to apply to the synthetic expected-result
+ * sample during detection, so `expected_result` reflects what callers
+ * actually receive after post-processing rather than the raw model output.
+ */
+export interface PostprocessSource {
+  file?: File | null;
+  code?: string;
+}
+
+/**
  * Sends a model file to the backend to auto-detect its framework, task type, inputs, outputs,
- * and generate example payloads and expected result templates.
+ * and generate example payloads and expected result templates. When `postprocess` is given, the
+ * backend also runs that script's `postprocess(prediction)` function against the synthetic
+ * expected-result sample, matching the same script serve.py runs at inference time.
  *
  * @param file - The model file binary.
+ * @param modelType - Optional model type hint (e.g. "LLM_GGUF") used to steer detection.
+ * @param postprocess - Optional postprocessing script (uploaded file or inline code).
  * @returns A promise resolving to the detected schema details.
  */
-export async function detectSchema(file: File, modelType?: string): Promise<DetectedSchema> {
+export async function detectSchema(
+  file: File,
+  modelType?: string,
+  postprocess?: PostprocessSource
+): Promise<DetectedSchema> {
   if (file.name.toLowerCase().endsWith('.gguf') || modelType === 'LLM_GGUF') {
     return {
       framework: 'gguf',
@@ -280,6 +372,11 @@ export async function detectSchema(file: File, modelType?: string): Promise<Dete
   }
   // Always pass the original filename so the Python script can use filename heuristics
   formData.append("originalFilename", file.name);
+  if (postprocess?.file) {
+    formData.append("postprocess", postprocess.file);
+  } else if (postprocess?.code?.trim()) {
+    formData.append("postprocessCode", postprocess.code);
+  }
   return smartFetch<DetectedSchema>("/models/detect-schema", {
     method: "POST",
     body: formData,

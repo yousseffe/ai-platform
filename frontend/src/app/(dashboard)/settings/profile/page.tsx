@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import Image from "next/image";
 import BecomeProviderCard from "@/components/dashboard/BecomeProviderCard";
 import { PageHeader } from "@/components/ui/page-header";
+import { useMyProfile, derivePlatformRoleLabel } from "@/hooks/use-my-profile";
 
 /**
  * Settings Page: Profile & Role.
@@ -12,7 +13,9 @@ import { PageHeader } from "@/components/ui/page-header";
  */
 export default function ProfileSettingsPage() {
   const { data: session } = useSession();
+  const { profile } = useMyProfile();
   const userEmail = session?.user?.email || "user@mlhub.ai";
+  const platformRole = derivePlatformRoleLabel(profile);
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(
     userEmail
   )}&background=4630eb&color=fff`;
@@ -51,7 +54,7 @@ export default function ProfileSettingsPage() {
             <input
               type="text"
               className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-xs text-muted-foreground cursor-not-allowed outline-none"
-              value="Platform Developer"
+              value={platformRole}
               readOnly
             />
           </div>

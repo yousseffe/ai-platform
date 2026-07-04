@@ -13,6 +13,7 @@ import { Framework } from '../../../modules/models/enums/framework.enum';
 import { TaskType } from '../../../modules/models/enums/task-type.enum';
 import { SchemaDetectionStatus } from '../../../modules/models/enums/schema-detection-status.enum';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as Docker from 'dockerode';
 import { Logger } from '@nestjs/common';
@@ -391,7 +392,7 @@ export class BuildProcessor extends WorkerHost implements OnModuleInit {
         });
       }
 
-      const buildDir = path.join('/tmp', `build-${versionId}`);
+      const buildDir = path.join(os.tmpdir(), `build-${versionId}`);
       if (!fs.existsSync(buildDir)) {
         fs.mkdirSync(buildDir, { recursive: true });
       }
