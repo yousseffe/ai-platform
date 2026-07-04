@@ -15,10 +15,12 @@ import {
   PredictionActor,
 } from '../interfaces/inference.interface';
 
-/** Pricing and container target resolved ahead of an inference call. */
 export interface PreparedCall extends ContainerCallTarget {
   cost: number;
   providerSharePercent: number;
+  isLlm?: boolean;
+  inputPricePerMToken?: number;
+  outputPricePerMToken?: number;
 }
 
 /**
@@ -47,27 +49,29 @@ export class InferenceCallPreparerService {
     actor: PredictionActor,
   ): Promise<PreparedCall> {
     const isTrial = actor.apiKeyType === ApiKeyType.TRIAL;
-    const { cost, providerSharePercent } =
-      await this.pricingService.computeCost(model, isTrial);
+    const pricing = await this.pricingService.computeCost(model, isTrial);
 
-    if (cost > 0) {
-      let balance = await this.walletsService.getBalance(
+    if (pricing.isLlm && !isTrial && (pricing.inputPricePerMToken || 0) > 0) {
+      const minCost = (1000 / 1_000_000) * (pricing.inputPricePerMToken || 0);
+      if (minCost > 0) {
+        const balance = await this.walletsService.getBalance(
+          actor.workspaceId,
+          actor.workspaceType,
+          WalletType.CONSUMER,
+        );
+        if (balance < minCost) {
+          throw new BadRequestException(
+            'Insufficient credits to perform prediction',
+          );
+        }
+      }
+    } else if (pricing.cost > 0) {
+      const balance = await this.walletsService.getBalance(
         actor.workspaceId,
         actor.workspaceType,
         WalletType.CONSUMER,
       );
-      if (
-        balance < cost &&
-        !actor.orgApiKeyId &&
-        actor.workspaceId !== actor.userId
-      ) {
-        balance = await this.walletsService.getBalance(
-          actor.userId,
-          OwnerType.USER,
-          WalletType.CONSUMER,
-        );
-      }
-      if (balance < cost) {
+      if (balance < pricing.cost) {
         throw new BadRequestException(
           'Insufficient credits to perform prediction',
         );
@@ -75,8 +79,17 @@ export class InferenceCallPreparerService {
     }
 
     const { endpoint, headers } = await this.getContainerCallTarget(model);
-    return { cost, providerSharePercent, endpoint, headers };
+    return {
+      cost: pricing.cost,
+      providerSharePercent: pricing.providerSharePercent,
+      endpoint,
+      headers,
+      isLlm: pricing.isLlm,
+      inputPricePerMToken: pricing.inputPricePerMToken,
+      outputPricePerMToken: pricing.outputPricePerMToken,
+    };
   }
+
 
   /** Marks a deployment as recently active for idle/eviction tracking. */
   async markActive(deploymentId: string): Promise<void> {

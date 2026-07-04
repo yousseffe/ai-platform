@@ -23,7 +23,9 @@ import { Logger } from '@nestjs/common';
   },
   namespace: '/logs',
 })
-export class LogStreamGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class LogStreamGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -47,7 +49,9 @@ export class LogStreamGateway implements OnGatewayConnection, OnGatewayDisconnec
       }
 
       if (!token) {
-        this.logger.warn(`Connection refused, missing token for client ${client.id}`);
+        this.logger.warn(
+          `Connection refused, missing token for client ${client.id}`,
+        );
         client.disconnect();
         return;
       }
@@ -64,9 +68,13 @@ export class LogStreamGateway implements OnGatewayConnection, OnGatewayDisconnec
         email: payload.email,
         isAdmin: payload.isAdmin || false, // Check if isAdmin payload exists
       };
-      this.logger.log(`Authenticated client ${client.id} as User ID: ${client.data.user.id}`);
+      this.logger.log(
+        `Authenticated client ${client.id} as User ID: ${client.data.user.id}`,
+      );
     } catch (err) {
-      this.logger.warn(`Authentication failed for client ${client.id}: ${err.message}`);
+      this.logger.warn(
+        `Authentication failed for client ${client.id}: ${err.message}`,
+      );
       client.disconnect();
     }
   }
@@ -103,7 +111,11 @@ export class LogStreamGateway implements OnGatewayConnection, OnGatewayDisconnec
     try {
       const deployment = await this.deploymentsRepository.findOne({
         where: { id: deploymentId },
-        relations: ['modelVersion', 'modelVersion.model', 'modelVersion.model.user'],
+        relations: [
+          'modelVersion',
+          'modelVersion.model',
+          'modelVersion.model.user',
+        ],
       });
 
       if (!deployment) {
@@ -116,26 +128,34 @@ export class LogStreamGateway implements OnGatewayConnection, OnGatewayDisconnec
       const isAdmin = user.isAdmin;
 
       if (!isOwner && !isAdmin) {
-        client.emit('error', { message: 'Forbidden: You do not own this model' });
+        client.emit('error', {
+          message: 'Forbidden: You do not own this model',
+        });
         return;
       }
 
       if (!deployment.containerId) {
-        client.emit('error', { message: 'Container not yet created for this deployment' });
+        client.emit('error', {
+          message: 'Container not yet created for this deployment',
+        });
         return;
       }
 
       const container = this.docker.getContainer(deployment.containerId);
-      
+
       // Verify container exists
       try {
         await container.inspect();
       } catch (err) {
-        client.emit('error', { message: `Container not found on Docker host: ${err.message}` });
+        client.emit('error', {
+          message: `Container not found on Docker host: ${err.message}`,
+        });
         return;
       }
 
-      this.logger.log(`Streaming logs for container ${deployment.containerId} to client ${client.id}`);
+      this.logger.log(
+        `Streaming logs for container ${deployment.containerId} to client ${client.id}`,
+      );
 
       const logStream = await container.logs({
         follow: true,
@@ -148,14 +168,20 @@ export class LogStreamGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       const stdoutStream = new Writable({
         write(chunk, encoding, callback) {
-          client.emit('log-line', { stream: 'stdout', text: chunk.toString('utf8') });
+          client.emit('log-line', {
+            stream: 'stdout',
+            text: chunk.toString('utf8'),
+          });
           callback();
         },
       });
 
       const stderrStream = new Writable({
         write(chunk, encoding, callback) {
-          client.emit('log-line', { stream: 'stderr', text: chunk.toString('utf8') });
+          client.emit('log-line', {
+            stream: 'stderr',
+            text: chunk.toString('utf8'),
+          });
           callback();
         },
       });
@@ -169,10 +195,11 @@ export class LogStreamGateway implements OnGatewayConnection, OnGatewayDisconnec
       logStream.on('error', (err) => {
         client.emit('error', { message: `Stream error: ${err.message}` });
       });
-
     } catch (err) {
       this.logger.error(`Error initializing log stream: ${err.message}`);
-      client.emit('error', { message: `Internal server error: ${err.message}` });
+      client.emit('error', {
+        message: `Internal server error: ${err.message}`,
+      });
     }
   }
 }

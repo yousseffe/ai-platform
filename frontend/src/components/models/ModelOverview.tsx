@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Code2, BookOpen, Layers, Cpu, Clock, Copy, Check } from "lucide-react";
 import { Model } from "@/types";
 import { UsageMetricsCard } from "./UsageMetricsCard";
+import { SchemaReviewBanner } from "./SchemaReviewBanner";
 
 interface ModelOverviewProps {
   model: Model;
@@ -358,6 +359,8 @@ console.log(result);`;
 
       {/* Right Column: Metrics & Infrastructure */}
       <div className="space-y-6">
+        {activeVersion && <SchemaReviewBanner version={activeVersion} modelId={model.id} />}
+
         <UsageMetricsCard model={model} />
 
         {/* Infrastructure Specs */}

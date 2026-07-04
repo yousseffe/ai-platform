@@ -140,7 +140,8 @@ export class MailService implements OnModuleInit {
       this.logger.error('Transporter is not initialized. Cannot send alert.');
       return false;
     }
-    const from = process.env.SMTP_FROM || '"MLHub Security" <no-reply@mlhub.com>';
+    const from =
+      process.env.SMTP_FROM || '"MLHub Security" <no-reply@mlhub.com>';
     try {
       const rawInfo: unknown = await this.transporter.sendMail({
         from,
@@ -160,7 +161,9 @@ export class MailService implements OnModuleInit {
       return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Failed to send security alert to ${email}: ${message}`);
+      this.logger.error(
+        `Failed to send security alert to ${email}: ${message}`,
+      );
       return false;
     }
   }

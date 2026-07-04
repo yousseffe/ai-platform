@@ -4,6 +4,7 @@ import { systemModule } from './tools/system/ping.js';
 import { integrationModule } from './tools/integration/index.js';
 import { observabilityModule } from './tools/observability/index.js';
 import { securityModule } from './tools/security/index.js';
+import { adminModule } from './tools/admin/index.js';
 
 /**
  * The full set of capability modules the MCP server exposes. New tool/resource
@@ -18,6 +19,7 @@ export function modules(): McpModule[] {
     integrationModule(),
     observabilityModule(),
     securityModule(),
+    adminModule(),
   ];
 }
 

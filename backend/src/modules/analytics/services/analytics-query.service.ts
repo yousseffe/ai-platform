@@ -1,4 +1,8 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import { Model } from '../../models/entities/model.entity';
@@ -54,27 +58,33 @@ export class AnalyticsQueryService {
   ) {}
 
   /**
-   * Computes windowed request statistics for a model the actor owns.
+   * Computes windowed request statistics for a model the actor owns, or for any
+   * model when the actor is an administrator.
    *
    * @param modelId - Target model UUID.
-   * @param actorId - Authenticated user id (ownership is enforced).
+   * @param actorId - Authenticated user id.
    * @param windowMinutes - Look-back window in minutes (clamped 1..1440).
+   * @param isAdmin - When true, bypasses the ownership check.
    * @returns The {@link RequestStats}.
    * @throws {NotFoundException} If the model does not exist.
-   * @throws {ForbiddenException} If the actor does not own the model.
+   * @throws {ForbiddenException} If the actor does not own the model and is not an admin.
    */
   async requestStats(
     modelId: string,
     actorId: string,
     windowMinutes: number,
+    isAdmin = false,
   ): Promise<RequestStats> {
-    const minutes = Math.min(Math.max(Math.trunc(windowMinutes) || 15, 1), 1440);
+    const minutes = Math.min(
+      Math.max(Math.trunc(windowMinutes) || 15, 1),
+      1440,
+    );
     const model = await this.modelsRepository.findOne({
       where: { id: modelId },
       relations: ['user'],
     });
     if (!model) throw new NotFoundException('Model not found');
-    if (model.user?.id !== actorId) {
+    if (model.user?.id !== actorId && !isAdmin) {
       throw new ForbiddenException('You do not own this model');
     }
 
@@ -93,7 +103,8 @@ export class AnalyticsQueryService {
       const codeKey = String(code);
       statusCodes[codeKey] = (statusCodes[codeKey] ?? 0) + 1;
       if (code >= 400) errorCount += 1;
-      if (typeof log.responseTimeMs === 'number') latencies.push(log.responseTimeMs);
+      if (typeof log.responseTimeMs === 'number')
+        latencies.push(log.responseTimeMs);
 
       const minuteKey = new Date(
         Math.floor(log.createdAt.getTime() / 60000) * 60000,
@@ -124,15 +135,18 @@ export class AnalyticsQueryService {
   }
 
   /**
-   * Lists deployments for the models the actor owns.
+   * Lists deployments for the models the actor owns, or every deployment on the
+   * platform when the actor is an administrator.
    *
    * @param actorId - Authenticated user id.
    * @param onlyRunning - When true, restrict to RUNNING deployments.
-   * @returns Scoped deployment summaries.
+   * @param isAdmin - When true, bypasses the ownership filter.
+   * @returns Scoped (or platform-wide) deployment summaries.
    */
   async listDeployments(
     actorId: string,
     onlyRunning: boolean,
+    isAdmin = false,
   ): Promise<DeploymentSummary[]> {
     const deployments = await this.deploymentsRepository.find({
       where: onlyRunning ? { status: DeploymentStatus.RUNNING } : {},
@@ -144,7 +158,7 @@ export class AnalyticsQueryService {
     });
 
     return deployments
-      .filter((d) => d.modelVersion?.model?.user?.id === actorId)
+      .filter((d) => isAdmin || d.modelVersion?.model?.user?.id === actorId)
       .map((d) => ({
         deploymentId: d.id,
         modelId: d.modelVersion.model.id,

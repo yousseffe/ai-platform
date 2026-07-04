@@ -7,8 +7,12 @@ const MCP_PROXY_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
 const SYSTEM_PROMPT =
   "You are an ops assistant for the ModelOps AI platform. " +
-  "Use tools to answer questions about models, alerts, deployments, and fraud risk. " +
-  "Be concise. Highlight warnings or anomalies. Never guess — always call the right tool.";
+  "Use tools to answer questions about models, deployments, fraud risk, logs, alerts, " +
+  "users, organizations, billing/transactions, background jobs, and Docker/storage health. " +
+  "For open-ended questions about errors or suspicious activity with no specific model named, " +
+  "use the platform-wide log/alert/audit tools instead of the per-model ones. " +
+  "Be concise. Highlight warnings or anomalies. Never guess — always call a tool before answering. " +
+  "If no tool matches the question, say so explicitly instead of answering from general knowledge.";
 
 const MAX_TOOL_ITERATIONS = 5;
 

@@ -28,9 +28,10 @@ export class InferencePricingService {
    */
   async computeCost(model: Model, isTrial: boolean): Promise<InferencePricing> {
     const providerSharePercent = model.providerSharePercent || 80;
+    const isLlm = model.type === 'LLM_GGUF';
 
     if (isTrial) {
-      return { cost: 0, providerSharePercent };
+      return { cost: 0, providerSharePercent, isLlm };
     }
 
     if (model.hasCustomPricing) {
@@ -38,7 +39,32 @@ export class InferencePricingService {
         typeof model.costPerRequest === 'string'
           ? parseFloat(model.costPerRequest)
           : model.costPerRequest;
-      return { cost, providerSharePercent };
+      return { cost, providerSharePercent, isLlm };
+    }
+
+    if (isLlm) {
+      const [inputConfig, outputConfig, shareConfig] = await Promise.all([
+        this.dataSource
+          .getRepository(SystemConfig)
+          .findOne({ where: { key: 'price_llm_gguf_input' } }),
+        this.dataSource
+          .getRepository(SystemConfig)
+          .findOne({ where: { key: 'price_llm_gguf_output' } }),
+        this.dataSource
+          .getRepository(SystemConfig)
+          .findOne({ where: { key: 'default_provider_share_percent' } }),
+      ]);
+      const inputPricePerMToken = inputConfig ? parseFloat(inputConfig.value) : 2.0;
+      const outputPricePerMToken = outputConfig ? parseFloat(outputConfig.value) : 8.0;
+      const resolvedSharePercent = shareConfig ? parseInt(shareConfig.value, 10) : providerSharePercent;
+
+      return {
+        cost: 0,
+        providerSharePercent: resolvedSharePercent,
+        isLlm: true,
+        inputPricePerMToken,
+        outputPricePerMToken,
+      };
     }
 
     const configKey = 'price_' + model.type.toLowerCase();
@@ -62,6 +88,6 @@ export class InferencePricingService {
         fallbackSharePercent,
       );
 
-    return { cost, providerSharePercent: resolvedSharePercent };
+    return { cost, providerSharePercent: resolvedSharePercent, isLlm: false };
   }
 }

@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Put,
   Body,
   UseGuards,
   Request,
@@ -16,7 +17,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Response, Request as ExpressRequest } from 'express';
 import { ModelsService } from '../services/models.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -31,6 +32,11 @@ import { Repository, DataSource } from 'typeorm';
 
 import { CreateModelDto } from '../dto/create-model.dto';
 import { UploadVersionDto } from '../dto/upload-version.dto';
+import { InitiateUploadDto } from '../dto/initiate-upload.dto';
+import { CompleteUploadDto } from '../dto/complete-upload.dto';
+import { AbortUploadDto } from '../dto/abort-upload.dto';
+import * as path from 'path';
+import * as fs from 'fs';
 import { CreateReviewDto } from '../dto/create-review.dto';
 import { ModelType } from '../enums/model-type.enum';
 import { TaskType } from '../enums/task-type.enum';
@@ -353,52 +359,84 @@ export class ModelsController {
    * @returns A promise resolving to the created ModelVersion.
    */
   @UseGuards(JwtAuthGuard)
-  @Post(':id/versions')
-  @UseInterceptors(
-    FileFieldsInterceptor(
-      [
-        { name: 'model', maxCount: 1 },
-        { name: 'scaler', maxCount: 1 },
-        { name: 'preprocess', maxCount: 1 },
-        { name: 'postprocess', maxCount: 1 },
-      ],
-      {
-        limits: { fileSize: 15 * 1024 * 1024 * 1024 }, // 15GB
-        storage: diskStorage({
-          destination: './uploads',
-          filename: (req, file, cb) => {
-            const uniqueSuffix =
-              Date.now() + '-' + Math.round(Math.random() * 1e9);
-            cb(
-              null,
-              file.fieldname + '-' + uniqueSuffix + extname(file.originalname),
-            );
-          },
-        }),
-      },
-    ),
-  )
-  async uploadVersion(
+  @Post(':id/versions/upload-initiate')
+  async initiateUpload(
     @Param('id') id: string,
-    @Body() body: UploadVersionDto,
-    @UploadedFiles()
-    files: {
-      model?: Express.Multer.File[];
-      scaler?: Express.Multer.File[];
-      preprocess?: Express.Multer.File[];
-      postprocess?: Express.Multer.File[];
-    },
+    @Body() body: InitiateUploadDto,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.modelsService.initiateVersionUpload(id, body, req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/versions/upload-complete')
+  async completeUpload(
+    @Param('id') id: string,
+    @Body() body: CompleteUploadDto,
     @Request() req: RequestWithUser,
   ): Promise<ModelVersion> {
-    return this.modelsService.uploadVersion(
-      id,
-      files,
-      body.examplePayload,
-      body.expectedResult,
-      body.triggerBuild,
-      req.user.id,
-      body.classLabels,
+    return this.modelsService.completeVersionUpload(id, body, req.user.id);
+  }
+
+  /**
+   * Aborts an in-progress multipart upload session for a model version,
+   * releasing the orphaned storage-side upload state so it does not leak.
+   * Called by the frontend when an upload fails or is cancelled after
+   * initiation but before completion.
+   *
+   * @param id - The parent model UUID.
+   * @param body - The object key and upload session ID to abort.
+   * @param req - Authenticated user request context.
+   * @returns A promise resolving to a success confirmation.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/versions/upload-abort')
+  async abortUpload(
+    @Param('id') id: string,
+    @Body() body: AbortUploadDto,
+    @Request() req: RequestWithUser,
+  ): Promise<{ success: boolean }> {
+    return this.modelsService.abortVersionUpload(id, body, req.user.id);
+  }
+
+  @Put('local-upload/*')
+  async handleLocalUpload(
+    @Req() req: ExpressRequest,
+    @Res() res: Response,
+  ) {
+    // Retrieve the path relative to local-upload
+    const objectKey = req.params[0] || req.path.replace(/^\/api\/v1\/models\/local-upload\//, '');
+    const uploadId = req.query.uploadId as string;
+    const partNumber = req.query.partNumber ? parseInt(req.query.partNumber as string, 10) : undefined;
+
+    const targetPath = path.join(
+      process.cwd(),
+      'uploads',
+      'local-s3',
+      'models', // bucket name
+      objectKey,
     );
+
+    const writePath = partNumber
+      ? `${targetPath}.part-${partNumber}`
+      : targetPath;
+
+    const targetDir = path.dirname(writePath);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const writeStream = fs.createWriteStream(writePath);
+    req.pipe(writeStream);
+
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', () => resolve(true));
+      writeStream.on('error', reject);
+      req.on('error', reject);
+    });
+
+    res.setHeader('ETag', `local-mock-etag-${partNumber || 1}`);
+    res.status(200).json({ success: true });
   }
 
   /**

@@ -20,7 +20,7 @@ import { RedisService } from '../../redis/redis.service';
  * model versions as running server instances inside isolated Docker containers.
  */
 @Processor('deploy-queue', {
-  concurrency: 1,
+  concurrency: parseInt(process.env.DEPLOY_QUEUE_CONCURRENCY || '3', 10),
   lockDuration: 300000, // 5 minutes lock duration to prevent stall if pulling base image (e.g. llama.cpp)
   stalledInterval: 300000,
 })
@@ -88,9 +88,28 @@ export class DeployProcessor extends WorkerHost {
       const activeDeployments = await this.deploymentsRepository.find({
         where: { status: DeploymentStatus.RUNNING },
       });
-      const usedPorts = new Set(
+      const usedPorts = new Set<number>(
         activeDeployments.map((d) => d.port).filter((p) => p != null),
       );
+
+      // Query Docker daemon for any containers already mapping host ports
+      try {
+        const containers = await this.docker.listContainers({ all: true });
+        for (const container of containers) {
+          if (container.Ports) {
+            for (const p of container.Ports) {
+              if (p.PublicPort) {
+                usedPorts.add(p.PublicPort);
+              }
+            }
+          }
+        }
+      } catch (dockerErr) {
+        this.logger.warn(
+          `Could not list docker containers for port check: ${dockerErr}`,
+        );
+      }
+
       let nextPort = 8000;
       while (usedPorts.has(nextPort)) {
         nextPort++;
@@ -120,7 +139,11 @@ export class DeployProcessor extends WorkerHost {
         const apiKeyEntity = await this.dataSource
           .getRepository(ApiKey)
           .findOne({
-            where: { user: { id: ownerId }, type: ApiKeyType.LIVE, isActive: true },
+            where: {
+              user: { id: ownerId },
+              type: ApiKeyType.LIVE,
+              isActive: true,
+            },
           });
         ownerApiKey = apiKeyEntity?.key || '';
       }
@@ -130,7 +153,10 @@ export class DeployProcessor extends WorkerHost {
       const hasNetwork = networks.some((n) => n.Name === 'ai-platform_models');
       if (!hasNetwork) {
         this.logger.log('Creating network ai-platform_models...');
-        await this.docker.createNetwork({ Name: 'ai-platform_models', Driver: 'bridge' });
+        await this.docker.createNetwork({
+          Name: 'ai-platform_models',
+          Driver: 'bridge',
+        });
       }
 
       // Memory-based eviction check
@@ -140,9 +166,25 @@ export class DeployProcessor extends WorkerHost {
         LARGE: 2048, // 2 GB
       };
 
+      // Diffusion pipelines (UNet + VAE + text encoder + safety checker,
+      // loaded at fp32 on CPU) need well over 512MB even for a "tiny"
+      // model — the billing tier alone (which defaults new models to SMALL)
+      // isn't a reliable proxy for actual memory footprint for this model
+      // type. Enforce a floor so these don't get OOM-killed (exit 137)
+      // regardless of tier. Applied consistently everywhere TIER_RAM_MAP
+      // is used below so eviction accounting stays accurate.
+      const DIFFUSION_MIN_RAM_MB = 2048;
+      const getRamMb = (model: { tier?: string; type?: ModelType }): number => {
+        const tier = model.tier?.toUpperCase() || 'SMALL';
+        const tierRam = TIER_RAM_MAP[tier] || 512;
+        return model.type === ModelType.DIFFUSION
+          ? Math.max(tierRam, DIFFUSION_MIN_RAM_MB)
+          : tierRam;
+      };
+
       const newModelTier =
         deployment.modelVersion.model.tier?.toUpperCase() || 'SMALL';
-      const newModelRamMb = TIER_RAM_MAP[newModelTier] || 512;
+      const newModelRamMb = getRamMb(deployment.modelVersion.model);
       const MAX_SYSTEM_RAM_MB = parseInt(
         process.env.MAX_SYSTEM_RAM_MB || '3072',
         10,
@@ -159,8 +201,7 @@ export class DeployProcessor extends WorkerHost {
       });
 
       let currentSystemRamMb = runningDeployments.reduce((sum, dep) => {
-        const tier = dep.modelVersion.model.tier?.toUpperCase() || 'SMALL';
-        return sum + (TIER_RAM_MAP[tier] || 512);
+        return sum + getRamMb(dep.modelVersion.model);
       }, 0);
 
       this.logger.log(
@@ -198,7 +239,7 @@ export class DeployProcessor extends WorkerHost {
           const depToStop = item.dep;
           const depTier =
             depToStop.modelVersion.model.tier?.toUpperCase() || 'SMALL';
-          const depRamMb = TIER_RAM_MAP[depTier] || 512;
+          const depRamMb = getRamMb(depToStop.modelVersion.model);
 
           this.logger.warn(
             `Evicting deployment ${depToStop.id} (Tier: ${depTier}, ${depRamMb}MB) to free up memory. Last active: ${new Date(
@@ -216,11 +257,14 @@ export class DeployProcessor extends WorkerHost {
         try {
           await this.docker.getImage(imageName).inspect();
         } catch (e) {
-          this.logger.log(`Base image ${imageName} not found locally. Pulling from registry...`);
+          this.logger.log(
+            `Base image ${imageName} not found locally. Pulling from registry...`,
+          );
           await new Promise<void>((resolve, reject) => {
             this.docker.pull(imageName, {}, (err, stream) => {
               if (err) return reject(err);
-              if (!stream) return reject(new Error('Docker pull stream is undefined'));
+              if (!stream)
+                return reject(new Error('Docker pull stream is undefined'));
               this.docker.modem.followProgress(stream, (followErr) => {
                 if (followErr) return reject(followErr);
                 resolve();
@@ -240,17 +284,37 @@ export class DeployProcessor extends WorkerHost {
 
       if (!isLlm) {
         hostConfig.Memory = newModelRamMb * 1024 * 1024;
-      } else {
-        // Mount GGUF model file dynamically from the host filesystem
-        const storageDirEnv = process.env.GGUF_STORAGE_PATH;
-        const ggufStorageDir = storageDirEnv
-          ? path.resolve(storageDirEnv)
-          : path.join(process.cwd(), 'uploads', 'gguf-models');
-        const ggufPath = path.join(ggufStorageDir, `${deployment.modelVersion.id}.gguf`);
 
-        hostConfig.Binds = [
-          `${ggufPath}:/models/model.gguf:ro`
-        ];
+        // C1: mount the shared model-weights volume read-only at /weights
+        // when build.processor.ts successfully relocated this version's
+        // weights out of the Docker image (see build.processor.ts's
+        // `weightsRelocated` flag). We detect this on disk rather than via a
+        // DB column, mirroring the existing GGUF convention of using the
+        // filesystem as the source of truth for weight location. If the
+        // version's weights were never relocated (e.g. an older build, or
+        // the relocation step failed and fell back to COPY-based image), no
+        // bind is added and the image's own COPY'd weights are used as
+        // before — this keeps both old and new images deployable.
+        const weightsStorageEnv = process.env.WEIGHTS_STORAGE_PATH;
+        const weightsStorageRoot = weightsStorageEnv
+          ? path.resolve(weightsStorageEnv)
+          : path.join(process.cwd(), 'uploads', 'model-weights');
+        const versionWeightsDir = path.join(
+          weightsStorageRoot,
+          deployment.modelVersion.id,
+        );
+        // Check for actual content, not just directory presence — build.processor.ts
+        // may leave an empty per-version directory behind if relocation failed
+        // partway through, which must not be mistaken for a successful relocation.
+        const hasRelocatedWeights =
+          fs.existsSync(versionWeightsDir) &&
+          fs.readdirSync(versionWeightsDir).length > 0;
+        if (hasRelocatedWeights) {
+          hostConfig.Binds = [`ai-platform_model_weights:/weights:ro`];
+        }
+      } else {
+        // Mount the GGUF named volume directly for native WSL2 I/O speeds
+        hostConfig.Binds = [`ai-platform_llm_models:/models:ro`];
       }
 
       const containerOptions: any = {
@@ -274,7 +338,7 @@ export class DeployProcessor extends WorkerHost {
         containerOptions.Entrypoint = [
           '/app/llama-server',
           '-m',
-          '/models/model.gguf',
+          `/models/${deployment.modelVersion.id}.gguf`,
           '--port',
           '8080',
           '--host',
@@ -376,7 +440,11 @@ export class DeployProcessor extends WorkerHost {
   private async stopDeployment(deploymentId: string): Promise<void> {
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },
-      relations: ['modelVersion', 'modelVersion.model', 'modelVersion.model.user'],
+      relations: [
+        'modelVersion',
+        'modelVersion.model',
+        'modelVersion.model.user',
+      ],
     });
     if (!deployment) return;
 
@@ -417,25 +485,44 @@ export class DeployProcessor extends WorkerHost {
     });
   }
 
-  private async verifyDeploymentHealth(job: Job<any, void, string>): Promise<void> {
+  /**
+   * B4: Computes an increasing health-check re-poll delay so early attempts
+   * (while the container is most likely to become healthy soon) poll
+   * frequently, while later attempts back off to reduce unnecessary load on
+   * the backend/Docker daemon during long framework-import waits (e.g.
+   * PyTorch/TensorFlow/diffusion cold starts).
+   *
+   * @param attempt - The 1-indexed attempt number that is about to be scheduled.
+   * @returns The delay, in milliseconds, before the next health-check attempt.
+   */
+  private getHealthCheckBackoffMs(attempt: number): number {
+    if (attempt <= 5) return 2000;
+    if (attempt <= 15) return 5000;
+    return 10000;
+  }
+
+  private async verifyDeploymentHealth(
+    job: Job<any, void, string>,
+  ): Promise<void> {
     const { deploymentId, attempt = 1 } = job.data;
 
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },
-      relations: [
-        'modelVersion',
-        'modelVersion.model',
-      ],
+      relations: ['modelVersion', 'modelVersion.model'],
     });
 
     if (!deployment) {
-      this.logger.warn(`verifyDeploymentHealth: Deployment ${deploymentId} not found.`);
+      this.logger.warn(
+        `verifyDeploymentHealth: Deployment ${deploymentId} not found.`,
+      );
       return;
     }
 
     // If it's already running or stopped/failed, we don't need to do anything
     if (deployment.status !== DeploymentStatus.STARTING) {
-      this.logger.log(`verifyDeploymentHealth: Deployment ${deploymentId} is in status ${deployment.status}. Skipping.`);
+      this.logger.log(
+        `verifyDeploymentHealth: Deployment ${deploymentId} is in status ${deployment.status}. Skipping.`,
+      );
       return;
     }
 
@@ -443,7 +530,9 @@ export class DeployProcessor extends WorkerHost {
     const url = deployment.url;
 
     if (!url) {
-      this.logger.error(`verifyDeploymentHealth: Deployment ${deploymentId} has no URL.`);
+      this.logger.error(
+        `verifyDeploymentHealth: Deployment ${deploymentId} has no URL.`,
+      );
       await this.deploymentsRepository.update(deploymentId, {
         status: DeploymentStatus.FAILED,
         errorMessage: 'Deployment URL not set.',
@@ -451,21 +540,29 @@ export class DeployProcessor extends WorkerHost {
       return;
     }
 
-    this.logger.log(`Checking health of deployment ${deploymentId} at ${url} (Attempt ${attempt})...`);
+    this.logger.log(
+      `Checking health of deployment ${deploymentId} at ${url} (Attempt ${attempt})...`,
+    );
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout for health probe
+      const probeTimeoutMs = parseInt(
+        process.env.HEALTH_PROBE_TIMEOUT_MS || '5000',
+        10,
+      );
+      const timeoutId = setTimeout(() => controller.abort(), probeTimeoutMs);
 
       const response = await fetch(`${url}/health`, {
         signal: controller.signal,
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
       });
       clearTimeout(timeoutId);
 
-      this.logger.log(`Health check response status for ${deploymentId}: ${response.status}`);
+      this.logger.log(
+        `Health check response status for ${deploymentId}: ${response.status}`,
+      );
 
       let isHealthy = false;
       if (isLlm) {
@@ -482,7 +579,9 @@ export class DeployProcessor extends WorkerHost {
       }
 
       if (isHealthy) {
-        this.logger.log(`Deployment ${deploymentId} is healthy! Flipping status to RUNNING.`);
+        this.logger.log(
+          `Deployment ${deploymentId} is healthy! Flipping status to RUNNING.`,
+        );
         await this.deploymentsRepository.update(deploymentId, {
           status: DeploymentStatus.RUNNING,
         });
@@ -496,13 +595,17 @@ export class DeployProcessor extends WorkerHost {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.log(`Health check failed for deployment ${deploymentId}: ${message}`);
+      this.logger.log(
+        `Health check failed for deployment ${deploymentId}: ${message}`,
+      );
     }
 
     // If health check failed/loading, decide to retry or fail
     const maxAttempts = isLlm ? 60 : 15; // 60 attempts for LLM (5 mins), 15 for others (75s)
     if (attempt >= maxAttempts) {
-      this.logger.error(`Deployment ${deploymentId} failed to become healthy after ${attempt} attempts. Marking as FAILED.`);
+      this.logger.error(
+        `Deployment ${deploymentId} failed to become healthy after ${attempt} attempts. Marking as FAILED.`,
+      );
 
       await this.stopDeployment(deploymentId);
 
@@ -513,17 +616,25 @@ export class DeployProcessor extends WorkerHost {
           : 'Model container failed to start responding within 75 seconds.',
       });
     } else {
-      // Re-queue health check with 5s delay
+      // Re-queue health check with an increasing backoff delay (B4):
+      // denser early on, sparser for long-running framework-import waits.
+      const nextAttempt = attempt + 1;
       await this.deployQueue.add(
         'verify-deployment-health',
-        { deploymentId, attempt: attempt + 1 },
-        { delay: 3000 },
+        { deploymentId, attempt: nextAttempt },
+        { delay: this.getHealthCheckBackoffMs(nextAttempt) },
       );
     }
   }
 
   private getTargetsFilePath(): string {
-    return path.join(process.cwd(), '..', 'docker', 'observability', 'targets.json');
+    return path.join(
+      process.cwd(),
+      '..',
+      'docker',
+      'observability',
+      'targets.json',
+    );
   }
 
   private async addPrometheusTarget(
@@ -543,7 +654,9 @@ export class DeployProcessor extends WorkerHost {
       const targets = JSON.parse(content || '[]');
 
       // Remove existing target for this container name if any
-      const filtered = targets.filter((t: any) => t.labels?.container_name !== containerName);
+      const filtered = targets.filter(
+        (t: any) => t.labels?.container_name !== containerName,
+      );
 
       // Add new target
       filtered.push({
@@ -558,9 +671,13 @@ export class DeployProcessor extends WorkerHost {
       });
 
       fs.writeFileSync(filePath, JSON.stringify(filtered, null, 2), 'utf8');
-      this.logger.log(`Added Prometheus scrape target for container: ${containerName}`);
+      this.logger.log(
+        `Added Prometheus scrape target for container: ${containerName}`,
+      );
     } catch (err: any) {
-      this.logger.error(`Failed to update Prometheus targets.json (add): ${err.message}`);
+      this.logger.error(
+        `Failed to update Prometheus targets.json (add): ${err.message}`,
+      );
     }
   }
 
@@ -571,21 +688,30 @@ export class DeployProcessor extends WorkerHost {
       const content = fs.readFileSync(filePath, 'utf8');
       const targets = JSON.parse(content || '[]');
 
-      const filtered = targets.filter((t: any) => t.labels?.container_name !== containerName);
+      const filtered = targets.filter(
+        (t: any) => t.labels?.container_name !== containerName,
+      );
 
       fs.writeFileSync(filePath, JSON.stringify(filtered, null, 2), 'utf8');
-      this.logger.log(`Removed Prometheus scrape target for container: ${containerName}`);
+      this.logger.log(
+        `Removed Prometheus scrape target for container: ${containerName}`,
+      );
     } catch (err: any) {
-      this.logger.error(`Failed to update Prometheus targets.json (remove): ${err.message}`);
+      this.logger.error(
+        `Failed to update Prometheus targets.json (remove): ${err.message}`,
+      );
     }
   }
 
   private getContainerName(deployment: any): string {
-    const userEmail = deployment.modelVersion?.model?.user?.email || 'unknown@unknown.com';
+    const userEmail =
+      deployment.modelVersion?.model?.user?.email || 'unknown@unknown.com';
     const emailPrefix = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-    const modelName = (deployment.modelVersion?.model?.name || '').replace(/[^a-zA-Z0-9]/g, '');
+    const modelName = (deployment.modelVersion?.model?.name || '').replace(
+      /[^a-zA-Z0-9]/g,
+      '',
+    );
     const shortDeployId = deployment.id.split('-')[0];
     return `${emailPrefix}_${modelName}_v${deployment.modelVersion?.versionNumber}_${shortDeployId}`.toLowerCase();
   }
 }
-

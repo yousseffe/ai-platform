@@ -8,6 +8,7 @@ import {
   Logger,
   Body,
   Param,
+  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -17,8 +18,21 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { ModelsService } from '../services/models.service';
+import { ConfirmSchemaDto } from '../dto/confirm-schema.dto';
+import { ModelVersion } from '../entities/model-version.entity';
 
 const execPromise = promisify(exec);
+
+/**
+ * Interface representing a NestJS request authenticated with a JWT payload.
+ */
+interface RequestWithUser {
+  user: {
+    id: string;
+    email: string;
+    isAdmin?: boolean;
+  };
+}
 
 /**
  * Controller exposing endpoints for model schema detection and verification.
@@ -144,5 +158,29 @@ export class SchemaController {
       body.classLabels,
     );
     return version as unknown as Record<string, unknown>;
+  }
+
+  /**
+   * Lets the provider review an auto-detected (or pending) schema and mark it
+   * confirmed, optionally overwriting the example payload/expected result.
+   *
+   * @param versionId - The UUID of the model version to confirm.
+   * @param body - Optional replacement schema values.
+   * @param req - The authenticated request, used to derive the acting user.
+   * @returns A promise resolving to the updated ModelVersion.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('versions/:versionId/confirm-schema')
+  async confirmSchema(
+    @Param('versionId') versionId: string,
+    @Body() body: ConfirmSchemaDto,
+    @Request() req: RequestWithUser,
+  ): Promise<ModelVersion> {
+    return this.modelsService.confirmSchemaDetection(
+      versionId,
+      req.user.id,
+      body.examplePayload,
+      body.expectedResult,
+    );
   }
 }

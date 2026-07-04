@@ -1,4 +1,9 @@
-import { Injectable, Logger, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import { ModelLog } from '../../models/entities/model-log.entity';
@@ -93,7 +98,9 @@ export class FraudService {
       model ? Number(model.reviewCount ?? 0) : undefined,
     );
 
-    let baseline = await this.baselineRepository.findOne({ where: { modelId } });
+    const baseline = await this.baselineRepository.findOne({
+      where: { modelId },
+    });
     const prior = {
       ewmaRequestRatePerMin: baseline
         ? Number(baseline.ewmaRequestRatePerMin)

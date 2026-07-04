@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  ParseUUIDPipe,
   Query,
   UseGuards,
   Req,
@@ -30,7 +31,8 @@ import { getDockerOptions } from '../../shared/docker/docker.util';
 @Controller('analytics')
 export class AnalyticsController {
   private readonly logger = new Logger(AnalyticsController.name);
-  private readonly prometheusUrl = process.env.PROMETHEUS_URL || 'http://localhost:9090';
+  private readonly prometheusUrl =
+    process.env.PROMETHEUS_URL || 'http://localhost:9090';
   private readonly lokiUrl = process.env.LOKI_URL || 'http://localhost:3100';
   private readonly docker: Docker;
 
@@ -50,7 +52,7 @@ export class AnalyticsController {
   @Get('models/:id/metrics')
   @UseGuards(ApiKeyOrJwtGuard)
   async getModelMetrics(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Req() req: any,
   ) {
     const userId = req.user.id;
@@ -69,7 +71,10 @@ export class AnalyticsController {
     }
 
     const deployment = await this.deploymentsRepository.findOne({
-      where: { modelVersion: { model: { id } }, status: DeploymentStatus.RUNNING },
+      where: {
+        modelVersion: { model: { id } },
+        status: DeploymentStatus.RUNNING,
+      },
     });
 
     if (!deployment || !deployment.containerId) {
@@ -117,11 +122,15 @@ export class AnalyticsController {
         const numCpus = stats.cpu_stats.online_cpus || 1;
 
         if (systemDelta > 0 && cpuDelta > 0) {
-          cpuPercent = parseFloat(((cpuDelta / systemDelta) * numCpus * 100).toFixed(1));
+          cpuPercent = parseFloat(
+            ((cpuDelta / systemDelta) * numCpus * 100).toFixed(1),
+          );
         }
         const usageBytes = stats.memory_stats.usage || 0;
         ramMb = parseFloat((usageBytes / (1024 * 1024)).toFixed(2));
-        this.logger.log(`Dockerode stats fallback used for container ${shortContainerId}: CPU=${cpuPercent}%, RAM=${ramMb}MB`);
+        this.logger.log(
+          `Dockerode stats fallback used for container ${shortContainerId}: CPU=${cpuPercent}%, RAM=${ramMb}MB`,
+        );
       } catch (err) {
         this.logger.warn(`Dockerode stats fallback failed: ${err.message}`);
       }
@@ -167,13 +176,19 @@ export class AnalyticsController {
 
         if (recentLogs.length > 0) {
           requestRate = parseFloat((recentLogs.length / (5 * 60)).toFixed(3)); // req/sec
-          const failedLogsCount = recentLogs.filter(l => l.statusCode >= 400).length;
+          const failedLogsCount = recentLogs.filter(
+            (l) => l.statusCode >= 400,
+          ).length;
           errorRate = parseFloat((failedLogsCount / (5 * 60)).toFixed(3));
 
-          const latencies = recentLogs.map(l => l.responseTimeMs || 0).sort((a, b) => a - b);
+          const latencies = recentLogs
+            .map((l) => l.responseTimeMs || 0)
+            .sort((a, b) => a - b);
           latencyP50 = latencies[Math.floor(latencies.length * 0.5)];
           latencyP95 = latencies[Math.floor(latencies.length * 0.95)];
-          this.logger.log(`PostgreSQL logs fallback used for model ${id}: Requests=${recentLogs.length}, P50=${latencyP50}ms`);
+          this.logger.log(
+            `PostgreSQL logs fallback used for model ${id}: Requests=${recentLogs.length}, P50=${latencyP50}ms`,
+          );
         }
       } catch (err) {
         this.logger.warn(`PostgreSQL logs fallback failed: ${err.message}`);
@@ -192,7 +207,7 @@ export class AnalyticsController {
   @Get('models/:id/logs')
   @UseGuards(ApiKeyOrJwtGuard)
   async getModelLogs(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Query('limit') limit = '100',
     @Req() req: any,
   ) {
@@ -224,7 +239,7 @@ export class AnalyticsController {
       const query = `{container_id=~".*${shortId}.*"}`;
       const url = `${this.lokiUrl}/loki/api/v1/query_range?query=${encodeURIComponent(query)}&limit=${limit}`;
       const response = await firstValueFrom(this.httpService.get(url));
-      
+
       const logs: any[] = [];
       const streams = response.data?.data?.result || [];
       for (const stream of streams) {
@@ -237,7 +252,10 @@ export class AnalyticsController {
       }
 
       // Sort logs by timestamp ascending
-      logs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      logs.sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      );
       return { logs };
     } catch (err) {
       this.logger.error(`Error querying Loki logs: ${err.message}`);
@@ -248,7 +266,7 @@ export class AnalyticsController {
   @Get('models/:id/request-history')
   @UseGuards(ApiKeyOrJwtGuard)
   async getModelRequestHistory(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Query('limit') limit = '50',
     @Req() req: any,
   ) {
@@ -273,7 +291,7 @@ export class AnalyticsController {
       take: Math.min(parseInt(limit, 10) || 50, 100),
     });
 
-    return logs.map(l => ({
+    return logs.map((l) => ({
       id: l.id,
       status: l.status,
       statusCode: l.statusCode,
@@ -283,7 +301,11 @@ export class AnalyticsController {
       responseSizeBytes: l.responseSizeBytes,
       ipAddress: l.ipAddress,
       createdAt: l.createdAt,
-      caller: l.user ? l.user.email : (l.apiKeyPrefix ? `Key: ${l.apiKeyPrefix}...` : 'Anonymous'),
+      caller: l.user
+        ? l.user.email
+        : l.apiKeyPrefix
+          ? `Key: ${l.apiKeyPrefix}...`
+          : 'Anonymous',
     }));
   }
 
@@ -309,8 +331,13 @@ export class AnalyticsController {
 
       const cpuUsage = parseFloat(cpuRes?.data?.result?.[0]?.value?.[1] || '0');
       const ramUsage = parseFloat(ramRes?.data?.result?.[0]?.value?.[1] || '0');
-      const diskUsage = parseFloat(diskRes?.data?.result?.[0]?.value?.[1] || '0');
-      const activeContainers = parseInt(containerRes?.data?.result?.[0]?.value?.[1] || '0', 10);
+      const diskUsage = parseFloat(
+        diskRes?.data?.result?.[0]?.value?.[1] || '0',
+      );
+      const activeContainers = parseInt(
+        containerRes?.data?.result?.[0]?.value?.[1] || '0',
+        10,
+      );
 
       // Query database for deployment stats
       const totalDeployments = await this.deploymentsRepository.count();
@@ -351,7 +378,9 @@ export class AnalyticsController {
       const logqls: string[] = [];
       if (service) {
         if (service === 'fastapi') {
-          logqls.push(`{container_name=~".+", container_name!~".*(postgres|redis|minio|gateway|loki|promtail|grafana|prometheus|alertmanager|cadvisor|node-exporter|otel-collector).*"}`);
+          logqls.push(
+            `{container_name=~".+", container_name!~".*(postgres|redis|minio|gateway|loki|promtail|grafana|prometheus|alertmanager|cadvisor|node-exporter|otel-collector).*"}`,
+          );
         } else {
           let searchPattern = service;
           if (service === 'nestjs') {
@@ -363,7 +392,9 @@ export class AnalyticsController {
           logqls.push(`{service_name=~".*${searchPattern}.*"}`);
         }
       } else {
-        logqls.push(`{container_name=~".+", container_name!~".*(loki|promtail|grafana|prometheus|alertmanager|cadvisor|node-exporter|otel-collector).*"}`);
+        logqls.push(
+          `{container_name=~".+", container_name!~".*(loki|promtail|grafana|prometheus|alertmanager|cadvisor|node-exporter|otel-collector).*"}`,
+        );
         logqls.push(`{service_name=~".+"}`);
       }
 
@@ -392,11 +423,16 @@ export class AnalyticsController {
             }
           }
         } catch (queryErr) {
-          this.logger.warn(`Failed to query Loki with LogQL "${logql}": ${queryErr.message}`);
+          this.logger.warn(
+            `Failed to query Loki with LogQL "${logql}": ${queryErr.message}`,
+          );
         }
       }
 
-      logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      logs.sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      );
       const finalLogs = logs.slice(0, parseInt(limit, 10));
       return { logs: finalLogs };
     } catch (err) {
@@ -467,31 +503,52 @@ export class AnalyticsController {
 
                 // Extract trace/span IDs — OTel Winston uses W3C snake_case
                 const logTraceId =
-                  parsed.trace_id || parsed.traceid || parsed['trace-id'] ||
-                  parsed.attributes?.trace_id || parsed.attributes?.traceid;
+                  parsed.trace_id ||
+                  parsed.traceid ||
+                  parsed['trace-id'] ||
+                  parsed.attributes?.trace_id ||
+                  parsed.attributes?.traceid;
 
                 // Only include logs that actually belong to this trace
                 if (logTraceId && logTraceId !== traceId) continue;
 
                 const spanId =
-                  parsed.span_id || parsed.spanid || parsed['span-id'] ||
-                  parsed.attributes?.span_id || parsed.attributes?.spanId;
+                  parsed.span_id ||
+                  parsed.spanid ||
+                  parsed['span-id'] ||
+                  parsed.attributes?.span_id ||
+                  parsed.attributes?.spanId;
 
-                const durationMs =
-                  Number(parsed.duration || parsed.durationMs ||
-                    parsed.attributes?.duration_ms || parsed['duration_ms'] || 0);
+                const durationMs = Number(
+                  parsed.duration ||
+                    parsed.durationMs ||
+                    parsed.attributes?.duration_ms ||
+                    parsed['duration_ms'] ||
+                    0,
+                );
 
                 const rawMessage =
-                  parsed.body || parsed.message || parsed.msg || parsed.Message || line;
+                  parsed.body ||
+                  parsed.message ||
+                  parsed.msg ||
+                  parsed.Message ||
+                  line;
                 const context =
-                  parsed.logger || parsed.context || parsed.attributes?.context ||
-                  parsed.attributes?.logger || parsed.name;
+                  parsed.logger ||
+                  parsed.context ||
+                  parsed.attributes?.context ||
+                  parsed.attributes?.logger ||
+                  parsed.name;
 
-                const severity =
-                  (parsed.severity || parsed.level || parsed.Level || 'info')
-                    .toString()
-                    .toLowerCase()
-                    .replace('warning', 'warn');
+                const severity = (
+                  parsed.severity ||
+                  parsed.level ||
+                  parsed.Level ||
+                  'info'
+                )
+                  .toString()
+                  .toLowerCase()
+                  .replace('warning', 'warn');
 
                 span = {
                   traceId,
@@ -514,14 +571,18 @@ export class AnalyticsController {
                   timestampNs,
                   durationMs: 0,
                   offsetMs: 0,
-                  status: line.toLowerCase().includes('error') ? 'error' : 'success',
+                  status: line.toLowerCase().includes('error')
+                    ? 'error'
+                    : 'success',
                   attributes: {},
                 };
               }
 
               // Deduplicate: skip if we already have a span with the same timestamp + service
               const isDupe = spans.some(
-                (s) => s.timestampNs === span.timestampNs && s.service === span.service,
+                (s) =>
+                  s.timestampNs === span.timestampNs &&
+                  s.service === span.service,
               );
               if (!isDupe) spans.push(span);
             }
@@ -549,7 +610,10 @@ export class AnalyticsController {
           span.offsetMs = Math.round((span.timestampNs - firstTs) / 1_000_000);
           if (span.durationMs === 0) {
             // Give zero-duration spans a minimum visible slice
-            span.durationMs = Math.max(1, Math.round(totalNs / spans.length / 1_000_000));
+            span.durationMs = Math.max(
+              1,
+              Math.round(totalNs / spans.length / 1_000_000),
+            );
           }
         }
       }
@@ -575,8 +639,10 @@ export class AnalyticsController {
   @Post('alerts/webhook')
   @HttpCode(HttpStatus.OK)
   async handleAlertmanagerWebhook(@Body() payload: any) {
-    this.logger.log(`Received alerts webhook from Alertmanager: ${JSON.stringify(payload)}`);
-    
+    this.logger.log(
+      `Received alerts webhook from Alertmanager: ${JSON.stringify(payload)}`,
+    );
+
     const alertsList = payload.alerts || [];
     for (const alertData of alertsList) {
       try {
@@ -585,8 +651,13 @@ export class AnalyticsController {
         const alertName = labels.alertname || 'UnknownAlert';
         const severity = labels.severity || 'warning';
         const status = alertData.status || 'firing';
-        const summary = annotations.summary || annotations.description || 'No description provided';
-        const startsAt = alertData.startsAt ? new Date(alertData.startsAt) : new Date();
+        const summary =
+          annotations.summary ||
+          annotations.description ||
+          'No description provided';
+        const startsAt = alertData.startsAt
+          ? new Date(alertData.startsAt)
+          : new Date();
         const endsAt = alertData.endsAt ? new Date(alertData.endsAt) : null;
 
         // Check if alert already exists (update status)
@@ -610,7 +681,9 @@ export class AnalyticsController {
         alert.endsAt = endsAt;
 
         await this.alertsRepository.save(alert);
-        this.logger.log(`Successfully saved/updated alert: ${alertName} (${status})`);
+        this.logger.log(
+          `Successfully saved/updated alert: ${alertName} (${status})`,
+        );
       } catch (err) {
         this.logger.error(`Failed to save alert item: ${err.message}`);
       }

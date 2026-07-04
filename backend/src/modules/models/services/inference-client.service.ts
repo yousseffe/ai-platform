@@ -133,6 +133,7 @@ export class InferenceClient {
     let errorMessage: string | null = null;
     let output: unknown = null;
     let responseSizeBytes: number | null = null;
+    let cost = prepared.cost;
 
     try {
       const response = await firstValueFrom(
@@ -145,6 +146,28 @@ export class InferenceClient {
         responseSizeBytes = Buffer.byteLength(JSON.stringify(response.data));
       } catch {
         /* leave response size null */
+      }
+
+      // Compute actual token cost for LLM GGUF models from response usage block
+      if (
+        prepared.isLlm &&
+        response.data &&
+        typeof response.data === 'object'
+      ) {
+        const usage = (response.data as Record<string, unknown>).usage as
+          | Record<string, number>
+          | undefined;
+        if (usage) {
+          const promptTokens = usage.prompt_tokens ?? 0;
+          const completionTokens = usage.completion_tokens ?? 0;
+          const inputPrice = prepared.inputPricePerMToken ?? 0;
+          const outputPrice = prepared.outputPricePerMToken ?? 0;
+          if (inputPrice > 0 || outputPrice > 0) {
+            cost =
+              (promptTokens / 1_000_000) * inputPrice +
+              (completionTokens / 1_000_000) * outputPrice;
+          }
+        }
       }
     } catch (err: unknown) {
       status = 'FAILED';
@@ -160,7 +183,7 @@ export class InferenceClient {
       actor,
       clientMeta,
       data,
-      cost: prepared.cost,
+      cost: status === 'SUCCESS' ? cost : 0,
       providerSharePercent: prepared.providerSharePercent,
       statusCode,
       status,
@@ -172,7 +195,7 @@ export class InferenceClient {
     return {
       output,
       statusCode,
-      cost: status === 'SUCCESS' ? prepared.cost : 0,
+      cost: status === 'SUCCESS' ? cost : 0,
       responseTimeMs,
       status,
       errorMessage,

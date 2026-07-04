@@ -1,4 +1,5 @@
 import { smartFetch } from "@/lib/utils/smart-fetch";
+import { LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES } from "@/lib/utils/upload-thresholds";
 import { Model, ModelVersion, ModelLog, ModelVersionReviewEvent, ModelVersionTestCase } from "@/types";
 
 /**
@@ -248,6 +249,30 @@ export interface DetectedSchema {
  * @returns A promise resolving to the detected schema details.
  */
 export async function detectSchema(file: File, modelType?: string): Promise<DetectedSchema> {
+  if (file.name.toLowerCase().endsWith('.gguf') || modelType === 'LLM_GGUF') {
+    return {
+      framework: 'gguf',
+      task: 'llm_gguf',
+      confidence: 1.0,
+      inputs: [],
+      outputs: [],
+      warnings: [],
+      example_payload: JSON.stringify({
+        messages: [{ role: "user", content: "Hello, how are you?" }],
+        temperature: 0.7,
+        max_tokens: 128,
+        stream: false
+      }, null, 2),
+      expected_result: JSON.stringify({
+        choices: [{ message: { role: "assistant", content: "Hello! I'm an AI assistant. How can I help you today?" } }]
+      }, null, 2)
+    };
+  }
+
+  if (file.size > LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES) {
+    throw new Error("This file is too large for instant schema detection. It will be automatically detected in the background during compilation.");
+  }
+
   const formData = new FormData();
   formData.append("model", file);
   if (modelType) {
@@ -285,6 +310,29 @@ export async function buildModelVersion(
 }
 
 /**
+ * Confirms (and optionally corrects) a model version's auto-detected or
+ * pending example payload/expected result schema.
+ *
+ * @param versionId - The UUID of the model version to confirm.
+ * @param examplePayload - Optional replacement sample request JSON.
+ * @param expectedResult - Optional replacement sample response JSON.
+ * @returns A promise resolving to the updated ModelVersion.
+ */
+export async function confirmSchemaDetection(
+  versionId: string,
+  examplePayload?: string,
+  expectedResult?: string,
+): Promise<ModelVersion> {
+  const body: Record<string, string> = {};
+  if (examplePayload !== undefined) body.examplePayload = examplePayload;
+  if (expectedResult !== undefined) body.expectedResult = expectedResult;
+  return smartFetch<ModelVersion>(`/models/versions/${versionId}/confirm-schema`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/**
  * Deprecates a model version, terminating any container running for it.
  */
 export async function deprecateModelVersion(versionId: string): Promise<ModelVersion> {
@@ -299,5 +347,55 @@ export async function deprecateModelVersion(versionId: string): Promise<ModelVer
 export async function undeprecateModelVersion(versionId: string): Promise<ModelVersion> {
   return smartFetch<ModelVersion>(`/models/versions/${versionId}/undeprecate`, {
     method: "POST",
+  });
+}
+
+export async function initiateVersionUpload(modelId: string, data: {
+  modelFilename: string;
+  modelSize: number;
+  scalerFilename?: string;
+  preprocessFilename?: string;
+  postprocessFilename?: string;
+}): Promise<any> {
+  return smartFetch<any>(`/models/${modelId}/versions/upload-initiate`, {
+    method: "POST",
+    body: JSON.stringify(data),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+export async function completeVersionUpload(modelId: string, data: any): Promise<ModelVersion> {
+  return smartFetch<ModelVersion>(`/models/${modelId}/versions/upload-complete`, {
+    method: "POST",
+    body: JSON.stringify(data),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+/**
+ * Aborts an in-progress multipart upload session for a model version,
+ * releasing the orphaned storage-side upload state. Should be called when an
+ * upload fails or is cancelled after initiation but before completion.
+ *
+ * @param modelId - The parent model UUID.
+ * @param objectKey - The storage object key returned by {@link initiateVersionUpload}.
+ * @param uploadId - The multipart upload session ID returned by {@link initiateVersionUpload}.
+ * @returns A promise resolving to a success confirmation.
+ */
+export async function abortVersionUpload(
+  modelId: string,
+  objectKey: string,
+  uploadId: string
+): Promise<{ success: boolean }> {
+  return smartFetch<{ success: boolean }>(`/models/${modelId}/versions/upload-abort`, {
+    method: "DELETE",
+    body: JSON.stringify({ objectKey, uploadId }),
+    headers: {
+      "Content-Type": "application/json",
+    },
   });
 }
