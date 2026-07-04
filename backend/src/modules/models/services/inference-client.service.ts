@@ -72,23 +72,19 @@ export class InferenceClient {
 
   /**
    * Charges (if successful) and logs the outcome of a prediction call.
-   * Billing/logging errors are caught internally and never thrown — the
-   * caller already has their response.
+   * Billing errors are allowed to fail the request; log-writing errors remain
+   * non-fatal inside {@link InferenceLogService}.
    */
   async recordOutcome(params: RecordOutcomeParams): Promise<void> {
     const fingerprint = this.logService.computeRequestFingerprint(params.data);
 
     if (params.cost > 0 && params.status === 'SUCCESS') {
-      try {
-        await this.billingService.chargeForInference(
-          params.model,
-          params.cost,
-          params.providerSharePercent,
-          params.actor,
-        );
-      } catch (error) {
-        console.error('[Billing Error]', error);
-      }
+      await this.billingService.chargeForInference(
+        params.model,
+        params.cost,
+        params.providerSharePercent,
+        params.actor,
+      );
     }
 
     await this.logService.writeModelLog({

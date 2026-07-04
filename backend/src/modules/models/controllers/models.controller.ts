@@ -60,7 +60,10 @@ import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import * as crypto from 'crypto';
 import { InferenceClient } from '../services/inference-client.service';
-import { ClientRequestMeta, PredictionActor } from '../interfaces/inference.interface';
+import {
+  ClientRequestMeta,
+  PredictionActor,
+} from '../interfaces/inference.interface';
 import { extractClientMeta } from '../../../shared/utils/client-meta.util';
 
 /**
@@ -88,8 +91,8 @@ interface PredictionRequestContext {
     orgId?: string;
     projectId?: string;
   };
-  workspaceId: string;
-  workspaceType: OwnerType;
+  workspaceId?: string;
+  workspaceType?: OwnerType;
 }
 
 /**
@@ -397,14 +400,15 @@ export class ModelsController {
   }
 
   @Put('local-upload/*')
-  async handleLocalUpload(
-    @Req() req: ExpressRequest,
-    @Res() res: Response,
-  ) {
+  async handleLocalUpload(@Req() req: ExpressRequest, @Res() res: Response) {
     // Retrieve the path relative to local-upload
-    const objectKey = req.params[0] || req.path.replace(/^\/api\/v1\/models\/local-upload\//, '');
+    const objectKey =
+      req.params[0] ||
+      req.path.replace(/^\/api\/v1\/models\/local-upload\//, '');
     const uploadId = req.query.uploadId as string;
-    const partNumber = req.query.partNumber ? parseInt(req.query.partNumber as string, 10) : undefined;
+    const partNumber = req.query.partNumber
+      ? parseInt(req.query.partNumber as string, 10)
+      : undefined;
 
     const targetPath = path.join(
       process.cwd(),
@@ -547,7 +551,8 @@ export class ModelsController {
       id,
       req.user.orgApiKeyId ? undefined : req.user.id,
     );
-    const { url, deploymentId } = await this.inferenceClient.resolveDeploymentUrl(model);
+    const { url, deploymentId } =
+      await this.inferenceClient.resolveDeploymentUrl(model);
     await this.respondWithPrediction(model, url, deploymentId, data, req, res);
   }
 
@@ -575,10 +580,8 @@ export class ModelsController {
       id,
       req.user.orgApiKeyId ? undefined : req.user.id,
     );
-    const { url, deploymentId } = await this.inferenceClient.resolveDeploymentUrl(
-      model,
-      versionNumber,
-    );
+    const { url, deploymentId } =
+      await this.inferenceClient.resolveDeploymentUrl(model, versionNumber);
     await this.respondWithPrediction(model, url, deploymentId, data, req, res);
   }
 
@@ -688,8 +691,8 @@ export class ModelsController {
       orgApiKeyPrefix: req.user.orgApiKeyPrefix,
       orgId: req.user.orgId,
       projectId: req.user.projectId,
-      workspaceId: req.workspaceId,
-      workspaceType: req.workspaceType,
+      workspaceId: req.workspaceId ?? req.user.id,
+      workspaceType: req.workspaceType ?? OwnerType.USER,
     };
   }
 
@@ -712,7 +715,15 @@ export class ModelsController {
     const clientMeta = extractClientMeta(req);
 
     if (data.stream === true) {
-      await this.streamPrediction(model, url, deploymentId, data, actor, clientMeta, res);
+      await this.streamPrediction(
+        model,
+        url,
+        deploymentId,
+        data,
+        actor,
+        clientMeta,
+        res,
+      );
       this.touchOrgApiKeyUsage(orgApiKey);
       return;
     }
@@ -726,7 +737,9 @@ export class ModelsController {
       clientMeta,
     );
     if (result.status === 'FAILED') {
-      res.status(result.statusCode).json({ error: `Prediction failed: ${result.errorMessage}` });
+      res
+        .status(result.statusCode)
+        .json({ error: `Prediction failed: ${result.errorMessage}` });
       return;
     }
     this.touchOrgApiKeyUsage(orgApiKey);
@@ -769,11 +782,6 @@ export class ModelsController {
         }),
       );
 
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      response.data.pipe(res);
-
       await this.inferenceClient.recordOutcome({
         model,
         actor,
@@ -787,6 +795,11 @@ export class ModelsController {
         errorMessage: null,
         responseSizeBytes: null,
       });
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      response.data.pipe(res);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       await this.inferenceClient.recordOutcome({

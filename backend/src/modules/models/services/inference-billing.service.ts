@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { Model } from '../entities/model.entity';
 import { User } from '../../users/entities/user.entity';
@@ -13,6 +13,10 @@ import { PredictionActor } from '../interfaces/inference.interface';
 
 const SYSTEM_OWNER_ID = '00000000-0000-0000-0000-000000000000';
 
+interface ReturningIdRow {
+  id: string;
+}
+
 /**
  * Moves credits for a single successful prediction call: debits the consumer
  * wallet, credits the model owner's provider wallet in EGP, and credits the
@@ -24,9 +28,8 @@ export class InferenceBillingService {
 
   /**
    * Charges the consumer and pays out the provider/platform shares for one
-   * successful inference call. Failures are caught and logged — billing
-   * errors never fail the prediction response since the caller already
-   * received their result.
+   * successful inference call. Any failure rolls the ledger back and is
+   * re-thrown so a successful API response is only returned after money moved.
    *
    * @param model - The model that was called.
    * @param cost - The credit cost already validated against the consumer balance.
@@ -39,6 +42,17 @@ export class InferenceBillingService {
     providerSharePercent: number,
     actor: PredictionActor,
   ): Promise<void> {
+    if (!Number.isFinite(cost) || cost <= 0) {
+      return;
+    }
+    if (
+      !Number.isFinite(providerSharePercent) ||
+      providerSharePercent < 0 ||
+      providerSharePercent > 100
+    ) {
+      throw new BadRequestException('Invalid provider share percentage');
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -55,30 +69,54 @@ export class InferenceBillingService {
         actor.email ||
         'Organization API Key';
 
-      await queryRunner.manager.query(
-        `UPDATE wallets SET balance = balance - $1 WHERE owner_id = $2 AND owner_type = $3 AND wallet_type = $4`,
-        [cost, actor.workspaceId, actor.workspaceType, WalletType.CONSUMER],
+      let debitRows = this.extractReturningRows<ReturningIdRow>(
+        await queryRunner.manager.query(
+          `UPDATE wallets
+         SET balance = balance - $1
+         WHERE owner_id = $2
+           AND owner_type = $3
+           AND wallet_type = $4
+           AND balance >= $1
+         RETURNING id`,
+          [cost, actor.workspaceId, actor.workspaceType, WalletType.CONSUMER],
+        ),
       );
-
-      const consumerWallet = await queryRunner.manager.findOne(Wallet, {
-        where: {
-          ownerId: actor.workspaceId,
-          ownerType: actor.workspaceType,
-          walletType: WalletType.CONSUMER,
-        },
-      });
-      if (consumerWallet) {
-        await queryRunner.manager.save(
-          Transaction,
-          queryRunner.manager.create(Transaction, {
-            walletId: consumerWallet.id,
-            type: TransactionType.DEBIT,
-            amount: cost,
-            reference: `Inference debit for model: ${model.name}`,
-            status: TransactionStatus.COMPLETED,
-          }),
+      if (
+        debitRows.length === 0 &&
+        !actor.orgApiKeyId &&
+        actor.workspaceId !== actor.userId
+      ) {
+        debitRows = this.extractReturningRows<ReturningIdRow>(
+          await queryRunner.manager.query(
+            `UPDATE wallets
+           SET balance = balance - $1
+           WHERE owner_id = $2
+             AND owner_type = $3
+             AND wallet_type = $4
+             AND balance >= $1
+           RETURNING id`,
+            [cost, actor.userId, OwnerType.USER, WalletType.CONSUMER],
+          ),
         );
       }
+
+      const debitedWalletId = debitRows[0]?.id;
+      if (!debitedWalletId) {
+        throw new BadRequestException(
+          'Insufficient credits to perform prediction',
+        );
+      }
+
+      await queryRunner.manager.save(
+        Transaction,
+        queryRunner.manager.create(Transaction, {
+          walletId: debitedWalletId,
+          type: TransactionType.DEBIT,
+          amount: cost,
+          reference: `Inference debit for model: ${model.name}`,
+          status: TransactionStatus.COMPLETED,
+        }),
+      );
 
       let config = await queryRunner.manager.findOne(SystemConfig, {
         where: { key: 'credits_per_egp' },
@@ -88,7 +126,11 @@ export class InferenceBillingService {
           where: { key: 'credits_per_usd' },
         });
       }
-      const creditsPerEgp = config ? parseInt(config.value, 10) || 10 : 10;
+      const configuredCreditsPerEgp = config ? Number(config.value) : 10;
+      const creditsPerEgp =
+        Number.isFinite(configuredCreditsPerEgp) && configuredCreditsPerEgp > 0
+          ? configuredCreditsPerEgp
+          : 10;
       const costInEgp = cost / creditsPerEgp;
       const providerShareEgp = costInEgp * (providerSharePercent / 100);
 
@@ -129,6 +171,7 @@ export class InferenceBillingService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
       console.error('[Billing Error] Rollback transaction:', error);
+      throw error;
     } finally {
       await queryRunner.release();
     }
@@ -178,5 +221,31 @@ export class InferenceBillingService {
         status: TransactionStatus.COMPLETED,
       }),
     );
+  }
+
+  /**
+   * TypeORM's Postgres driver returns `[rows, rowCount]` for UPDATE/DELETE
+   * queries with RETURNING, while some drivers/test doubles return just `rows`.
+   */
+  private extractReturningRows<T>(result: unknown): T[] {
+    if (Array.isArray(result)) {
+      const [rows] = result;
+      if (Array.isArray(rows) && typeof result[1] === 'number') {
+        return rows as T[];
+      }
+      return result as T[];
+    }
+
+    if (result && typeof result === 'object') {
+      const structured = result as { records?: unknown; raw?: unknown };
+      if (Array.isArray(structured.records)) {
+        return structured.records as T[];
+      }
+      if (structured.raw !== result) {
+        return this.extractReturningRows<T>(structured.raw);
+      }
+    }
+
+    return [];
   }
 }
