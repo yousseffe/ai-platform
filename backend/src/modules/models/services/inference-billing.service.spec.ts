@@ -44,9 +44,8 @@ function createService(overrides?: {
   const manager = {
     query: jest.fn((sql: string) => {
       if (sql.includes('UPDATE wallets')) {
-        return Promise.resolve(
-          overrides?.debitRows ?? [{ id: 'consumer-wallet-id' }],
-        );
+        const rows = overrides?.debitRows ?? [{ id: 'consumer-wallet-id' }];
+        return Promise.resolve([rows, rows.length]);
       }
       return Promise.resolve([]);
     }),

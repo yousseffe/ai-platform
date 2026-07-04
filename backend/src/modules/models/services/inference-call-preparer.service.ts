@@ -54,11 +54,7 @@ export class InferenceCallPreparerService {
     if (pricing.isLlm && !isTrial && (pricing.inputPricePerMToken || 0) > 0) {
       const minCost = (1000 / 1_000_000) * (pricing.inputPricePerMToken || 0);
       if (minCost > 0) {
-        const balance = await this.walletsService.getBalance(
-          actor.workspaceId,
-          actor.workspaceType,
-          WalletType.CONSUMER,
-        );
+        const balance = await this.getConsumerBalance(actor);
         if (balance < minCost) {
           throw new BadRequestException(
             'Insufficient credits to perform prediction',
@@ -66,11 +62,7 @@ export class InferenceCallPreparerService {
         }
       }
     } else if (pricing.cost > 0) {
-      const balance = await this.walletsService.getBalance(
-        actor.workspaceId,
-        actor.workspaceType,
-        WalletType.CONSUMER,
-      );
+      const balance = await this.getConsumerBalance(actor);
       if (balance < pricing.cost) {
         throw new BadRequestException(
           'Insufficient credits to perform prediction',
@@ -90,13 +82,34 @@ export class InferenceCallPreparerService {
     };
   }
 
-
   /** Marks a deployment as recently active for idle/eviction tracking. */
   async markActive(deploymentId: string): Promise<void> {
     await this.redisService.set(
       `model:last-active:${deploymentId}`,
       Date.now().toString(),
     );
+  }
+
+  private async getConsumerBalance(actor: PredictionActor): Promise<number> {
+    let balance = await this.walletsService.getBalance(
+      actor.workspaceId,
+      actor.workspaceType,
+      WalletType.CONSUMER,
+    );
+
+    if (
+      balance <= 0 &&
+      !actor.orgApiKeyId &&
+      actor.workspaceId !== actor.userId
+    ) {
+      balance = await this.walletsService.getBalance(
+        actor.userId,
+        OwnerType.USER,
+        WalletType.CONSUMER,
+      );
+    }
+
+    return balance;
   }
 
   /** Resolves the container-facing endpoint path and auth headers for a model. */

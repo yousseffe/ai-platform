@@ -13,6 +13,10 @@ import { PredictionActor } from '../interfaces/inference.interface';
 
 const SYSTEM_OWNER_ID = '00000000-0000-0000-0000-000000000000';
 
+interface ReturningIdRow {
+  id: string;
+}
+
 /**
  * Moves credits for a single successful prediction call: debits the consumer
  * wallet, credits the model owner's provider wallet in EGP, and credits the
@@ -65,30 +69,34 @@ export class InferenceBillingService {
         actor.email ||
         'Organization API Key';
 
-      let debitRows: Array<{ id: string }> = await queryRunner.manager.query(
-        `UPDATE wallets
+      let debitRows = this.extractReturningRows<ReturningIdRow>(
+        await queryRunner.manager.query(
+          `UPDATE wallets
          SET balance = balance - $1
          WHERE owner_id = $2
            AND owner_type = $3
            AND wallet_type = $4
            AND balance >= $1
          RETURNING id`,
-        [cost, actor.workspaceId, actor.workspaceType, WalletType.CONSUMER],
+          [cost, actor.workspaceId, actor.workspaceType, WalletType.CONSUMER],
+        ),
       );
       if (
         debitRows.length === 0 &&
         !actor.orgApiKeyId &&
         actor.workspaceId !== actor.userId
       ) {
-        debitRows = await queryRunner.manager.query(
-          `UPDATE wallets
+        debitRows = this.extractReturningRows<ReturningIdRow>(
+          await queryRunner.manager.query(
+            `UPDATE wallets
            SET balance = balance - $1
            WHERE owner_id = $2
              AND owner_type = $3
              AND wallet_type = $4
              AND balance >= $1
            RETURNING id`,
-          [cost, actor.userId, OwnerType.USER, WalletType.CONSUMER],
+            [cost, actor.userId, OwnerType.USER, WalletType.CONSUMER],
+          ),
         );
       }
 
@@ -213,5 +221,31 @@ export class InferenceBillingService {
         status: TransactionStatus.COMPLETED,
       }),
     );
+  }
+
+  /**
+   * TypeORM's Postgres driver returns `[rows, rowCount]` for UPDATE/DELETE
+   * queries with RETURNING, while some drivers/test doubles return just `rows`.
+   */
+  private extractReturningRows<T>(result: unknown): T[] {
+    if (Array.isArray(result)) {
+      const [rows] = result;
+      if (Array.isArray(rows) && typeof result[1] === 'number') {
+        return rows as T[];
+      }
+      return result as T[];
+    }
+
+    if (result && typeof result === 'object') {
+      const structured = result as { records?: unknown; raw?: unknown };
+      if (Array.isArray(structured.records)) {
+        return structured.records as T[];
+      }
+      if (structured.raw !== result) {
+        return this.extractReturningRows<T>(structured.raw);
+      }
+    }
+
+    return [];
   }
 }

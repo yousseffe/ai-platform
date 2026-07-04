@@ -91,8 +91,8 @@ interface PredictionRequestContext {
     orgId?: string;
     projectId?: string;
   };
-  workspaceId: string;
-  workspaceType: OwnerType;
+  workspaceId?: string;
+  workspaceType?: OwnerType;
 }
 
 /**
@@ -400,14 +400,15 @@ export class ModelsController {
   }
 
   @Put('local-upload/*')
-  async handleLocalUpload(
-    @Req() req: ExpressRequest,
-    @Res() res: Response,
-  ) {
+  async handleLocalUpload(@Req() req: ExpressRequest, @Res() res: Response) {
     // Retrieve the path relative to local-upload
-    const objectKey = req.params[0] || req.path.replace(/^\/api\/v1\/models\/local-upload\//, '');
+    const objectKey =
+      req.params[0] ||
+      req.path.replace(/^\/api\/v1\/models\/local-upload\//, '');
     const uploadId = req.query.uploadId as string;
-    const partNumber = req.query.partNumber ? parseInt(req.query.partNumber as string, 10) : undefined;
+    const partNumber = req.query.partNumber
+      ? parseInt(req.query.partNumber as string, 10)
+      : undefined;
 
     const targetPath = path.join(
       process.cwd(),
