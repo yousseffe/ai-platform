@@ -22,4 +22,12 @@ export enum ModelType {
    * Generative Image/Diffusion models.
    */
   DIFFUSION = 'DIFFUSION',
+  /**
+   * Audio processing or generation models.
+   */
+  AUDIO = 'AUDIO',
+  /**
+   * Embedding/vector representation models.
+   */
+  EMBEDDING = 'EMBEDDING',
 }

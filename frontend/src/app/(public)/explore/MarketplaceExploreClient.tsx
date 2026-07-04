@@ -36,6 +36,8 @@ const TYPE_META: Record<string, { label: string; color: string; bg: string; bord
   VISION:   { label: "Computer Vision",        color: "text-blue-700 dark:text-blue-400",     bg: "bg-blue-50 dark:bg-blue-950/30",       border: "border-blue-200 dark:border-blue-800/40",     icon: Cpu },
   LLM_GGUF: { label: "Generative AI & LLMs",   color: "text-violet-700 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/30",   border: "border-violet-200 dark:border-violet-800/40", icon: Sparkles },
   DIFFUSION: { label: "Stable Diffusion",      color: "text-pink-700 dark:text-pink-400",     bg: "bg-pink-50 dark:bg-pink-950/30",       border: "border-pink-200 dark:border-pink-800/40",     icon: Image },
+  AUDIO:    { label: "Audio Intelligence",     color: "text-cyan-700 dark:text-cyan-400",     bg: "bg-cyan-50 dark:bg-cyan-950/30",       border: "border-cyan-200 dark:border-cyan-800/40",     icon: Activity },
+  EMBEDDING: { label: "Embeddings",            color: "text-slate-700 dark:text-slate-300",   bg: "bg-slate-50 dark:bg-slate-900/40",     border: "border-slate-200 dark:border-slate-700/50",   icon: Package },
 };
 
 const TYPE_ACCENT: Record<string, string> = {
@@ -44,6 +46,16 @@ const TYPE_ACCENT: Record<string, string> = {
   VISION:   "from-blue-500 to-cyan-500",
   LLM_GGUF: "from-violet-500 to-purple-500",
   DIFFUSION: "from-pink-500 to-rose-500",
+  AUDIO:    "from-cyan-500 to-sky-500",
+  EMBEDDING: "from-slate-500 to-zinc-500",
+};
+
+const DEFAULT_TYPE_META = {
+  label: "Other Models",
+  color: "text-slate-700 dark:text-slate-300",
+  bg: "bg-slate-50 dark:bg-slate-900/40",
+  border: "border-slate-200 dark:border-slate-700/50",
+  icon: Package,
 };
 
 const FRAMEWORK_LABELS: Record<string, string> = {
@@ -440,7 +452,7 @@ export default function MarketplaceExploreClient() {
           <div className="flex flex-wrap items-center gap-2 mt-4">
             <span className="text-xs text-muted-foreground font-medium mr-1">Quick filter:</span>
             {AVAILABLE_TYPES.map((type) => {
-              const meta = TYPE_META[type];
+              const meta = TYPE_META[type] ?? { ...DEFAULT_TYPE_META, label: type };
               const Icon = meta.icon;
               const active = selectedTypes.includes(type);
               const count = getFacetCount(facets?.types, type);

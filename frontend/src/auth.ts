@@ -25,9 +25,9 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 
   activeRefreshPromise = (async () => {
     try {
-      const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+      const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
       console.log("[Auth-Refresh] Attempting to refresh access token for user ID:", token.userId, "URL:", `${backendUrl}/api/v1/auth/refresh`);
-      
+
       if (!token.refreshToken) {
         console.warn("[Auth-Refresh] Warning: token.refreshToken is missing in JWT payload");
       }
@@ -102,7 +102,7 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+        const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
         try {
           const res = await fetch(`${backendUrl}/api/v1/auth/login`, {
             method: "POST",

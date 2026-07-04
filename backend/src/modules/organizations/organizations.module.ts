@@ -14,6 +14,7 @@ import { UsersModule } from '../users/users.module';
 import { WalletsModule } from '../wallets/wallets.module';
 import { StripeModule } from '../../shared/stripe/stripe.module';
 import { MinioModule } from '../../shared/minio/minio.module';
+import { ProviderAccountsModule } from '../provider-accounts/provider-accounts.module';
 
 /**
  * Module responsible for workspace organizations, membership tracking,
@@ -33,6 +34,7 @@ import { MinioModule } from '../../shared/minio/minio.module';
     forwardRef(() => WalletsModule),
     StripeModule,
     MinioModule,
+    forwardRef(() => ProviderAccountsModule),
   ],
   providers: [OrganizationsService, ProjectsService],
   controllers: [OrganizationsController, ProjectsController],

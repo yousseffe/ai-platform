@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { VerificationCode } from './entities/verification-code.entity';
 import { ApiKey } from './entities/api-key.entity';
@@ -30,7 +30,7 @@ import { getRsaKeys } from './utils/keys';
       OrgApiKey,
       McpToken,
     ]),
-    UsersModule,
+    forwardRef(() => UsersModule),
     PassportModule,
     JwtModule.registerAsync({
       useFactory: () => {
@@ -42,8 +42,8 @@ import { getRsaKeys } from './utils/keys';
         };
       },
     }),
-    OrganizationsModule,
-    WalletsModule,
+    forwardRef(() => OrganizationsModule),
+    forwardRef(() => WalletsModule),
   ],
   providers: [
     AuthService,

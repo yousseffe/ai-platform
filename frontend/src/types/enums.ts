@@ -89,6 +89,8 @@ export enum ModelType {
   VISION = 'VISION',
   LLM_GGUF = 'LLM_GGUF',
   DIFFUSION = 'DIFFUSION',
+  AUDIO = 'AUDIO',
+  EMBEDDING = 'EMBEDDING',
 }
 
 /**

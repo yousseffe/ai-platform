@@ -270,7 +270,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       // 3. Upload version files using Axios to track progress
       const session = await getSession();
       const token = session?.accessToken;
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
 
       const headers: Record<string, string> = {};
       if (token) {
@@ -338,7 +338,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
     setIsDetectingSchema(true);
     try {
       const result = await detectSchema(model);
-      
+
       // Update form values
       if (result.example_payload) {
         form.setValue("examplePayload", result.example_payload);
@@ -352,7 +352,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       form.setValue("type", type);
       form.setValue("framework", framework);
       form.setValue("taskType", taskType);
-      
+
       setHasDetected(true);
       toast.success("Model schema and configuration auto-detected successfully!");
     } catch (e: unknown) {

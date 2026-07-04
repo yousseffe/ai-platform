@@ -62,8 +62,8 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
   const activeVersion = selectedVersionNumber
     ? versions.find((v: ModelVersion) => v.versionNumber === selectedVersionNumber)
     : (versions.length
-        ? [...versions].sort((a: ModelVersion, b: ModelVersion) => b.versionNumber - a.versionNumber)[0]
-        : null);
+      ? [...versions].sort((a: ModelVersion, b: ModelVersion) => b.versionNumber - a.versionNumber)[0]
+      : null);
 
   // Retrieve active deployment specifically for activeVersion
   const activeDeployment = activeVersion
@@ -218,7 +218,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
       const shouldStream = parsedPayload.stream === true;
 
       if (shouldStream) {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
         const urlSuffix = selectedVersionNumber ? `/v${selectedVersionNumber}/predict` : `/predict`;
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -249,7 +249,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
           try {
             const parsed = JSON.parse(text);
             parsedErr = parsed.error || parsed.message || text;
-          } catch {}
+          } catch { }
           throw new Error(parsedErr || "Streaming request failed");
         }
 
@@ -342,7 +342,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
         let res: { success: boolean; data?: Record<string, unknown>; error?: string };
         if (trialApiKey) {
           try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
             const urlSuffix = selectedVersionNumber ? `/v${selectedVersionNumber}/predict` : `/predict`;
             const response = await fetch(`${backendUrl}/api/v1/models/${model.id}${urlSuffix}`, {
               method: "POST",
@@ -359,7 +359,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
               try {
                 const parsed = JSON.parse(text);
                 parsedErr = parsed.error || parsed.message || text;
-              } catch {}
+              } catch { }
               throw new Error(parsedErr || "Prediction request failed");
             }
 
@@ -398,7 +398,7 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
               const numericVals = Object.values(responseData).filter(
                 (v) => typeof v === "number"
               ) as number[];
- 
+
               if (numericVals.length > 0) {
                 const possibleProb = numericVals.find((n) => n > 0 && n <= 1);
                 if (possibleProb) {

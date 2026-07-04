@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { AuditLog } from './entities/audit-log.entity';
@@ -11,6 +11,7 @@ import { UsersRepository } from './repositories/users.repository';
 import { UsersController } from './controllers/users.controller';
 import { AdminController } from './controllers/admin.controller';
 import { WalletsModule } from '../wallets/wallets.module';
+import { ProviderAccountsModule } from '../provider-accounts/provider-accounts.module';
 
 /**
  * Module responsible for user account management and data persistence.
@@ -26,6 +27,7 @@ import { WalletsModule } from '../wallets/wallets.module';
       Wallet,
     ]),
     WalletsModule,
+    forwardRef(() => ProviderAccountsModule),
   ],
   providers: [UsersService, UsersRepository],
   controllers: [UsersController, AdminController],

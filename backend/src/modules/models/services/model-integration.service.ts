@@ -72,7 +72,7 @@ export class ModelIntegrationService {
     private readonly modelsService: ModelsService,
     @InjectRepository(SystemConfig)
     private readonly systemConfigRepository: Repository<SystemConfig>,
-  ) {}
+  ) { }
 
   /**
    * Builds the {@link ModelIntegrationSpec} for a model the actor may access.
@@ -100,7 +100,7 @@ export class ModelIntegrationService {
     const baseUrl = (
       process.env.PUBLIC_API_URL ??
       process.env.BACKEND_PUBLIC_URL ??
-      'http://localhost:5000'
+      'http://localhost:3000'
     ).replace(/\/$/, '');
     const isLlm = model.type === ModelType.LLM_GGUF;
 

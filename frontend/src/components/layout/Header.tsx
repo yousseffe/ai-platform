@@ -55,6 +55,9 @@ const ROUTE_SEGMENT_LABELS: Record<string, string> = {
   workspaces: "Workspaces",
   create: "Create",
   explore: "Explore",
+  provider: "Provider",
+  subscriptions: "Subscriptions",
+  payments: "Subscription Payments",
 };
 
 /**
@@ -105,11 +108,13 @@ export default function Header({ session, onMenuClick, onSearchClick }: HeaderPr
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
+    Promise.resolve().then(() => {
+      setMounted(true);
+      const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
+      if (savedTheme) {
+        setTheme(savedTheme);
+      }
+    });
   }, []);
 
   useEffect(() => {

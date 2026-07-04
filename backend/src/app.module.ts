@@ -47,6 +47,13 @@ import { PipelineStep } from './modules/pipelines/entities/pipeline-step.entity'
 import { PipelineEdge } from './modules/pipelines/entities/pipeline-edge.entity';
 import { PipelineRun } from './modules/pipelines/entities/pipeline-run.entity';
 import { PipelineStepRun } from './modules/pipelines/entities/pipeline-step-run.entity';
+import { ProviderAccountsModule } from './modules/provider-accounts/provider-accounts.module';
+import { BillingModule } from './modules/billing/billing.module';
+import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
+import { ProviderAccount } from './modules/provider-accounts/entities/provider-account.entity';
+import { ProviderTierDefinition } from './modules/provider-accounts/entities/provider-tier-definition.entity';
+import { ProviderOffer } from './modules/provider-accounts/entities/provider-offer.entity';
+import { ProviderOfferRedemption } from './modules/provider-accounts/entities/provider-offer-redemption.entity';
 
 /**
  * Root application module configuring TypeORM database connectivity, Redis-backed
@@ -90,6 +97,10 @@ import { PipelineStepRun } from './modules/pipelines/entities/pipeline-step-run.
         PipelineRun,
         PipelineStepRun,
         ModelReview,
+        ProviderAccount,
+        ProviderTierDefinition,
+        ProviderOffer,
+        ProviderOfferRedemption,
       ],
       synchronize: true, // For MVP only
       logging: ['query', 'error', 'schema', 'warn'],
@@ -117,12 +128,15 @@ import { PipelineStepRun } from './modules/pipelines/entities/pipeline-step-run.
     AnalyticsModule,
     FraudModule,
     PipelinesModule,
+    BillingModule,
+    ProviderAccountsModule,
+    AdminDashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggerMiddleware).forRoutes('*');
+    consumer.apply(LoggerMiddleware).forRoutes('*path');
   }
 }

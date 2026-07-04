@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Upload, Globe, Play, TrendingUp, BarChart3, Sparkles, Server, ArrowUpRight, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { Upload, Globe, Play, TrendingUp, BarChart3, Sparkles, Server, ArrowUpRight, BookOpen, ChevronLeft, ChevronRight, Crown } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,16 +70,25 @@ export default function PublisherDashboard({
             Monitor published models traffic, served API executions, and platform earnings.
           </p>
         </div>
-        <Link
-          href="/models/upload"
-          className={cn(
-            buttonVariants({ variant: "default" }),
-            "bg-linear-to-r from-primary via-primary-600 to-primary-700 hover:opacity-95 text-primary-foreground font-semibold px-4 h-9 rounded-lg text-xs shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer shrink-0 self-start sm:self-auto gap-1.5"
-          )}
-        >
-          <Upload className="w-3.5 h-3.5" strokeWidth={2} />
-          Publish Model
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-2 self-start sm:self-auto">
+          <Link
+            href="/provider/subscriptions"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background hover:bg-secondary px-4 h-9 text-xs font-bold text-foreground hover:text-primary transition-all shadow-sm"
+          >
+            <Crown className="w-3.5 h-3.5" strokeWidth={2} />
+            Manage Plan
+          </Link>
+          <Link
+            href="/models/upload"
+            className={cn(
+              buttonVariants({ variant: "default" }),
+              "bg-linear-to-r from-primary via-primary-600 to-primary-700 hover:opacity-95 text-primary-foreground font-semibold px-4 h-9 rounded-lg text-xs shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer shrink-0 gap-1.5"
+            )}
+          >
+            <Upload className="w-3.5 h-3.5" strokeWidth={2} />
+            Publish Model
+          </Link>
+        </div>
       </div>
 
       {/* Mode indicator banner */}
