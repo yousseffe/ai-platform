@@ -4,6 +4,7 @@ import React from "react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import BecomeProviderCard from "@/components/dashboard/BecomeProviderCard";
+import { PageHeader } from "@/components/ui/page-header";
 
 /**
  * Settings Page: Profile & Role.
@@ -18,6 +19,12 @@ export default function ProfileSettingsPage() {
 
   return (
     <div className="space-y-5 animate-fade-in text-left">
+      <PageHeader
+        title="Profile & Role"
+        description="Your account details and model provider enrollment status."
+        className="mb-0"
+      />
+
       <div className="card p-5 rounded-xl border border-border bg-card shadow-sm">
         <div className="flex items-center gap-3 border-b border-border/60 pb-4 mb-4 select-none">
           <div className="w-10 h-10 rounded-full overflow-hidden border border-border shrink-0">

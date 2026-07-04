@@ -26,7 +26,7 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     mode: "onChange",
@@ -220,7 +220,7 @@ export default function LoginPage() {
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !isValid}
                   className="btn-primary w-full py-2 flex justify-center mt-2 cursor-pointer rounded-lg text-xs font-semibold shadow-sm"
                 >
                   {loading ? "Signing In..." : "Sign In"}{" "}

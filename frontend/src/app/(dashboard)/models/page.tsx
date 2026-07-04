@@ -1,12 +1,13 @@
 import React from "react";
 import { Metadata } from "next";
-import { Filter, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { getModels } from "@/lib/actions/models.actions";
 import type { Model, ModelVersion } from "@/types";
 import { DeploymentStatus, VersionStatus } from "@/types";
 import { RegistryStatsOverview } from "@/components/models/RegistryStatsOverview";
 import { ModelsTable, RegistryModelItem } from "@/components/models/ModelsTable";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const revalidate = 0;
 
@@ -66,21 +67,15 @@ export default async function ModelsRegistryPage() {
 
   return (
     <div className="w-full">
-      {/* Title & Action Buttons Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-foreground font-mono">Models Registry</h1>
-          <p className="text-xs text-muted-foreground mt-1 font-mono">Manage, version, and deploy your machine learning assets across environments.</p>
-        </div>
-        <div className="flex gap-3">
-          <button type="button" className="btn-outline cursor-pointer flex items-center gap-1.5">
-            <Filter className="w-4 h-4" /> Filter
-          </button>
+      <PageHeader
+        title="Models Registry"
+        description="Manage, version, and deploy your machine learning assets across environments."
+        actions={
           <Link href="/models/upload" className="btn-primary">
             <Plus className="w-4 h-4" /> New Model
           </Link>
-        </div>
-      </div>
+        }
+      />
 
       {/* Registry Specific Status Metric Cards */}
       <RegistryStatsOverview

@@ -23,6 +23,7 @@ import {
   Key,
   Plug,
   Workflow,
+  X,
 } from "lucide-react";
 import { useWorkspace, Workspace } from "@/hooks/use-workspace";
 import { smartFetch } from "@/lib/utils/smart-fetch";
@@ -79,15 +80,25 @@ function SidebarLink({ href, active, icon, children }: SidebarLinkProps) {
   );
 }
 
+interface SidebarProps {
+  /** Whether the mobile drawer variant of the sidebar is currently open. Ignored at desktop widths. */
+  isOpen: boolean;
+  /** Invoked when the mobile drawer should close (backdrop click, nav link, or explicit close button). */
+  onClose: () => void;
+}
+
 /**
  * Platform navigation Sidebar component.
  * Integrates Shadcn Dropdown switcher for workspaces, dual role layout toggles,
  * active status details, and OTP verification challenge overlays.
  * Refactored to include a collapsible Settings menu for sub-routing settings tabs.
+ * Renders as a static column on large screens and an off-canvas drawer with a
+ * backdrop below the `lg` breakpoint.
  *
+ * @param props - Mobile drawer open state and close handler.
  * @returns The React component rendering the sidebar.
  */
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const {
     activeWorkspace,
@@ -199,6 +210,21 @@ export default function Sidebar() {
     await signOut({ callbackUrl: "/login" });
   };
 
+  /**
+   * Switches between Consumer and Provider workspace view modes. Provider-only
+   * routes (Models, Pipelines) have no meaning in Consumer mode, so if the user
+   * is currently on one of those routes when switching to Consumer, this sends
+   * them back to the dashboard instead of leaving them stranded on a page whose
+   * nav link just disappeared.
+   */
+  const handleViewModeChange = (mode: WalletType) => {
+    setViewMode(mode);
+    const isOnProviderOnlyRoute = pathname.startsWith("/models") || pathname.startsWith("/pipelines");
+    if (mode === WalletType.CONSUMER && isOnProviderOnlyRoute) {
+      router.push("/dashboard");
+    }
+  };
+
   const isActive = (path: string) => {
     if (path === "/") {
       return pathname === "/";
@@ -229,9 +255,23 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-60 bg-card border-r border-border flex flex-col h-screen shrink-0 relative z-30 font-sans">
+    <>
+      {/* Mobile backdrop, shown only while the drawer is open below lg */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] lg:hidden animate-fade-in"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <div
+        className={`w-64 bg-card border-r border-border flex flex-col h-screen shrink-0 font-sans fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-out lg:static lg:z-30 lg:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
       {/* Logo Area */}
-      <div className="h-14 flex items-center px-6 border-b border-border">
+      <div className="h-14 flex items-center justify-between px-6 border-b border-border/60">
         <Link href="/dashboard" className="flex items-center gap-2 text-primary font-bold text-sm tracking-tight hover:opacity-90 transition-opacity">
           <div className="w-7 h-7 relative flex items-center justify-center shrink-0">
             <Image
@@ -245,10 +285,18 @@ export default function Sidebar() {
           </div>
           <span className="font-sans text-sm font-bold text-foreground tracking-tight">MLHub Console</span>
         </Link>
+        <button
+          type="button"
+          onClick={onClose}
+          className="lg:hidden text-muted-foreground hover:text-foreground p-1 -mr-1 rounded-md hover:bg-secondary transition-colors cursor-pointer"
+          aria-label="Close navigation menu"
+        >
+          <X className="w-4 h-4" strokeWidth={1.5} />
+        </button>
       </div>
 
       {/* Workspace Switcher */}
-      <div className="px-3 py-3 border-b border-border">
+      <div className="px-3 py-3 border-b border-border/60">
         <DropdownMenu>
           <DropdownMenuTrigger className="w-full flex items-center justify-between px-2.5 py-1.5 h-10 rounded-lg border border-border bg-background/50 hover:bg-secondary/80 hover:border-border transition-all cursor-pointer text-left focus:outline-none text-[11px] font-sans shadow-xs font-normal">
             <div className="flex items-center gap-2.5 overflow-hidden text-left">
@@ -316,32 +364,34 @@ export default function Sidebar() {
 
       {/* Role view toggle (Consumer Mode vs Provider Mode) */}
       {isProviderModeEnabled && (
-        <div className="px-3 py-2.5 border-b border-border bg-secondary/15 flex flex-col gap-1.5">
-          <div className="flex bg-muted/65 rounded-lg p-1 border border-border/70">
-            <Button
-              variant={viewMode === WalletType.CONSUMER ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode(WalletType.CONSUMER)}
-              className={`flex-1 text-[10px] font-semibold h-7 cursor-pointer ${
-                viewMode === WalletType.CONSUMER
-                  ? "bg-card text-primary shadow-sm border border-border"
-                  : "text-muted-foreground hover:text-foreground hover:bg-card/30"
-              }`}
-            >
-              <Coins className="w-3.5 h-3.5" strokeWidth={1.5} /> Consumer
-            </Button>
-            <Button
-              variant={viewMode === WalletType.PROVIDER ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode(WalletType.PROVIDER)}
-              className={`flex-1 text-[10px] font-semibold h-7 cursor-pointer ${
-                viewMode === WalletType.PROVIDER
-                  ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/95"
-                  : "text-muted-foreground hover:text-foreground hover:bg-card/30"
-              }`}
-            >
-              <TrendingUp className="w-3.5 h-3.5" strokeWidth={1.5} /> Provider
-            </Button>
+        <div className="px-3 py-2.5 border-b border-border/60 bg-secondary/15 flex flex-col gap-1.5">
+          <div className="bg-muted/65 rounded-lg p-1 border border-border/70">
+            <div className="relative flex">
+              <div
+                className={`absolute inset-y-0 left-0 w-1/2 rounded-md bg-card border border-border shadow-sm transition-transform duration-200 ease-out ${
+                  viewMode === WalletType.PROVIDER ? "translate-x-full" : "translate-x-0"
+                }`}
+                aria-hidden="true"
+              />
+              <button
+                type="button"
+                onClick={() => handleViewModeChange(WalletType.CONSUMER)}
+                className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 h-7 rounded-md text-[10px] font-semibold cursor-pointer transition-colors ${
+                  viewMode === WalletType.CONSUMER ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Coins className="w-3.5 h-3.5" strokeWidth={1.5} /> Consumer
+              </button>
+              <button
+                type="button"
+                onClick={() => handleViewModeChange(WalletType.PROVIDER)}
+                className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 h-7 rounded-md text-[10px] font-semibold cursor-pointer transition-colors ${
+                  viewMode === WalletType.PROVIDER ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5" strokeWidth={1.5} /> Provider
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -480,7 +530,7 @@ export default function Sidebar() {
       </div>
 
       {/* Footer Links */}
-      <div className="p-2 border-t border-border flex flex-col gap-0.5 bg-secondary/5">
+      <div className="p-2 border-t border-border/60 flex flex-col gap-0.5 bg-secondary/5">
         <Button
           variant="ghost"
           className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-muted-foreground hover:bg-secondary/70 hover:text-foreground text-sm cursor-pointer select-none font-medium"
@@ -562,6 +612,7 @@ export default function Sidebar() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }

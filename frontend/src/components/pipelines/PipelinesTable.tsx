@@ -4,6 +4,8 @@ import React from "react";
 import Link from "next/link";
 import { Workflow } from "lucide-react";
 import { Pipeline, PipelineStatus } from "@/types";
+import { EmptyState } from "@/components/ui/empty-state";
+import { CreatePipelineDialog } from "./CreatePipelineDialog";
 
 interface PipelinesTableProps {
   pipelines: Pipeline[];
@@ -34,9 +36,12 @@ export function PipelinesTable({ pipelines }: PipelinesTableProps) {
     <div className="border border-border bg-card rounded-xl p-0 overflow-hidden mb-8 shadow-sm">
       <div className="overflow-x-auto">
         {pipelines.length === 0 ? (
-          <div className="p-12 text-center text-muted-foreground font-mono text-xs">
-            No pipelines yet. Click &quot;New Pipeline&quot; to chain your first models together.
-          </div>
+          <EmptyState
+            icon={<Workflow />}
+            title="No pipelines yet"
+            description="Chain your deployed models together — the output of one step feeds into the next."
+            action={<CreatePipelineDialog />}
+          />
         ) : (
           <table className="w-full text-left border-collapse font-mono text-xs text-foreground">
             <thead>

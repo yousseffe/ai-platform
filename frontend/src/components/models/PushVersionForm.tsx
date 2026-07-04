@@ -167,7 +167,7 @@ export default function PushVersionForm({
                 className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 mt-4 group-hover:scale-105 transition-transform duration-300 ${
                   scalerFile 
                     ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 shadow-sm shadow-emerald-500/10" 
-                    : "bg-slate-50 text-slate-400 dark:bg-slate-850 dark:text-slate-500"
+                    : "bg-slate-50 text-slate-400 dark:bg-slate-800 dark:text-slate-500"
                 }`}
               >
                 {scalerFile ? <ShieldCheck className="w-6 h-6" /> : <FileJson className="w-6 h-6" />}

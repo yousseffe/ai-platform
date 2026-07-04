@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Loader2, UserCheck, UserX, Trash2, DollarSign, Users as UsersIcon, Award, Sparkles, Coins, RefreshCw, Eye, Key, Calendar } from "lucide-react";
+import { Shield, Loader2, UserCheck, UserX, Trash2, DollarSign, Users as UsersIcon, Award, Sparkles, Coins, RefreshCw, Eye } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { smartFetch } from "@/lib/utils/smart-fetch";
@@ -11,7 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import AdjustBalanceModal from "@/components/admin/AdjustBalanceModal";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
 
 interface AdminUser {
   id: string;
@@ -51,6 +54,8 @@ export default function AdminUsersPage() {
   // Modal State
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [userPendingDelete, setUserPendingDelete] = useState<AdminUser | null>(null);
+  const [userPendingAdminToggle, setUserPendingAdminToggle] = useState<AdminUser | null>(null);
 
   // Load workspace context on mount
   useEffect(() => {
@@ -122,9 +127,6 @@ export default function AdminUsersPage() {
   };
 
   const deleteUser = async (user: AdminUser) => {
-    if (!confirm(`Are you absolutely sure you want to permanently delete user account "${user.fullName}"? This action is irreversible.`)) {
-      return;
-    }
     try {
       const res = await smartFetch<{ success: boolean }>(`/admin/users/${user.id}`, {
         method: "DELETE",
@@ -135,6 +137,8 @@ export default function AdminUsersPage() {
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to delete account");
+    } finally {
+      setUserPendingDelete(null);
     }
   };
 
@@ -167,84 +171,29 @@ export default function AdminUsersPage() {
 
   return (
     <div className="w-full space-y-6 text-foreground font-mono text-xs animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border pb-5">
-        <div className="text-left">
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2 font-mono">
-            <Shield className="w-5 h-5 text-primary" />
-            User Registry Console
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1 font-sans">
-            Overseeing registered developer accounts, administrative authorization privileges, and manual balance adjustments.
-          </p>
-        </div>
-        <button
-          onClick={() => loadUsers(true)}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 text-foreground font-bold"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          <span>Refresh</span>
-        </button>
-      </div>
+      <PageHeader
+        title={<><Shield /> User Registry Console</>}
+        description="Overseeing registered developer accounts, administrative authorization privileges, and manual balance adjustments."
+        className="mb-0"
+        actions={
+          <Button
+            variant="outline"
+            onClick={() => loadUsers(true)}
+            disabled={loading}
+            className="gap-1.5 cursor-pointer font-bold"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </Button>
+        }
+      />
 
       {/* User Statistics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Total Registries */}
-        <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden group hover:border-primary/20 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-muted-foreground/15">
-              <UsersIcon className="w-8 h-8" />
-            </div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Developer Registries</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-foreground">{totalUsers}</span>
-              <span className="text-[10px] text-muted-foreground">Active profiles</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Administrators */}
-        <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden group hover:border-primary/20 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-muted-foreground/15">
-              <Award className="w-8 h-8" />
-            </div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Administrators</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-foreground">{adminCount}</span>
-              <span className="text-[10px] text-muted-foreground">Auth controllers</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Providers */}
-        <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden group hover:border-primary/20 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-muted-foreground/15">
-              <Sparkles className="w-8 h-8" />
-            </div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Service Providers</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-foreground">{providerCount}</span>
-              <span className="text-[10px] text-muted-foreground">Hosts enabled</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Credits Volume */}
-        <Card className="border border-primary/20 bg-primary/[0.02] p-0 shadow-xs relative overflow-hidden group hover:border-primary/30 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-primary/20">
-              <Coins className="w-8 h-8" />
-            </div>
-            <p className="text-[9px] font-bold text-primary uppercase tracking-wider mb-1">Circulating Credits</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-primary">{Math.round(totalCreditsCirculating)}</span>
-              <span className="text-[9px] text-muted-foreground">In consumer wallets</span>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard icon={<UsersIcon />} label="Developer Registries" value={totalUsers} caption="Active profiles" />
+        <StatCard icon={<Award />} label="Administrators" value={adminCount} caption="Auth controllers" />
+        <StatCard icon={<Sparkles />} label="Service Providers" value={providerCount} caption="Hosts enabled" />
+        <StatCard icon={<Coins />} label="Circulating Credits" value={Math.round(totalCreditsCirculating)} caption="In consumer wallets" tone="primary" />
       </div>
 
       {/* Main content table */}
@@ -344,7 +293,7 @@ export default function AdminUsersPage() {
                             variant="ghost"
                             size="icon"
                             title={user.isAdmin ? "Revoke Admin Status" : "Promote to Admin"}
-                            onClick={() => toggleAdmin(user.id)}
+                            onClick={() => setUserPendingAdminToggle(user)}
                             className={`h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer ${
                               user.isAdmin ? "text-red-500 hover:text-red-600 bg-red-500/5 hover:bg-red-500/15" : ""
                             }`}
@@ -376,7 +325,7 @@ export default function AdminUsersPage() {
                             size="icon"
                             title="Delete Account"
                             disabled={user.email.toLowerCase().includes("admin")}
-                            onClick={() => deleteUser(user)}
+                            onClick={() => setUserPendingDelete(user)}
                             className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -389,9 +338,11 @@ export default function AdminUsersPage() {
               </Table>
             </div>
           ) : (
-            <div className="p-8 text-center text-muted-foreground">
-              No registered user accounts found matching your query.
-            </div>
+            <EmptyState
+              icon={<UsersIcon />}
+              title="No matching accounts"
+              description="No registered user accounts found matching your search query."
+            />
           )}
         </CardContent>
       </Card>
@@ -407,6 +358,37 @@ export default function AdminUsersPage() {
         onSuccess={() => loadUsers(false)}
       />
 
+      <ConfirmDialog
+        open={!!userPendingDelete}
+        onOpenChange={(open) => !open && setUserPendingDelete(null)}
+        title="Delete user account"
+        description={`Permanently delete "${userPendingDelete?.fullName}"? This purges their account, models, and API keys and can't be undone.`}
+        confirmLabel="Delete account"
+        onConfirm={async () => {
+          if (userPendingDelete) {
+            await deleteUser(userPendingDelete);
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!userPendingAdminToggle}
+        onOpenChange={(open) => !open && setUserPendingAdminToggle(null)}
+        title={userPendingAdminToggle?.isAdmin ? "Revoke admin access" : "Grant admin access"}
+        description={
+          userPendingAdminToggle?.isAdmin
+            ? `Remove admin privileges from "${userPendingAdminToggle?.fullName}"? They'll lose access to this console immediately.`
+            : `Grant "${userPendingAdminToggle?.fullName}" full admin access, including user management and platform configuration.`
+        }
+        variant={userPendingAdminToggle?.isAdmin ? "danger" : "default"}
+        confirmLabel={userPendingAdminToggle?.isAdmin ? "Revoke access" : "Grant access"}
+        onConfirm={async () => {
+          if (userPendingAdminToggle) {
+            await toggleAdmin(userPendingAdminToggle.id);
+          }
+          setUserPendingAdminToggle(null);
+        }}
+      />
     </div>
   );
 }

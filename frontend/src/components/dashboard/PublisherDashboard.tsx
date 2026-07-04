@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Model, DeploymentStatus, ModelLog } from "@/types";
 import { InferenceLogsTable } from "./InferenceLogsTable";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -167,6 +168,18 @@ export default function PublisherDashboard({
               <p className="text-[10px] text-muted-foreground">ML models registered and hosted in this workspace context</p>
             </CardHeader>
             <CardContent className="p-0 flex-1 flex flex-col justify-between">
+              {models.length === 0 ? (
+                <EmptyState
+                  icon={<Globe />}
+                  title="No models published yet"
+                  description="Publish your first model to see it listed here alongside deployment status and pricing."
+                  action={
+                    <Link href="/models/upload" className={cn(buttonVariants({ variant: "default", size: "sm" }))}>
+                      <Upload className="w-3.5 h-3.5" strokeWidth={2} /> Publish Model
+                    </Link>
+                  }
+                />
+              ) : (
               <div className="overflow-x-auto">
                 <Table className="w-full text-left border-collapse text-xs">
                   <TableHeader>
@@ -179,8 +192,7 @@ export default function PublisherDashboard({
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-border/40 text-xs">
-                    {models.length > 0 ? (
-                      currentModels.map((model) => {
+                    {currentModels.map((model) => {
                         const isActive = model.versions?.some((v) => v.deployments?.some((d) => d.status === DeploymentStatus.RUNNING));
                         const status = isActive ? "ACTIVE" : "INACTIVE";
 
@@ -214,17 +226,11 @@ export default function PublisherDashboard({
                             </TableCell>
                           </TableRow>
                         );
-                      })
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={5} className="px-4.5 py-12 text-center text-muted-foreground text-xs font-mono">
-                          No models published in this workspace context yet.
-                        </TableCell>
-                      </TableRow>
-                    )}
+                      })}
                   </TableBody>
                 </Table>
               </div>
+              )}
             </CardContent>
           </div>
 

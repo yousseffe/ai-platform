@@ -13,8 +13,6 @@ import {
   ArrowUpRight,
   Calendar,
   RefreshCw,
-  Cpu,
-  HardDrive,
   Activity,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -23,6 +21,11 @@ import { smartFetch } from "@/lib/utils/smart-fetch";
 import { toast } from "react-hot-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
 import { PlatformStats, PlatformTransaction } from "@/types";
 import { AlertsPanel } from "@/components/admin/AlertsPanel";
 
@@ -157,26 +160,22 @@ export default function AdminOverviewPage() {
 
   return (
     <div className="w-full space-y-6 text-foreground font-mono text-xs animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border pb-5">
-        <div className="text-left">
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2 font-mono">
-            <Shield className="w-5 h-5 text-primary" />
-            Admin Operations Center
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1 font-sans">
-            Global system health overview, platform payout wallet vault, and general ledger operations.
-          </p>
-        </div>
-        <button
-          onClick={handleRefresh}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 text-foreground font-bold"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          <span>Refresh</span>
-        </button>
-      </div>
+      <PageHeader
+        title={<><Shield /> Admin Operations Center</>}
+        description="Global system health overview, platform payout wallet vault, and general ledger operations."
+        className="mb-0"
+        actions={
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="gap-1.5 cursor-pointer font-bold"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </Button>
+        }
+      />
 
       {loading && !stats ? (
         <div className="py-12 flex flex-col items-center justify-center text-muted-foreground bg-card border border-border rounded-xl">
@@ -187,35 +186,9 @@ export default function AdminOverviewPage() {
         <>
           {/* KPI Dashboard Grid */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden">
-              <CardContent className="p-5">
-                <div className="absolute right-3 top-3 text-muted-foreground/15">
-                  <UsersIcon className="w-10 h-10" />
-                </div>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Platform Users</p>
-                <CardTitle className="text-2xl font-extrabold text-foreground border-none p-0 h-auto">{stats.totalUsers}</CardTitle>
-              </CardContent>
-            </Card>
-
-            <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden">
-              <CardContent className="p-5">
-                <div className="absolute right-3 top-3 text-muted-foreground/15">
-                  <Layers className="w-10 h-10" />
-                </div>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Orgs</p>
-                <CardTitle className="text-2xl font-extrabold text-foreground border-none p-0 h-auto">{stats.totalOrgs}</CardTitle>
-              </CardContent>
-            </Card>
-
-            <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden">
-              <CardContent className="p-5">
-                <div className="absolute right-3 top-3 text-muted-foreground/15">
-                  <Database className="w-10 h-10" />
-                </div>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Registered Models</p>
-                <CardTitle className="text-2xl font-extrabold text-foreground border-none p-0 h-auto">{stats.totalModels}</CardTitle>
-              </CardContent>
-            </Card>
+            <StatCard icon={<UsersIcon />} label="Platform Users" value={stats.totalUsers} tone="default" />
+            <StatCard icon={<Layers />} label="Total Orgs" value={stats.totalOrgs} tone="default" />
+            <StatCard icon={<Database />} label="Registered Models" value={stats.totalModels} tone="default" />
 
             {/* Platform Revenue Payout Wallet Card - Extremely Premium */}
             <Card className="border border-primary/30 bg-primary/4 p-0 shadow-xs relative overflow-hidden group hover:border-primary/50 transition-all">
@@ -327,15 +300,16 @@ export default function AdminOverviewPage() {
                 {/* Type Filter */}
                 <div>
                   <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-1">Transaction Type</label>
-                  <select
-                    value={txType}
-                    onChange={(e) => setTxType(e.target.value as "ALL" | "CREDIT" | "DEBIT")}
-                    className="w-full h-8 px-2 rounded-md border border-border bg-background text-foreground text-xs font-mono outline-hidden focus:border-primary transition-all"
-                  >
-                    <option value="ALL">All Types</option>
-                    <option value="CREDIT">CREDIT (Inflow)</option>
-                    <option value="DEBIT">DEBIT (Outflow)</option>
-                  </select>
+                  <Select value={txType} onValueChange={(value) => setTxType((value ?? "ALL") as "ALL" | "CREDIT" | "DEBIT")}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Types</SelectItem>
+                      <SelectItem value="CREDIT">CREDIT (Inflow)</SelectItem>
+                      <SelectItem value="DEBIT">DEBIT (Outflow)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* From Date */}
@@ -429,9 +403,11 @@ export default function AdminOverviewPage() {
                   </Table>
                 </div>
               ) : (
-                <div className="p-8 text-center text-muted-foreground">
-                  No system transactions matched your filters.
-                </div>
+                <EmptyState
+                  icon={<Coins />}
+                  title="No matching transactions"
+                  description="No system transactions matched your current filters. Try widening the date range or clearing a filter."
+                />
               )}
             </CardContent>
 

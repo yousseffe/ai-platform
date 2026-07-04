@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Terminal, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Terminal, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ModelLog } from "@/types";
 
 interface InferenceLogsTableProps {
@@ -47,9 +48,11 @@ export function InferenceLogsTable({ logs, title }: InferenceLogsTableProps) {
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto flex-1 flex flex-col justify-between">
           {logs.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground text-xs font-mono">
-              No prediction logs found. Make a model inference request to populate this ledger.
-            </div>
+            <EmptyState
+              icon={<Terminal />}
+              title="No prediction logs yet"
+              description="Make a model inference request to populate this ledger."
+            />
           ) : (
             <Table className="w-full text-left border-collapse font-sans text-xs">
               <TableHeader>
