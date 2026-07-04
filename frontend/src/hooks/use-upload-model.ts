@@ -10,7 +10,9 @@ import { getSession } from "next-auth/react";
 
 import { createModel } from "@/lib/actions/models.actions";
 import { uploadModelFormSchema, type UploadModelFormInput } from "@/lib/schemas";
-import { detectSchema } from "@/lib/services/models.service";
+import { detectSchema, initiateVersionUpload, completeVersionUpload, abortVersionUpload } from "@/lib/services/models.service";
+import { uploadChunksConcurrently, assertPartsAreContiguous } from "@/lib/utils/multipart-upload.util";
+import { LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES } from "@/lib/utils/upload-thresholds";
 
 function mapDetectedAttributes(framework: string, task: string) {
   const fw = (framework || "").toLowerCase();
@@ -216,12 +218,14 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
    * uploading the artifacts, saving the schema configs, and starting the build.
    *
    * @param data - The parsed model schema options.
-   */
-  const onSubmit = async (data: UploadModelFormInput) => {
+   */  const onSubmit = async (data: UploadModelFormInput) => {
     setSubmitError("");
     setIsUploading(true);
     setUploadStatus("Initializing model registry entry...");
     setUploadProgress(10);
+
+    let modelId: string | null = null;
+    let abortableUpload: { objectKey: string; uploadId: string } | null = null;
 
     try {
       // 1. Create model registry entry
@@ -237,88 +241,135 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       if (!createRes.success) {
         throw new Error(createRes.error || "Model registry creation failed.");
       }
-      const modelId = createRes.data.id;
+      modelId = createRes.data.id;
       setCreatedModelId(modelId);
-      setUploadProgress(30);
-      setUploadStatus("Uploading artifacts & starting compilation...");
+      setUploadProgress(20);
+      setUploadStatus("Initializing upload registry session...");
 
-      // 2. Prepare payload files for version upload
-      const formData = new FormData();
-      formData.append("model", data.modelFile!);
-      if (data.scalerFile) formData.append("scaler", data.scalerFile);
-
-      if (data.preprocessMode === "file" && data.preprocessFile) {
-        formData.append("preprocess", data.preprocessFile);
-      } else if (data.preprocessMode === "code" && data.preprocessCode?.trim()) {
-        const blob = new Blob([data.preprocessCode], { type: "text/plain" });
-        formData.append("preprocess", blob, "preprocess.py");
-      }
-
-      if (data.postprocessMode === "file" && data.postprocessFile) {
-        formData.append("postprocess", data.postprocessFile);
-      } else if (data.postprocessMode === "code" && data.postprocessCode?.trim()) {
-        const blob = new Blob([data.postprocessCode], { type: "text/plain" });
-        formData.append("postprocess", blob, "postprocess.py");
-      }
-
-      // Add schema configuration and trigger build flag
-      formData.append("examplePayload", data.examplePayload || "");
-      formData.append("expectedResult", data.expectedResult || "");
-      formData.append("classLabels", data.classLabels || "");
-      formData.append("triggerBuild", "true");
-
-      // 3. Upload version files using Axios to track progress
-      const session = await getSession();
-      const token = session?.accessToken;
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
-
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      const activeWorkspaceId = document.cookie.match(/(?:^|; )activeWorkspaceId=([^;]*)/)?.[1];
-      if (activeWorkspaceId) {
-        headers["X-Workspace-Id"] = decodeURIComponent(activeWorkspaceId);
-      }
-
-      const response = await axios.post(`${backendUrl}/api/v1/models/${modelId}/versions`, formData, {
-        headers,
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const percentCompleted = Math.round((progressEvent.loaded * 60) / progressEvent.total);
-            setUploadProgress(30 + percentCompleted);
-          }
-        },
+      // 2. Request presigned URLs from backend
+      const initiateRes = await initiateVersionUpload(modelId, {
+        modelFilename: data.modelFile!.name,
+        modelSize: data.modelFile!.size,
+        scalerFilename: data.scalerFile?.name,
+        preprocessFilename: data.preprocessMode === "file" && data.preprocessFile ? data.preprocessFile.name : (data.preprocessMode === "code" && data.preprocessCode?.trim() ? "preprocess.py" : undefined),
+        postprocessFilename: data.postprocessMode === "file" && data.postprocessFile ? data.postprocessFile.name : (data.postprocessMode === "code" && data.postprocessCode?.trim() ? "postprocess.py" : undefined),
       });
 
-      if (response.status >= 200 && response.status < 300) {
-        const version = response.data;
-        setCreatedVersionId(version.id);
+      const { chunkSize, urls: partUrls, uploadId, objectKey } = initiateRes.model;
+      abortableUpload = { objectKey, uploadId };
 
-        setUploadStatus("Model successfully uploaded and queued for compilation!");
-        setUploadProgress(100);
-        toast.success("Model uploaded and compilation started!");
-
-        setTimeout(() => {
-          router.push(options?.successRedirect?.(modelId) ?? `/models/${modelId}`);
-          router.refresh();
-        }, 800);
-      } else {
-        const errorMsg = response.data?.message || "Upload failed";
-        throw new Error(errorMsg);
+      // 3. Slice file into chunks
+      const chunks: Blob[] = [];
+      let start = 0;
+      while (start < data.modelFile!.size) {
+        chunks.push(data.modelFile!.slice(start, start + chunkSize));
+        start += chunkSize;
       }
+
+      setUploadProgress(30);
+      setUploadStatus("Uploading model weights in chunks...");
+
+      // 4. Upload chunks concurrently
+      const parts = await uploadChunksConcurrently(
+        chunks,
+        partUrls,
+        data.modelFile!.size,
+        (percent) => setUploadProgress(30 + Math.round(percent * 0.5)), // 50% of total progress
+      );
+      assertPartsAreContiguous(parts);
+
+      // 5. Upload scaler if needed
+      if (initiateRes.scaler && data.scalerFile) {
+        setUploadStatus("Uploading scaler artifact...");
+        await axios.put(initiateRes.scaler.url, data.scalerFile, {
+          headers: { 'Content-Type': 'application/octet-stream' }
+        });
+      }
+
+      // 6. Upload preprocessing if needed
+      if (initiateRes.preprocess) {
+        setUploadStatus("Uploading preprocessing script...");
+        let prepBlob: Blob;
+        if (data.preprocessMode === "file" && data.preprocessFile) {
+          prepBlob = data.preprocessFile;
+        } else {
+          prepBlob = new Blob([data.preprocessCode || ""], { type: "text/plain" });
+        }
+        await axios.put(initiateRes.preprocess.url, prepBlob, {
+          headers: { 'Content-Type': 'application/octet-stream' }
+        });
+      }
+
+      // 7. Upload postprocessing if needed
+      if (initiateRes.postprocess) {
+        setUploadStatus("Uploading postprocessing script...");
+        let postBlob: Blob;
+        if (data.postprocessMode === "file" && data.postprocessFile) {
+          postBlob = data.postprocessFile;
+        } else {
+          postBlob = new Blob([data.postprocessCode || ""], { type: "text/plain" });
+        }
+        await axios.put(initiateRes.postprocess.url, postBlob, {
+          headers: { 'Content-Type': 'application/octet-stream' }
+        });
+      }
+
+      // 8. Complete the upload on the backend
+      setUploadStatus("Completing upload registry stitching...");
+      setUploadProgress(90);
+
+      const completePayload = {
+        examplePayload: data.examplePayload || undefined,
+        expectedResult: data.expectedResult || undefined,
+        classLabels: data.classLabels || undefined,
+        triggerBuild: "true",
+        model: {
+          objectKey,
+          uploadId,
+          parts,
+        },
+        scaler: initiateRes.scaler ? { objectKey: initiateRes.scaler.objectKey } : undefined,
+        preprocess: initiateRes.preprocess ? { objectKey: initiateRes.preprocess.objectKey } : undefined,
+        postprocess: initiateRes.postprocess ? { objectKey: initiateRes.postprocess.objectKey } : undefined,
+      };
+
+      const version = await completeVersionUpload(modelId, completePayload);
+      abortableUpload = null; // Completed successfully — nothing left to abort.
+      setCreatedVersionId(version.id);
+
+      setUploadStatus("Model successfully uploaded and queued for compilation!");
+      setUploadProgress(100);
+      toast.success("Model uploaded and compilation started!");
+
+      setTimeout(() => {
+        router.push(`/models/${modelId}`);
+        router.refresh();
+      }, 800);
+
     } catch (e: unknown) {
       console.error(e);
-      let errMsg = "An unexpected error occurred during final submission.";
+      let errMsg = "An error occurred during submission.";
       if (axios.isAxiosError(e)) {
         errMsg = e.response?.data?.message || e.message || errMsg;
       } else if (e instanceof Error) {
         errMsg = e.message;
       }
+
+      // Best-effort cleanup of the orphaned multipart upload session. Never let
+      // an abort failure mask the original error being surfaced to the user.
+      if (modelId && abortableUpload) {
+        try {
+          await abortVersionUpload(modelId, abortableUpload.objectKey, abortableUpload.uploadId);
+        } catch (abortErr) {
+          console.error("Failed to abort orphaned upload session:", abortErr);
+        }
+      }
+
       setSubmitError(errMsg);
-      setIsUploading(false);
-      setUploadProgress(0);
       toast.error(errMsg);
+      setUploadProgress(0);
+      setUploadStatus("");
+      setIsUploading(false);
     }
   };
 
@@ -357,7 +408,12 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       toast.success("Model schema and configuration auto-detected successfully!");
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e);
-      toast.error(`Schema detection failed: ${errMsg}`);
+      toast.error(`Schema detection: ${errMsg}`);
+      if (model.size > LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES) {
+        toast.success("Proceeding with background schema auto-detection during compilation.");
+        // Mark as detected to allow stepping forward in wizard
+        setHasDetected(true);
+      }
     } finally {
       setIsDetectingSchema(false);
     }

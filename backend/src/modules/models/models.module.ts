@@ -11,6 +11,7 @@ import { InferenceDeploymentResolverService } from './services/inference-deploym
 import { InferenceCallPreparerService } from './services/inference-call-preparer.service';
 import { InferenceClient } from './services/inference-client.service';
 import { ModelsController } from './controllers/models.controller';
+import { UploadCleanupProcessor } from '../../shared/queue/processors/upload-cleanup.processor';
 import { SearchController } from './controllers/search.controller';
 import { SchemaController } from './controllers/schema.controller';
 import { IntegrationController } from './controllers/integration.controller';
@@ -54,6 +55,9 @@ import { OrganizationsModule } from '../organizations/organizations.module';
     BullModule.registerQueue({
       name: 'build-queue',
     }),
+    BullModule.registerQueue({
+      name: 'upload-cleanup-queue',
+    }),
     forwardRef(() => DeploymentsModule),
     HttpModule,
     MinioModule,
@@ -74,6 +78,7 @@ import { OrganizationsModule } from '../organizations/organizations.module';
     InferenceDeploymentResolverService,
     InferenceCallPreparerService,
     InferenceClient,
+    UploadCleanupProcessor,
   ],
   controllers: [
     SearchController,

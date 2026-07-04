@@ -12,6 +12,7 @@ import { User } from '../../users/entities/user.entity';
 import { Deployment } from '../../deployments/entities/deployment.entity';
 import { VersionStatus } from '../enums/version-status.enum';
 import { VersionReviewStatus } from '../enums/version-review-status.enum';
+import { SchemaDetectionStatus } from '../enums/schema-detection-status.enum';
 import { ModelVersionTestCase } from './model-version-test-case.entity';
 
 /**
@@ -118,6 +119,20 @@ export class ModelVersion {
    */
   @Column({ type: 'text', nullable: true })
   expectedResult: string | null;
+
+  /**
+   * Trust/review state of examplePayload/expectedResult: whether the provider
+   * supplied them manually, detection is still pending (deferred to the build
+   * pipeline), it was auto-detected but not yet reviewed, auto-detection
+   * failed and needs manual input, or the provider has confirmed it.
+   */
+  @Column({
+    name: 'schema_detection_status',
+    type: 'varchar',
+    enum: SchemaDetectionStatus,
+    default: SchemaDetectionStatus.MANUAL,
+  })
+  schemaDetectionStatus: SchemaDetectionStatus;
 
   /**
    * Mapping of class IDs to human-readable labels for classification models.

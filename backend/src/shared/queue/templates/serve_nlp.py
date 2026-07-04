@@ -4,6 +4,7 @@ import sys
 import uvicorn
 import importlib.util
 import inspect
+import threading
 
 otel_available = False
 if os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
@@ -82,65 +83,30 @@ if preprocess_func and preprocess_nargs >= 2 and preprocess_module:
         except Exception as e:
             print(f"Warning: load_metadata() failed: {e}")
 
-# Load model based on framework
+# C3: Lazy framework import / model load — see serve_tabular.py for the full
+# rationale. Deferred to the first /predict call so /health can return 200
+# as soon as uvicorn is bound, without waiting on transformers/torch/tf import.
 model_path = os.getenv("MODEL_PATH", "model.pkl")
 framework = os.getenv("FRAMEWORK", "SKLEARN")
 
-model = None
-try:
-    if framework == "TENSORFLOW":
-        import tensorflow as tf
+_model = None
+_model_lock = threading.Lock()
+_model_load_error = None
+_metadata_synced = False
 
-        # Patch Keras 3.x Layer base class to accept and ignore quantization_config
-        # This affects ALL layers (Dense, Embedding, LSTM, etc.) that have this
-        # parameter in their serialized config but don't accept it in __init__
-        try:
-            from keras.src.layers.layer import Layer as _KerasLayer
-            _orig_layer_init = _KerasLayer.__init__
-            def _patched_layer_init(self, *args, **kwargs):
-                kwargs.pop("quantization_config", None)
-                return _orig_layer_init(self, *args, **kwargs)
-            _KerasLayer.__init__ = _patched_layer_init
-        except Exception:
-            pass
 
-        try:
-            model = tf.keras.models.load_model(model_path)
-        except Exception:
-            # Fallback: model might be saved as a pickle via joblib
-            import joblib
-            model = joblib.load(model_path)
-    elif framework == "PYTORCH":
-        import torch
-        loaded = torch.load(model_path, map_location="cpu")
-        if isinstance(loaded, dict) or type(loaded).__name__ == "OrderedDict":
-            if preprocess_module and hasattr(preprocess_module, "load_model"):
-                model = preprocess_module.load_model(model_path)
-            else:
-                raise ValueError(
-                    "Loaded object is a state_dict (OrderedDict). "
-                    "Please define a 'load_model' function in preprocess.py "
-                    "to instantiate your PyTorch model architecture and load the weights."
-                )
-        else:
-            model = loaded
-        model.eval()
-    elif framework == "ONNX":
-        import onnxruntime
-        model = onnxruntime.InferenceSession(model_path)
-    else:
-        # SKLEARN, CUSTOM, or any other framework: use joblib
-        import joblib
-        model = joblib.load(model_path)
-except Exception as e:
-    print(f"Error loading {framework} model from {model_path}: {e}")
-    sys.exit(1)
-
-# Sync preprocess metadata max_len with the model's actual input shape
-# This prevents mismatches where the metadata says max_len=100 but the model expects 200
-if preprocess_metadata and model is not None:
+def _sync_preprocess_metadata():
+    """Sync preprocess metadata max_len with the model's actual input shape.
+    Prevents mismatches where metadata says max_len=100 but the model expects 200.
+    Must run after the model is loaded, so it is called from _load_model()."""
+    global _metadata_synced
+    if _metadata_synced:
+        return
+    _metadata_synced = True
+    if not preprocess_metadata or _model is None:
+        return
     try:
-        raw_shape = getattr(model, "input_shape", None)
+        raw_shape = getattr(_model, "input_shape", None)
         if isinstance(raw_shape, list):
             raw_shape = raw_shape[0]
         if raw_shape and len(raw_shape) == 2 and raw_shape[1] is not None:
@@ -151,6 +117,68 @@ if preprocess_metadata and model is not None:
                 preprocess_metadata["max_len"] = model_max_len
     except Exception as e:
         print(f"[serve_nlp] Could not sync max_len: {e}", flush=True)
+
+
+def _load_model():
+    """Loads (and caches) the model on first use. Thread-safe via _model_lock."""
+    global _model, _model_load_error
+    if _model is not None or _model_load_error is not None:
+        return
+    with _model_lock:
+        if _model is not None or _model_load_error is not None:
+            return
+        try:
+            if framework == "TENSORFLOW":
+                import tensorflow as tf
+
+                # Patch Keras 3.x Layer base class to accept and ignore quantization_config
+                # This affects ALL layers (Dense, Embedding, LSTM, etc.) that have this
+                # parameter in their serialized config but don't accept it in __init__
+                try:
+                    from keras.src.layers.layer import Layer as _KerasLayer
+                    _orig_layer_init = _KerasLayer.__init__
+                    def _patched_layer_init(self, *args, **kwargs):
+                        kwargs.pop("quantization_config", None)
+                        return _orig_layer_init(self, *args, **kwargs)
+                    _KerasLayer.__init__ = _patched_layer_init
+                except Exception:
+                    pass
+
+                try:
+                    _model = tf.keras.models.load_model(model_path)
+                except Exception:
+                    # Fallback: model might be saved as a pickle via joblib
+                    import joblib
+                    _model = joblib.load(model_path)
+            elif framework == "PYTORCH":
+                import torch
+                loaded = torch.load(model_path, map_location="cpu")
+                if isinstance(loaded, dict) or type(loaded).__name__ == "OrderedDict":
+                    if preprocess_module and hasattr(preprocess_module, "load_model"):
+                        _model = preprocess_module.load_model(model_path)
+                    else:
+                        raise ValueError(
+                            "Loaded object is a state_dict (OrderedDict). "
+                            "Please define a 'load_model' function in preprocess.py "
+                            "to instantiate your PyTorch model architecture and load the weights."
+                        )
+                else:
+                    _model = loaded
+                _model.eval()
+            elif framework == "ONNX":
+                import onnxruntime
+                _model = onnxruntime.InferenceSession(model_path)
+            else:
+                # SKLEARN, CUSTOM, or any other framework: use joblib
+                import joblib
+                _model = joblib.load(model_path)
+        except Exception as e:
+            _model_load_error = str(e)
+            print(f"Error loading {framework} model from {model_path}: {e}")
+            return
+
+        _sync_preprocess_metadata()
+
 
 # Helper to convert dataclass / arbitrary objects to JSON-safe dicts
 def _to_serializable(obj):
@@ -163,6 +191,11 @@ def _to_serializable(obj):
         return obj.tolist()
     return obj
 
+
+@app.get("/health")
+async def health():
+    # Process liveness only — not gated on model load. See C3 comment above.
+    return {"status": "ok"}
 
 
 @app.post("/predict")
@@ -179,6 +212,11 @@ async def predict(request: Request):
         if api_key != expected_api_key:
             from fastapi import HTTPException
             raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
+
+    _load_model()
+    if _model_load_error is not None:
+        return {"error": f"Model failed to load: {_model_load_error}"}
+    model = _model
 
     data = await request.json()
 

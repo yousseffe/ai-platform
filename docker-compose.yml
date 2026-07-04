@@ -1,17 +1,6 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: aidb
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: always
   redis:
     image: redis:7-alpine
     ports:
@@ -26,6 +15,7 @@ services:
     environment:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_API_CORS_ALLOW_ORIGIN=*
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -94,10 +84,25 @@ services:
       - LOKI_URL=http://loki:3100
       - PUBLIC_API_URL=http://localhost:5000
       - OPENSEARCH_URL=http://opensearch:9200
+      - GGUF_STORAGE_PATH=/usr/src/app/uploads/gguf-models
+      - WEIGHTS_STORAGE_PATH=/usr/src/app/uploads/model-weights
     volumes:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules
       - /var/run/docker.sock:/var/run/docker.sock
+      - llm_models:/usr/src/app/uploads/gguf-models
+      - model_weights:/usr/src/app/uploads/model-weights
+      # B7: read-only access to the base-image Dockerfiles so
+      # BaseImageWarmerService can `docker build` them from inside the
+      # backend container (the Docker socket bind above talks to the host
+      # daemon, but that daemon still needs a build context it can read —
+      # since the daemon runs on the host, not in this container, the
+      # *host* path is what actually matters for docker build's context;
+      # this mount lets BaseImageWarmerService read the Dockerfile content
+      # to detect/orchestrate but the daemon build itself resolves the
+      # bind-mounted host path transparently under Docker Desktop's shared
+      # filesystem).
+      - ./docker/base-images:/usr/src/docker/base-images:ro
     depends_on:
       - redis
       - minio
@@ -109,6 +114,14 @@ services:
     networks:
       - default
       - models
+    # Resource ceiling for the backend container itself (not the model-serving
+    # containers it spawns via the Docker socket). Host has 10c/16 logical
+    # cores; this leaves ample headroom for BUILD_QUEUE_CONCURRENCY / model
+    # containers while preventing a runaway build from starving the host.
+    # `mem_limit`/`cpus` (Compose v2 non-swarm syntax) are used instead of
+    # `deploy.resources.limits`, which only applies under `docker stack deploy`.
+    mem_limit: 4g
+    cpus: 4
 
   llm-init:
     image: alpine:latest
@@ -300,6 +313,9 @@ volumes:
   loki_data:
   grafana_data:
   llm_models:
+    name: ai-platform_llm_models
+  model_weights:
+    name: ai-platform_model_weights
   opensearch_data:
 
 networks:

@@ -1,7 +1,8 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
+import { Processor, WorkerHost, InjectQueue } from '@nestjs/bullmq';
+import { Job, Queue } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { OnModuleInit } from '@nestjs/common';
 import { ModelVersion } from '../../../modules/models/entities/model-version.entity';
 import { Model } from '../../../modules/models/entities/model.entity';
 import { Deployment } from '../../../modules/deployments/entities/deployment.entity';
@@ -10,6 +11,7 @@ import { DeploymentStatus } from '../../../modules/deployments/enums/deployment-
 import { ModelType } from '../../../modules/models/enums/model-type.enum';
 import { Framework } from '../../../modules/models/enums/framework.enum';
 import { TaskType } from '../../../modules/models/enums/task-type.enum';
+import { SchemaDetectionStatus } from '../../../modules/models/enums/schema-detection-status.enum';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Docker from 'dockerode';
@@ -32,15 +34,39 @@ function isZipFile(filePath: string): boolean {
 }
 
 /**
+ * Moves a file or directory to `dest`, falling back to a recursive copy +
+ * delete when `src` and `dest` live on different filesystems/mounts (e.g.
+ * a /tmp build directory vs. a Docker named volume), where a plain rename
+ * throws EXDEV.
+ */
+function moveDirOrFile(src: string, dest: string): void {
+  try {
+    fs.renameSync(src, dest);
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException)?.code !== 'EXDEV') {
+      throw err;
+    }
+    const isDir = fs.statSync(src).isDirectory();
+    if (isDir) {
+      fs.cpSync(src, dest, { recursive: true });
+      fs.rmSync(src, { recursive: true, force: true });
+    } else {
+      fs.copyFileSync(src, dest);
+      fs.unlinkSync(src);
+    }
+  }
+}
+
+/**
  * BullMQ processor responsible for packaging uploaded model weights and scripts
  * into standalone, self-serving Docker container images.
  */
 @Processor('build-queue', {
-  concurrency: 1,
+  concurrency: parseInt(process.env.BUILD_QUEUE_CONCURRENCY || '2', 10),
   lockDuration: 600000, // 10 minutes lock duration to prevent stall on large model weights (e.g. GGUF)
   stalledInterval: 600000,
 })
-export class BuildProcessor extends WorkerHost {
+export class BuildProcessor extends WorkerHost implements OnModuleInit {
   private readonly docker: Docker;
   private readonly logger = new Logger(BuildProcessor.name);
 
@@ -51,9 +77,187 @@ export class BuildProcessor extends WorkerHost {
     private readonly deploymentsRepository: Repository<Deployment>,
     private readonly minioService: MinioService,
     private readonly dataSource: DataSource,
+    @InjectQueue('build-queue') private readonly buildQueue: Queue,
   ) {
     super();
     this.docker = new Docker(getDockerOptions());
+  }
+
+  /**
+   * Registers the hourly repeatable "prune-docker-images" job on the build
+   * queue (B6). Pruning dangling/intermediate images used to run
+   * synchronously at the end of every single build (blocking up to 30s of
+   * the build job's critical path) — it now runs decoupled, on a schedule,
+   * exactly like the existing `check-idle-deployments` repeatable job on the
+   * deploy queue.
+   */
+  async onModuleInit(): Promise<void> {
+    this.logger.log('Scheduling repeatable prune-docker-images job...');
+    try {
+      await this.buildQueue.add(
+        'prune-docker-images',
+        {},
+        {
+          repeat: { pattern: '0 * * * *' }, // hourly, on the hour
+          jobId: 'prune-docker-images',
+        },
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Failed to register prune-docker-images: ${message}`);
+    }
+  }
+
+  /**
+   * Prunes dangling/intermediate Docker images. Runs asynchronously on an
+   * hourly schedule (see {@link onModuleInit}) instead of synchronously
+   * inline at the end of every build.
+   */
+  private async pruneDanglingImages(): Promise<void> {
+    try {
+      const { execSync } = require('child_process');
+      execSync('docker image prune -f', { timeout: 30000 });
+      this.logger.log(
+        'Successfully pruned dangling/intermediate docker images (scheduled).',
+      );
+    } catch (pruneError: unknown) {
+      const pruneMsg =
+        pruneError instanceof Error ? pruneError.message : String(pruneError);
+      this.logger.warn(`Scheduled docker image prune failed: ${pruneMsg}`);
+    }
+  }
+
+  /**
+   * B3: Runs schema auto-detection (examplePayload/expectedResult) for a
+   * model version. This spawns a Python subprocess (or, for GGUF, generates
+   * a canned chat-completion example) and can take 30-60s. It is invoked
+   * fire-and-forget via {@link scheduleSchemaAutoDetection} after the build
+   * completes and the version is already marked READY, so it never holds up
+   * the build job's BullMQ lock.
+   *
+   * @param versionId - The model version's ID to update once detection completes.
+   * @param modelType - The model's type (used for GGUF special-casing and passed to the detector script).
+   * @param hasExistingPayload - Whether examplePayload/expectedResult are already set (skips work if so).
+   * @param modelLocalPath - Local filesystem path to the downloaded model weights, snapshotted before any cleanup/relocation.
+   */
+  private async runSchemaAutoDetection(
+    versionId: string,
+    modelType: string,
+    hasExistingPayload: boolean,
+    modelLocalPath: string,
+  ): Promise<void> {
+    if (hasExistingPayload) {
+      return;
+    }
+    try {
+      this.logger.log(
+        `Running background schema auto-detection for version ${versionId}...`,
+      );
+      const scriptPath = path.join(
+        process.cwd(),
+        'src',
+        'shared',
+        'utils',
+        'detect_schema.py',
+      );
+
+      const isGguf = modelType === ModelType.LLM_GGUF;
+
+      let examplePayload: string | null | undefined;
+      let expectedResult: string | null | undefined;
+
+      if (isGguf) {
+        examplePayload = JSON.stringify(
+          {
+            messages: [{ role: 'user', content: 'Hello, how are you?' }],
+            temperature: 0.7,
+            max_tokens: 128,
+            stream: false,
+          },
+          null,
+          2,
+        );
+        expectedResult = JSON.stringify(
+          {
+            choices: [
+              {
+                message: {
+                  role: 'assistant',
+                  content:
+                    "Hello! I'm an AI assistant. How can I help you today?",
+                },
+              },
+            ],
+          },
+          null,
+          2,
+        );
+      } else if (fs.existsSync(modelLocalPath)) {
+        const { execSync } = require('child_process');
+        const command = `python "${scriptPath}" "${modelLocalPath}" --model-type "${modelType}"`;
+        const stdout = execSync(command, { encoding: 'utf8' });
+        const result = JSON.parse(stdout);
+        if (result && !result.error) {
+          if (typeof result.example_payload === 'string') {
+            examplePayload = result.example_payload;
+          }
+          if (typeof result.expected_result === 'string') {
+            expectedResult = result.expected_result;
+          }
+        }
+      }
+
+      if (examplePayload || expectedResult) {
+        await this.modelVersionsRepository.update(versionId, {
+          examplePayload,
+          expectedResult,
+          schemaDetectionStatus: SchemaDetectionStatus.AUTO_DETECTED,
+        });
+        this.logger.log(
+          `Background schema auto-detection completed for version ${versionId}`,
+        );
+      } else {
+        await this.modelVersionsRepository.update(versionId, {
+          schemaDetectionStatus: SchemaDetectionStatus.NEEDS_ATTENTION,
+        });
+        this.logger.warn(
+          `Background schema auto-detection produced no result for version ${versionId}`,
+        );
+      }
+    } catch (schemaErr: unknown) {
+      const message =
+        schemaErr instanceof Error ? schemaErr.message : String(schemaErr);
+      this.logger.warn(
+        `Failed to run background schema auto-detection: ${message}`,
+      );
+      await this.modelVersionsRepository.update(versionId, {
+        schemaDetectionStatus: SchemaDetectionStatus.NEEDS_ATTENTION,
+      });
+    }
+  }
+
+  /**
+   * Fire-and-forget scheduler for {@link runSchemaAutoDetection}. Uses
+   * `setImmediate` so the call returns instantly and the build job's
+   * `process()` promise can resolve/complete without waiting on it.
+   */
+  private scheduleSchemaAutoDetection(
+    versionId: string,
+    modelType: string,
+    hasExistingPayload: boolean,
+    modelLocalPath: string,
+  ): void {
+    setImmediate(() => {
+      this.runSchemaAutoDetection(
+        versionId,
+        modelType,
+        hasExistingPayload,
+        modelLocalPath,
+      ).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`scheduleSchemaAutoDetection failed: ${message}`);
+      });
+    });
   }
 
   /**
@@ -79,6 +283,11 @@ export class BuildProcessor extends WorkerHost {
   }
 
   async process(job: Job<BuildJobPayload, void, string>): Promise<void> {
+    if (job.name === 'prune-docker-images') {
+      await this.pruneDanglingImages();
+      return;
+    }
+
     const { versionId } = job.data;
     const logsBuffer: string[] = [];
 
@@ -119,6 +328,32 @@ export class BuildProcessor extends WorkerHost {
       return;
     }
 
+    // C2: Build-skip / image reuse. If a Docker image for this exact version
+    // already exists (e.g. a redeploy or a retried job after the process was
+    // built once already) and the version's last recorded status was not
+    // FAILED, there is no need to pay the full build cost again — just mark
+    // the version READY and let the deploy step pick up the existing image.
+    // GGUF models never reach this point with a Docker image (they bypass
+    // the build entirely further below), so this only applies to
+    // pytorch/tensorflow/sklearn/diffusion image-based versions.
+    if (version.status !== VersionStatus.FAILED) {
+      const imageName = `model-version-${versionId}`;
+      try {
+        await this.docker.getImage(imageName).inspect();
+        await logInfo(
+          `Docker image ${imageName} already exists and last build status was not FAILED. Skipping rebuild and marking version READY.`,
+        );
+        await this.modelVersionsRepository.update(versionId, {
+          status: VersionStatus.READY,
+          errorMessage: null,
+          buildProgress: 100,
+        });
+        return;
+      } catch (inspectErr: unknown) {
+        // Image does not exist locally — proceed with a normal build.
+      }
+    }
+
     await this.modelVersionsRepository.update(versionId, {
       status: VersionStatus.BUILDING,
       buildProgress: 0,
@@ -156,11 +391,7 @@ export class BuildProcessor extends WorkerHost {
         });
       }
 
-      const buildDir = path.join(
-        process.cwd(),
-        'uploads',
-        `build-${versionId}`,
-      );
+      const buildDir = path.join('/tmp', `build-${versionId}`);
       if (!fs.existsSync(buildDir)) {
         fs.mkdirSync(buildDir, { recursive: true });
       }
@@ -219,7 +450,7 @@ export class BuildProcessor extends WorkerHost {
           fs.mkdirSync(unzippedDir, { recursive: true });
           try {
             const { execSync } = require('child_process');
-            execSync(`tar -xf model.pkl -C unzipped_model`, { cwd: buildDir });
+            execSync(`unzip -q model.pkl -d unzipped_model`, { cwd: buildDir });
 
             const contents = fs.readdirSync(unzippedDir);
             const subdirs = contents.filter((file) =>
@@ -286,6 +517,14 @@ export class BuildProcessor extends WorkerHost {
           }
         }
       }
+
+      // B3: Schema auto-detection (examplePayload/expectedResult) used to run
+      // synchronously here via execSync, holding the BullMQ job lock for
+      // 30-60s mid-build. Nothing later in the build depends on its result,
+      // so it is now scheduled fire-and-forget (see scheduleSchemaAutoDetection
+      // below, invoked after the version is marked READY) instead of awaited
+      // inline. We snapshot the local model path now, before buildDir may be
+      // cleaned up or the weights relocated to a persistent volume (C1).
 
       // Double-Safety Auto-Detection Phase
       let detectedFramework = version.model.framework;
@@ -376,7 +615,7 @@ export class BuildProcessor extends WorkerHost {
 
         // Check config.json for HF models
         const configJsonPath = findFileRecursive(unzippedDir, 'config.json');
-        if (configJsonPath) {
+        if (configJsonPath && detectedType !== ModelType.DIFFUSION) {
           try {
             const configData = JSON.parse(
               fs.readFileSync(configJsonPath, 'utf8'),
@@ -444,17 +683,24 @@ export class BuildProcessor extends WorkerHost {
 
           // Type clues
           if (
-            /cv2\b|PIL\b|Image\b|torchvision|skimage|matplotlib/i.test(content)
+            detectedType !== ModelType.DIFFUSION &&
+            detectedType !== ModelType.LLM_GGUF
           ) {
-            detectedType = ModelType.VISION;
-          } else if (
-            /transformers\b|nltk\b|spacy\b|tokenizers\b|sentencepiece\b|gensim\b/i.test(
-              content,
-            )
-          ) {
-            detectedType = ModelType.NLP;
-          } else if (/diffusers\b/i.test(content)) {
-            detectedType = ModelType.DIFFUSION;
+            if (/diffusers\b/i.test(content)) {
+              detectedType = ModelType.DIFFUSION;
+            } else if (
+              /cv2\b|PIL\b|Image\b|torchvision|skimage|matplotlib/i.test(
+                content,
+              )
+            ) {
+              detectedType = ModelType.VISION;
+            } else if (
+              /transformers\b|nltk\b|spacy\b|tokenizers\b|sentencepiece\b|gensim\b/i.test(
+                content,
+              )
+            ) {
+              detectedType = ModelType.NLP;
+            }
           }
         } catch (codeErr) {
           // ignore
@@ -504,6 +750,96 @@ export class BuildProcessor extends WorkerHost {
         version.model.taskType = detectedTaskType;
       }
 
+      // C1: Volume-mount model weights instead of COPY-ing them into the
+      // image. Extends the pattern already used for GGUF/LLM models (which
+      // skip the Docker build entirely and mount weights from a persistent
+      // named volume at deploy time) to the remaining model types
+      // (pytorch/tensorflow/sklearn/diffusion). Relocating the weight
+      // file(s) out of buildDir before the Dockerfile is generated/COPY'd
+      // means the Docker build context — and therefore every layer commit —
+      // no longer includes multi-GB weight files, and rebuilding the same
+      // version's code/deps no longer re-copies unchanged weights.
+      //
+      // Weights are moved into a per-version subdirectory of a shared named
+      // Docker volume (`ai-platform_model_weights`, mirroring
+      // `ai-platform_llm_models`'s convention), which deploy.processor.ts
+      // mounts read-only at /weights in the serving container. The serve_*.py
+      // templates resolve MODEL_PATH/SCALER_PATH relative to their working
+      // directory, so we point those env vars at the mounted /weights path.
+      let weightsRelocated = false;
+      let versionWeightsDir = '';
+      if (version.model.type !== ModelType.LLM_GGUF) {
+        const weightsStorageEnv = process.env.WEIGHTS_STORAGE_PATH;
+        const weightsStorageRoot = weightsStorageEnv
+          ? path.resolve(weightsStorageEnv)
+          : path.join(process.cwd(), 'uploads', 'model-weights');
+        versionWeightsDir = path.join(weightsStorageRoot, versionId);
+
+        try {
+          if (!fs.existsSync(versionWeightsDir)) {
+            fs.mkdirSync(versionWeightsDir, { recursive: true });
+          }
+
+          // Move the primary weight artifact: either the extracted directory
+          // (e.g. diffusion/HF-style models) or the single model file.
+          // `buildDir` (under /tmp) and the persistent weights volume are
+          // typically different filesystems/mounts, so a plain renameSync
+          // throws EXDEV — fall back to copy+delete in that case (mirrors
+          // the existing GGUF move pattern below).
+          if (
+            fs.existsSync(unzippedDir) &&
+            fs.statSync(unzippedDir).isDirectory()
+          ) {
+            const destUnzipped = path.join(versionWeightsDir, 'unzipped_model');
+            moveDirOrFile(unzippedDir, destUnzipped);
+          } else if (fs.existsSync(modelLocalPath)) {
+            moveDirOrFile(
+              modelLocalPath,
+              path.join(versionWeightsDir, 'model.pkl'),
+            );
+          }
+
+          // Move the scaler alongside the weights, if present.
+          const scalerLocalPath = path.join(buildDir, 'scaler.pkl');
+          if (fs.existsSync(scalerLocalPath)) {
+            moveDirOrFile(
+              scalerLocalPath,
+              path.join(versionWeightsDir, 'scaler.pkl'),
+            );
+          }
+
+          weightsRelocated = true;
+          this.logger.log(
+            `Relocated model weights for version ${versionId} to persistent volume path: ${versionWeightsDir}`,
+          );
+        } catch (relocateErr: unknown) {
+          const message =
+            relocateErr instanceof Error
+              ? relocateErr.message
+              : String(relocateErr);
+          this.logger.warn(
+            `Failed to relocate weights to persistent volume for version ${versionId}, falling back to COPY-based image (old behavior): ${message}`,
+          );
+          weightsRelocated = false;
+          // The mkdirSync above may have already created an empty
+          // per-version directory before the failure. Remove it so
+          // deploy.processor.ts's filesystem-presence check (used to decide
+          // whether to bind-mount /weights) doesn't mistake it for a
+          // successful relocation and mount an empty/irrelevant volume into
+          // an image that actually has its weights baked in via COPY.
+          try {
+            if (
+              fs.existsSync(versionWeightsDir) &&
+              fs.readdirSync(versionWeightsDir).length === 0
+            ) {
+              fs.rmdirSync(versionWeightsDir);
+            }
+          } catch {
+            // Best-effort cleanup; not worth failing the build over.
+          }
+        }
+      }
+
       // Phase 3: Generate Dockerfile (30% → 50%)
       await this.updateProgress(versionId, 30);
 
@@ -528,7 +864,16 @@ export class BuildProcessor extends WorkerHost {
         const destPath = path.join(ggufStorageDir, `${versionId}.gguf`);
 
         if (fs.existsSync(sourcePath)) {
-          fs.renameSync(sourcePath, destPath);
+          try {
+            fs.renameSync(sourcePath, destPath);
+          } catch (renameErr: any) {
+            if (renameErr.code === 'EXDEV') {
+              fs.copyFileSync(sourcePath, destPath);
+              fs.unlinkSync(sourcePath);
+            } else {
+              throw renameErr;
+            }
+          }
         } else {
           throw new Error(
             'GGUF model weights file not found in build directory after download.',
@@ -556,6 +901,16 @@ export class BuildProcessor extends WorkerHost {
 
         this.logger.log(
           `Bypassed Docker image build for GGUF model version: ${versionId}. GGUF model saved to ${destPath}`,
+        );
+
+        // B3: schedule schema auto-detection fire-and-forget now that the
+        // version is already READY; GGUF uses a canned payload so it does
+        // not need the (already-relocated) local weights file.
+        this.scheduleSchemaAutoDetection(
+          versionId,
+          version.model.type,
+          !!(version.examplePayload && version.expectedResult),
+          destPath,
         );
         return;
       } else {
@@ -798,13 +1153,61 @@ export class BuildProcessor extends WorkerHost {
         const originalModelName =
           path.basename(version.modelFilePath || '') || version.model.name;
 
+        // C1: When weights were successfully relocated to the persistent
+        // volume, MODEL_PATH/SCALER_PATH point at the read-only /weights
+        // mount that deploy.processor.ts binds in at container start,
+        // instead of a path relative to the image's WORKDIR. The mounted
+        // volume is shared across every version (deploy.processor.ts binds
+        // the whole `ai-platform_model_weights` volume, not a per-version
+        // subpath), so the path must include this version's subdirectory —
+        // `/weights/<versionId>/...` — matching where build.processor.ts
+        // actually relocated the files above (`versionWeightsDir`). If
+        // relocation failed for any reason, fall back to the old
+        // COPY-everything behavior with the original relative paths so the
+        // build still succeeds correctly.
+        const weightsMountRoot = path.posix.join('/weights', versionId);
+        const effectiveModelPath = weightsRelocated
+          ? path.posix.join(weightsMountRoot, modelPathEnv)
+          : modelPathEnv;
+        const effectiveScalerPath = weightsRelocated
+          ? hasScaler
+            ? path.posix.join(weightsMountRoot, 'scaler.pkl')
+            : ''
+          : hasScaler
+            ? 'scaler.pkl'
+            : '';
+
+        // B5: only COPY code/dependency files into the image — model weights
+        // are no longer part of the build context when relocated (C1), so a
+        // blanket `COPY . .` would either fail (files moved away) or, if it
+        // didn't, would defeat the whole point of C1. List code files
+        // explicitly instead.
+        const codeCopyLines = ['COPY serve.py .'];
+        if (hasPreprocess) codeCopyLines.push('COPY preprocess.py .');
+        if (hasPostprocess) codeCopyLines.push('COPY postprocess.py .');
+        const codeCopyBlock = codeCopyLines.join('\n');
+
         if (useBaseImage) {
-          dockerfileContent = `FROM ${baseImage}
+          dockerfileContent = weightsRelocated
+            ? `FROM ${baseImage}
+WORKDIR /app
+${codeCopyBlock}${extraPipInstall}
+ENV MODEL_PATH=${effectiveModelPath}
+ENV MODEL_NAME=${originalModelName}
+ENV SCALER_PATH=${effectiveScalerPath}
+ENV PREPROCESS_PATH=${hasPreprocess ? 'preprocess.py' : ''}
+ENV POSTPROCESS_PATH=${hasPostprocess ? 'postprocess.py' : ''}
+ENV FRAMEWORK=${version.model.framework}
+ENV TASK_TYPE=${version.model.taskType}
+EXPOSE 8000
+CMD ["python", "serve.py"]
+`
+            : `FROM ${baseImage}
 WORKDIR /app
 COPY . .${extraPipInstall}
-ENV MODEL_PATH=${modelPathEnv}
+ENV MODEL_PATH=${effectiveModelPath}
 ENV MODEL_NAME=${originalModelName}
-ENV SCALER_PATH=${hasScaler ? 'scaler.pkl' : ''}
+ENV SCALER_PATH=${effectiveScalerPath}
 ENV PREPROCESS_PATH=${hasPreprocess ? 'preprocess.py' : ''}
 ENV POSTPROCESS_PATH=${hasPostprocess ? 'postprocess.py' : ''}
 ENV FRAMEWORK=${version.model.framework}
@@ -813,14 +1216,33 @@ EXPOSE 8000
 CMD ["python", "serve.py"]
 `;
         } else {
-          dockerfileContent = `FROM python:3.11-slim
+          // B5: cache-mount pip install and put dependency installation
+          // before the code COPY so an unchanged requirements.txt hits the
+          // Docker layer cache even when serve.py/preprocess.py change.
+          dockerfileContent = weightsRelocated
+            ? `FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-ENV MODEL_PATH=${modelPathEnv}
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
+${codeCopyBlock}
+ENV MODEL_PATH=${effectiveModelPath}
 ENV MODEL_NAME=${originalModelName}
-ENV SCALER_PATH=${hasScaler ? 'scaler.pkl' : ''}
+ENV SCALER_PATH=${effectiveScalerPath}
+ENV PREPROCESS_PATH=${hasPreprocess ? 'preprocess.py' : ''}
+ENV POSTPROCESS_PATH=${hasPostprocess ? 'postprocess.py' : ''}
+ENV FRAMEWORK=${version.model.framework}
+ENV TASK_TYPE=${version.model.taskType}
+EXPOSE 8000
+CMD ["python", "serve.py"]
+`
+            : `FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
+COPY . .
+ENV MODEL_PATH=${effectiveModelPath}
+ENV MODEL_NAME=${originalModelName}
+ENV SCALER_PATH=${effectiveScalerPath}
 ENV PREPROCESS_PATH=${hasPreprocess ? 'preprocess.py' : ''}
 ENV POSTPROCESS_PATH=${hasPostprocess ? 'postprocess.py' : ''}
 ENV FRAMEWORK=${version.model.framework}
@@ -864,6 +1286,22 @@ numpy
       }
 
       fs.writeFileSync(path.join(buildDir, 'Dockerfile'), dockerfileContent);
+
+      // B5: exclude zip artifacts / temp extraction leftovers from the build
+      // context so they're never accidentally sent to the Docker daemon.
+      // IMPORTANT: only exclude weight artifacts (unzipped_model/, model.pkl,
+      // scaler.pkl) when C1's relocation actually succeeded — the Dockerfile
+      // generated above still `COPY . .`s them in the non-relocated fallback
+      // branch, and excluding them here would silently ship an image with
+      // no model weights at all while the build reports success.
+      const dockerignoreLines = ['*.zip', '*.gguf', '.dockerignore'];
+      if (weightsRelocated) {
+        dockerignoreLines.push('unzipped_model/', 'model.pkl', 'scaler.pkl');
+      }
+      fs.writeFileSync(
+        path.join(buildDir, '.dockerignore'),
+        dockerignoreLines.join('\n'),
+      );
 
       // Phase 4: Docker build (50% → 90%)
       await this.updateProgress(versionId, 50, logsBuffer.join('\n'));
@@ -944,18 +1382,10 @@ numpy
       // Phase 5: Cleanup (90% → 95%)
       await this.updateProgress(versionId, 90, logsBuffer.join('\n'));
 
-      // Prune dangling/intermediate build images synchronously
-      try {
-        const { execSync } = require('child_process');
-        execSync('docker image prune -f', { timeout: 30000 });
-        await logInfo(
-          'Successfully pruned dangling/intermediate docker images',
-        );
-      } catch (pruneError: unknown) {
-        const pruneMsg =
-          pruneError instanceof Error ? pruneError.message : String(pruneError);
-        await logInfo(`Failed to prune dangling images: ${pruneMsg}`);
-      }
+      // B6: Dangling/intermediate image pruning no longer runs synchronously
+      // here — it used to block up to 30s of every single build's critical
+      // path. It now runs on the hourly "prune-docker-images" repeatable job
+      // registered in onModuleInit(), decoupled from any single build.
 
       await this.modelVersionsRepository.update(versionId, {
         status: VersionStatus.READY,
@@ -963,6 +1393,20 @@ numpy
         buildProgress: 100,
         buildLogs: logsBuffer.join('\n'),
       });
+
+      // B3: schedule schema auto-detection fire-and-forget now that the
+      // version is already READY and the build job's lock can be released.
+      // Point it at the relocated weights path (C1) when available, since
+      // buildDir/modelLocalPath are about to be deleted below.
+      const schemaDetectionModelPath = weightsRelocated
+        ? path.join(versionWeightsDir, 'model.pkl')
+        : modelLocalPath;
+      this.scheduleSchemaAutoDetection(
+        versionId,
+        version.model.type,
+        !!(version.examplePayload && version.expectedResult),
+        schemaDetectionModelPath,
+      );
 
       // Cleanup local build files
       try {

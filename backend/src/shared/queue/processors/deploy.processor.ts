@@ -20,7 +20,7 @@ import { RedisService } from '../../redis/redis.service';
  * model versions as running server instances inside isolated Docker containers.
  */
 @Processor('deploy-queue', {
-  concurrency: 1,
+  concurrency: parseInt(process.env.DEPLOY_QUEUE_CONCURRENCY || '3', 10),
   lockDuration: 300000, // 5 minutes lock duration to prevent stall if pulling base image (e.g. llama.cpp)
   stalledInterval: 300000,
 })
@@ -88,9 +88,28 @@ export class DeployProcessor extends WorkerHost {
       const activeDeployments = await this.deploymentsRepository.find({
         where: { status: DeploymentStatus.RUNNING },
       });
-      const usedPorts = new Set(
+      const usedPorts = new Set<number>(
         activeDeployments.map((d) => d.port).filter((p) => p != null),
       );
+
+      // Query Docker daemon for any containers already mapping host ports
+      try {
+        const containers = await this.docker.listContainers({ all: true });
+        for (const container of containers) {
+          if (container.Ports) {
+            for (const p of container.Ports) {
+              if (p.PublicPort) {
+                usedPorts.add(p.PublicPort);
+              }
+            }
+          }
+        }
+      } catch (dockerErr) {
+        this.logger.warn(
+          `Could not list docker containers for port check: ${dockerErr}`,
+        );
+      }
+
       let nextPort = 8000;
       while (usedPorts.has(nextPort)) {
         nextPort++;
@@ -147,9 +166,25 @@ export class DeployProcessor extends WorkerHost {
         LARGE: 2048, // 2 GB
       };
 
+      // Diffusion pipelines (UNet + VAE + text encoder + safety checker,
+      // loaded at fp32 on CPU) need well over 512MB even for a "tiny"
+      // model — the billing tier alone (which defaults new models to SMALL)
+      // isn't a reliable proxy for actual memory footprint for this model
+      // type. Enforce a floor so these don't get OOM-killed (exit 137)
+      // regardless of tier. Applied consistently everywhere TIER_RAM_MAP
+      // is used below so eviction accounting stays accurate.
+      const DIFFUSION_MIN_RAM_MB = 2048;
+      const getRamMb = (model: { tier?: string; type?: ModelType }): number => {
+        const tier = model.tier?.toUpperCase() || 'SMALL';
+        const tierRam = TIER_RAM_MAP[tier] || 512;
+        return model.type === ModelType.DIFFUSION
+          ? Math.max(tierRam, DIFFUSION_MIN_RAM_MB)
+          : tierRam;
+      };
+
       const newModelTier =
         deployment.modelVersion.model.tier?.toUpperCase() || 'SMALL';
-      const newModelRamMb = TIER_RAM_MAP[newModelTier] || 512;
+      const newModelRamMb = getRamMb(deployment.modelVersion.model);
       const MAX_SYSTEM_RAM_MB = parseInt(
         process.env.MAX_SYSTEM_RAM_MB || '3072',
         10,
@@ -166,8 +201,7 @@ export class DeployProcessor extends WorkerHost {
       });
 
       let currentSystemRamMb = runningDeployments.reduce((sum, dep) => {
-        const tier = dep.modelVersion.model.tier?.toUpperCase() || 'SMALL';
-        return sum + (TIER_RAM_MAP[tier] || 512);
+        return sum + getRamMb(dep.modelVersion.model);
       }, 0);
 
       this.logger.log(
@@ -205,7 +239,7 @@ export class DeployProcessor extends WorkerHost {
           const depToStop = item.dep;
           const depTier =
             depToStop.modelVersion.model.tier?.toUpperCase() || 'SMALL';
-          const depRamMb = TIER_RAM_MAP[depTier] || 512;
+          const depRamMb = getRamMb(depToStop.modelVersion.model);
 
           this.logger.warn(
             `Evicting deployment ${depToStop.id} (Tier: ${depTier}, ${depRamMb}MB) to free up memory. Last active: ${new Date(
@@ -250,18 +284,37 @@ export class DeployProcessor extends WorkerHost {
 
       if (!isLlm) {
         hostConfig.Memory = newModelRamMb * 1024 * 1024;
-      } else {
-        // Mount GGUF model file dynamically from the host filesystem
-        const storageDirEnv = process.env.GGUF_STORAGE_PATH;
-        const ggufStorageDir = storageDirEnv
-          ? path.resolve(storageDirEnv)
-          : path.join(process.cwd(), 'uploads', 'gguf-models');
-        const ggufPath = path.join(
-          ggufStorageDir,
-          `${deployment.modelVersion.id}.gguf`,
-        );
 
-        hostConfig.Binds = [`${ggufPath}:/models/model.gguf:ro`];
+        // C1: mount the shared model-weights volume read-only at /weights
+        // when build.processor.ts successfully relocated this version's
+        // weights out of the Docker image (see build.processor.ts's
+        // `weightsRelocated` flag). We detect this on disk rather than via a
+        // DB column, mirroring the existing GGUF convention of using the
+        // filesystem as the source of truth for weight location. If the
+        // version's weights were never relocated (e.g. an older build, or
+        // the relocation step failed and fell back to COPY-based image), no
+        // bind is added and the image's own COPY'd weights are used as
+        // before — this keeps both old and new images deployable.
+        const weightsStorageEnv = process.env.WEIGHTS_STORAGE_PATH;
+        const weightsStorageRoot = weightsStorageEnv
+          ? path.resolve(weightsStorageEnv)
+          : path.join(process.cwd(), 'uploads', 'model-weights');
+        const versionWeightsDir = path.join(
+          weightsStorageRoot,
+          deployment.modelVersion.id,
+        );
+        // Check for actual content, not just directory presence — build.processor.ts
+        // may leave an empty per-version directory behind if relocation failed
+        // partway through, which must not be mistaken for a successful relocation.
+        const hasRelocatedWeights =
+          fs.existsSync(versionWeightsDir) &&
+          fs.readdirSync(versionWeightsDir).length > 0;
+        if (hasRelocatedWeights) {
+          hostConfig.Binds = [`ai-platform_model_weights:/weights:ro`];
+        }
+      } else {
+        // Mount the GGUF named volume directly for native WSL2 I/O speeds
+        hostConfig.Binds = [`ai-platform_llm_models:/models:ro`];
       }
 
       const containerOptions: any = {
@@ -285,7 +338,7 @@ export class DeployProcessor extends WorkerHost {
         containerOptions.Entrypoint = [
           '/app/llama-server',
           '-m',
-          '/models/model.gguf',
+          `/models/${deployment.modelVersion.id}.gguf`,
           '--port',
           '8080',
           '--host',
@@ -432,6 +485,22 @@ export class DeployProcessor extends WorkerHost {
     });
   }
 
+  /**
+   * B4: Computes an increasing health-check re-poll delay so early attempts
+   * (while the container is most likely to become healthy soon) poll
+   * frequently, while later attempts back off to reduce unnecessary load on
+   * the backend/Docker daemon during long framework-import waits (e.g.
+   * PyTorch/TensorFlow/diffusion cold starts).
+   *
+   * @param attempt - The 1-indexed attempt number that is about to be scheduled.
+   * @returns The delay, in milliseconds, before the next health-check attempt.
+   */
+  private getHealthCheckBackoffMs(attempt: number): number {
+    if (attempt <= 5) return 2000;
+    if (attempt <= 15) return 5000;
+    return 10000;
+  }
+
   private async verifyDeploymentHealth(
     job: Job<any, void, string>,
   ): Promise<void> {
@@ -477,7 +546,11 @@ export class DeployProcessor extends WorkerHost {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout for health probe
+      const probeTimeoutMs = parseInt(
+        process.env.HEALTH_PROBE_TIMEOUT_MS || '5000',
+        10,
+      );
+      const timeoutId = setTimeout(() => controller.abort(), probeTimeoutMs);
 
       const response = await fetch(`${url}/health`, {
         signal: controller.signal,
@@ -543,11 +616,13 @@ export class DeployProcessor extends WorkerHost {
           : 'Model container failed to start responding within 75 seconds.',
       });
     } else {
-      // Re-queue health check with 5s delay
+      // Re-queue health check with an increasing backoff delay (B4):
+      // denser early on, sparser for long-running framework-import waits.
+      const nextAttempt = attempt + 1;
       await this.deployQueue.add(
         'verify-deployment-health',
-        { deploymentId, attempt: attempt + 1 },
-        { delay: 5000 },
+        { deploymentId, attempt: nextAttempt },
+        { delay: this.getHealthCheckBackoffMs(nextAttempt) },
       );
     }
   }

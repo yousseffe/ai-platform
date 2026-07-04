@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { join } from 'path';
+import { join, dirname } from 'path';
 
 const execPromise = promisify(exec);
 import { Queue } from 'bullmq';
@@ -23,9 +23,13 @@ import { ModelVersionReviewEvent } from '../entities/model-version-review-event.
 import { ModelReview } from '../entities/model-review.entity';
 import { ApiKey } from '../../auth/entities/api-key.entity';
 import { CreateReviewDto } from '../dto/create-review.dto';
+import { InitiateUploadDto } from '../dto/initiate-upload.dto';
+import { CompleteUploadDto } from '../dto/complete-upload.dto';
+import { AbortUploadDto } from '../dto/abort-upload.dto';
 import { VersionStatus } from '../enums/version-status.enum';
 import { VersionReviewStatus } from '../enums/version-review-status.enum';
 import { VersionReviewAction } from '../enums/version-review-action.enum';
+import { SchemaDetectionStatus } from '../enums/schema-detection-status.enum';
 import { ModelType } from '../enums/model-type.enum';
 import { TaskType } from '../enums/task-type.enum';
 import { Framework } from '../enums/framework.enum';
@@ -310,19 +314,101 @@ export class ModelsService {
    * @throws {NotFoundException} If the parent model does not exist.
    * @throws {BadRequestException} If required file is missing and no previous version exists.
    */
-  async uploadVersion(
+  async initiateVersionUpload(
     modelId: string,
-    files: {
-      model?: Express.Multer.File[];
-      scaler?: Express.Multer.File[];
-      preprocess?: Express.Multer.File[];
-      postprocess?: Express.Multer.File[];
-    },
-    examplePayload?: string,
-    expectedResult?: string,
-    triggerBuild?: string,
+    dto: InitiateUploadDto,
     uploaderUserId?: string,
-    classLabels?: string,
+  ): Promise<any> {
+    const model = await this.modelsRepository.findOne({
+      where: { id: modelId },
+      relations: ['versions', 'user', 'organization'],
+    });
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+    if (model.organization) {
+      if (!uploaderUserId) {
+        throw new ForbiddenException('Missing authenticated uploader');
+      }
+      await this.assertProviderOrgAccess(
+        model.organization.id,
+        uploaderUserId,
+        [OrgRole.OWNER, OrgRole.MAINTAINER, OrgRole.CONTRIBUTOR],
+      );
+    } else if (uploaderUserId && model.user?.id !== uploaderUserId) {
+      throw new ForbiddenException('Only the model owner can upload versions');
+    }
+
+    const versionNumber = model.versions.length + 1;
+    const ownerScope =
+      model.organization?.slug ??
+      (model.user?.email ? model.user.email.split('@')[0] : 'unknown');
+    const sanitizedOwnerScope = ownerScope
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .toLowerCase();
+    const sanitizedName = model.name
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .toLowerCase();
+
+    const result: any = {
+      versionNumber,
+      model: {},
+    };
+
+    // Calculate chunks for model file
+    const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB
+    const chunkCount = Math.ceil(dto.modelSize / CHUNK_SIZE);
+    if (chunkCount === 0) {
+      throw new BadRequestException('modelSize must be greater than 0');
+    }
+    const modelObjectKey = `${sanitizedOwnerScope}/${sanitizedName}/v${versionNumber}/model-${dto.modelFilename}`;
+    const uploadId = await this.minioService.initiateMultipartUpload(
+      modelObjectKey,
+      'application/octet-stream',
+    );
+    const urls: { partNumber: number; url: string }[] = [];
+
+    for (let i = 1; i <= chunkCount; i++) {
+      const url = await this.minioService.generatePresignedUrlForPut(
+        modelObjectKey,
+        uploadId,
+        i,
+      );
+      urls.push({ partNumber: i, url });
+    }
+
+    result.model = {
+      objectKey: modelObjectKey,
+      uploadId,
+      chunkSize: CHUNK_SIZE,
+      urls,
+    };
+
+    if (dto.scalerFilename) {
+      const objectKey = `${sanitizedOwnerScope}/${sanitizedName}/v${versionNumber}/scaler-${dto.scalerFilename}`;
+      const url = await this.minioService.generatePresignedUrlForPut(objectKey);
+      result.scaler = { objectKey, url };
+    }
+
+    if (dto.preprocessFilename) {
+      const objectKey = `${sanitizedOwnerScope}/${sanitizedName}/v${versionNumber}/preprocess-${dto.preprocessFilename}`;
+      const url = await this.minioService.generatePresignedUrlForPut(objectKey);
+      result.preprocess = { objectKey, url };
+    }
+
+    if (dto.postprocessFilename) {
+      const objectKey = `${sanitizedOwnerScope}/${sanitizedName}/v${versionNumber}/postprocess-${dto.postprocessFilename}`;
+      const url = await this.minioService.generatePresignedUrlForPut(objectKey);
+      result.postprocess = { objectKey, url };
+    }
+
+    return result;
+  }
+
+  async completeVersionUpload(
+    modelId: string,
+    dto: CompleteUploadDto,
+    uploaderUserId?: string,
   ): Promise<ModelVersion> {
     const model = await this.modelsRepository.findOne({
       where: { id: modelId },
@@ -352,84 +438,62 @@ export class ModelsService {
       )[0];
     }
 
-    const ownerScope =
-      model.organization?.slug ??
-      (model.user?.email ? model.user.email.split('@')[0] : 'unknown');
-    const sanitizedOwnerScope = ownerScope
-      .replace(/[^a-zA-Z0-9]/g, '_')
-      .toLowerCase();
-    const sanitizedName = model.name
-      .replace(/[^a-zA-Z0-9]/g, '_')
-      .toLowerCase();
+    // Complete the multipart upload
+    const modelObjectKey = dto.model.objectKey;
+    const uploadId = dto.model.uploadId;
 
-    // Auto-detect schema prior to uploading and deleting the local file if schemas are not fully provided
-    let detectedExamplePayload: string | null = null;
-    let detectedExpectedResult: string | null = null;
+    this.assertPartsAreContiguous(dto.model.parts);
 
-    if (files.model?.[0] && (!examplePayload || !expectedResult)) {
-      try {
-        const scriptPath = join(
-          process.cwd(),
-          'src',
-          'shared',
-          'utils',
-          'detect_schema.py',
-        );
-        const command = `python "${scriptPath}" "${files.model[0].path}"`;
-        const { stdout } = await execPromise(command);
-        const result = JSON.parse(stdout) as Record<string, unknown>;
-        if (result && !result.error) {
-          if (typeof result.example_payload === 'string') {
-            detectedExamplePayload = result.example_payload;
-          }
-          if (typeof result.expected_result === 'string') {
-            detectedExpectedResult = result.expected_result;
-          }
+    if (this.minioService.isFallbackActive()) {
+      // Stitch file chunks locally
+      const targetPath = join(
+        process.cwd(),
+        'uploads',
+        'local-s3',
+        'models',
+        modelObjectKey,
+      );
+      const targetDir = dirname(targetPath);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      const writeStream = fs.createWriteStream(targetPath);
+      // Sort parts by part number
+      const sortedParts = [...dto.model.parts].sort((a, b) => a.partNumber - b.partNumber);
+
+      for (const part of sortedParts) {
+        const partPath = `${targetPath}.part-${part.partNumber}`;
+        if (!fs.existsSync(partPath)) {
+          throw new BadRequestException(`Missing chunk part ${part.partNumber}`);
         }
-      } catch (err: unknown) {
-        console.warn(
-          `Failed to auto-detect schema during upload: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    }
-
-    const uploadToMinio = async (
-      file: Express.Multer.File | undefined,
-      prefix: string,
-    ): Promise<string | null> => {
-      if (!file) {
-        return null;
-      }
-      const objectName = `${sanitizedOwnerScope}/${sanitizedName}/v${versionNumber}/${prefix}-${file.originalname}`;
-      await this.minioService.uploadFile(objectName, file.path, file.mimetype);
-      try {
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
+        const chunkBuffer = fs.readFileSync(partPath);
+        writeStream.write(chunkBuffer);
+        // Clean up part file
+        try {
+          fs.unlinkSync(partPath);
+        } catch (e) {
+          console.warn(`Failed to delete part file: ${partPath}`, e);
         }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn(`Failed to cleanup temp upload file: ${message}`);
       }
-      return objectName;
-    };
-
-    const modelObjName = await uploadToMinio(files.model?.[0], 'model');
-    const scalerObjName = await uploadToMinio(files.scaler?.[0], 'scaler');
-    const preprocessObjName = await uploadToMinio(
-      files.preprocess?.[0],
-      'preprocess',
-    );
-    const postprocessObjName = await uploadToMinio(
-      files.postprocess?.[0],
-      'postprocess',
-    );
-
-    const finalModelPath = modelObjName || prevVersion?.modelFilePath;
-    if (!finalModelPath) {
-      throw new BadRequestException(
-        'Model weights file is required for the first version',
+      writeStream.end();
+    } else {
+      // Call Minio to complete the multipart upload
+      const mappedParts = dto.model.parts.map(p => ({
+        part: p.partNumber,
+        etag: p.etag,
+      }));
+      await this.minioService.completeMultipartUpload(
+        modelObjectKey,
+        uploadId,
+        mappedParts,
       );
     }
+
+    const finalModelPath = modelObjectKey;
+    const scalerPath = dto.scaler?.objectKey || prevVersion?.scalerFilePath || null;
+    const preprocessPath = dto.preprocess?.objectKey || prevVersion?.preprocessFilePath || null;
+    const postprocessPath = dto.postprocess?.objectKey || prevVersion?.postprocessFilePath || null;
 
     const parseJsonSafely = (val?: string): Record<string, any> | null => {
       if (!val) return null;
@@ -440,34 +504,39 @@ export class ModelsService {
       }
     };
 
+    const examplePayload = dto.examplePayload || prevVersion?.examplePayload || null;
+    const expectedResult = dto.expectedResult || prevVersion?.expectedResult || null;
+
+    // Providing either field fresh always means "manually supplied this time".
+    // Otherwise, if a value was inherited from the previous version, carry its
+    // review status forward; if there's nothing at all, detection is deferred
+    // to the build pipeline (B3/Part D).
+    let schemaDetectionStatus: SchemaDetectionStatus;
+    if (dto.examplePayload || dto.expectedResult) {
+      schemaDetectionStatus = SchemaDetectionStatus.MANUAL;
+    } else if (examplePayload || expectedResult) {
+      schemaDetectionStatus =
+        prevVersion?.schemaDetectionStatus ?? SchemaDetectionStatus.MANUAL;
+    } else {
+      schemaDetectionStatus = SchemaDetectionStatus.PENDING;
+    }
+
     const modelVersion = this.modelVersionsRepository.create({
       model,
       uploadedBy: uploaderUserId ? { id: uploaderUserId } : null,
       versionNumber,
-      status: model.organization
-        ? VersionStatus.UPLOADED
-        : VersionStatus.UPLOADED,
+      status: VersionStatus.UPLOADED,
       reviewStatus: model.organization
         ? VersionReviewStatus.PENDING
         : VersionReviewStatus.NOT_REQUIRED,
       modelFilePath: finalModelPath,
-      scalerFilePath: scalerObjName || prevVersion?.scalerFilePath || null,
-      preprocessFilePath:
-        preprocessObjName || prevVersion?.preprocessFilePath || null,
-      postprocessFilePath:
-        postprocessObjName || prevVersion?.postprocessFilePath || null,
-      examplePayload:
-        examplePayload ||
-        detectedExamplePayload ||
-        prevVersion?.examplePayload ||
-        null,
-      expectedResult:
-        expectedResult ||
-        detectedExpectedResult ||
-        prevVersion?.expectedResult ||
-        null,
-      classLabels:
-        parseJsonSafely(classLabels) || prevVersion?.classLabels || null,
+      scalerFilePath: scalerPath,
+      preprocessFilePath: preprocessPath,
+      postprocessFilePath: postprocessPath,
+      examplePayload,
+      expectedResult,
+      classLabels: parseJsonSafely(dto.classLabels) || prevVersion?.classLabels || null,
+      schemaDetectionStatus,
     });
 
     const savedVersion = await this.modelVersionsRepository.save(modelVersion);
@@ -483,20 +552,131 @@ export class ModelsService {
       metadata: {
         reviewRequired: Boolean(model.organization),
         files: {
-          model: Boolean(modelObjName),
-          scaler: Boolean(scalerObjName),
-          preprocess: Boolean(preprocessObjName),
-          postprocess: Boolean(postprocessObjName),
+          model: true,
+          scaler: Boolean(dto.scaler?.objectKey),
+          preprocess: Boolean(dto.preprocess?.objectKey),
+          postprocess: Boolean(dto.postprocess?.objectKey),
         },
       },
     });
 
-    if (!model.organization && triggerBuild !== 'false') {
-      // Dispatch job to build queue
+    if (!model.organization && dto.triggerBuild !== 'false') {
       await this.buildQueue.add('build-model', { versionId: savedVersion.id });
     }
 
     return savedVersion;
+  }
+
+  /**
+   * Verifies that a collected set of multipart upload parts is exactly
+   * contiguous from 1..N with no gaps or duplicates before allowing the
+   * upload to be completed. Defense-in-depth alongside the client-side check.
+   *
+   * @param parts - The parts reported as uploaded by the client.
+   * @throws {BadRequestException} If parts are missing, duplicated, or non-contiguous.
+   */
+  private assertPartsAreContiguous(parts: { partNumber: number }[]): void {
+    if (!parts || parts.length === 0) {
+      throw new BadRequestException('No uploaded parts were provided');
+    }
+    const sortedPartNumbers = [...parts]
+      .map((p) => p.partNumber)
+      .sort((a, b) => a - b);
+
+    for (let i = 0; i < sortedPartNumbers.length; i++) {
+      if (sortedPartNumbers[i] !== i + 1) {
+        throw new BadRequestException(
+          'Uploaded parts must be contiguous starting at 1, with no gaps or duplicates',
+        );
+      }
+    }
+  }
+
+  /**
+   * Aborts an in-progress multipart upload session, releasing any orphaned
+   * storage-side state so it does not leak. Reuses the same ownership/access
+   * checks as {@link initiateVersionUpload} and {@link completeVersionUpload}.
+   *
+   * @param modelId - The parent model UUID.
+   * @param dto - The object key and upload session ID to abort.
+   * @param requestingUserId - The authenticated caller's user UUID.
+   * @throws {NotFoundException} If the model does not exist.
+   * @throws {ForbiddenException} If the caller does not own the model/organization.
+   */
+  async abortVersionUpload(
+    modelId: string,
+    dto: AbortUploadDto,
+    requestingUserId?: string,
+  ): Promise<{ success: boolean }> {
+    const model = await this.modelsRepository.findOne({
+      where: { id: modelId },
+      relations: ['versions', 'user', 'organization'],
+    });
+    if (!model) {
+      throw new NotFoundException('Model not found');
+    }
+    if (model.organization) {
+      if (!requestingUserId) {
+        throw new ForbiddenException('Missing authenticated uploader');
+      }
+      await this.assertProviderOrgAccess(
+        model.organization.id,
+        requestingUserId,
+        [OrgRole.OWNER, OrgRole.MAINTAINER, OrgRole.CONTRIBUTOR],
+      );
+    } else if (requestingUserId && model.user?.id !== requestingUserId) {
+      throw new ForbiddenException('Only the model owner can abort uploads');
+    }
+
+    await this.minioService.abortMultipartUpload(dto.objectKey, dto.uploadId);
+    return { success: true };
+  }
+
+  /**
+   * Lets the provider review and, optionally, correct a schema that was
+   * auto-detected during the build pipeline, marking it as confirmed.
+   * Safe to call regardless of the version's current schema status.
+   *
+   * @param versionId - The model version's UUID.
+   * @param actorId - The authenticated caller's user UUID.
+   * @param examplePayload - Optional replacement sample request JSON.
+   * @param expectedResult - Optional replacement sample response JSON.
+   * @throws {NotFoundException} If the version does not exist.
+   * @throws {ForbiddenException} If the caller does not own the model/organization.
+   */
+  async confirmSchemaDetection(
+    versionId: string,
+    actorId: string,
+    examplePayload?: string,
+    expectedResult?: string,
+  ): Promise<ModelVersion> {
+    const version = await this.modelVersionsRepository.findOne({
+      where: { id: versionId },
+      relations: ['model', 'model.organization', 'model.user'],
+    });
+    if (!version) {
+      throw new NotFoundException('Model version not found');
+    }
+    const model = version.model;
+    if (model.organization) {
+      await this.assertProviderOrgAccess(model.organization.id, actorId, [
+        OrgRole.OWNER,
+        OrgRole.MAINTAINER,
+        OrgRole.CONTRIBUTOR,
+      ]);
+    } else if (model.user?.id !== actorId) {
+      throw new ForbiddenException('Only the model owner can confirm the schema');
+    }
+
+    if (examplePayload) {
+      version.examplePayload = examplePayload;
+    }
+    if (expectedResult) {
+      version.expectedResult = expectedResult;
+    }
+    version.schemaDetectionStatus = SchemaDetectionStatus.CONFIRMED;
+
+    return this.modelVersionsRepository.save(version);
   }
 
   async addVersionTestCase(
@@ -950,7 +1130,7 @@ export class ModelsService {
     // Delete local GGUF file if it exists
     const storageDirEnv = process.env.GGUF_STORAGE_PATH;
     const ggufStorageDir = storageDirEnv
-      ? join(process.cwd(), storageDirEnv)
+      ? (require('path').isAbsolute(storageDirEnv) ? storageDirEnv : join(process.cwd(), storageDirEnv))
       : join(process.cwd(), 'uploads', 'gguf-models');
     const ggufPath = join(ggufStorageDir, `${versionId}.gguf`);
     if (fs.existsSync(ggufPath)) {
@@ -959,6 +1139,18 @@ export class ModelsService {
       } catch (e: any) {
         console.warn(
           `Failed to delete local GGUF file ${ggufPath}: ${e.message || e}`,
+        );
+      }
+    }
+
+    // Delete temporary build directory if it was left behind
+    const buildDir = join(process.cwd(), 'uploads', `build-${versionId}`);
+    if (fs.existsSync(buildDir)) {
+      try {
+        fs.rmSync(buildDir, { recursive: true, force: true });
+      } catch (e: any) {
+        console.warn(
+          `Failed to delete build directory ${buildDir}: ${e.message || e}`,
         );
       }
     }

@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { getSession } from "next-auth/react";
-import { detectSchema } from "@/lib/services/models.service";
+import { detectSchema, initiateVersionUpload, completeVersionUpload, abortVersionUpload } from "@/lib/services/models.service";
+import { uploadChunksConcurrently, assertPartsAreContiguous } from "@/lib/utils/multipart-upload.util";
+import { LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES } from "@/lib/utils/upload-thresholds";
 
 /**
  * Custom React hook to coordinate model version uploads.
@@ -61,7 +63,10 @@ export function useUploadVersion(modelId: string, modelType?: string) {
       toast.success("Model schema detected and loaded successfully!");
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e);
-      toast.error(`Schema detection failed: ${errMsg}`);
+      toast.error(`Schema detection: ${errMsg}`);
+      if (modelFile.size > LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES) {
+        toast.success("Proceeding with background schema auto-detection during compilation.");
+      }
     } finally {
       setIsDetectingSchema(false);
     }
@@ -72,68 +77,116 @@ export function useUploadVersion(modelId: string, modelType?: string) {
    * uploads them to the server with progress tracking, and redirects back.
    */
   const handleUploadVersion = async () => {
+    if (!modelFile) {
+      toast.error("Please upload a model weights file first.");
+      return;
+    }
+
     setIsUploading(true);
-    setUploadStatus("Preparing version packaging...");
-    setUploadProgress(10);
+    setUploadStatus("Initializing upload registry session...");
+    setUploadProgress(5);
+
+    let abortableUpload: { objectKey: string; uploadId: string } | null = null;
 
     try {
-      const formData = new FormData();
-      if (modelFile) formData.append("model", modelFile);
-      if (scalerFile) formData.append("scaler", scalerFile);
-
-      if (preprocessMode === "file" && preprocessFile) {
-        formData.append("preprocess", preprocessFile);
-      } else if (preprocessMode === "code" && preprocessCode?.trim()) {
-        const blob = new Blob([preprocessCode], { type: "text/plain" });
-        formData.append("preprocess", blob, "preprocess.py");
-      }
-
-      if (postprocessMode === "file" && postprocessFile) {
-        formData.append("postprocess", postprocessFile);
-      } else if (postprocessMode === "code" && postprocessCode?.trim()) {
-        const blob = new Blob([postprocessCode], { type: "text/plain" });
-        formData.append("postprocess", blob, "postprocess.py");
-      }
-
-      if (examplePayload) formData.append("examplePayload", examplePayload);
-      if (expectedResult) formData.append("expectedResult", expectedResult);
-      formData.append("triggerBuild", "true");
-
-      setUploadStatus("Uploading artifacts to registry...");
-      setUploadProgress(20);
-
-      const session = await getSession();
-      const token = session?.accessToken;
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
-
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await axios.post(`${backendUrl}/api/v1/models/${modelId}/versions`, formData, {
-        headers,
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const percentCompleted = Math.round((progressEvent.loaded * 80) / progressEvent.total);
-            setUploadProgress(20 + percentCompleted);
-          }
-        },
+      // 1. Request presigned URLs from backend
+      const initiateRes = await initiateVersionUpload(modelId, {
+        modelFilename: modelFile.name,
+        modelSize: modelFile.size,
+        scalerFilename: scalerFile?.name,
+        preprocessFilename: preprocessMode === "file" && preprocessFile ? preprocessFile.name : (preprocessMode === "code" && preprocessCode?.trim() ? "preprocess.py" : undefined),
+        postprocessFilename: postprocessMode === "file" && postprocessFile ? postprocessFile.name : (postprocessMode === "code" && postprocessCode?.trim() ? "postprocess.py" : undefined),
       });
 
-      if (response.status >= 200 && response.status < 300) {
-        setUploadStatus("Version successfully pushed and queued for build!");
-        setUploadProgress(100);
-        toast.success("New version uploaded and compilation started!");
+      const { chunkSize, urls: partUrls, uploadId, objectKey } = initiateRes.model;
+      abortableUpload = { objectKey, uploadId };
 
-        setTimeout(() => {
-          router.push(`/models/${modelId}`);
-          router.refresh();
-        }, 800);
-      } else {
-        const errorMsg = response.data?.message || "Upload failed";
-        throw new Error(errorMsg);
+      // 2. Slice file into chunks
+      const chunks: Blob[] = [];
+      let start = 0;
+      while (start < modelFile.size) {
+        chunks.push(modelFile.slice(start, start + chunkSize));
+        start += chunkSize;
       }
+
+      setUploadProgress(10);
+      setUploadStatus("Uploading model weights in chunks...");
+
+      // 3. Upload chunks concurrently
+      const parts = await uploadChunksConcurrently(
+        chunks,
+        partUrls,
+        modelFile.size,
+        (percent) => setUploadProgress(10 + Math.round(percent * 0.7)), // 70% of total progress
+      );
+      assertPartsAreContiguous(parts);
+
+      // 4. Upload scaler if needed
+      if (initiateRes.scaler && scalerFile) {
+        setUploadStatus("Uploading scaler artifact...");
+        await axios.put(initiateRes.scaler.url, scalerFile, {
+          headers: { 'Content-Type': 'application/octet-stream' }
+        });
+      }
+
+      // 5. Upload preprocessing if needed
+      if (initiateRes.preprocess) {
+        setUploadStatus("Uploading preprocessing script...");
+        let prepBlob: Blob;
+        if (preprocessMode === "file" && preprocessFile) {
+          prepBlob = preprocessFile;
+        } else {
+          prepBlob = new Blob([preprocessCode], { type: "text/plain" });
+        }
+        await axios.put(initiateRes.preprocess.url, prepBlob, {
+          headers: { 'Content-Type': 'application/octet-stream' }
+        });
+      }
+
+      // 6. Upload postprocessing if needed
+      if (initiateRes.postprocess) {
+        setUploadStatus("Uploading postprocessing script...");
+        let postBlob: Blob;
+        if (postprocessMode === "file" && postprocessFile) {
+          postBlob = postprocessFile;
+        } else {
+          postBlob = new Blob([postprocessCode], { type: "text/plain" });
+        }
+        await axios.put(initiateRes.postprocess.url, postBlob, {
+          headers: { 'Content-Type': 'application/octet-stream' }
+        });
+      }
+
+      // 7. Complete the upload on the backend
+      setUploadStatus("Completing upload registry stitching...");
+      setUploadProgress(90);
+
+      const completePayload = {
+        examplePayload: examplePayload || undefined,
+        expectedResult: expectedResult || undefined,
+        triggerBuild: "true",
+        model: {
+          objectKey,
+          uploadId,
+          parts,
+        },
+        scaler: initiateRes.scaler ? { objectKey: initiateRes.scaler.objectKey } : undefined,
+        preprocess: initiateRes.preprocess ? { objectKey: initiateRes.preprocess.objectKey } : undefined,
+        postprocess: initiateRes.postprocess ? { objectKey: initiateRes.postprocess.objectKey } : undefined,
+      };
+
+      await completeVersionUpload(modelId, completePayload);
+      abortableUpload = null; // Completed successfully — nothing left to abort.
+
+      setUploadStatus("Version successfully pushed and queued for build!");
+      setUploadProgress(100);
+      toast.success("New version uploaded and compilation started!");
+
+      setTimeout(() => {
+        router.push(`/models/${modelId}`);
+        router.refresh();
+      }, 800);
+
     } catch (e: unknown) {
       console.error(e);
       let errMsg = "An error occurred during submission.";
@@ -142,6 +195,17 @@ export function useUploadVersion(modelId: string, modelType?: string) {
       } else if (e instanceof Error) {
         errMsg = e.message;
       }
+
+      // Best-effort cleanup of the orphaned multipart upload session. Never let
+      // an abort failure mask the original error being surfaced to the user.
+      if (abortableUpload) {
+        try {
+          await abortVersionUpload(modelId, abortableUpload.objectKey, abortableUpload.uploadId);
+        } catch (abortErr) {
+          console.error("Failed to abort orphaned upload session:", abortErr);
+        }
+      }
+
       toast.error(errMsg);
       setUploadProgress(0);
       setUploadStatus("");

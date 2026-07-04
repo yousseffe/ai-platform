@@ -3,8 +3,7 @@ import os
 import uvicorn
 import io
 import base64
-import torch
-from diffusers import StableDiffusionPipeline
+import threading
 
 otel_available = False
 if os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
@@ -29,23 +28,56 @@ if os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") and otel_available:
     except Exception as e:
         print(f"Warning: Failed to instrument FastAPI app with OpenTelemetry: {e}")
 
-# Load model
+# C3: Lazy framework import / pipeline load. Importing torch + diffusers and
+# loading a Stable Diffusion pipeline is the single largest chunk of
+# "warm-up" time in the whole platform (often 30-60s). Previously this ran
+# at module import time, before uvicorn could bind, so the deploy
+# health-check loop had no choice but to wait out the entire load. Now the
+# import + pipeline load is deferred to the first /predict call and cached
+# in _pipeline, so /health can return 200 immediately and the deployment is
+# marked RUNNING far sooner. Trade-off: the first prediction after deploy
+# pays the full pipeline-load cost inline; subsequent predictions reuse the
+# cached pipeline.
 model_path = os.getenv("MODEL_PATH", "model.pkl")
-pipeline = None
 
-try:
-    print(f"Loading Stable Diffusion pipeline from {model_path}...")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
-    
-    # Load pipeline
-    pipeline = StableDiffusionPipeline.from_pretrained(model_path, local_files_only=True)
-    pipeline = pipeline.to(device)
-    print("Stable Diffusion pipeline loaded successfully.")
-except Exception as e:
-    print(f"Error loading Stable Diffusion pipeline from {model_path}: {e}")
-    import sys
-    sys.exit(1)
+_pipeline = None
+_pipeline_lock = threading.Lock()
+_pipeline_load_error = None
+
+
+def _load_pipeline():
+    """Loads (and caches) the Stable Diffusion pipeline on first use.
+    Thread-safe via _pipeline_lock."""
+    global _pipeline, _pipeline_load_error
+    if _pipeline is not None or _pipeline_load_error is not None:
+        return
+    with _pipeline_lock:
+        if _pipeline is not None or _pipeline_load_error is not None:
+            return
+        try:
+            import torch
+            from diffusers import StableDiffusionPipeline
+
+            print(f"Loading Stable Diffusion pipeline from {model_path}...")
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            print(f"Using device: {device}")
+
+            pipeline = StableDiffusionPipeline.from_pretrained(model_path, local_files_only=True)
+            if device == "cpu":
+                pipeline = pipeline.to(torch.float32)
+            pipeline = pipeline.to(device)
+            _pipeline = pipeline
+            print("Stable Diffusion pipeline loaded successfully.")
+        except Exception as e:
+            _pipeline_load_error = str(e)
+            print(f"Error loading Stable Diffusion pipeline from {model_path}: {e}")
+
+
+@app.get("/health")
+async def health():
+    # Process liveness only — not gated on pipeline load. See C3 comment above.
+    return {"status": "ok"}
+
 
 @app.post("/predict")
 async def predict(request: Request):
@@ -61,7 +93,10 @@ async def predict(request: Request):
         if api_key != expected_api_key:
             raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
 
-    if pipeline is None:
+    _load_pipeline()
+    if _pipeline_load_error is not None:
+        raise HTTPException(status_code=500, detail=f"Stable Diffusion pipeline failed to load: {_pipeline_load_error}")
+    if _pipeline is None:
         raise HTTPException(status_code=500, detail="Stable Diffusion pipeline is not loaded.")
 
     try:
@@ -78,9 +113,11 @@ async def predict(request: Request):
     guidance_scale = data.get("guidance_scale", 7.5)
 
     try:
+        import torch
+
         # Run inference
         with torch.no_grad():
-            output = pipeline(
+            output = _pipeline(
                 prompt=prompt,
                 num_inference_steps=num_inference_steps,
                 guidance_scale=guidance_scale
