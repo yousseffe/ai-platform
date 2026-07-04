@@ -8,6 +8,7 @@ import TransactionsTable from "@/components/dashboard/TransactionsTable";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { WalletType } from "@/types";
+import { PageHeader } from "@/components/ui/page-header";
 
 /**
  * Settings Page: Billing & Wallet.
@@ -39,15 +40,11 @@ export default function BillingSettingsPage() {
   if (!canAccessBilling) {
     return (
       <div className="space-y-6 animate-fade-in text-left">
-        <div className="border-b border-border pb-4 select-none">
-          <h1 className="text-lg font-bold text-foreground flex items-center gap-2 tracking-tight font-sans">
-            <Coins className="w-5 h-5 text-primary" strokeWidth={2.5} />
-            Billing & Wallet Settings
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Shared organization billing is restricted to workspace owners.
-          </p>
-        </div>
+        <PageHeader
+          title={<><Coins /> Billing & Wallet Settings</>}
+          description="Shared organization billing is restricted to workspace owners."
+          className="mb-0"
+        />
 
         <Card className="border border-border bg-card rounded-xl shadow-sm">
           <CardContent className="p-6 space-y-2">
@@ -63,16 +60,11 @@ export default function BillingSettingsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in text-left">
-      {/* Premium Header */}
-      <div className="border-b border-border pb-4 select-none">
-        <h1 className="text-lg font-bold text-foreground flex items-center gap-2 tracking-tight font-sans">
-          <Coins className="w-5 h-5 text-primary animate-pulse" strokeWidth={2.5} />
-          Billing & Wallet Settings
-        </h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Top up your inference credits, cash out earnings, and audit complete transaction ledger histories.
-        </p>
-      </div>
+      <PageHeader
+        title={<><Coins /> Billing & Wallet Settings</>}
+        description="Top up your inference credits, cash out earnings, and audit complete transaction ledger histories."
+        className="mb-0"
+      />
 
       {/* Top Metrics Panel */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

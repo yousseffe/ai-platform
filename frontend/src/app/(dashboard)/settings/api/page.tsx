@@ -20,6 +20,10 @@ import {
 import { smartFetch } from "@/lib/utils/smart-fetch";
 import { Model } from "@/types";
 import { toast } from "react-hot-toast";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface ApiKeyInfo {
   id: string;
@@ -71,6 +75,7 @@ export default function ApiSettingsPage() {
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [keyPendingRevoke, setKeyPendingRevoke] = useState<ApiKeyInfo | null>(null);
 
   // Usage states
   const [consumerStats, setConsumerStats] = useState<ConsumerModelStats[]>([]);
@@ -152,11 +157,9 @@ export default function ApiSettingsPage() {
     }
   };
 
-  const handleRevokeKey = async (keyId: string) => {
-    const confirmation = window.confirm(
-      "Are you sure you want to revoke this API key? Applications using this credential will fail immediately.",
-    );
-    if (!confirmation) return;
+  const handleRevokeKey = async () => {
+    if (!keyPendingRevoke) return;
+    const keyId = keyPendingRevoke.id;
 
     setRevokingId(keyId);
     try {
@@ -165,6 +168,7 @@ export default function ApiSettingsPage() {
       });
       setApiKeys((prev) => prev.filter((k) => k.id !== keyId));
       toast.success("API Key revoked successfully");
+      setKeyPendingRevoke(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to revoke key";
       toast.error(msg);
@@ -193,6 +197,12 @@ export default function ApiSettingsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in text-left">
+      <PageHeader
+        title="API Credentials"
+        description="Generate and manage per-model API keys, and monitor consumer request activity."
+        className="mb-0"
+      />
+
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Left side: Subscriptions & keys listing */}
         <div className="flex-1 card p-5 rounded-xl border border-border bg-card shadow-sm space-y-4">
@@ -219,10 +229,11 @@ export default function ApiSettingsPage() {
               </span>
             </div>
           ) : apiKeys.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground font-mono text-xs border border-dashed border-border rounded-lg bg-secondary/10">
-              No API keys generated. Subscribe to a model on the right to
-              generate credentials.
-            </div>
+            <EmptyState
+              icon={<Key />}
+              title="No API keys generated"
+              description="Subscribe to a model on the right to generate your first credential."
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full font-mono text-[10px] text-left border-collapse">
@@ -283,7 +294,7 @@ export default function ApiSettingsPage() {
                         </td>
                         <td className="py-3 px-2 text-right">
                           <button
-                            onClick={() => handleRevokeKey(key.id)}
+                            onClick={() => setKeyPendingRevoke(key)}
                             disabled={revokingId === key.id}
                             className="text-red-500 hover:text-red-600 hover:bg-red-500/10 p-1.5 rounded cursor-pointer transition-colors"
                             title="Revoke Key"
@@ -325,22 +336,20 @@ export default function ApiSettingsPage() {
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
                 Select Model
               </label>
-              <select
+              <Select
                 value={selectedModelId}
-                onChange={(e) => setSelectedModelId(e.target.value)}
+                onValueChange={(value) => setSelectedModelId(value ?? "")}
                 disabled={models.length === 0}
-                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-sans font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
               >
-                {models.length === 0 ? (
-                  <option value="">No models available</option>
-                ) : (
-                  models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))
-                )}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="No models available" />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">
@@ -398,10 +407,11 @@ export default function ApiSettingsPage() {
               <span className="font-mono text-xs">Loading statistics...</span>
             </div>
           ) : consumerStats.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground font-mono text-xs border border-dashed border-border rounded-lg bg-secondary/10">
-              No API calls recorded yet. Run model prediction to generate
-              metrics.
-            </div>
+            <EmptyState
+              icon={<BarChart3 />}
+              title="No calls recorded yet"
+              description="Run a model prediction to start generating usage metrics."
+            />
           ) : (
             <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
               {consumerStats.map((stat) => (
@@ -465,9 +475,11 @@ export default function ApiSettingsPage() {
               </span>
             </div>
           ) : consumerLogs.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground font-mono text-xs border border-dashed border-border rounded-lg bg-secondary/10">
-              No live logs available.
-            </div>
+            <EmptyState
+              icon={<Activity />}
+              title="No live logs available"
+              description="Inference calls made with your credentials will appear here in real time."
+            />
           ) : (
             <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
               <table className="w-full font-mono text-[9px] text-left border-collapse">
@@ -562,6 +574,15 @@ export default function ApiSettingsPage() {
           5.6]&#125;&apos;
         </pre>
       </div>
+
+      <ConfirmDialog
+        open={!!keyPendingRevoke}
+        onOpenChange={(open) => !open && setKeyPendingRevoke(null)}
+        title="Revoke API key"
+        description={`Applications using "${keyPendingRevoke?.name ?? "this key"}" will fail immediately. This can't be undone.`}
+        confirmLabel="Revoke key"
+        onConfirm={handleRevokeKey}
+      />
     </div>
   );
 }

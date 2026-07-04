@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -20,14 +20,10 @@ import {
   OrganizationUsageSummary,
 } from "@/lib/services/projects.service";
 import { toast } from "react-hot-toast";
-
-type UsageMetricCardProps = {
-  label: string;
-  value: string;
-  caption: string;
-  icon: React.ReactNode;
-  tone: string;
-};
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
 
 function formatNumber(value: number) {
   return value.toLocaleString("en-US");
@@ -46,33 +42,6 @@ function formatDate(value: string | null) {
     day: "numeric",
     year: "numeric",
   });
-}
-
-function UsageMetricCard({
-  label,
-  value,
-  caption,
-  icon,
-  tone,
-}: UsageMetricCardProps) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase text-muted-foreground">
-            {label}
-          </p>
-          <p className="mt-3 truncate text-2xl font-black text-foreground">
-            {value}
-          </p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            {caption}
-          </p>
-        </div>
-        <div className={`rounded-lg border p-2 ${tone}`}>{icon}</div>
-      </div>
-    </div>
-  );
 }
 
 function MiniBar({
@@ -115,24 +84,23 @@ export default function OrgUsagePage() {
   const [summary, setSummary] = useState<OrganizationUsageSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchUsage = useCallback(async () => {
     if (!org) return;
-
-    const fetchUsage = async () => {
-      setIsLoading(true);
-      try {
-        setSummary(await getOrganizationUsageSummary(org.id));
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to load usage",
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    Promise.resolve().then(fetchUsage);
+    setIsLoading(true);
+    try {
+      setSummary(await getOrganizationUsageSummary(org.id));
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load usage",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   }, [org]);
+
+  useEffect(() => {
+    Promise.resolve().then(fetchUsage);
+  }, [fetchUsage]);
 
   const daily = useMemo(() => summary?.daily.slice(-14) ?? [], [summary]);
   const monthly = useMemo(() => summary?.monthly.slice(-6) ?? [], [summary]);
@@ -170,31 +138,29 @@ export default function OrgUsagePage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 animate-fade-in">
-      <div className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold text-foreground">
-              Usage Tracking
-            </h1>
+      <PageHeader
+        title={
+          <>
+            Usage Tracking
             {summary && (
               <span className="rounded-md border border-border bg-card px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">
                 {summary.scope.toLowerCase()}
               </span>
             )}
-          </div>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-            Project requests, model consumption, API key activity, and spend
-            signals for this organization.
-          </p>
-        </div>
-        <Link
-          href={`/orgs/${org.slug}/projects`}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
-        >
-          <FolderKanban className="h-3.5 w-3.5" strokeWidth={1.8} />
-          Projects
-        </Link>
-      </div>
+          </>
+        }
+        description="Project requests, model consumption, API key activity, and spend signals for this organization."
+        className="mb-0"
+        actions={
+          <Link
+            href={`/orgs/${org.slug}/projects`}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
+          >
+            <FolderKanban className="h-3.5 w-3.5" strokeWidth={1.8} />
+            Projects
+          </Link>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-24">
@@ -204,44 +170,48 @@ export default function OrgUsagePage() {
           />
         </div>
       ) : !summary ? (
-        <div className="rounded-lg border border-border bg-card p-8 text-center">
-          <p className="text-sm font-semibold text-foreground">
-            Usage could not be loaded
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Refresh the page to try again.
-          </p>
+        <div className="rounded-lg border border-border bg-card">
+          <EmptyState
+            icon={<AlertTriangle />}
+            title="Usage could not be loaded"
+            description="Something went wrong fetching usage data for this organization."
+            action={
+              <Button variant="outline" size="sm" onClick={() => fetchUsage()}>
+                Try again
+              </Button>
+            }
+          />
         </div>
       ) : (
         <>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <UsageMetricCard
+            <StatCard
               label="Requests"
               value={formatNumber(summary.totals.requests)}
               caption={`${formatNumber(summary.totals.successfulRequests)} successful requests`}
-              icon={<Activity className="h-4 w-4" strokeWidth={1.8} />}
-              tone="border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300"
+              icon={<Activity />}
+              tone="primary"
             />
-            <UsageMetricCard
+            <StatCard
               label="Credits Used"
               value={formatCredits(summary.totals.creditsCharged)}
               caption="Total organization consumer spend"
-              icon={<Coins className="h-4 w-4" strokeWidth={1.8} />}
-              tone="border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+              icon={<Coins />}
+              tone="warning"
             />
-            <UsageMetricCard
+            <StatCard
               label="Error Rate"
               value={`${summary.totals.errorRate}%`}
               caption={`${formatNumber(summary.totals.failedRequests)} failed requests`}
-              icon={<AlertTriangle className="h-4 w-4" strokeWidth={1.8} />}
-              tone="border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+              icon={<AlertTriangle />}
+              tone="danger"
             />
-            <UsageMetricCard
+            <StatCard
               label="Last Used"
               value={formatDate(summary.totals.lastUsedAt)}
               caption="Most recent model request"
-              icon={<Clock className="h-4 w-4" strokeWidth={1.8} />}
-              tone="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              icon={<Clock />}
+              tone="success"
             />
           </section>
 

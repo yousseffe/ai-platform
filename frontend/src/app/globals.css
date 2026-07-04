@@ -22,7 +22,7 @@ body {
 }
 
 .card {
-  @apply bg-card border border-border rounded-xl shadow-sm hover:border-muted-foreground/30 transition-all duration-200 p-6;
+  @apply bg-card border border-border rounded-xl shadow-xs hover:border-muted-foreground/30 transition-all duration-200 p-6;
 }
 
 .btn-primary {
@@ -140,17 +140,17 @@ body {
   --accent: oklch(0.938 0.012 248); /* clearer hover state */
   --accent-foreground: oklch(0.23 0.02 255);
   --destructive: oklch(0.58 0.19 28); /* clearer red in light mode */
-  --border: oklch(0.885 0.01 250); /* stronger surface edges */
+  --border: oklch(0.93 0.008 250); /* refined hairline edge, not a hard outline */
   --input: oklch(0.998 0.002 250);
   --ring: oklch(0.56 0.2 259);
-  --radius: 0.5rem;
+  --radius: 0.625rem;
   --sidebar: oklch(0.989 0.003 248);
   --sidebar-foreground: oklch(0.23 0.02 255);
   --sidebar-primary: oklch(0.56 0.2 259);
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.952 0.008 248);
   --sidebar-accent-foreground: oklch(0.23 0.02 255);
-  --sidebar-border: oklch(0.9 0.01 250);
+  --sidebar-border: oklch(0.93 0.008 250);
   --sidebar-ring: oklch(0.56 0.2 259);
 }
 
@@ -170,7 +170,7 @@ body {
   --accent: oklch(0.18 0.006 240);
   --accent-foreground: oklch(0.95 0.003 240);
   --destructive: oklch(0.54 0.21 25.5); /* Red #f87171 */
-  --border: oklch(0.22 0.008 240); /* Subtle border #222326 */
+  --border: oklch(0.2 0.007 240); /* refined hairline edge, less contrast than before */
   --input: oklch(0.12 0.004 240);
   --ring: oklch(0.58 0.22 281.3);
   --sidebar: oklch(0.13 0.004 240); /* Deep sidebar #0e0f11 */
@@ -179,7 +179,7 @@ body {
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.18 0.006 240);
   --sidebar-accent-foreground: oklch(0.95 0.003 240);
-  --sidebar-border: oklch(0.22 0.008 240);
+  --sidebar-border: oklch(0.2 0.007 240);
   --sidebar-ring: oklch(0.58 0.22 281.3);
 }
 

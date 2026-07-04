@@ -26,7 +26,7 @@ export default function RegisterForm({ onSubmit, loading }: RegisterFormProps) {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
     mode: "onChange",
@@ -128,7 +128,7 @@ export default function RegisterForm({ onSubmit, loading }: RegisterFormProps) {
 
       <Button
         type="submit"
-        disabled={loading}
+        disabled={loading || !isValid}
         className="btn-primary w-full py-2 flex justify-center mt-3 cursor-pointer rounded-lg text-xs font-semibold shadow-sm h-9"
       >
         {loading ? "Creating Account..." : "Create Account"}{" "}

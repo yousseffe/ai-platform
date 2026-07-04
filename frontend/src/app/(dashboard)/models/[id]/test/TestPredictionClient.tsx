@@ -57,7 +57,7 @@ export default function TestPredictionClient({ model }: TestPredictionClientProp
       {/* Back Button */}
       <button
         onClick={() => router.push(`/models/${model.id}`)}
-        className="flex items-center gap-2 text-primary-600 font-semibold text-xs tracking-wider uppercase mb-6 hover:text-primary-700 cursor-pointer"
+        className="flex items-center gap-2 text-primary font-semibold text-xs tracking-wider uppercase mb-6 hover:text-primary/80 cursor-pointer"
       >
         <ArrowLeft className="w-4 h-4" /> Back to Model Details
       </button>
@@ -66,28 +66,28 @@ export default function TestPredictionClient({ model }: TestPredictionClientProp
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900">Sandbox Playground</h1>
-            <span className="badge badge-info bg-indigo-50 text-indigo-700 border-none text-[10px]">
+            <h1 className="text-2xl font-bold text-foreground">Sandbox Playground</h1>
+            <span className="badge badge-info text-[10px]">
               Testing Interface
             </span>
           </div>
-          <p className="text-slate-500 text-sm mt-1">
-            Send real-time prediction request payloads to <span className="font-semibold text-slate-700">{model.name}</span>
+          <p className="text-muted-foreground text-sm mt-1">
+            Send real-time prediction request payloads to <span className="font-semibold text-foreground">{model.name}</span>
           </p>
           {activeDeployment ? (
             <div className="flex items-center gap-2 mt-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-xs text-slate-600 font-medium">
+              <span className="text-xs text-muted-foreground font-medium">
                 Live Deployment URL:{" "}
-                <span className="font-mono text-indigo-600">
+                <span className="font-mono text-primary">
                   {activeDeployment.url || `Port ${activeDeployment.port}`}
                 </span>
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 mt-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg w-fit">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-              <span className="text-xs text-amber-700 font-medium">
+            <div className="flex items-center gap-2 mt-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 px-3 py-1.5 rounded-lg w-fit">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
                 No active deployment. Run prediction requests might fail. Deploy a version first.
               </span>
             </div>
@@ -110,20 +110,20 @@ export default function TestPredictionClient({ model }: TestPredictionClientProp
       {/* Editor & Output Container */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Payload Input */}
-        <div className="card p-0 overflow-hidden flex flex-col h-125 border border-slate-200 shadow-sm">
-          <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-            <div className="flex items-center gap-2 font-semibold text-slate-700 text-sm">
-              <FileCode className="w-4 h-4 text-primary-500" /> Payload JSON
+        <div className="card p-0 overflow-hidden flex flex-col h-125 border border-border shadow-sm">
+          <div className="p-4 border-b border-border flex justify-between items-center bg-secondary/40">
+            <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
+              <FileCode className="w-4 h-4 text-primary" /> Payload JSON
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleFormat}
-                className="text-xs text-slate-500 hover:text-primary-600 font-semibold px-2 py-1 rounded bg-white border border-slate-200 cursor-pointer hover:border-slate-300 transition-colors"
+                className="text-xs text-muted-foreground hover:text-primary font-semibold px-2 py-1 rounded bg-card border border-border cursor-pointer hover:border-muted-foreground/30 transition-colors"
                 disabled={!isValidJson}
               >
                 Format
               </button>
-              <span className="text-[10px] font-bold text-slate-400 tracking-wider">APPLICATION/JSON</span>
+              <span className="text-[10px] font-bold text-muted-foreground tracking-wider">APPLICATION/JSON</span>
             </div>
           </div>
           <div className="relative flex-1 flex flex-col bg-[#0f172a]">
@@ -143,10 +143,10 @@ export default function TestPredictionClient({ model }: TestPredictionClientProp
         </div>
 
         {/* Prediction Result */}
-        <div className="card p-0 overflow-hidden flex flex-col h-125 border border-slate-200 shadow-sm">
-          <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-            <div className="flex items-center gap-2 font-semibold text-slate-700 text-sm">
-              <Sparkles className="w-4 h-4 text-indigo-500" /> Response Output
+        <div className="card p-0 overflow-hidden flex flex-col h-125 border border-border shadow-sm">
+          <div className="p-4 border-b border-border flex justify-between items-center bg-secondary/40">
+            <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
+              <Sparkles className="w-4 h-4 text-primary" /> Response Output
             </div>
             {httpStatus && (
               <div
@@ -178,31 +178,31 @@ export default function TestPredictionClient({ model }: TestPredictionClientProp
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="card flex items-center gap-4 py-5 border border-slate-200 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center text-primary-500 shrink-0">
+        <div className="card flex items-center gap-4 py-5 border border-border shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
             <Clock className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-0.5">Response Latency</p>
-            <p className="text-2xl font-bold text-slate-900">{lastLatency}</p>
+            <p className="text-[10px] font-bold text-muted-foreground tracking-wider uppercase mb-0.5">Response Latency</p>
+            <p className="text-2xl font-bold text-foreground">{lastLatency}</p>
           </div>
         </div>
-        <div className="card flex items-center gap-4 py-5 border border-slate-200 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+        <div className="card flex items-center gap-4 py-5 border border-border shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-0.5">Model Confidence</p>
-            <p className="text-2xl font-bold text-slate-900">{lastConfidence}</p>
+            <p className="text-[10px] font-bold text-muted-foreground tracking-wider uppercase mb-0.5">Model Confidence</p>
+            <p className="text-2xl font-bold text-foreground">{lastConfidence}</p>
           </div>
         </div>
-        <div className="card flex items-center gap-4 py-5 border border-slate-200 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+        <div className="card flex items-center gap-4 py-5 border border-border shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
             <Cpu className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-0.5">Container Memory</p>
-            <p className="text-2xl font-bold text-slate-900">{lastMemory}</p>
+            <p className="text-[10px] font-bold text-muted-foreground tracking-wider uppercase mb-0.5">Container Memory</p>
+            <p className="text-2xl font-bold text-foreground">{lastMemory}</p>
           </div>
         </div>
       </div>

@@ -16,6 +16,9 @@ import RoleBadge from "@/components/orgs/RoleBadge";
 import InviteMemberModal from "@/components/orgs/InviteMemberModal";
 import { getOrgRoleMeta } from "@/lib/org-role-meta";
 import OrgRoleCombobox from "@/components/orgs/OrgRoleCombobox";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PageHeader } from "@/components/ui/page-header";
 
 /**
  * Members management page — lists all org members with their roles.
@@ -28,6 +31,7 @@ export default function OrgMembersPage() {
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [memberPendingRemoval, setMemberPendingRemoval] = useState<{ userId: string; email?: string } | null>(null);
 
   const fetchMembers = useCallback(async () => {
     if (!org) return;
@@ -45,14 +49,16 @@ export default function OrgMembersPage() {
     Promise.resolve().then(fetchMembers);
   }, [fetchMembers]);
 
-  const handleRemove = async (userId: string, email?: string) => {
-    if (!org || !confirm(`Remove ${email ?? "this member"} from the organization?`)) return;
+  const handleRemove = async (userId: string) => {
+    if (!org) return;
     try {
       await removeOrgMember(org.id, userId);
       toast.success("Member removed");
       setMembers((prev) => prev.filter((m) => m.userId !== userId));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to remove member");
+    } finally {
+      setMemberPendingRemoval(null);
     }
   };
 
@@ -96,19 +102,18 @@ export default function OrgMembersPage() {
 
   return (
     <div className="space-y-5 max-w-6xl animate-fade-in">
-      <div className="flex items-center justify-between gap-4 border-b border-border pb-5">
-        <div>
-          <h1 className="text-xl font-bold text-foreground tracking-tight">Members</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Set clear business roles and access levels for your organization team.
-          </p>
-        </div>
-        {canInvite && (
-          <Button size="sm" onClick={() => setInviteOpen(true)}>
-            <Plus className="w-3.5 h-3.5" strokeWidth={2} /> Invite Member
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Members"
+        description="Set clear business roles and access levels for your organization team."
+        className="mb-0"
+        actions={
+          canInvite && (
+            <Button size="sm" onClick={() => setInviteOpen(true)}>
+              <Plus className="w-3.5 h-3.5" strokeWidth={2} /> Invite Member
+            </Button>
+          )
+        }
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {roleSummary.map((item) => {
@@ -181,6 +186,13 @@ export default function OrgMembersPage() {
               </p>
             </div>
           </div>
+          {members.length === 0 ? (
+            <EmptyState
+              icon={<Users />}
+              title="No members yet"
+              description="Invite teammates to collaborate on this organization's models and pipelines."
+            />
+          ) : (
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-border bg-secondary/30">
@@ -239,7 +251,7 @@ export default function OrgMembersPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       {canRemove && !isOwner && (
-                        <button onClick={() => handleRemove(member.userId, email)} className="inline-flex items-center gap-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 px-2 py-1.5 rounded-md transition-all" title="Remove member">
+                        <button onClick={() => setMemberPendingRemoval({ userId: member.userId, email })} className="inline-flex items-center gap-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 px-2 py-1.5 rounded-md transition-all" title="Remove member">
                           <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} /> Remove
                         </button>
                       )}
@@ -249,10 +261,24 @@ export default function OrgMembersPage() {
               })}
             </tbody>
           </table>
+          )}
         </div>
       )}
 
       <InviteMemberModal orgId={org.id} orgType={org.type} open={inviteOpen} onClose={() => setInviteOpen(false)} onInvited={fetchMembers} />
+
+      <ConfirmDialog
+        open={!!memberPendingRemoval}
+        onOpenChange={(open) => !open && setMemberPendingRemoval(null)}
+        title="Remove member"
+        description={`Remove ${memberPendingRemoval?.email ?? "this member"} from ${org.name}? They'll lose access to this organization's models and pipelines immediately.`}
+        confirmLabel="Remove member"
+        onConfirm={async () => {
+          if (memberPendingRemoval) {
+            await handleRemove(memberPendingRemoval.userId);
+          }
+        }}
+      />
     </div>
   );
 }

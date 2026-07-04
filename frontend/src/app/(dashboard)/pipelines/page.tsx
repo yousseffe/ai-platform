@@ -3,6 +3,7 @@ import { Metadata } from "next";
 import { getPipelines } from "@/lib/actions/pipelines.actions";
 import { PipelinesTable } from "@/components/pipelines/PipelinesTable";
 import { CreatePipelineDialog } from "@/components/pipelines/CreatePipelineDialog";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const revalidate = 0;
 
@@ -25,15 +26,11 @@ export default async function PipelinesPage() {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-foreground font-mono">Pipelines</h1>
-          <p className="text-xs text-muted-foreground mt-1 font-mono">
-            Chain your models together — the output of one step feeds into the next.
-          </p>
-        </div>
-        <CreatePipelineDialog />
-      </div>
+      <PageHeader
+        title="Pipelines"
+        description="Chain your models together — the output of one step feeds into the next."
+        actions={<CreatePipelineDialog />}
+      />
 
       <PipelinesTable pipelines={pipelines} />
     </div>

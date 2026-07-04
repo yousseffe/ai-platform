@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "react-hot-toast";
+import { PageHeader } from "@/components/ui/page-header";
 
 /**
  * Org Settings page — OWNER-only form to update org name, description, and avatar URL.
@@ -75,15 +76,16 @@ export default function OrgSettingsPage() {
 
   return (
     <div className="space-y-5 max-w-6xl animate-fade-in">
-      <div className="flex items-center justify-between gap-4 border-b border-border pb-5">
-        <div>
-          <h1 className="text-xl font-bold text-foreground tracking-tight">Settings</h1>
-          <p className="text-sm text-muted-foreground">Manage organization identity, visibility, and workspace metadata.</p>
-        </div>
-        <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/15 flex items-center justify-center text-primary">
-          <Settings className="w-4 h-4" strokeWidth={1.8} />
-        </div>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Manage organization identity, visibility, and workspace metadata."
+        className="mb-0"
+        actions={
+          <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/15 flex items-center justify-center text-primary">
+            <Settings className="w-4 h-4" strokeWidth={1.8} />
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-card border border-border rounded-lg p-6 space-y-5">

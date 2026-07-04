@@ -450,7 +450,7 @@ export default function CreateWorkspaceWizard() {
                   type="button"
                   onClick={handleBypassCreate}
                   disabled={isSubmitting}
-                  className="py-2 h-9 px-3.5 text-xs bg-slate-850 dark:bg-slate-800 hover:bg-slate-700 border border-border text-foreground hover:text-foreground cursor-pointer font-semibold transition-all disabled:opacity-50 rounded-lg"
+                  className="py-2 h-9 px-3.5 text-xs bg-secondary hover:bg-accent border border-border text-foreground hover:text-foreground cursor-pointer font-semibold transition-all disabled:opacity-50 rounded-lg"
                 >
                   Bypass with Credits (Dev)
                 </Button>

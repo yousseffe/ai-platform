@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Copy, CheckCircle, AlertTriangle, KeyRound, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { createApiKey, CreatedApiKey } from "@/lib/services/projects.service";
@@ -190,32 +191,29 @@ export default function CreateApiKeyModal({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="key-model" className="text-sm font-medium">Allowed Model</Label>
-              <select
-                id="key-model"
+              <Select
                 value={selectedModelId}
-                onChange={(e) => setSelectedModelId(e.target.value)}
+                onValueChange={(value) => setSelectedModelId(value ?? "")}
                 disabled={isSubmitting || isLoadingModels || availableModels.length === 0}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
               >
-                {isLoadingModels ? (
-                  <option value="">Loading models...</option>
-                ) : availableModels.length === 0 ? (
-                  <option value="">No available models found</option>
-                ) : (
-                  availableModels.map((model) => {
+                <SelectTrigger id="key-model" className="w-full">
+                  <SelectValue placeholder={isLoadingModels ? "Loading models..." : "No available models found"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableModels.map((model) => {
                     const ownerLabel = model.organization?.name
                       ? ` · ${model.organization.name}`
                       : model.isPublic
                         ? " · Marketplace"
                         : "";
                     return (
-                      <option key={model.id} value={model.id}>
+                      <SelectItem key={model.id} value={model.id}>
                         {model.name}{ownerLabel}
-                      </option>
+                      </SelectItem>
                     );
-                  })
-                )}
-              </select>
+                  })}
+                </SelectContent>
+              </Select>
               <p className="text-xs leading-5 text-muted-foreground">
                 This key will only work for the selected model.
                 {selectedModel ? ` Current selection: ${selectedModel.name}.` : ""}

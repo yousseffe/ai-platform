@@ -23,6 +23,7 @@ import {
 import { OrgType, WalletType } from "@/types";
 import TransactionsTable from "@/components/dashboard/TransactionsTable";
 import OrganizationFinanceActionPanel from "@/components/orgs/OrganizationFinanceActionPanel";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface FinanceTileProps {
   label: string;
@@ -148,7 +149,7 @@ export default function OrgBillingPage() {
   }, [fetchTransactions, fetchWallets]);
 
   useEffect(() => {
-    Promise.resolve().then(fetchWallets);
+    Promise.resolve().then(() => fetchWallets());
   }, [fetchWallets]);
 
   useEffect(() => {
@@ -278,22 +279,23 @@ export default function OrgBillingPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 animate-fade-in">
-      <div className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-foreground">{pageTitle}</h1>
+      <PageHeader
+        title={
+          <>
+            {pageTitle}
             <span className="rounded-md border border-border bg-card px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">
               {org.type.replace("_", " ")}
             </span>
+          </>
+        }
+        description={pageDescription}
+        className="mb-0"
+        actions={
+          <div className="flex h-9 items-center rounded-lg border border-border bg-card px-3 text-xs font-semibold text-muted-foreground">
+            {org.type === OrgType.PROVIDER ? "Earnings ledger" : "Workspace finance"}
           </div>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-            {pageDescription}
-          </p>
-        </div>
-        <div className="flex h-9 items-center rounded-lg border border-border bg-card px-3 text-xs font-semibold text-muted-foreground">
-          {org.type === OrgType.PROVIDER ? "Earnings ledger" : "Workspace finance"}
-        </div>
-      </div>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
