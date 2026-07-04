@@ -139,6 +139,72 @@ export class StripeService {
   }
 
   /**
+   * Generates a Stripe Checkout Session for provider tier subscription payments.
+   *
+   * @param params - Provider subscription checkout parameters.
+   * @returns A promise resolving to the created Stripe Session object.
+   */
+  async createProviderTierCheckoutSession(params: {
+    providerAccountId: string;
+    tierId: string;
+    tierName: string;
+    billingCycle: string;
+    amountEgp: number;
+    offerId?: string | null;
+    discountAmountEgp?: number;
+  }): Promise<Record<string, unknown>> {
+    const stripeInstance = this.getStripe();
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const successUrl = `${frontendUrl}/provider/subscriptions?status=provider_subscription_success&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${frontendUrl}/provider/subscriptions?status=provider_subscription_cancelled`;
+
+    const session = await stripeInstance.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'egp',
+            product_data: {
+              name: `ModelOps Provider Tier: ${params.tierName}`,
+              description: `${params.billingCycle} provider subscription`,
+            },
+            unit_amount: Math.round(params.amountEgp * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        type: 'provider_tier_subscription',
+        providerAccountId: params.providerAccountId,
+        tierId: params.tierId,
+        billingCycle: params.billingCycle,
+        amountEgp: params.amountEgp.toString(),
+        offerId: params.offerId ?? '',
+        discountAmountEgp: (params.discountAmountEgp ?? 0).toString(),
+      },
+    });
+
+    return session as unknown as Record<string, unknown>;
+  }
+
+  /**
+   * Retrieves a Stripe Checkout Session by ID for post-redirect confirmation.
+   *
+   * @param sessionId - Stripe Checkout Session ID.
+   * @returns Stripe Checkout Session record.
+   */
+  async retrieveCheckoutSession(
+    sessionId: string,
+  ): Promise<Record<string, unknown>> {
+    const stripeInstance = this.getStripe();
+    const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
+    return session as unknown as Record<string, unknown>;
+  }
+
+  /**
    * Verifies the cryptographic signature of a Stripe webhook event.
    *
    * @param rawBody - The unparsed raw body Buffer.

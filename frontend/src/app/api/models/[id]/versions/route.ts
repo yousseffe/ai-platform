@@ -18,7 +18,7 @@ export async function POST(
 
   try {
     const formData = await req.formData();
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
 
     const res = await fetch(`${backendUrl}/api/v1/models/${id}/versions`, {
       method: "POST",

@@ -3,7 +3,13 @@
 import React, { useState } from "react";
 import { Sparkles, ArrowRight, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "react-hot-toast";
@@ -15,7 +21,8 @@ import { toast } from "react-hot-toast";
  * @returns The React component rendering the Provider Enrollment card.
  */
 export default function BecomeProviderCard() {
-  const { activeWorkspace, isProviderModeEnabled, becomeProvider } = useWorkspace();
+  const { activeWorkspace, isProviderModeEnabled, becomeProvider } =
+    useWorkspace();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -28,9 +35,12 @@ export default function BecomeProviderCard() {
     const res = await becomeProvider();
     setLoading(false);
     if (res.success) {
-      toast.success("Provider mode enabled! You can now toggle Provider Mode in the sidebar.", {
-        duration: 5000,
-      });
+      toast.success(
+        "Provider mode enabled! You can now toggle Provider Mode in the sidebar.",
+        {
+          duration: 3000,
+        },
+      );
     } else {
       setError(res.error || "Failed to enable provider mode");
       toast.error(res.error || "Failed to enable provider mode");
@@ -47,15 +57,23 @@ export default function BecomeProviderCard() {
             <CheckCircle2 className="w-4 h-4" />
           </div>
           <div>
-            <CardTitle className="text-xs font-bold text-foreground">Workspace Capabilities</CardTitle>
+            <CardTitle className="text-xs font-bold text-foreground">
+              Workspace Capabilities
+            </CardTitle>
             <CardDescription className="text-[11px] text-muted-foreground">
-              Collaborative workspaces support both consumer and provider workflows automatically.
+              Collaborative workspaces support both consumer and provider
+              workflows automatically.
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="pt-4">
           <p className="text-xs text-muted-foreground leading-relaxed bg-secondary/35 border border-border p-3.5 rounded-lg">
-            This organization is enrolled as a dual-role publisher. Use the <strong className="text-foreground font-semibold">Consumer / Provider Mode</strong> toggle in the sidebar to switch between buying credits and publishing model API endpoints.
+            This organization is enrolled as a dual-role publisher. Use the{" "}
+            <strong className="text-foreground font-semibold">
+              Consumer / Provider Mode
+            </strong>{" "}
+            toggle in the sidebar to switch between buying credits and
+            publishing model API endpoints.
           </p>
         </CardContent>
       </Card>
@@ -68,14 +86,21 @@ export default function BecomeProviderCard() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-primary/10 border border-primary/20 text-primary hover:bg-primary/15 text-[9px] font-bold tracking-wider py-0.5 px-2 uppercase rounded-full">
+              <Badge
+                variant="secondary"
+                className="bg-primary/10 border border-primary/20 text-primary hover:bg-primary/15 text-[9px] font-bold tracking-wider py-0.5 px-2 uppercase rounded-full"
+              >
                 Become a Provider
               </Badge>
               <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
             </div>
-            <CardTitle className="font-bold text-foreground text-xs uppercase tracking-wider">Publish Models & Earn Revenue</CardTitle>
+            <CardTitle className="font-bold text-foreground text-xs uppercase tracking-wider">
+              Publish Models & Earn Revenue
+            </CardTitle>
             <CardDescription className="text-xs text-muted-foreground leading-relaxed max-w-xl">
-              Register individual model container weights, serve API calls on optimized GPU servers, and get paid withdrawable earnings in real-time.
+              Register individual model container weights, serve API calls on
+              optimized GPU servers, and get paid withdrawable earnings in
+              real-time.
             </CardDescription>
 
             {error && (

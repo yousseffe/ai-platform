@@ -33,7 +33,7 @@ export function useSystemAlerts() {
 
   useEffect(() => {
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 15000);
+    const interval = setInterval(fetchAlerts, 13000);
 
     return () => clearInterval(interval);
   }, [fetchAlerts]);

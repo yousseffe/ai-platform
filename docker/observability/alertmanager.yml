@@ -2,14 +2,14 @@ global:
   resolve_timeout: 5m
 
 route:
-  group_by: ['alertname', 'name']
+  group_by: ["alertname", "name"]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
-  receiver: 'nestjs-webhook'
+  receiver: "nestjs-webhook"
 
 receivers:
-  - name: 'nestjs-webhook'
+  - name: "nestjs-webhook"
     webhook_configs:
-      - url: 'http://host.docker.internal:5000/api/v1/analytics/alerts/webhook'
+      - url: "http://host.docker.internal:3000/api/v1/analytics/alerts/webhook"
         send_resolved: true

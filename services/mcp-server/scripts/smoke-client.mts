@@ -1,7 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-const url = new URL(process.env.MCP_URL ?? 'http://localhost:7000/mcp');
+const url = new URL(process.env.MCP_URL ?? 'http://localhost:3030/mcp');
 const transport = new StreamableHTTPClientTransport(url, {
   requestInit: { headers: { Authorization: 'Bearer ml_sk_live_0c192a092211da06956fb37f6213f8dd81f33ecdee6de39c' } },
 });

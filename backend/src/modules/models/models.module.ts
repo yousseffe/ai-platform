@@ -34,6 +34,7 @@ import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
 import { WalletsModule } from '../wallets/wallets.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { ProviderAccountsModule } from '../provider-accounts/provider-accounts.module';
 
 /**
  * Module responsible for model cataloging, version tracking, file uploading,
@@ -64,6 +65,7 @@ import { OrganizationsModule } from '../organizations/organizations.module';
     AuthModule,
     UsersModule,
     WalletsModule,
+    ProviderAccountsModule,
     forwardRef(() => OrganizationsModule),
   ],
   providers: [

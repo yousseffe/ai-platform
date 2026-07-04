@@ -389,7 +389,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
     setIsDetectingSchema(true);
     try {
       const result = await detectSchema(model);
-      
+
       // Update form values
       if (result.example_payload) {
         form.setValue("examplePayload", result.example_payload);
@@ -403,7 +403,7 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
       form.setValue("type", type);
       form.setValue("framework", framework);
       form.setValue("taskType", taskType);
-      
+
       setHasDetected(true);
       toast.success("Model schema and configuration auto-detected successfully!");
     } catch (e: unknown) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL ?? "http://localhost:7000";
+const MCP_SERVER_URL = process.env.MCP_SERVER_URL ?? "http://localhost:3030";
 
 /**
  * Parses a Server-Sent Events body and returns all JSON-RPC payloads found in

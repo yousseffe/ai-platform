@@ -16,20 +16,26 @@ interface ModelOverviewProps {
  * and code snippets for Python, Javascript, and cURL prediction endpoint consumption.
  * Supports active language toggle, copying code to clipboard, and syntax highlighting.
  */
-export default function ModelOverview({ model, selectedVersionNumber }: ModelOverviewProps) {
-  const [activeLang, setActiveLang] = useState<"curl" | "python" | "js">("curl");
+export default function ModelOverview({
+  model,
+  selectedVersionNumber,
+}: ModelOverviewProps) {
+  const [activeLang, setActiveLang] = useState<"curl" | "python" | "js">(
+    "curl",
+  );
   const [copied, setCopied] = useState(false);
 
   const versions = model.versions || [];
   const activeVersion = selectedVersionNumber
     ? versions.find((v) => v.versionNumber === selectedVersionNumber)
-    : (versions.length
-        ? [...versions].sort((a, b) => b.versionNumber - a.versionNumber)[0]
-        : null);
+    : versions.length
+      ? [...versions].sort((a, b) => b.versionNumber - a.versionNumber)[0]
+      : null;
 
-  const backendUrl = typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_BACKEND_URL || window.location.origin)
-    : (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000");
+  const backendUrl =
+    typeof window !== "undefined"
+      ? process.env.NEXT_PUBLIC_BACKEND_URL || window.location.origin
+      : process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
 
   const urlPath = selectedVersionNumber
     ? `${backendUrl}/api/v1/models/${model.id}/v${selectedVersionNumber}/predict`
@@ -53,7 +59,7 @@ response = requests.post(url, json=payload, headers=headers)
 print(response.json())`;
 
   const getJsCode = () => `const url = "${urlPath}";
-const payload = ${activeVersion?.examplePayload || '{\n  features: [1.2, 3.4, 5.6]\n}'};
+const payload = ${activeVersion?.examplePayload || "{\n  features: [1.2, 3.4, 5.6]\n}"};
 
 const response = await fetch(url, {
   method: "POST",
@@ -84,31 +90,56 @@ console.log(result);`;
           </div>
           <div className="w-full h-px bg-border" />
           <div className="text-muted-foreground leading-relaxed space-y-3 font-sans text-xs">
-            <p className="text-foreground text-sm font-semibold">{model.name}</p>
-            <p>{model.description || "No model description has been pushed to this repository yet."}</p>
+            <p className="text-foreground text-sm font-semibold">
+              {model.name}
+            </p>
+            <p>
+              {model.description ||
+                "No model description has been pushed to this repository yet."}
+            </p>
           </div>
 
           <div className="pt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-border/50 text-[11px] font-sans">
             <div>
-              <span className="text-muted-foreground block uppercase font-bold tracking-wider text-[9px]">Tier</span>
-              <span className="text-foreground font-semibold font-mono capitalize">{model.tier || "Standard"}</span>
+              <span className="text-muted-foreground block uppercase font-bold tracking-wider text-[9px]">
+                Tier
+              </span>
+              <span className="text-foreground font-semibold font-mono capitalize">
+                {model.tier || "Standard"}
+              </span>
             </div>
             <div>
-              <span className="text-muted-foreground block uppercase font-bold tracking-wider text-[9px]">Cost Per Request</span>
+              <span className="text-muted-foreground block uppercase font-bold tracking-wider text-[9px]">
+                Cost Per Request
+              </span>
               <span className="text-foreground font-semibold font-mono">
-                ${(() => {
-                  const costVal = typeof model.costPerRequest === "string" ? parseFloat(model.costPerRequest) : model.costPerRequest;
-                  return typeof costVal === "number" && !isNaN(costVal) ? costVal.toFixed(4) : "0.0000";
+                $
+                {(() => {
+                  const costVal =
+                    typeof model.costPerRequest === "string"
+                      ? parseFloat(model.costPerRequest)
+                      : model.costPerRequest;
+                  return typeof costVal === "number" && !isNaN(costVal)
+                    ? costVal.toFixed(4)
+                    : "0.0000";
                 })()}
               </span>
             </div>
             <div>
-              <span className="text-muted-foreground block uppercase font-bold tracking-wider text-[9px]">Releases</span>
-              <span className="text-foreground font-semibold font-mono">{versions.length}</span>
+              <span className="text-muted-foreground block uppercase font-bold tracking-wider text-[9px]">
+                Releases
+              </span>
+              <span className="text-foreground font-semibold font-mono">
+                {versions.length}
+              </span>
             </div>
             <div>
-              <span className="text-muted-foreground block uppercase font-bold tracking-wider text-[9px]">Visibility</span>
-              <span className="text-foreground font-semibold font-mono capitalize font-mono text-xs">{model.isPublic ? "Public" : "Private"}</span>
+              <span className="text-muted-foreground block uppercase font-bold tracking-wider text-[9px]">
+                Visibility
+              </span>
+              <span className="text-foreground font-semibold font-mono capitalize font-mono text-xs">
+                {model.isPublic ? "Public" : "Private"}
+              </span>
             </div>
           </div>
         </div>
@@ -131,7 +162,11 @@ console.log(result);`;
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {lang === "curl" ? "cURL" : lang === "python" ? "Python" : "Node.js"}
+                  {lang === "curl"
+                    ? "cURL"
+                    : lang === "python"
+                      ? "Python"
+                      : "Node.js"}
                 </button>
               ))}
             </div>
@@ -153,8 +188,8 @@ console.log(result);`;
                   activeLang === "curl"
                     ? getCurlCode()
                     : activeLang === "python"
-                    ? getPythonCode()
-                    : getJsCode();
+                      ? getPythonCode()
+                      : getJsCode();
                 handleCopy(code);
               }}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border bg-card hover:bg-secondary hover:text-foreground text-muted-foreground text-xs font-semibold cursor-pointer active:scale-95 transition-all"
@@ -178,38 +213,125 @@ console.log(result);`;
             <pre className="font-mono whitespace-pre text-slate-300">
               {activeLang === "curl" && (
                 <code>
-                  <span className="text-pink-400">curl</span> <span className="text-indigo-400">-X</span> POST {urlPath} \<br />
-                  &nbsp;&nbsp;<span className="text-indigo-400">-H</span> <span className="text-emerald-400">{"\"Content-Type: application/json\""}</span> \<br />
-                  &nbsp;&nbsp;<span className="text-indigo-400">-H</span> <span className="text-emerald-400">{"\"Authorization: Bearer YOUR_JWT_TOKEN\""}</span> \<br />
-                  &nbsp;&nbsp;<span className="text-indigo-400">-d</span> <span className="text-amber-300">{"'"}</span>{activeVersion?.examplePayload || '{"features": [1.2, 3.4, 5.6]'}<span className="text-amber-300">{"'"}</span>
+                  <span className="text-pink-400">curl</span>{" "}
+                  <span className="text-indigo-400">-X</span> POST {urlPath} \
+                  <br />
+                  &nbsp;&nbsp;<span className="text-indigo-400">-H</span>{" "}
+                  <span className="text-emerald-400">
+                    {'"Content-Type: application/json"'}
+                  </span>{" "}
+                  \<br />
+                  &nbsp;&nbsp;<span className="text-indigo-400">-H</span>{" "}
+                  <span className="text-emerald-400">
+                    {'"Authorization: Bearer YOUR_JWT_TOKEN"'}
+                  </span>{" "}
+                  \<br />
+                  &nbsp;&nbsp;<span className="text-indigo-400">-d</span>{" "}
+                  <span className="text-amber-300">{"'"}</span>
+                  {activeVersion?.examplePayload ||
+                    '{"features": [1.2, 3.4, 5.6]'}
+                  <span className="text-amber-300">{"'"}</span>
                 </code>
               )}
               {activeLang === "python" && (
                 <code>
-                  <span className="text-pink-400">import</span> requests<br /><br />
-                  url = <span className="text-emerald-400">{"\""}{urlPath}{"\""}</span><br />
-                  headers = &#123;<br />
-                  &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-emerald-400">{"\"Content-Type\""}</span>: <span className="text-emerald-400">{"\"application/json\""}</span>,<br />
-                  &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-emerald-400">{"\"Authorization\""}</span>: <span className="text-emerald-400">{"\"Bearer YOUR_JWT_TOKEN\""}</span><br />
-                  &#125;<br />
-                  payload = <span className="text-amber-300">{activeVersion?.examplePayload || '{\n    "features": [1.2, 3.4, 5.6]\n}'}</span><br /><br />
-                  response = requests.<span className="text-indigo-400">post</span>(url, json=payload, headers=headers)<br />
-                  <span className="text-pink-400">print</span>(response.<span className="text-indigo-400">json</span>())
+                  <span className="text-pink-400">import</span> requests
+                  <br />
+                  <br />
+                  url ={" "}
+                  <span className="text-emerald-400">
+                    {'"'}
+                    {urlPath}
+                    {'"'}
+                  </span>
+                  <br />
+                  headers = &#123;
+                  <br />
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  <span className="text-emerald-400">
+                    {'"Content-Type"'}
+                  </span>:{" "}
+                  <span className="text-emerald-400">
+                    {'"application/json"'}
+                  </span>
+                  ,<br />
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  <span className="text-emerald-400">
+                    {'"Authorization"'}
+                  </span>:{" "}
+                  <span className="text-emerald-400">
+                    {'"Bearer YOUR_JWT_TOKEN"'}
+                  </span>
+                  <br />
+                  &#125;
+                  <br />
+                  payload ={" "}
+                  <span className="text-amber-300">
+                    {activeVersion?.examplePayload ||
+                      '{\n    "features": [1.2, 3.4, 5.6]\n}'}
+                  </span>
+                  <br />
+                  <br />
+                  response = requests.
+                  <span className="text-indigo-400">post</span>(url,
+                  json=payload, headers=headers)
+                  <br />
+                  <span className="text-pink-400">print</span>(response.
+                  <span className="text-indigo-400">json</span>())
                 </code>
               )}
               {activeLang === "js" && (
                 <code>
-                  <span className="text-pink-400">const</span> url = <span className="text-emerald-400">{"\""}{urlPath}{"\""}</span>;<br />
-                  <span className="text-pink-400">const</span> payload = <span className="text-amber-300">{activeVersion?.examplePayload || '{\n  features: [1.2, 3.4, 5.6]\n}'}</span>;<br /><br />
-                  <span className="text-pink-400">const</span> response = <span className="text-pink-400">await</span> <span className="text-indigo-400">fetch</span>(url, &#123;<br />
-                  &nbsp;&nbsp;method: <span className="text-emerald-400">{"\"POST\""}</span>,<br />
-                  &nbsp;&nbsp;headers: &#123;<br />
-                  &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-emerald-400">{"\"Content-Type\""}</span>: <span className="text-emerald-400">{"\"application/json\""}</span>,<br />
-                  &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-emerald-400">{"\"Authorization\""}</span>: <span className="text-emerald-400">{"\"Bearer YOUR_JWT_TOKEN\""}</span><br />
-                  &nbsp;&nbsp;&#125;,<br />
-                  &nbsp;&nbsp;body: JSON.<span className="text-indigo-400">stringify</span>(payload)<br />
-                  &#125;);<br /><br />
-                  <span className="text-pink-400">const</span> result = <span className="text-pink-400">await</span> response.<span className="text-indigo-400">json</span>();<br />
+                  <span className="text-pink-400">const</span> url ={" "}
+                  <span className="text-emerald-400">
+                    {'"'}
+                    {urlPath}
+                    {'"'}
+                  </span>
+                  ;<br />
+                  <span className="text-pink-400">const</span> payload ={" "}
+                  <span className="text-amber-300">
+                    {activeVersion?.examplePayload ||
+                      "{\n  features: [1.2, 3.4, 5.6]\n}"}
+                  </span>
+                  ;<br />
+                  <br />
+                  <span className="text-pink-400">const</span> response ={" "}
+                  <span className="text-pink-400">await</span>{" "}
+                  <span className="text-indigo-400">fetch</span>(url, &#123;
+                  <br />
+                  &nbsp;&nbsp;method:{" "}
+                  <span className="text-emerald-400">{'"POST"'}</span>,<br />
+                  &nbsp;&nbsp;headers: &#123;
+                  <br />
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  <span className="text-emerald-400">
+                    {'"Content-Type"'}
+                  </span>:{" "}
+                  <span className="text-emerald-400">
+                    {'"application/json"'}
+                  </span>
+                  ,<br />
+                  &nbsp;&nbsp;&nbsp;&nbsp;
+                  <span className="text-emerald-400">
+                    {'"Authorization"'}
+                  </span>:{" "}
+                  <span className="text-emerald-400">
+                    {'"Bearer YOUR_JWT_TOKEN"'}
+                  </span>
+                  <br />
+                  &nbsp;&nbsp;&#125;,
+                  <br />
+                  &nbsp;&nbsp;body: JSON.
+                  <span className="text-indigo-400">stringify</span>(payload)
+                  <br />
+                  &#125;);
+                  <br />
+                  <br />
+                  <span className="text-pink-400">const</span> result ={" "}
+                  <span className="text-pink-400">await</span> response.
+                  <span className="text-indigo-400">json</span>();
+                  <br />
                   console.<span className="text-indigo-400">log</span>(result);
                 </code>
               )}
@@ -218,7 +340,18 @@ console.log(result);`;
           <div className="px-4 py-3 bg-secondary/10 border-t border-border/50 text-xs text-muted-foreground flex items-start gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
             <p>
-              Replace <code className="text-foreground font-mono bg-secondary px-1 py-0.5 rounded text-[10px]">YOUR_JWT_TOKEN</code> with a valid API token generated in your <a href="/settings/api" className="text-primary hover:underline font-semibold">API Settings</a> page.
+              Replace{" "}
+              <code className="text-foreground font-mono bg-secondary px-1 py-0.5 rounded text-[10px]">
+                YOUR_JWT_TOKEN
+              </code>{" "}
+              with a valid API token generated in your{" "}
+              <a
+                href="/settings/api"
+                className="text-primary hover:underline font-semibold"
+              >
+                API Settings
+              </a>{" "}
+              page.
             </p>
           </div>
         </div>
@@ -232,19 +365,33 @@ console.log(result);`;
 
         {/* Infrastructure Specs */}
         <div className="border border-border bg-card rounded-xl p-5 font-mono text-xs">
-          <h3 className="font-bold text-foreground mb-4 text-sm font-sans">Cluster specs</h3>
+          <h3 className="font-bold text-foreground mb-4 text-sm font-sans">
+            Cluster specs
+          </h3>
           <div className="space-y-4">
             <div className="flex justify-between items-center pb-2 border-b border-border/50">
-              <span className="text-muted-foreground flex items-center gap-1.5"><Cpu className="w-3.5 h-3.5" /> Hardware</span>
-              <span className="text-foreground font-bold">{model.tier === "premium" ? "NVIDIA A100 GPU" : "CPU - 4 Cores"}</span>
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5" /> Hardware
+              </span>
+              <span className="text-foreground font-bold">
+                {model.tier === "premium" ? "NVIDIA A100 GPU" : "CPU - 4 Cores"}
+              </span>
             </div>
             <div className="flex justify-between items-center pb-2 border-b border-border/50">
-              <span className="text-muted-foreground flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" /> Autoscaler</span>
-              <span className="text-foreground font-bold">{model.tier === "premium" ? "1 - 8 nodes" : "1 - 2 nodes"}</span>
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5" /> Autoscaler
+              </span>
+              <span className="text-foreground font-bold">
+                {model.tier === "premium" ? "1 - 8 nodes" : "1 - 2 nodes"}
+              </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Idle timeout</span>
-              <span className="text-foreground font-bold">{model.tier === "premium" ? "5 mins" : "2 mins"}</span>
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" /> Idle timeout
+              </span>
+              <span className="text-foreground font-bold">
+                {model.tier === "premium" ? "5 mins" : "2 mins"}
+              </span>
             </div>
           </div>
         </div>

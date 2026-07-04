@@ -11,7 +11,7 @@ export async function registerUser(email: string, full_name: string, password: s
   const backendUrl =
     (typeof window === "undefined"
       ? process.env.BACKEND_URL
-      : process.env.NEXT_PUBLIC_BACKEND_URL) || "http://localhost:5000";
+      : process.env.NEXT_PUBLIC_BACKEND_URL) || "http://localhost:3000";
 
   const res = await fetch(`${backendUrl}/api/v1/auth/register`, {
     method: "POST",
@@ -42,7 +42,7 @@ export async function verifyUser(email: string, otp: string): Promise<unknown> {
   const backendUrl =
     (typeof window === "undefined"
       ? process.env.BACKEND_URL
-      : process.env.NEXT_PUBLIC_BACKEND_URL) || "http://localhost:5000";
+      : process.env.NEXT_PUBLIC_BACKEND_URL) || "http://localhost:3000";
 
   const res = await fetch(`${backendUrl}/api/v1/auth/verify`, {
     method: "POST",

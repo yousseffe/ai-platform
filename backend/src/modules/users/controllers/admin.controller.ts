@@ -38,6 +38,8 @@ import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { TransactionType } from '../../wallets/enums/transaction-type.enum';
 import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
+import { ProviderAccountStatus } from '../../provider-accounts/enums/provider-account-status.enum';
 import * as Docker from 'dockerode';
 import { getDockerOptions } from '../../../shared/docker/docker.util';
 
@@ -61,6 +63,7 @@ export class AdminController {
     private readonly walletRepository: Repository<Wallet>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly providerAccountsService: ProviderAccountsService,
   ) {
     this.docker = new Docker(getDockerOptions());
   }
@@ -747,6 +750,19 @@ export class AdminController {
     }
     user.providerMode = !user.providerMode;
     await this.userRepository.save(user);
+    const account = await this.providerAccountsService.ensureProviderAccount(
+      OwnerType.USER,
+      user.id,
+      null,
+    );
+    await this.providerAccountsService.changeStatus(account.id, {
+      status: user.providerMode
+        ? ProviderAccountStatus.ACTIVE
+        : ProviderAccountStatus.SUSPENDED,
+      notes: user.providerMode
+        ? 'Provider mode activated by admin'
+        : 'Provider mode deactivated by admin',
+    });
     return { success: true, providerMode: user.providerMode };
   }
 

@@ -3,6 +3,8 @@ import { DataSource } from 'typeorm';
 import { Model } from '../entities/model.entity';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import { InferencePricing } from '../interfaces/inference.interface';
+import { OwnerType } from '../../../shared/enums/owner-type.enum';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
 
 /**
  * Resolves the credit cost and provider revenue share for a single prediction
@@ -11,7 +13,10 @@ import { InferencePricing } from '../interfaces/inference.interface';
  */
 @Injectable()
 export class InferencePricingService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly providerAccountsService: ProviderAccountsService,
+  ) {}
 
   /**
    * Computes the cost (in credits) and provider share percentage for a call to
@@ -71,9 +76,17 @@ export class InferencePricingService {
     const shareConfig = await this.dataSource
       .getRepository(SystemConfig)
       .findOne({ where: { key: 'default_provider_share_percent' } });
-    const resolvedSharePercent = shareConfig
+    const fallbackSharePercent = shareConfig
       ? parseInt(shareConfig.value, 10)
       : providerSharePercent;
+    const ownerType = model.organization ? OwnerType.ORG : OwnerType.USER;
+    const ownerId = model.organization?.id ?? model.user.id;
+    const resolvedSharePercent =
+      await this.providerAccountsService.resolveProviderSharePercent(
+        ownerType,
+        ownerId,
+        fallbackSharePercent,
+      );
 
     return { cost, providerSharePercent: resolvedSharePercent, isLlm: false };
   }

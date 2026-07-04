@@ -74,6 +74,7 @@ export class WalletsService {
       ownerType,
       walletType,
       balance: initialBalance,
+      currency: walletType === WalletType.PROVIDER ? 'EGP' : 'CREDITS',
     });
 
     return this.walletRepository.save(wallet);

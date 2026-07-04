@@ -39,7 +39,10 @@ enum McpScope {
   ADMIN_READ = "admin:read",
 }
 
-const SCOPE_LABELS: Record<McpScope, { label: string; desc: string; admin: boolean }> = {
+const SCOPE_LABELS: Record<
+  McpScope,
+  { label: string; desc: string; admin: boolean }
+> = {
   [McpScope.INTEGRATION_READ]: {
     label: "integration:read",
     desc: "Read repository layout analysis and static external provider metadata templates.",
@@ -84,13 +87,19 @@ export default function McpAccessTokensPage() {
 
   // UI state overlays
   const [newRawToken, setNewRawToken] = useState<string | null>(null);
-  const [newCreatedToken, setNewCreatedToken] = useState<McpTokenInfo | null>(null);
+  const [newCreatedToken, setNewCreatedToken] = useState<McpTokenInfo | null>(
+    null,
+  );
   const [showCreatedModal, setShowCreatedModal] = useState(false);
-  const [activeConfigTab, setActiveConfigTab] = useState<"claude" | "cursor" | "antigravity">("antigravity");
+  const [activeConfigTab, setActiveConfigTab] = useState<
+    "claude" | "cursor" | "antigravity"
+  >("antigravity");
 
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
   const [copiedRawText, setCopiedRawText] = useState(false);
-  const [visibleTokens, setVisibleTokens] = useState<Record<string, boolean>>({});
+  const [visibleTokens, setVisibleTokens] = useState<Record<string, boolean>>(
+    {},
+  );
 
   useEffect(() => {
     fetchTokens();
@@ -125,7 +134,8 @@ export default function McpAccessTokensPage() {
       const body = {
         name: tokenName.trim(),
         scopes: selectedScopes,
-        expiresInDays: expiresInDays === "never" ? null : parseInt(expiresInDays, 10),
+        expiresInDays:
+          expiresInDays === "never" ? null : parseInt(expiresInDays, 10),
       };
 
       const res = await smartFetch<McpTokenCreateResponse>("/auth/mcp-tokens", {
@@ -140,7 +150,8 @@ export default function McpAccessTokensPage() {
       setShowCreatedModal(true);
       toast.success("MCP Access Token generated!");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to generate token";
+      const msg =
+        err instanceof Error ? err.message : "Failed to generate token";
       toast.error(msg);
     } finally {
       setGenerating(false);
@@ -149,7 +160,7 @@ export default function McpAccessTokensPage() {
 
   const handleRevokeToken = async (tokenId: string) => {
     const confirm = window.confirm(
-      "Are you sure you want to revoke this MCP token? Clients using this token will fail to authenticate immediately."
+      "Are you sure you want to revoke this MCP token? Clients using this token will fail to authenticate immediately.",
     );
     if (!confirm) return;
 
@@ -158,7 +169,7 @@ export default function McpAccessTokensPage() {
         method: "POST",
       });
       setTokens((prev) =>
-        prev.map((t) => (t.id === tokenId ? { ...t, isActive: false } : t))
+        prev.map((t) => (t.id === tokenId ? { ...t, isActive: false } : t)),
       );
       toast.success("Token revoked successfully");
     } catch (err: unknown) {
@@ -169,7 +180,7 @@ export default function McpAccessTokensPage() {
 
   const handleDeleteToken = async (tokenId: string) => {
     const confirm = window.confirm(
-      "Are you sure you want to permanently delete this MCP token? This action cannot be undone."
+      "Are you sure you want to permanently delete this MCP token? This action cannot be undone.",
     );
     if (!confirm) return;
 
@@ -198,22 +209,26 @@ export default function McpAccessTokensPage() {
 
   const toggleScope = (scope: McpScope) => {
     setSelectedScopes((prev) =>
-      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]
+      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope],
     );
   };
 
   // Warnings checks
-  const tokensWithNoExpiration = tokens.filter((t) => t.isActive && !t.expiresAt);
+  const tokensWithNoExpiration = tokens.filter(
+    (t) => t.isActive && !t.expiresAt,
+  );
   const staleTokens = tokens.filter((t) => {
     if (!t.isActive) return false;
-    const lastUsed = t.lastUsedAt ? new Date(t.lastUsedAt).getTime() : new Date(t.createdAt).getTime();
+    const lastUsed = t.lastUsedAt
+      ? new Date(t.lastUsedAt).getTime()
+      : new Date(t.createdAt).getTime();
     const ageDays = (Date.now() - lastUsed) / (1000 * 60 * 60 * 24);
     return ageDays >= 90;
   });
 
   const getMcpConfigString = () => {
     const tokenVal = newRawToken || "mcp_your_token_here";
-    const port = 7000;
+    const port = 3030;
 
     if (activeConfigTab === "claude") {
       return `{\n  "mcpServers": {\n    "ai-platform": {\n      "command": "npx",\n      "args": [\n        "-y",\n        "@modelcontextprotocol/client-http",\n        "--url",\n        "http://localhost:${port}/mcp",\n        "--headers",\n        "Authorization=Bearer ${tokenVal}"\n      ]\n    }\n  }\n}`;
@@ -231,7 +246,9 @@ export default function McpAccessTokensPage() {
       <div className="flex flex-col gap-3 select-none">
         <h1 className="text-xl font-bold text-foreground">MCP Access Tokens</h1>
         <p className="text-xs text-muted-foreground max-w-2xl">
-          Personal access credentials used to securely connect external AI clients (Claude Code, Cursor, Antigravity) to the platform context services.
+          Personal access credentials used to securely connect external AI
+          clients (Claude Code, Cursor, Antigravity) to the platform context
+          services.
         </p>
       </div>
 
@@ -242,8 +259,11 @@ export default function McpAccessTokensPage() {
             <div className="flex gap-3 p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 text-yellow-600 dark:text-yellow-400 text-xs">
               <ShieldAlert className="w-5 h-5 shrink-0" />
               <div>
-                <span className="font-bold">Security Alert:</span> You have active tokens with no expiration date ({" "}
-                {tokensWithNoExpiration.map((t) => t.name).join(", ")} ). We strongly recommend setting expiration dates to secure your environment.
+                <span className="font-bold">Security Alert:</span> You have
+                active tokens with no expiration date ({" "}
+                {tokensWithNoExpiration.map((t) => t.name).join(", ")} ). We
+                strongly recommend setting expiration dates to secure your
+                environment.
               </div>
             </div>
           )}
@@ -251,8 +271,10 @@ export default function McpAccessTokensPage() {
             <div className="flex gap-3 p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 text-blue-600 dark:text-blue-400 text-xs">
               <AlertCircle className="w-5 h-5 shrink-0" />
               <div>
-                <span className="font-bold">Optimization Alert:</span> You have tokens that haven't been used in 90+ days ({" "}
-                {staleTokens.map((t) => t.name).join(", ")} ). Consider revoking or deleting them.
+                <span className="font-bold">Optimization Alert:</span> You have
+                tokens that haven't been used in 90+ days ({" "}
+                {staleTokens.map((t) => t.name).join(", ")} ). Consider revoking
+                or deleting them.
               </div>
             </div>
           )}
@@ -267,8 +289,12 @@ export default function McpAccessTokensPage() {
               <Plug className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="font-bold text-foreground text-xs font-mono">Tokens List</h2>
-              <p className="text-[10px] text-muted-foreground">Manage active credential authorizations.</p>
+              <h2 className="font-bold text-foreground text-xs font-mono">
+                Tokens List
+              </h2>
+              <p className="text-[10px] text-muted-foreground">
+                Manage active credential authorizations.
+              </p>
             </div>
           </div>
 
@@ -279,7 +305,8 @@ export default function McpAccessTokensPage() {
             </div>
           ) : tokens.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground font-mono text-xs border border-dashed border-border rounded-lg bg-secondary/10">
-              No MCP Access Tokens generated. Use the panel on the right to create your first token.
+              No MCP Access Tokens generated. Use the panel on the right to
+              create your first token.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -299,29 +326,37 @@ export default function McpAccessTokensPage() {
                   {tokens.map((token) => {
                     const isVisible = !!visibleTokens[token.id];
                     const maskedToken = token.keyPrefix;
-                    const isExpired = token.expiresAt && new Date(token.expiresAt).getTime() < Date.now();
+                    const isExpired =
+                      token.expiresAt &&
+                      new Date(token.expiresAt).getTime() < Date.now();
 
                     let statusBadge = (
                       <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-500 select-none">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{" "}
+                        Active
                       </span>
                     );
                     if (!token.isActive) {
                       statusBadge = (
                         <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-500 select-none">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Revoked
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />{" "}
+                          Revoked
                         </span>
                       );
                     } else if (isExpired) {
                       statusBadge = (
                         <span className="inline-flex items-center gap-1 text-[9px] font-bold text-yellow-500 select-none">
-                          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" /> Expired
+                          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />{" "}
+                          Expired
                         </span>
                       );
                     }
 
                     return (
-                      <tr key={token.id} className="border-b border-border/40 hover:bg-secondary/20 transition-colors">
+                      <tr
+                        key={token.id}
+                        className="border-b border-border/40 hover:bg-secondary/20 transition-colors"
+                      >
                         <td className="py-3 px-2 font-sans font-bold text-foreground max-w-[120px] truncate">
                           {token.name}
                         </td>
@@ -344,9 +379,7 @@ export default function McpAccessTokensPage() {
                             ))}
                           </div>
                         </td>
-                        <td className="py-3 px-2">
-                          {statusBadge}
-                        </td>
+                        <td className="py-3 px-2">{statusBadge}</td>
                         <td className="py-3 px-2 text-muted-foreground font-sans text-[9px]">
                           {token.lastUsedAt
                             ? new Date(token.lastUsedAt).toLocaleDateString()
@@ -354,7 +387,11 @@ export default function McpAccessTokensPage() {
                         </td>
                         <td className="py-3 px-2 text-muted-foreground font-sans text-[9px]">
                           {token.expiresAt ? (
-                            <span className={isExpired ? "text-yellow-600 font-bold" : ""}>
+                            <span
+                              className={
+                                isExpired ? "text-yellow-600 font-bold" : ""
+                              }
+                            >
                               {new Date(token.expiresAt).toLocaleDateString()}
                             </span>
                           ) : (
@@ -399,8 +436,12 @@ export default function McpAccessTokensPage() {
               <Sparkles className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h2 className="font-bold text-foreground text-xs font-mono">New Token</h2>
-              <p className="text-[10px] text-muted-foreground">Generate personal access credentials.</p>
+              <h2 className="font-bold text-foreground text-xs font-mono">
+                New Token
+              </h2>
+              <p className="text-[10px] text-muted-foreground">
+                Generate personal access credentials.
+              </p>
             </div>
           </div>
 
@@ -442,14 +483,18 @@ export default function McpAccessTokensPage() {
                       />
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold font-mono text-foreground">{meta.label}</span>
+                          <span className="text-[10px] font-bold font-mono text-foreground">
+                            {meta.label}
+                          </span>
                           {meta.admin && (
                             <span className="bg-red-500/10 text-red-500 text-[8px] font-bold px-1.5 py-0.25 rounded border border-red-500/20 inline-flex items-center gap-0.5">
                               <Lock className="w-2 h-2" /> Admin Only
                             </span>
                           )}
                         </div>
-                        <p className="text-[9px] text-muted-foreground mt-0.5 font-sans leading-relaxed">{meta.desc}</p>
+                        <p className="text-[9px] text-muted-foreground mt-0.5 font-sans leading-relaxed">
+                          {meta.desc}
+                        </p>
                       </div>
                     </label>
                   );
@@ -496,17 +541,21 @@ export default function McpAccessTokensPage() {
         <DialogContent className="sm:max-w-xl bg-card border border-border rounded-2xl shadow-xl text-left">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-foreground font-bold select-none text-sm">
-              <Sparkles className="w-5 h-5 text-emerald-500" /> Token Generated Successfully
+              <Sparkles className="w-5 h-5 text-emerald-500" /> Token Generated
+              Successfully
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground select-none">
-              Make sure to copy your personal access token now. You won't be able to see it again!
+              Make sure to copy your personal access token now. You won't be
+              able to see it again!
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 my-2">
             {/* The raw token container */}
             <div className="p-3 bg-secondary/40 border border-border/80 rounded-lg flex items-center justify-between gap-3 font-mono text-xs">
-              <span className="text-foreground font-bold break-all">{newRawToken}</span>
+              <span className="text-foreground font-bold break-all">
+                {newRawToken}
+              </span>
               <button
                 onClick={() => handleCopyRaw(newRawToken || "")}
                 className="btn hover:bg-secondary text-muted-foreground hover:text-foreground p-2 rounded-lg cursor-pointer shrink-0 transition-colors"

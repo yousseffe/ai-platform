@@ -28,11 +28,13 @@ export default function Header({ session }: HeaderProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
+    Promise.resolve().then(() => {
+      setMounted(true);
+      const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
+      if (savedTheme) {
+        setTheme(savedTheme);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -57,6 +59,8 @@ export default function Header({ session }: HeaderProps) {
     if (pathname.startsWith("/models/upload")) return `${wsName} / Models / Upload`;
     if (pathname.startsWith("/models/")) return `${wsName} / Models / Details`;
     if (pathname === "/models") return `${wsName} / Models Registry`;
+    if (pathname === "/provider/subscriptions") return `${wsName} / Provider / Subscriptions`;
+    if (pathname === "/provider/payments") return `${wsName} / Provider / Subscription Payments`;
     return `${wsName} / Dashboard`;
   };
 
