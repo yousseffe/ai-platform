@@ -107,6 +107,7 @@ export class ProviderAccountsController {
     data: Record<string, unknown>[];
     total: number;
     totalPaidEgp: number;
+    subscription: Record<string, unknown>;
   }> {
     const account = await this.providerAccountsService.ensureProviderAccount(
       OwnerType.USER,

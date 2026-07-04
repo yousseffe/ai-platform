@@ -82,7 +82,17 @@ export class ProviderSubscriptionBillingService {
     data: Transaction[];
     total: number;
     totalPaidEgp: number;
+    subscription: {
+      billingCycle: BillingCycle | null;
+      startedAt: string | null;
+      expiresAt: string | null;
+      lastPaymentAt: string | null;
+      status: 'FREE' | 'ACTIVE' | 'EXPIRED';
+      daysRemaining: number | null;
+    };
   }> {
+    const account =
+      await this.providerAccountsService.getProviderAccount(providerAccountId);
     const reference = this.getSubscriptionPaymentReference(providerAccountId);
     const [data, total] = await this.transactionRepository.findAndCount({
       where: { reference },
@@ -93,7 +103,12 @@ export class ProviderSubscriptionBillingService {
       0,
     );
 
-    return { data, total, totalPaidEgp };
+    return {
+      data,
+      total,
+      totalPaidEgp,
+      subscription: this.buildSubscriptionSnapshot(account),
+    };
   }
 
   /**
@@ -115,13 +130,21 @@ export class ProviderSubscriptionBillingService {
     if (!providerAccountId || !tierId || amountEgp < 0) {
       throw new BadRequestException('Invalid provider subscription metadata');
     }
+    if (paymentReference) {
+      const existingPayment = await this.transactionRepository.findOne({
+        where: { stripeEventId: paymentReference },
+      });
+      if (existingPayment) {
+        return;
+      }
+    }
 
-    const account = await this.providerAccountsService.changeTier(
-      providerAccountId,
-      { tierId },
-      null,
-    );
     const tier = await this.tierService.getTier(tierId);
+    const account = await this.providerAccountsService.activatePaidSubscription(
+      providerAccountId,
+      tier,
+      billingCycle,
+    );
     await this.walletLedgerService.creditSystemRevenue(
       amountEgp,
       this.getSubscriptionPaymentReference(providerAccountId),
@@ -195,5 +218,35 @@ export class ProviderSubscriptionBillingService {
    */
   private getSubscriptionPaymentReference(providerAccountId: string): string {
     return `Provider tier subscription payment: ${providerAccountId}`;
+  }
+
+  /**
+   * Builds provider-facing subscription state from the stored account period.
+   */
+  private buildSubscriptionSnapshot(account: Awaited<ReturnType<ProviderAccountsService['getProviderAccount']>>): {
+    billingCycle: BillingCycle | null;
+    startedAt: string | null;
+    expiresAt: string | null;
+    lastPaymentAt: string | null;
+    status: 'FREE' | 'ACTIVE' | 'EXPIRED';
+    daysRemaining: number | null;
+  } {
+    const now = Date.now();
+    const expiresAt = account.subscriptionExpiresAt;
+    const isPaidTier = Number(account.tier?.monthlyPriceEgp ?? 0) > 0;
+    const isExpired = Boolean(expiresAt && expiresAt.getTime() <= now);
+    const daysRemaining =
+      expiresAt && !isExpired
+        ? Math.ceil((expiresAt.getTime() - now) / 86_400_000)
+        : null;
+
+    return {
+      billingCycle: account.subscriptionBillingCycle,
+      startedAt: account.subscriptionStartedAt?.toISOString() ?? null,
+      expiresAt: expiresAt?.toISOString() ?? null,
+      lastPaymentAt: account.lastSubscriptionPaymentAt?.toISOString() ?? null,
+      status: isPaidTier && !isExpired ? 'ACTIVE' : isExpired ? 'EXPIRED' : 'FREE',
+      daysRemaining,
+    };
   }
 }

@@ -4,6 +4,8 @@ import React from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  AlertTriangle,
+  CalendarDays,
   CheckCircle2,
   Clock,
   CreditCard,
@@ -34,6 +36,14 @@ interface SubscriptionPaymentsResponse {
   data: SubscriptionPayment[];
   total: number;
   totalPaidEgp: number;
+  subscription: {
+    billingCycle: "MONTHLY" | "ANNUAL" | null;
+    startedAt: string | null;
+    expiresAt: string | null;
+    lastPaymentAt: string | null;
+    status: "FREE" | "ACTIVE" | "EXPIRED";
+    daysRemaining: number | null;
+  };
 }
 
 function toNumber(value: number | string | null | undefined): number {
@@ -68,6 +78,8 @@ export default function ProviderSubscriptionPaymentsPage() {
   const [payments, setPayments] = React.useState<SubscriptionPayment[]>([]);
   const [total, setTotal] = React.useState(0);
   const [totalPaidEgp, setTotalPaidEgp] = React.useState(0);
+  const [subscription, setSubscription] =
+    React.useState<SubscriptionPaymentsResponse["subscription"] | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   const loadPayments = React.useCallback(async () => {
@@ -75,6 +87,7 @@ export default function ProviderSubscriptionPaymentsPage() {
     setPayments(res.data);
     setTotal(res.total);
     setTotalPaidEgp(toNumber(res.totalPaidEgp));
+    setSubscription(res.subscription);
   }, []);
 
   React.useEffect(() => {
@@ -96,6 +109,8 @@ export default function ProviderSubscriptionPaymentsPage() {
   }, [loadPayments]);
 
   const lastPayment = payments[0];
+  const isSubscriptionActive = subscription?.status === "ACTIVE";
+  const isSubscriptionExpired = subscription?.status === "EXPIRED";
 
   return (
     <div className="space-y-6 animate-fade-in text-left">
@@ -118,6 +133,74 @@ export default function ProviderSubscriptionPaymentsPage() {
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
+
+      <Card
+        className={cn(
+          "border rounded-xl shadow-sm",
+          isSubscriptionActive
+            ? "border-emerald-500/25 bg-emerald-500/[0.03]"
+            : isSubscriptionExpired
+              ? "border-amber-500/25 bg-amber-500/[0.04]"
+              : "border-border bg-card",
+        )}
+      >
+        <CardContent className="p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div
+              className={cn(
+                "p-2.5 rounded-lg border",
+                isSubscriptionActive
+                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                  : isSubscriptionExpired
+                    ? "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400"
+                    : "bg-primary/10 text-primary border-primary/15",
+              )}
+            >
+              {isSubscriptionExpired ? <AlertTriangle className="w-5 h-5" /> : <CalendarDays className="w-5 h-5" />}
+            </div>
+            <div>
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider font-mono">
+                Current subscription
+              </p>
+              <h2 className="mt-1 text-lg font-extrabold text-foreground">
+                {isSubscriptionActive
+                  ? `Active until ${subscription?.expiresAt ? formatDate(subscription.expiresAt) : "next renewal"}`
+                  : isSubscriptionExpired
+                    ? "Expired and reverted to the default plan"
+                    : "No active paid subscription"}
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                {isSubscriptionActive &&
+                subscription?.daysRemaining !== null &&
+                subscription?.daysRemaining !== undefined
+                  ? `${subscription?.daysRemaining} day${subscription?.daysRemaining === 1 ? "" : "s"} remaining on the current ${subscription?.billingCycle?.toLowerCase()} period.`
+                  : isSubscriptionExpired
+                    ? "Paid tier access is removed automatically after the stored expiry date."
+                    : "Choose a paid provider plan to start a subscription period."}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div className="rounded-lg border border-border bg-background/70 px-3 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Cycle</p>
+              <p className="mt-1 font-bold text-foreground">{subscription?.billingCycle ?? "None"}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-background/70 px-3 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Started</p>
+              <p className="mt-1 font-bold text-foreground">
+                {subscription?.startedAt ? formatDate(subscription.startedAt) : "-"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-background/70 px-3 py-2 col-span-2 sm:col-span-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Expires</p>
+              <p className="mt-1 font-bold text-foreground">
+                {subscription?.expiresAt ? formatDate(subscription.expiresAt) : "-"}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <Card className="border border-border bg-card border-l-4 border-l-primary rounded-xl shadow-sm">

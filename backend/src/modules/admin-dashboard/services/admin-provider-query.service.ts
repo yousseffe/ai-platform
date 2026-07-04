@@ -4,6 +4,7 @@ import { Between, FindOptionsWhere, Repository } from 'typeorm';
 import { Model } from '../../models/entities/model.entity';
 import { ModelType } from '../../models/enums/model-type.enum';
 import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
 import { ProviderUtilizationService } from '../../provider-accounts/services/provider-utilization.service';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { ListProvidersQueryDto } from '../dto/list-providers-query.dto';
@@ -28,6 +29,7 @@ export class AdminProviderQueryService {
     private readonly auditLogService: AdminAuditLogService,
     private readonly providerMetricsService: AdminProviderMetricsService,
     private readonly providerUtilizationService: ProviderUtilizationService,
+    private readonly providerAccountsService: ProviderAccountsService,
   ) {}
 
   /**
@@ -61,7 +63,12 @@ export class AdminProviderQueryService {
       relations: ['tier'],
       order: { createdAt: 'DESC' },
     });
-    const rows = await this.buildListRows(accounts);
+    const normalizedAccounts = await Promise.all(
+      accounts.map((account) =>
+        this.providerAccountsService.getProviderAccount(account.id),
+      ),
+    );
+    const rows = await this.buildListRows(normalizedAccounts);
     const filteredRows = rows.filter((row) => this.matchesFilters(row, query));
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -95,14 +102,19 @@ export class AdminProviderQueryService {
       throw new NotFoundException('Provider account not found');
     }
 
-    const [listRow] = await this.buildListRows([account]);
-    const modelMap = await this.providerMetricsService.getModelMap([account]);
+    const normalizedAccount =
+      await this.providerAccountsService.getProviderAccount(account.id);
+
+    const [listRow] = await this.buildListRows([normalizedAccount]);
+    const modelMap = await this.providerMetricsService.getModelMap([
+      normalizedAccount,
+    ]);
     const models = modelMap.get(account.id) ?? [];
     const logMetricsMap =
       await this.providerMetricsService.getModelLogMetricsMap(
         models.map((model) => model.id),
       );
-    const recentTransactions = await this.listRecentTransactions(account);
+    const recentTransactions = await this.listRecentTransactions(normalizedAccount);
 
     return {
       id: account.id,
@@ -115,9 +127,11 @@ export class AdminProviderQueryService {
       totalEarningsEgp: listRow.totalEarningsEgp,
       platformCommissionEgp: listRow.platformCommissionEgp,
       subscriptionRevenueEgp:
-        (await this.providerMetricsService.getSubscriptionMap([account])).get(
-          account.id,
-        )?.totalPaidEgp ?? 0,
+        (
+          await this.providerMetricsService.getSubscriptionMap([
+            normalizedAccount,
+          ])
+        ).get(normalizedAccount.id)?.totalPaidEgp ?? 0,
       totalInferenceRequests: models.reduce(
         (sum, model) => sum + (logMetricsMap.get(model.id)?.totalRequests ?? 0),
         0,
@@ -125,7 +139,7 @@ export class AdminProviderQueryService {
       lastActiveAt: this.resolveLastActiveAt(models, logMetricsMap),
       createdAt: account.createdAt.toISOString(),
       utilization:
-        (await this.providerUtilizationService.getUtilization(account)) as unknown as Record<
+        (await this.providerUtilizationService.getUtilization(normalizedAccount)) as unknown as Record<
           string,
           { used: number; limit: number | null; remaining: number | null }
         >,
@@ -144,8 +158,8 @@ export class AdminProviderQueryService {
         'PROVIDER_ACCOUNT',
         account.id,
       ),
-      notes: account.notes,
-      customNotes: account.customNotes,
+      notes: normalizedAccount.notes,
+      customNotes: normalizedAccount.customNotes,
     };
   }
 

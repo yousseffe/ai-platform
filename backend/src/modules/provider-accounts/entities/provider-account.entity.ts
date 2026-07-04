@@ -9,6 +9,7 @@ import {
   Unique,
 } from 'typeorm';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
+import { BillingCycle } from '../enums/billing-cycle.enum';
 import { ProviderAccountStatus } from '../enums/provider-account-status.enum';
 import { ProviderTierDefinition } from './provider-tier-definition.entity';
 
@@ -52,6 +53,31 @@ export class ProviderAccount {
   /** Time the current assignment was made. */
   @Column({ name: 'assigned_at', type: 'timestamp', nullable: true })
   assignedAt: Date | null;
+
+  /** Billing cycle for the active paid subscription. */
+  @Column({
+    name: 'subscription_billing_cycle',
+    type: 'varchar',
+    enum: BillingCycle,
+    nullable: true,
+  })
+  subscriptionBillingCycle: BillingCycle | null;
+
+  /** Timestamp when the current paid subscription period started. */
+  @Column({ name: 'subscription_started_at', type: 'timestamp', nullable: true })
+  subscriptionStartedAt: Date | null;
+
+  /** Timestamp when the current paid subscription period expires. */
+  @Column({ name: 'subscription_expires_at', type: 'timestamp', nullable: true })
+  subscriptionExpiresAt: Date | null;
+
+  /** Timestamp of the latest confirmed subscription payment. */
+  @Column({
+    name: 'last_subscription_payment_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  lastSubscriptionPaymentAt: Date | null;
 
   /** Admin notes for lifecycle context. */
   @Column({ type: 'text', nullable: true })

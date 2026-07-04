@@ -261,16 +261,26 @@ export class AdminProviderMetricsService {
           );
         const latestPayment = paymentRows[0] ?? null;
         const latestRedemption = redemptionMap.get(account.id) ?? null;
+        const storedBillingCycle =
+          account.subscriptionBillingCycle === BillingCycle.ANNUAL
+            ? 'ANNUAL'
+            : account.subscriptionBillingCycle === BillingCycle.MONTHLY
+              ? 'MONTHLY'
+              : null;
         const billingCycle =
-          latestRedemption?.billingCycle === BillingCycle.ANNUAL
+          storedBillingCycle ??
+          (latestRedemption?.billingCycle === BillingCycle.ANNUAL
             ? 'ANNUAL'
             : latestRedemption?.billingCycle === BillingCycle.MONTHLY
               ? 'MONTHLY'
-              : null;
-        const lastPaymentDate = latestPayment?.createdAt ?? null;
-        const nextRenewalDate = lastPaymentDate
-          ? addBillingCycle(lastPaymentDate, billingCycle)
-          : null;
+              : null);
+        const lastPaymentDate =
+          account.lastSubscriptionPaymentAt ?? latestPayment?.createdAt ?? null;
+        const nextRenewalDate =
+          account.subscriptionExpiresAt ??
+          (lastPaymentDate ? addBillingCycle(lastPaymentDate, billingCycle) : null);
+        const isExpired =
+          nextRenewalDate !== null && nextRenewalDate.getTime() <= Date.now();
 
         return [
           account.id,
@@ -280,7 +290,7 @@ export class AdminProviderMetricsService {
                 ? 'SUSPENDED'
                 : Number(account.tier?.monthlyPriceEgp ?? 0) === 0
                   ? 'FREE'
-                  : latestPayment
+                  : latestPayment && !isExpired
                     ? 'ACTIVE'
                     : 'PENDING',
             billingCycle,

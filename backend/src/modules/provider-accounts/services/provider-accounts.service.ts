@@ -18,6 +18,7 @@ import {
 } from '../dto/provider-account.dto';
 import { ProviderAccount } from '../entities/provider-account.entity';
 import { ProviderTierDefinition } from '../entities/provider-tier-definition.entity';
+import { BillingCycle } from '../enums/billing-cycle.enum';
 import { ProviderAccountStatus } from '../enums/provider-account-status.enum';
 import { ProviderTierService } from './provider-tier.service';
 
@@ -40,9 +41,12 @@ export class ProviderAccountsService {
    * @returns Provider account collection.
    */
   async listProviderAccounts(): Promise<ProviderAccount[]> {
-    return this.providerAccountRepository.find({
+    const accounts = await this.providerAccountRepository.find({
       order: { createdAt: 'DESC' },
     });
+    return Promise.all(
+      accounts.map((account) => this.applyExpiredSubscription(account)),
+    );
   }
 
   /**
@@ -61,7 +65,7 @@ export class ProviderAccountsService {
     if (!account) {
       throw new NotFoundException('Provider account not found');
     }
-    return account;
+    return this.applyExpiredSubscription(account);
   }
 
   /**
@@ -75,9 +79,10 @@ export class ProviderAccountsService {
     ownerType: OwnerType,
     ownerId: string,
   ): Promise<ProviderAccount | null> {
-    return this.providerAccountRepository.findOne({
+    const account = await this.providerAccountRepository.findOne({
       where: { ownerType, ownerId },
     });
+    return account ? this.applyExpiredSubscription(account) : null;
   }
 
   /**
@@ -106,6 +111,10 @@ export class ProviderAccountsService {
     account.status = dto.status ?? ProviderAccountStatus.ACTIVE;
     account.assignedBy = assignedBy;
     account.assignedAt = new Date();
+    account.subscriptionBillingCycle = null;
+    account.subscriptionStartedAt = null;
+    account.subscriptionExpiresAt = null;
+    account.lastSubscriptionPaymentAt = null;
     account.notes = dto.notes ?? account.notes ?? null;
 
     await this.ensureProviderWallet(dto.ownerType, dto.ownerId);
@@ -165,7 +174,46 @@ export class ProviderAccountsService {
     account.tier = tier;
     account.assignedBy = assignedBy;
     account.assignedAt = new Date();
+    account.subscriptionBillingCycle = null;
+    account.subscriptionStartedAt = null;
+    account.subscriptionExpiresAt = null;
+    account.lastSubscriptionPaymentAt = null;
     account.notes = dto.notes ?? account.notes;
+    return this.providerAccountRepository.save(account);
+  }
+
+  /**
+   * Activates a paid subscription period and extends from the current expiry when still active.
+   *
+   * @param providerAccountId - Provider account UUID.
+   * @param tier - Paid tier definition.
+   * @param billingCycle - Confirmed billing cycle.
+   * @param paidAt - Payment confirmation timestamp.
+   * @returns Updated provider account.
+   */
+  async activatePaidSubscription(
+    providerAccountId: string,
+    tier: ProviderTierDefinition,
+    billingCycle: BillingCycle,
+    paidAt = new Date(),
+  ): Promise<ProviderAccount> {
+    const account = await this.getProviderAccount(providerAccountId);
+    const currentExpiry = account.subscriptionExpiresAt;
+    const periodStart =
+      currentExpiry && currentExpiry.getTime() > paidAt.getTime()
+        ? currentExpiry
+        : paidAt;
+
+    account.tier = tier;
+    account.status = ProviderAccountStatus.ACTIVE;
+    account.assignedBy = null;
+    account.assignedAt = paidAt;
+    account.subscriptionBillingCycle = billingCycle;
+    account.subscriptionStartedAt = periodStart;
+    account.subscriptionExpiresAt = this.addBillingCycle(periodStart, billingCycle);
+    account.lastSubscriptionPaymentAt = paidAt;
+    account.notes = `Subscription active until ${account.subscriptionExpiresAt.toISOString()}`;
+
     return this.providerAccountRepository.save(account);
   }
 
@@ -254,5 +302,44 @@ export class ProviderAccountsService {
       WalletType.PROVIDER,
       0,
     );
+  }
+
+  /**
+   * Downgrades expired paid subscriptions to the default tier before callers use the account.
+   */
+  private async applyExpiredSubscription(
+    account: ProviderAccount,
+  ): Promise<ProviderAccount> {
+    if (
+      !account.subscriptionExpiresAt ||
+      account.subscriptionExpiresAt.getTime() > Date.now()
+    ) {
+      return account;
+    }
+
+    const defaultTier = await this.tierService.getDefaultTier();
+    if (account.tier?.id === defaultTier.id) {
+      return account;
+    }
+
+    account.tier = defaultTier;
+    account.assignedBy = null;
+    account.assignedAt = new Date();
+    account.notes = `Paid subscription expired at ${account.subscriptionExpiresAt.toISOString()}; downgraded to default tier`;
+
+    return this.providerAccountRepository.save(account);
+  }
+
+  /**
+   * Calculates the subscription period end for supported billing cycles.
+   */
+  private addBillingCycle(start: Date, billingCycle: BillingCycle): Date {
+    const expiresAt = new Date(start);
+    if (billingCycle === BillingCycle.ANNUAL) {
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      return expiresAt;
+    }
+    expiresAt.setMonth(expiresAt.getMonth() + 1);
+    return expiresAt;
   }
 }
