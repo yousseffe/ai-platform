@@ -5,10 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import {
-  Shield,
   Server,
   LogOut,
   LayoutGrid,
+  BriefcaseBusiness,
   Users,
   Cpu,
   Sliders,
@@ -16,6 +16,7 @@ import {
   Bell,
   Bot,
   ShieldAlert,
+  Crown,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -103,8 +104,16 @@ export default function AdminSidebar() {
         </div>
 
         <div className="space-y-1">
-          <SidebarLink href="/admin" active={pathname === "/admin"} icon={<LayoutGrid className="w-4 h-4" />}>
+          <SidebarLink href="/admin/dashboard" active={pathname === "/admin/dashboard" || pathname === "/admin"} icon={<LayoutGrid className="w-4 h-4" />}>
             <span>Overview Dashboard</span>
+          </SidebarLink>
+
+          <SidebarLink href="/admin/providers" active={pathname.startsWith("/admin/providers")} icon={<BriefcaseBusiness className="w-4 h-4" />}>
+            <span>Providers</span>
+          </SidebarLink>
+
+          <SidebarLink href="/admin/provider-plans" active={pathname === "/admin/provider-plans"} icon={<Crown className="w-4 h-4" />}>
+            <span>Provider Plans</span>
           </SidebarLink>
 
           <SidebarLink href="/admin/deployments" active={pathname === "/admin/deployments"} icon={<Server className="w-4 h-4" />}>

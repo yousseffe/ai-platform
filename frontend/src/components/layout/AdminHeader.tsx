@@ -24,11 +24,13 @@ export default function AdminHeader({ userEmail, avatarUrl }: AdminHeaderProps) 
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
+    Promise.resolve().then(() => {
+      setMounted(true);
+      const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
+      if (savedTheme) {
+        setTheme(savedTheme);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -46,6 +48,12 @@ export default function AdminHeader({ userEmail, avatarUrl }: AdminHeaderProps) 
   };
 
   const getBreadcrumb = () => {
+    if (pathname === "/admin/dashboard" || pathname === "/admin") {
+      return "System Console / Dashboard";
+    }
+    if (pathname.startsWith("/admin/providers/")) return "System Console / Providers / Details";
+    if (pathname === "/admin/providers") return "System Console / Providers";
+    if (pathname === "/admin/provider-plans") return "System Console / Provider Plans";
     if (pathname === "/admin/deployments") return "System Console / Deployments";
     if (pathname === "/admin/users") return "System Console / Users";
     if (pathname === "/admin/models") return "System Console / Models";

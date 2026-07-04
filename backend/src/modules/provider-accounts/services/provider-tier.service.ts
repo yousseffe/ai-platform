@@ -77,6 +77,7 @@ export class ProviderTierService implements OnModuleInit {
    * @returns Created tier.
    */
   async createTier(dto: UpsertProviderTierDto): Promise<ProviderTierDefinition> {
+    this.assertRevenueSplit(dto);
     const existing = await this.tierRepository.findOne({
       where: { code: dto.code.toUpperCase() },
     });
@@ -98,6 +99,7 @@ export class ProviderTierService implements OnModuleInit {
     tierId: string,
     dto: UpsertProviderTierDto,
   ): Promise<ProviderTierDefinition> {
+    this.assertRevenueSplit(dto);
     const tier = await this.getTier(tierId);
     Object.assign(tier, this.normalizeTierDto(dto));
     return this.tierRepository.save(tier);
@@ -257,5 +259,16 @@ export class ProviderTierService implements OnModuleInit {
       maxAudioModels: dto.maxAudioModels ?? null,
       maxEmbeddingModels: dto.maxEmbeddingModels ?? null,
     };
+  }
+
+  /**
+   * Ensures tier payout percentages describe a full revenue split.
+   */
+  private assertRevenueSplit(dto: UpsertProviderTierDto): void {
+    if (dto.platformCommissionPercent + dto.providerSharePercent !== 100) {
+      throw new BadRequestException(
+        'Platform commission and provider share must add up to 100',
+      );
+    }
   }
 }
