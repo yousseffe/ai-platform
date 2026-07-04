@@ -73,25 +73,21 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "5000:5000"
     env_file:
       - ./backend/.env
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=password
-      - DB_NAME=aidb
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - MINIO_ENDPOINT=minio
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - PROMETHEUS_URL=http://prometheus:9090
       - LOKI_URL=http://loki:3100
-      - PUBLIC_API_URL=http://localhost:3000
+      - PUBLIC_API_URL=http://localhost:5000
       - OPENSEARCH_URL=http://opensearch:9200
       - GGUF_STORAGE_PATH=/usr/src/app/uploads/gguf-models
       - WEIGHTS_STORAGE_PATH=/usr/src/app/uploads/model-weights
+      - DB_HOST=host.docker.internal
     volumes:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules
@@ -110,7 +106,6 @@ services:
       # filesystem).
       - ./docker/base-images:/usr/src/docker/base-images:ro
     depends_on:
-      - postgres
       - redis
       - minio
       - otel-collector
@@ -174,7 +169,7 @@ services:
       - "3030:3030"
     environment:
       - MCP_PORT=3030
-      - BACKEND_URL=http://backend:3000
+      - BACKEND_URL=http://backend:5000
       - BACKEND_API_PREFIX=/api/v1
       - PROMETHEUS_URL=http://prometheus:9090
       - LOKI_URL=http://loki:3100
