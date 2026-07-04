@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES } from "@/lib/utils/upload-thresholds";
 
 // Model Creation Schema
 export const createModelSchema = z.object({
@@ -88,10 +89,10 @@ export const uploadModelFormSchema = z.object({
 
   examplePayload: z
     .string()
-    .trim()
-    .min(1, "Example payload is required")
+    .optional()
     .refine(
       (val) => {
+        if (!val || val.trim() === "") return true;
         try {
           JSON.parse(val);
           return true;
@@ -103,10 +104,10 @@ export const uploadModelFormSchema = z.object({
     ),
   expectedResult: z
     .string()
-    .trim()
-    .min(1, "Expected prediction result is required")
+    .optional()
     .refine(
       (val) => {
+        if (!val || val.trim() === "") return true;
         try {
           JSON.parse(val);
           return true;
@@ -131,6 +132,31 @@ export const uploadModelFormSchema = z.object({
       },
       { message: "Class labels must be a valid JSON string" }
     ),
+}).superRefine((data, ctx) => {
+  // Large model files defer schema detection to the backend build pipeline,
+  // so the provider shouldn't be forced to type placeholder JSON up front.
+  const isLargeModel =
+    data.modelFile instanceof File &&
+    data.modelFile.size > LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES;
+
+  if (isLargeModel) {
+    return;
+  }
+
+  if (!data.examplePayload || data.examplePayload.trim() === "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Example payload is required",
+      path: ["examplePayload"],
+    });
+  }
+  if (!data.expectedResult || data.expectedResult.trim() === "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Expected prediction result is required",
+      path: ["expectedResult"],
+    });
+  }
 });
 
 export type UploadModelFormInput = z.infer<typeof uploadModelFormSchema>;

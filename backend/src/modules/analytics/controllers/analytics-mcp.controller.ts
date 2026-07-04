@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
 import {
   AnalyticsQueryService,
@@ -7,7 +15,7 @@ import {
 } from '../services/analytics-query.service';
 
 interface ActorRequest {
-  user: { id: string };
+  user: { id: string; isAdmin?: boolean };
 }
 
 /**
@@ -20,7 +28,8 @@ export class AnalyticsMcpController {
   constructor(private readonly analyticsQueryService: AnalyticsQueryService) {}
 
   /**
-   * Windowed request statistics for a model the caller owns.
+   * Windowed request statistics for a model the caller owns, or any model when
+   * the caller is an administrator.
    *
    * @param id - Model UUID.
    * @param minutes - Look-back window in minutes (default 15).
@@ -30,7 +39,7 @@ export class AnalyticsMcpController {
   @Get('models/:id/request-stats')
   @UseGuards(ApiKeyOrJwtGuard)
   async requestStats(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Query('minutes') minutes = '15',
     @Req() req: ActorRequest,
   ): Promise<RequestStats> {
@@ -38,15 +47,17 @@ export class AnalyticsMcpController {
       id,
       req.user.id,
       parseInt(minutes, 10),
+      req.user.isAdmin,
     );
   }
 
   /**
-   * Lists the caller's deployments.
+   * Lists the caller's deployments, or every deployment on the platform when
+   * the caller is an administrator.
    *
    * @param running - When `'true'`, restrict to RUNNING deployments.
    * @param req - Authenticated request.
-   * @returns Scoped deployment summaries.
+   * @returns Scoped (or platform-wide) deployment summaries.
    */
   @Get('deployments')
   @UseGuards(ApiKeyOrJwtGuard)
@@ -57,6 +68,7 @@ export class AnalyticsMcpController {
     return this.analyticsQueryService.listDeployments(
       req.user.id,
       running === 'true',
+      req.user.isAdmin,
     );
   }
 }

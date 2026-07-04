@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { useUploadModel } from "@/hooks/use-upload-model";
+import { LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES } from "@/lib/utils/upload-thresholds";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -206,6 +207,7 @@ export default function UploadModelWizard({
                 isDetectingSchema={isDetectingSchema}
                 handleDetectSchema={handleDetectSchema}
                 hasModelFile={!!modelFile}
+                isLargeModel={!!modelFile && modelFile.size > LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES}
                 hasDetected={hasDetected}
                 detectedType={detectedType}
                 detectedFramework={detectedFramework}

@@ -29,8 +29,14 @@ export function securityModule(): McpModule {
           {
             title: 'Get model risk report',
             description:
-              'Return the deterministic fraud/abuse risk report for a model the caller owns: current risk score, threat class, recent findings (rules + evidence), recommendations, the traffic baseline, and the model reviews/ratings summary.',
-            inputSchema: { modelId: z.string().describe('Model UUID') },
+              'Return the deterministic fraud/abuse risk report for any model on the platform: current risk score, threat class, recent findings (rules + evidence), recommendations, the traffic baseline, and the model reviews/ratings summary. Requires admin scope.',
+            inputSchema: {
+              modelId: z
+                .string()
+                .describe(
+                  'Real model UUID obtained from admin_list_models or integration_list_platform_models — never a placeholder string.',
+                ),
+            },
           },
           async ({ modelId }) => {
             const scopeError = requireScope(ctx, 'security:read');
@@ -38,7 +44,7 @@ export function securityModule(): McpModule {
 
             try {
               const report = await ctx.backend.get(
-                `fraud/models/${encodeURIComponent(modelId)}/risk-report`,
+                `fraud/admin/models/${encodeURIComponent(modelId)}/risk-report`,
               );
               return jsonResult(report);
             } catch (err) {

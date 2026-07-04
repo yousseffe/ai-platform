@@ -311,7 +311,10 @@ export class WalletsService {
     }
 
     wallet.balance = currentBalance - amount;
-    if (wallet.walletType === WalletType.PROVIDER && wallet.currency !== 'EGP') {
+    if (
+      wallet.walletType === WalletType.PROVIDER &&
+      wallet.currency !== 'EGP'
+    ) {
       wallet.currency = 'EGP';
     }
     const savedWallet = await this.walletRepository.save(wallet);

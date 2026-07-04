@@ -45,7 +45,9 @@ export class ModelsAdminController {
     try {
       await this.modelsSearchService.deleteFromIndex(id);
     } catch (err: any) {
-      this.logger.error(`Failed to delete model ${id} from OpenSearch: ${err.message}`);
+      this.logger.error(
+        `Failed to delete model ${id} from OpenSearch: ${err.message}`,
+      );
     }
     return { success: true };
   }
@@ -74,7 +76,9 @@ export class ModelsAdminController {
       try {
         await this.modelsSearchService.indexModel(fullModel);
       } catch (err: any) {
-        this.logger.error(`Failed to index model ${id} in OpenSearch: ${err.message}`);
+        this.logger.error(
+          `Failed to index model ${id} in OpenSearch: ${err.message}`,
+        );
       }
     }
     return { success: true, isPublic: model.isPublic };

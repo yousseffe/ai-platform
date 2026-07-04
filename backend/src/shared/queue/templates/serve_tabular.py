@@ -3,6 +3,7 @@ import os
 import sys
 import uvicorn
 import importlib.util
+import threading
 
 otel_available = False
 if os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
@@ -67,50 +68,79 @@ if postprocess_path and os.path.exists(postprocess_path):
     except Exception as e:
         print(f"Warning: Failed to load postprocess script: {e}")
 
-# Load model
+# C3: Lazy framework import / model load. Importing torch/tensorflow and
+# loading the model weights is the dominant chunk of container "warm-up"
+# time (several seconds for PyTorch, longer for TensorFlow). Instead of
+# doing this at module import time (which blocks uvicorn from binding and
+# therefore blocks the deploy health check from ever passing until the
+# model finishes loading), we defer it to the first /predict request and
+# cache the result in _model. This trades first-request latency for much
+# faster deploy-readiness — the health check can pass as soon as the
+# process is up, and B4's health-check backoff no longer has to wait out
+# the full framework import.
 model_path = os.getenv("MODEL_PATH", "model.pkl")
 framework = os.getenv("FRAMEWORK", "SKLEARN")
 task_type = os.getenv("TASK_TYPE", "OTHER")
 
-model = None
-try:
-    if framework == "SKLEARN" or framework == "CUSTOM":
-        import joblib
-        model = joblib.load(model_path)
-    elif framework == "ONNX":
-        import onnxruntime
-        model = onnxruntime.InferenceSession(model_path)
-    elif framework == "PYTORCH":
-        import torch
-        loaded = torch.load(model_path, map_location="cpu")
-        if isinstance(loaded, dict) or type(loaded).__name__ == "OrderedDict":
-            if preprocess_module and hasattr(preprocess_module, "load_model"):
-                model = preprocess_module.load_model(model_path)
-            else:
-                raise ValueError("Loaded object is a state_dict (OrderedDict). Please define a 'load_model' function in preprocess.py to instantiate your PyTorch model architecture and load the weights.")
-        else:
-            model = loaded
-        model.eval()
-    elif framework == "TENSORFLOW":
-        import tensorflow as tf
-        # Patch Keras 3.x Layer base class to accept and ignore quantization_config
+_model = None
+_model_lock = threading.Lock()
+_model_load_error = None
+
+
+def _load_model():
+    """Loads (and caches) the model on first use. Thread-safe via _model_lock."""
+    global _model, _model_load_error
+    if _model is not None or _model_load_error is not None:
+        return
+    with _model_lock:
+        if _model is not None or _model_load_error is not None:
+            return
         try:
-            from keras.src.layers.layer import Layer as _KerasLayer
-            _orig_layer_init = _KerasLayer.__init__
-            def _patched_layer_init(self, *args, **kwargs):
-                kwargs.pop("quantization_config", None)
-                return _orig_layer_init(self, *args, **kwargs)
-            _KerasLayer.__init__ = _patched_layer_init
-        except Exception:
-            pass
-        try:
-            model = tf.keras.models.load_model(model_path)
-        except Exception:
-            import joblib
-            model = joblib.load(model_path)
-except Exception as e:
-    print(f"Error loading {framework} model from {model_path}: {e}")
-    sys.exit(1)
+            if framework == "SKLEARN" or framework == "CUSTOM":
+                import joblib
+                _model = joblib.load(model_path)
+            elif framework == "ONNX":
+                import onnxruntime
+                _model = onnxruntime.InferenceSession(model_path)
+            elif framework == "PYTORCH":
+                import torch
+                loaded = torch.load(model_path, map_location="cpu")
+                if isinstance(loaded, dict) or type(loaded).__name__ == "OrderedDict":
+                    if preprocess_module and hasattr(preprocess_module, "load_model"):
+                        _model = preprocess_module.load_model(model_path)
+                    else:
+                        raise ValueError("Loaded object is a state_dict (OrderedDict). Please define a 'load_model' function in preprocess.py to instantiate your PyTorch model architecture and load the weights.")
+                else:
+                    _model = loaded
+                _model.eval()
+            elif framework == "TENSORFLOW":
+                import tensorflow as tf
+                # Patch Keras 3.x Layer base class to accept and ignore quantization_config
+                try:
+                    from keras.src.layers.layer import Layer as _KerasLayer
+                    _orig_layer_init = _KerasLayer.__init__
+                    def _patched_layer_init(self, *args, **kwargs):
+                        kwargs.pop("quantization_config", None)
+                        return _orig_layer_init(self, *args, **kwargs)
+                    _KerasLayer.__init__ = _patched_layer_init
+                except Exception:
+                    pass
+                try:
+                    _model = tf.keras.models.load_model(model_path)
+                except Exception:
+                    import joblib
+                    _model = joblib.load(model_path)
+        except Exception as e:
+            _model_load_error = str(e)
+            print(f"Error loading {framework} model from {model_path}: {e}")
+
+
+@app.get("/health")
+async def health():
+    # Health reflects process liveness only, not model-load state, so the
+    # deploy health-check loop can flip the deployment to RUNNING as soon as
+    # uvicorn is bound — see C3 comment above.
+    return {"status": "ok"}
 
 
 @app.post("/predict")
@@ -128,14 +158,19 @@ async def predict(request: Request):
             from fastapi import HTTPException
             raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
 
+    _load_model()
+    if _model_load_error is not None:
+        return {"error": f"Model failed to load: {_model_load_error}"}
+    model = _model
+
     data = await request.json()
-    
+
     # Preprocess
     if preprocess_func:
         data = preprocess_func(data)
     elif scaler:
-        pass 
-    
+        pass
+
     # Format data for TABULAR inference.
     # Sklearn numeric models expect shape (1, n_features): [[v1, v2, ...]].
     # Sklearn text pipelines (TF-IDF, CountVectorizer, etc.) expect a 1-D
@@ -159,18 +194,18 @@ async def predict(request: Request):
         elif len(data) > 0 and not isinstance(data[0], list):
             # Always wrap 1D list in a 2D array for tabular models
             data = [data]
-            
+
     # Inference
     try:
         prediction_proba = None
-        
+
         if framework == "SKLEARN" or framework == "CUSTOM":
             prediction = model.predict(data)
-            
+
             # If it's a classification task, we can also try to return probabilities
             if task_type == "CLASSIFICATION" and hasattr(model, "predict_proba"):
                 prediction_proba = model.predict_proba(data)
-                
+
         elif framework == "ONNX":
             import numpy as np
             input_name = model.get_inputs()[0].name
@@ -181,40 +216,40 @@ async def predict(request: Request):
             # ONNX usually returns probabilities as the second output for classification
             if task_type == "CLASSIFICATION" and len(outputs) > 1:
                 prediction_proba = outputs[1]
-                
+
         elif framework == "PYTORCH":
             import torch
             tensor_data = torch.tensor(data, dtype=torch.float32)
             with torch.no_grad():
                 prediction = model(tensor_data)
-                
+
                 # For classification, PyTorch models usually output logits. Apply softmax.
                 if task_type == "CLASSIFICATION":
                     prediction_proba = torch.nn.functional.softmax(prediction, dim=1).numpy()
                     prediction = torch.argmax(prediction, dim=1).numpy()
                 else:
                     prediction = prediction.numpy()
-                    
+
         elif framework == "TENSORFLOW":
             import numpy as np
             np_data = np.array(data).astype(np.float32)
             prediction = model.predict(np_data)
-            
+
             # TF usually outputs probabilities for classification
             if task_type == "CLASSIFICATION":
                 prediction_proba = prediction
                 prediction = np.argmax(prediction, axis=1)
-                
+
     except Exception as e:
         return {"error": str(e)}
-    
+
     # Postprocess
     if postprocess_func:
         prediction = postprocess_func(prediction)
-    
+
     if hasattr(prediction, "tolist"):
         prediction = prediction.tolist()
-        
+
     if prediction_proba is not None and hasattr(prediction_proba, "tolist"):
         prediction_proba = prediction_proba.tolist()
 
@@ -223,7 +258,7 @@ async def predict(request: Request):
         result = prediction
     else:
         result = {"prediction": prediction}
-        
+
     if prediction_proba is not None and not postprocess_func:
         result["probabilities"] = prediction_proba
 

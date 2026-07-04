@@ -42,6 +42,8 @@ const SUGGESTED_PROMPTS = [
   "Any active alerts right now?",
   "Platform health summary",
   "Fraud risk summary",
+  "Any suspicious or error logs recently?",
+  "Any failed background jobs right now?",
 ];
 
 interface Props {

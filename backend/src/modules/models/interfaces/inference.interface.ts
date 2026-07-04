@@ -41,6 +41,9 @@ export interface InferenceResult {
 export interface InferencePricing {
   cost: number;
   providerSharePercent: number;
+  isLlm?: boolean;
+  inputPricePerMToken?: number;
+  outputPricePerMToken?: number;
 }
 
 /** Resolved target the platform proxies the prediction call to. */

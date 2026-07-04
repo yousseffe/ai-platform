@@ -5,6 +5,7 @@ import { BuildProcessor } from './processors/build.processor';
 import { DeployProcessor } from './processors/deploy.processor';
 import { ModelVersion } from '../../modules/models/entities/model-version.entity';
 import { Deployment } from '../../modules/deployments/entities/deployment.entity';
+import { BaseImageWarmerService } from '../docker/base-image-warmer.service';
 
 /**
  * Module responsible for registering and handling background job processors
@@ -20,6 +21,6 @@ import { Deployment } from '../../modules/deployments/entities/deployment.entity
       name: 'deploy-queue',
     }),
   ],
-  providers: [BuildProcessor, DeployProcessor],
+  providers: [BuildProcessor, DeployProcessor, BaseImageWarmerService],
 })
 export class QueueModule {}
