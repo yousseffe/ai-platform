@@ -447,12 +447,12 @@ export default function ModelDetailsClient({
                 }
               />
             ) : (
-              <div className="bg-slate-950 border border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center text-slate-400">
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400">
                 <AlertTriangle className="w-8 h-8 text-amber-500 mb-2" />
-                <p className="font-semibold text-slate-200">
+                <p className="font-semibold text-slate-850 dark:text-slate-200">
                   No Running Deployment
                 </p>
-                <p className="text-xs max-w-md text-center mt-1">
+                <p className="text-xs max-w-md text-center mt-1 text-slate-550 dark:text-slate-400">
                   Logs are only available for running deployments. Please deploy
                   version v{activeVersion?.versionNumber} to stream container
                   logs.
