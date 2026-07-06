@@ -98,9 +98,12 @@ export default function McpTokenManager({ onTokenChange }: Props) {
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => { fetchTokens(); }, [fetchTokens]);
-
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchTokens();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchTokens]);
   const handleCreate = async () => {
     if (!newName.trim() || newScopes.length === 0) {
       toast.error("Name and at least one scope are required");

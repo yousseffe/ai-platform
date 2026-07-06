@@ -256,7 +256,7 @@ export default function OrgModelReviewPage() {
       return;
     }
 
-    let parsedPayload: any;
+    let parsedPayload: unknown;
     try {
       parsedPayload = JSON.parse(pl);
     } catch (e) {
@@ -340,7 +340,7 @@ export default function OrgModelReviewPage() {
         toast.error(`Test case "${name}" FAILED (mismatch or force-failure active)`);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
       setSimulationLogs(prev => [
         ...prev,
@@ -628,7 +628,7 @@ export default function OrgModelReviewPage() {
                   <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
                     {testCases.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                        No saved test cases yet. Load a preset and click "Save to Suite" to build your review suite.
+                        No saved test cases yet. Load a preset and click &quot;Save to Suite&quot; to build your review suite.
                       </div>
                     ) : (
                       testCases.map((testCase) => {

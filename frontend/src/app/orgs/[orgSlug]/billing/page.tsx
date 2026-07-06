@@ -162,7 +162,10 @@ export default function OrgBillingPage() {
   useEffect(() => {
     if (!org) return;
     if (org.type === OrgType.PROVIDER && walletView !== WalletType.PROVIDER) {
-      setWalletView(WalletType.PROVIDER);
+      const timer = setTimeout(() => {
+        setWalletView(WalletType.PROVIDER);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [org, walletView]);
 
@@ -172,10 +175,79 @@ export default function OrgBillingPage() {
     Promise.resolve().then(fetchTransactions);
   }, [org, fetchTransactions]);
 
-  if (!org) return null;
-
   const consumerWallet = wallets.find((w) => w.walletType === WalletType.CONSUMER);
   const providerWallet = wallets.find((w) => w.walletType === WalletType.PROVIDER);
+
+  const visibleTiles = useMemo(
+    () => {
+      if (!org) return [];
+      return [
+        showConsumerFinance
+          ? {
+            label: "Consumer Credits",
+            value: consumerWallet ? `${consumerWallet.balance.toLocaleString()} cr` : "No wallet",
+            caption: "Used by organization projects when calling marketplace models.",
+            icon: <Coins className="h-4 w-4" strokeWidth={1.8} />,
+            tone: "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+          }
+          : null,
+        showProviderFinance
+          ? {
+            label: "Provider Earnings",
+            value: providerWallet ? `${providerWallet.balance.toLocaleString()} EGP` : "No wallet",
+            caption: "Revenue earned from approved provider models and available for owner-controlled payout.",
+            icon: <TrendingUp className="h-4 w-4" strokeWidth={1.8} />,
+            tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+          }
+          : null,
+        showConsumerFinance
+          ? {
+            label: "Credit Rate",
+            value: `${creditsPerEgp}`,
+            caption: "Credits added per 1 EGP deposited into the consumer wallet.",
+            icon: <Receipt className="h-4 w-4" strokeWidth={1.8} />,
+            tone: "border-primary/20 bg-primary/10 text-primary",
+          }
+          : null,
+        showProviderFinance
+          ? {
+            label: "Payout Currency",
+            value: providerWallet?.currency || "EGP",
+            caption: "Provider withdrawals settle from the organization earnings wallet.",
+            icon: <Landmark className="h-4 w-4" strokeWidth={1.8} />,
+            tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+          }
+          : null,
+        {
+          label: "Finance Scope",
+          value:
+            org.type === OrgType.PROVIDER
+              ? "Provider-only"
+              : org.type === OrgType.CONSUMER
+                ? "Consumer-only"
+                : "Hybrid",
+          caption:
+            org.type === OrgType.PROVIDER
+              ? "This organization does not manage consumer credit top-ups."
+              : org.type === OrgType.CONSUMER
+                ? "This organization manages spend, not provider revenue."
+                : "Credit spend and provider revenue are separated.",
+          icon: <Wallet className="h-4 w-4" strokeWidth={1.8} />,
+          tone: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+        },
+      ].filter(Boolean) as FinanceTileProps[];
+    },
+    [
+      org,
+      showConsumerFinance,
+      showProviderFinance,
+      consumerWallet,
+      providerWallet,
+      creditsPerEgp,
+    ]
+  );
+
+  if (!org) return null;
 
   const pageTitle =
     org.type === OrgType.PROVIDER ? "Provider Finance" : "Billing";
@@ -185,72 +257,6 @@ export default function OrgBillingPage() {
       : org.type === OrgType.CONSUMER
         ? "Manage shared credits, deposits, project spend, and organization ledger activity."
         : "Manage consumer credits and provider earnings separately for this hybrid organization.";
-
-  const visibleTiles = useMemo(
-    () => [
-      showConsumerFinance
-        ? {
-          label: "Consumer Credits",
-          value: consumerWallet ? `${consumerWallet.balance.toLocaleString()} cr` : "No wallet",
-          caption: "Used by organization projects when calling marketplace models.",
-          icon: <Coins className="h-4 w-4" strokeWidth={1.8} />,
-          tone: "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-        }
-        : null,
-      showProviderFinance
-        ? {
-          label: "Provider Earnings",
-          value: providerWallet ? `${providerWallet.balance.toLocaleString()} EGP` : "No wallet",
-          caption: "Revenue earned from approved provider models and available for owner-controlled payout.",
-          icon: <TrendingUp className="h-4 w-4" strokeWidth={1.8} />,
-          tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-        }
-        : null,
-      showConsumerFinance
-        ? {
-          label: "Credit Rate",
-          value: `${creditsPerEgp}`,
-          caption: "Credits added per 1 EGP deposited into the consumer wallet.",
-          icon: <Receipt className="h-4 w-4" strokeWidth={1.8} />,
-          tone: "border-primary/20 bg-primary/10 text-primary",
-        }
-        : null,
-      showProviderFinance
-        ? {
-          label: "Payout Currency",
-          value: providerWallet?.currency || "EGP",
-          caption: "Provider withdrawals settle from the organization earnings wallet.",
-          icon: <Landmark className="h-4 w-4" strokeWidth={1.8} />,
-          tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-        }
-        : null,
-      {
-        label: "Finance Scope",
-        value:
-          org.type === OrgType.PROVIDER
-            ? "Provider-only"
-            : org.type === OrgType.CONSUMER
-              ? "Consumer-only"
-              : "Hybrid",
-        caption:
-          org.type === OrgType.PROVIDER
-            ? "This organization does not manage consumer credit top-ups."
-            : org.type === OrgType.CONSUMER
-              ? "This organization manages spend, not provider revenue."
-              : "Credit spend and provider revenue are separated.",
-        icon: <Wallet className="h-4 w-4" strokeWidth={1.8} />,
-        tone: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-      },
-    ].filter(Boolean) as FinanceTileProps[],
-    [
-      showConsumerFinance,
-      showProviderFinance,
-      consumerWallet,
-      providerWallet,
-      creditsPerEgp,
-      org.type,
-    ]
-  );
 
   const handleWalletViewChange = (nextView: WalletType) => {
     setWalletView(nextView);

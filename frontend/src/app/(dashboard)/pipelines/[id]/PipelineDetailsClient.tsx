@@ -1038,7 +1038,7 @@ export function PipelineDetailsClient({ pipeline, runs, edges, readyVersionOptio
           <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm space-y-4">
             <div className="space-y-1">
               <h3 className="text-sm font-bold text-foreground">Pipeline Version History</h3>
-              <p className="text-xs text-muted-foreground">Historical records of this pipeline's configuration snapshots.</p>
+              <p className="text-xs text-muted-foreground">Historical records of this pipeline&apos;s configuration snapshots.</p>
             </div>
             
             <div className="overflow-x-auto">

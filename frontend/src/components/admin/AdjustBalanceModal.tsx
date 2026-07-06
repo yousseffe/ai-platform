@@ -41,9 +41,12 @@ export default function AdjustBalanceModal({
   // Reset inputs when user changes
   useEffect(() => {
     if (isOpen) {
-      setAmount("");
-      setWalletType("CONSUMER");
-      setType("CREDIT");
+      const timer = setTimeout(() => {
+        setAmount("");
+        setWalletType("CONSUMER");
+        setType("CREDIT");
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, user]);
 

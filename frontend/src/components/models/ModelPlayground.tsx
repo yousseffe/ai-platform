@@ -55,18 +55,21 @@ export default function ModelPlayground({ model, selectedVersionNumber, isAuthen
 
   React.useEffect(() => {
     if (model.type === ModelType.VISION) {
+      let preview: string | null = null;
       try {
         const parsed = JSON.parse(payload);
         if (parsed && typeof parsed.image === "string" && parsed.image.startsWith("data:image")) {
-          setSelectedImagePreview(parsed.image);
+          preview = parsed.image;
         } else if (parsed && typeof parsed.image === "string" && parsed.image !== "base64_encoded_image_string") {
-          setSelectedImagePreview(`data:image/png;base64,${parsed.image}`);
-        } else {
-          setSelectedImagePreview(null);
+          preview = `data:image/png;base64,${parsed.image}`;
         }
       } catch (e) {
-        setSelectedImagePreview(null);
+        // ignore
       }
+      const timer = setTimeout(() => {
+        setSelectedImagePreview(preview);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [payload, model.type]);
 
@@ -556,7 +559,7 @@ export default function ModelPlayground({ model, selectedVersionNumber, isAuthen
                     ) : (
                       <>
                         <TerminalIcon className="w-9 h-9 opacity-35 animate-pulse text-primary" />
-                        <p className="text-[11px] font-sans text-center px-4">Click "Run Inference" to execute the prediction query and view output telemetry.</p>
+                        <p className="text-[11px] font-sans text-center px-4">Click &quot;Run Inference&quot; to execute the prediction query and view output telemetry.</p>
                       </>
                     )}
                   </div>

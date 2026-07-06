@@ -48,7 +48,7 @@ export function ModelLogsConsole({ deploymentId }: ModelLogsConsoleProps) {
           {/* Stream Selector */}
           <Select
             value={filter}
-            onValueChange={(val: any) => setFilter(val)}
+            onValueChange={(val) => setFilter(val as "all" | "stdout" | "stderr")}
           >
             <SelectTrigger className="h-8 w-32 border-slate-800 bg-slate-900 text-slate-350 text-xs focus:ring-purple-500/20 focus:border-purple-500 hover:bg-slate-800/60 transition duration-150">
               <SelectValue placeholder="All Channels" />

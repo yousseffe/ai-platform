@@ -53,7 +53,7 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Model, ModelIntegrationSpec, ModelVersion } from "@/types";
+import { Model, ModelIntegrationSpec, ModelVersion, ModelReview } from "@/types";
 import {
   DeploymentStatus,
   Framework,
@@ -366,10 +366,10 @@ export default function PublicModelDetailClient({
   >("overview");
 
   // Reviews states
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<ModelReview[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [localAvgRating, setLocalAvgRating] = useState<number>(
-    parseFloat((model.averageRating as any) || 0),
+    Number(model.averageRating || 0),
   );
   const [localReviewCount, setLocalReviewCount] = useState<number>(
     model.reviewCount || 0,
@@ -387,14 +387,14 @@ export default function PublicModelDetailClient({
   const fetchReviews = async () => {
     setIsLoadingReviews(true);
     try {
-      const data = await smartFetch<any[]>(`/models/${model.id}/reviews`);
+      const data = await smartFetch<ModelReview[]>(`/models/${model.id}/reviews`);
       const reviewList = data || [];
       setReviews(reviewList);
 
       const count = reviewList.length;
       const avg =
         count > 0
-          ? reviewList.reduce((sum: number, r: any) => sum + r.rating, 0) /
+          ? reviewList.reduce((sum: number, r: ModelReview) => sum + r.rating, 0) /
             count
           : 0.0;
       setLocalAvgRating(avg);
@@ -402,7 +402,7 @@ export default function PublicModelDetailClient({
 
       // Prepopulate form if user has a review
       const myReview = reviewList.find(
-        (r: any) => r.user?.email === session?.user?.email,
+        (r: ModelReview) => r.user?.email === session?.user?.email,
       );
       if (myReview) {
         setUserRating(myReview.rating);
@@ -421,7 +421,10 @@ export default function PublicModelDetailClient({
   };
 
   React.useEffect(() => {
-    fetchReviews();
+    const timer = setTimeout(() => {
+      fetchReviews();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [model.id, session?.user?.email]);
 
   const handleSubmitReview = async (e: React.FormEvent) => {
@@ -438,9 +441,9 @@ export default function PublicModelDetailClient({
           : "Review submitted successfully!",
       );
       await fetchReviews();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Review submit error:", err);
-      const message = err.message || "Failed to submit review";
+      const message = err instanceof Error ? err.message : "Failed to submit review";
       if (
         message.toLowerCase().includes("api key") ||
         message.toLowerCase().includes("forbidden")
@@ -467,9 +470,9 @@ export default function PublicModelDetailClient({
       setUserComment("");
       setIsEditingReview(false);
       await fetchReviews();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Review delete error:", err);
-      toast.error(err.message || "Failed to delete review");
+      toast.error(err instanceof Error ? err.message : "Failed to delete review");
     } finally {
       setIsDeletingReview(false);
     }
@@ -562,9 +565,8 @@ export default function PublicModelDetailClient({
                 {/* Cost/Credits badge */}
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
                   <Zap className="w-3 h-3 text-emerald-500" />
-                  {model.costPerRequest &&
-                  parseFloat(model.costPerRequest as any) > 0
-                    ? `${parseFloat(model.costPerRequest as any).toFixed(2)} Credits / Run`
+                {model.costPerRequest && model.costPerRequest > 0
+                    ? `${model.costPerRequest.toFixed(2)} Credits / Run`
                     : "Free Sandbox Run"}
                 </span>
                 {model.marketplaceVerified && (
@@ -643,7 +645,7 @@ export default function PublicModelDetailClient({
       <div className="border-b border-border bg-card/65 backdrop-blur-md sticky top-0 z-40 select-none">
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-3 flex overflow-x-auto scrollbar-none">
           <div className="flex bg-secondary/35 border border-border/80 p-1 rounded-xl gap-1.5 shrink-0">
-            {[
+            {([
               {
                 id: "overview",
                 label: "Overview",
@@ -673,12 +675,12 @@ export default function PublicModelDetailClient({
                 icon: <Sparkles className="w-4 h-4" />,
                 count: localReviewCount,
               },
-            ]
+            ] as { id: typeof activeTab; label: string; icon: React.ReactNode; hide?: boolean; count?: number; badge?: string }[])
               .filter((tab) => !tab.hide)
               .map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     activeTab === tab.id
                       ? "bg-background text-foreground shadow-xs"
@@ -784,17 +786,17 @@ export default function PublicModelDetailClient({
                   <StatCard
                     icon={<Tag className="w-4 h-4" />}
                     label="Model Type"
-                    value={modelTypeLabel((model as any).type ?? "—")}
+                    value={modelTypeLabel(model.type ?? "—")}
                   />
                   <StatCard
                     icon={<Code2 className="w-4 h-4" />}
                     label="Framework"
-                    value={frameworkLabel((model as any).framework ?? "—")}
+                    value={frameworkLabel(model.framework ?? "—")}
                   />
                   <StatCard
                     icon={<Brain className="w-4 h-4" />}
                     label="Task Type"
-                    value={taskTypeLabel((model as any).taskType ?? "—")}
+                    value={taskTypeLabel(model.taskType ?? "—")}
                   />
                   <StatCard
                     icon={<Package className="w-4 h-4" />}

@@ -28,7 +28,7 @@ interface TraceSpan {
   durationMs: number;
   offsetMs: number;
   status: "success" | "error";
-  attributes: Record<string, any>;
+  attributes: Record<string, unknown>;
 }
 
 interface TraceFlowVisualizerProps {
@@ -89,8 +89,8 @@ export function TraceFlowVisualizer({ traceId, onClose }: TraceFlowVisualizerPro
       );
       setSpans(data.spans || []);
       if (data.error) setError(data.error);
-    } catch (err: any) {
-      setError(err.message || "Failed to load trace");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load trace");
       setSpans([]);
     } finally {
       setIsLoading(false);
@@ -98,7 +98,10 @@ export function TraceFlowVisualizer({ traceId, onClose }: TraceFlowVisualizerPro
   }, [traceId]);
 
   useEffect(() => {
-    fetchTrace();
+    const timer = setTimeout(() => {
+      fetchTrace();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [fetchTrace]);
 
   // ESC key to close
@@ -245,12 +248,12 @@ export function TraceFlowVisualizer({ traceId, onClose }: TraceFlowVisualizerPro
               <div className="text-xs text-slate-600 space-y-1.5 text-center max-w-sm">
                 <p>Loki was queried using three strategies:</p>
                 <p className="text-slate-700 font-mono">trace_id · traceid · line filter</p>
-                <p className="mt-2">Spans appear here when the backend's Winston logger has the
+                <p className="mt-2">Spans appear here when the backend&apos;s Winston logger has the
                   <span className="text-purple-500/70"> OpenTelemetryTransportV3 </span>
                   wired and an active HTTP request span is in context at log time.
                 </p>
                 <p className="text-slate-700">
-                  Trigger an API request, then open the resulting log's trace.
+                  Trigger an API request, then open the resulting log&apos;s trace.
                 </p>
               </div>
               <div className="mt-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800 font-mono text-[10px] text-slate-600 break-all">

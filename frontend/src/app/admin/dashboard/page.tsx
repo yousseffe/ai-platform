@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { smartFetch } from "@/lib/utils/smart-fetch";
 import { toast } from "react-hot-toast";
+import { AdminDashboardOverview, AdminMetricCard } from "@/types";
+import { Subscriber } from "@/components/admin/SubscribersOverview";
 import {
   LayoutGrid,
   Users,
@@ -44,7 +46,63 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; desc: string }[] = 
   { id: "analytics", label: "Telemetry Charts", icon: <LineChartIcon className="w-3.5 h-3.5" />, desc: "Growth area charts & latency percentiles" },
   { id: "insights", label: "Insights Engine", icon: <Cpu className="w-3.5 h-3.5" />, desc: "Automated thresholds & dynamic upgrades" },
 ];
+interface InfrastructureContainer {
+  deploymentId: string;
+  modelName: string;
+  url: string;
+  modelType: string;
+  port?: number | string;
+  cpu: number;
+  ram: number;
+  tier?: string;
+  [key: string]: unknown;
+}
 
+interface InsightsRecommendation {
+  modelId: string;
+  modelName: string;
+  actionType: string;
+  reason: string;
+  currentPrice: number;
+  suggestedPrice: number;
+  currentTier: string;
+  suggestedTier: string;
+  [key: string]: unknown;
+}
+
+interface InsightsAlert {
+  id: string;
+  alertName: string;
+  severity: string;
+  summary: string;
+  receivedAt: string | number;
+  [key: string]: unknown;
+}
+
+interface AdminInsightsTelemetry {
+  infrastructure: {
+    activeContainers: number;
+    containersList: InfrastructureContainer[];
+    storage: {
+      bucket: string;
+      fallback: boolean;
+      objectCount: number;
+      totalSizeBytes: number;
+    };
+    queues: {
+      buildQueue: { waiting: number; active: number; completed: number; failed: number; delayed: number };
+      deployQueue: { waiting: number; active: number; completed: number; failed: number; delayed: number };
+    };
+  };
+  subscriptions: {
+    subscribers: Subscriber[];
+    planBreakdown: { name: string; value: number }[];
+  };
+  userGrowth?: { month: string; signups: number; totalUsers: number }[];
+  caps: Record<string, { cpuPercent: number; ramMb: number }>;
+  recommendations: InsightsRecommendation[];
+  alerts: InsightsAlert[];
+}
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -54,8 +112,8 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   // States for API Payloads
-  const [kpiOverview, setKpiOverview] = useState<any>(null);
-  const [insights, setInsights] = useState<any>(null);
+  const [kpiOverview, setKpiOverview] = useState<AdminDashboardOverview | null>(null);
+  const [insights, setInsights] = useState<AdminInsightsTelemetry | null>(null);
 
   // Load workspace details on mount
   useEffect(() => {
@@ -76,8 +134,8 @@ export default function AdminDashboardPage() {
     setLoading(true);
     try {
       const [overviewData, insightsData] = await Promise.all([
-        smartFetch<any>("/admin/dashboard/overview"),
-        smartFetch<any>("/admin/dashboard/insights"),
+        smartFetch<AdminDashboardOverview>("/admin/dashboard/overview"),
+        smartFetch<AdminInsightsTelemetry>("/admin/dashboard/insights"),
       ]);
 
       setKpiOverview(overviewData);
@@ -95,7 +153,10 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (isAdmin) {
-      loadData(false);
+      const timer = setTimeout(() => {
+        loadData(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isAdmin]);
 
@@ -111,7 +172,7 @@ export default function AdminDashboardPage() {
   // Filter KPI cards to present on the Overview tab
   const getCards = () => {
     if (!kpiOverview?.cards) return [];
-    return kpiOverview.cards.filter((card: any) =>
+    return kpiOverview.cards.filter((card) =>
       ["total-users", "total-revenue", "platform-commission", "inference-revenue"].includes(card.key)
     );
   };
@@ -186,7 +247,7 @@ export default function AdminDashboardPage() {
           <div className="space-y-6">
             {/* Real-time KPI Card matrix */}
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-              {getCards().map((card: any) => {
+              {getCards().map((card: AdminMetricCard) => {
                 let Icon = LayoutGrid;
                 let colorClass = "text-primary bg-primary/10 border-primary/20 dark:bg-primary/5";
                 let decoration = "from-primary/10 to-transparent";
@@ -232,10 +293,10 @@ export default function AdminDashboardPage() {
                             card.value
                           )}
                         </span>
-                        {card.changePercent !== 0 && (
+                        {card.changePercent !== null && card.changePercent !== 0 && (
                           <AdminTrendBadge
                             changePercent={card.changePercent}
-                            trend={card.changePercent > 0 ? "up" : card.changePercent < 0 ? "down" : "flat"}
+                            trend={card.changePercent > 0 ? "up" : "down"}
                           />
                         )}
                       </div>
@@ -260,7 +321,7 @@ export default function AdminDashboardPage() {
                     <BriefcaseBusiness className="w-4 h-4 text-muted-foreground/50" />
                   </div>
                   <CardContent className="p-0">
-                    {kpiOverview.topProviders.length === 0 ? (
+                    {(!kpiOverview?.topProviders || kpiOverview.topProviders.length === 0) ? (
                       <AdminEmptyState
                         title="No provider revenue yet"
                         description="Top-performing providers will appear here as the marketplace generates earnings."
@@ -276,7 +337,7 @@ export default function AdminDashboardPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {kpiOverview.topProviders.map((provider: any) => (
+                          {(kpiOverview?.topProviders || []).map((provider) => (
                             <TableRow key={provider.id} className="hover:bg-muted/25 transition-all">
                               <TableCell className="font-bold text-foreground px-5 py-3.5">
                                 {provider.name}
@@ -374,7 +435,7 @@ export default function AdminDashboardPage() {
         {/* TAB 5: INSIGHTS ENGINE */}
         {activeTab === "insights" && (
           <InsightsEngine
-            caps={insights?.caps || {}}
+            caps={insights?.caps || ({} as Record<string, { cpuPercent: number; ramMb: number }>)}
             recommendations={insights?.recommendations || []}
             alerts={insights?.alerts || []}
             onRefresh={() => loadData(true)}

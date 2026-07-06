@@ -30,16 +30,19 @@ export function useSystemLogs() {
       );
       setLogs(res.logs || []);
       setError(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching system logs:", err);
-      setError(err.message || "Failed to load system logs");
+      setError(err instanceof Error ? err.message : "Failed to load system logs");
     } finally {
       setIsLoading(false);
     }
   }, [filters]);
 
   useEffect(() => {
-    fetchLogs();
+    const timer = setTimeout(() => {
+      fetchLogs();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [fetchLogs]);
 
   return { logs, isLoading, error, filters, setFilters, refresh: fetchLogs };

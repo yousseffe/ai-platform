@@ -70,7 +70,7 @@ export function useContainerLogs(deploymentId: string) {
           }
         });
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to connect to logs socket:", err);
         if (isMounted) {
           setError("Connection failed");

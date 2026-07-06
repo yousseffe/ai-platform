@@ -38,13 +38,24 @@ import {
 } from "recharts";
 
 const COLORS = ["#10b981", "#3b82f6", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6"];
+interface RechartsTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: string | number;
+    color?: string;
+    fill?: string;
+    payload: Record<string, unknown>;
+  }>;
+  label?: string | number;
+}
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: RechartsTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="rounded-lg border border-border bg-popover p-3 shadow-md text-xs space-y-1">
         <p className="font-bold text-foreground">{label}</p>
-        {payload.map((p: any) => (
+        {payload.map((p) => (
           <p key={p.name} className="flex items-center gap-2" style={{ color: p.color || p.fill }}>
             <span className="h-2 w-2 rounded-full animate-pulse" style={{ backgroundColor: p.color || p.fill }} />
             <span className="text-muted-foreground">{p.name}:</span>
@@ -59,9 +70,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const CustomPieTooltip = ({ active, payload }: any) => {
+const CustomPieTooltip = ({ active, payload }: RechartsTooltipProps) => {
   if (active && payload && payload.length) {
-    const data = payload[0].payload;
+    const data = payload[0].payload as { name: string; value: number; percentage: number };
     return (
       <div className="rounded-lg border border-border bg-popover p-3 shadow-md text-xs space-y-1">
         <p className="font-bold text-foreground">{data.name}</p>
@@ -75,7 +86,6 @@ const CustomPieTooltip = ({ active, payload }: any) => {
   }
   return null;
 };
-
 /**
  * Provider organization decision analytics.
  */
@@ -84,11 +94,12 @@ export default function OrgModelAnalyticsPage() {
   const [analytics, setAnalytics] = useState<OrganizationModelAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
-
   useEffect(() => {
-    setIsMounted(true);
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
-
   useEffect(() => {
     if (!org || (!can(OrgAction.DEPLOY_MODEL) && !can(OrgAction.EDIT_SETTINGS))) return;
     Promise.resolve().then(async () => {

@@ -50,11 +50,12 @@ export default function OrgOverviewPage() {
   const [stats, setStats] = useState<OrgStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
-
   useEffect(() => {
-    setIsMounted(true);
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
-
   useEffect(() => {
     if (!org) return;
     const fetchStats = async () => {
@@ -73,16 +74,7 @@ export default function OrgOverviewPage() {
     fetchStats();
   }, [org]);
 
-  if (!org) return null;
 
-  const showProvider = org.type === OrgType.PROVIDER || org.type === OrgType.HYBRID;
-  const showConsumer = org.type === OrgType.CONSUMER || org.type === OrgType.HYBRID;
-  const modeMessage =
-    org.type === OrgType.HYBRID
-      ? "Hybrid workspace: consume marketplace models and coordinate provider-side model publishing from one shared console."
-      : org.type === OrgType.CONSUMER
-        ? "Consumer workspace: create projects, generate API keys, and run marketplace model predictions from a shared wallet."
-        : "Provider workspace: track team model publishing, readiness, deployments, and provider wallet activity.";
 
   const membersTrend = useMemo(() => {
     if (stats?.trends?.members && stats.trends.members.length > 0) {
@@ -153,6 +145,17 @@ export default function OrgOverviewPage() {
       { value: stats?.totalEarnings || 500 }
     ];
   }, [stats]);
+
+  if (!org) return null;
+
+  const showProvider = org.type === OrgType.PROVIDER || org.type === OrgType.HYBRID;
+  const showConsumer = org.type === OrgType.CONSUMER || org.type === OrgType.HYBRID;
+  const modeMessage =
+    org.type === OrgType.HYBRID
+      ? "Hybrid workspace: consume marketplace models and coordinate provider-side model publishing from one shared console."
+      : org.type === OrgType.CONSUMER
+        ? "Consumer workspace: create projects, generate API keys, and run marketplace model predictions from a shared wallet."
+        : "Provider workspace: track team model publishing, readiness, deployments, and provider wallet activity.";
 
   const statCards = [
     { label: "Members", value: stats?.memberCount ?? "—", icon: <Users className="w-4 h-4" strokeWidth={1.8} />, tone: "blue" as const, caption: "Active collaborators", show: true, trend: membersTrend, color: "#3b82f6" },

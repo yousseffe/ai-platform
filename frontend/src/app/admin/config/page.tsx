@@ -75,7 +75,10 @@ export default function AdminConfigPage() {
 
   useEffect(() => {
     if (isAdmin) {
-      loadFeeConfig(false);
+      const timer = setTimeout(() => {
+        loadFeeConfig(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isAdmin]);
 

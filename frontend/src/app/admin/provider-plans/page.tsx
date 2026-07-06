@@ -192,7 +192,10 @@ export default function AdminProviderPlansPage() {
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const loadTiers = useCallback(async () => {
@@ -207,7 +210,10 @@ export default function AdminProviderPlansPage() {
   }, []);
 
   useEffect(() => {
-    loadTiers();
+    const timer = setTimeout(() => {
+      loadTiers();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [loadTiers]);
 
   const handleCreateNewClick = () => {

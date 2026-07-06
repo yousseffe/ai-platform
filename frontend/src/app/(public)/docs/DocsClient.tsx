@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import {
   BookOpen,
   Search,
@@ -41,7 +42,10 @@ export default function DocsClient() {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleCopy = (text: string, id: string) => {
@@ -313,7 +317,7 @@ export default function DocsClient() {
             <div className="rounded-lg border border-slate-200 dark:border-border bg-slate-50 dark:bg-secondary/10 p-3.5 space-y-2">
               <span className="font-bold text-slate-800 dark:text-foreground text-xs block">2. Provider Wallets (EGP)</span>
               <p className="text-xs leading-relaxed">
-                Publishers accumulate EGP balances. When a consumer queries a provider's model, credits are converted into EGP based on fixed system-wide conversion matrices and payout schedules.
+                Publishers accumulate EGP balances. When a consumer queries a provider&apos;s model, credits are converted into EGP based on fixed system-wide conversion matrices and payout schedules.
               </p>
             </div>
           </div>
@@ -513,13 +517,13 @@ export default function DocsClient() {
                 </div>
               ))}
               <div className="border-t border-slate-100 dark:border-border/50 pt-4 mt-6">
-                <a
+                <Link
                   href="/explore"
                   className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-muted-foreground hover:text-primary transition-colors group px-2"
                 >
                   <span>Model Marketplace</span>
                   <ExternalLink className="h-3.5 w-3.5 transform group-hover:translate-x-0.5 transition-transform" />
-                </a>
+                </Link>
               </div>
             </nav>
           </aside>

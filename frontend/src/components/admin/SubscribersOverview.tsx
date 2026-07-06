@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Search, ShieldAlert, Calendar, CreditCard, UserCheck, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-interface Subscriber {
+export interface Subscriber {
   id: string;
   ownerName: string;
   ownerEmail: string;

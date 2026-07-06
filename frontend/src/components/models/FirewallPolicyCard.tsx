@@ -83,12 +83,17 @@ export function FirewallPolicyCard({ modelId }: FirewallPolicyCardProps) {
   };
 
   useEffect(() => {
-    load();
-    fetchLogs();
+    const timer = setTimeout(() => {
+      load();
+      fetchLogs();
+    }, 0);
     
     // Poll logs every 10 seconds for real-time security updates
     const interval = setInterval(fetchLogs, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelId]);
 
@@ -115,11 +120,17 @@ export function FirewallPolicyCard({ modelId }: FirewallPolicyCardProps) {
   };
 
   useEffect(() => {
-    setAllowlistErrors(validateIpList(ipAllowlist));
+    const timer = setTimeout(() => {
+      setAllowlistErrors(validateIpList(ipAllowlist));
+    }, 0);
+    return () => clearTimeout(timer);
   }, [ipAllowlist]);
 
   useEffect(() => {
-    setDenylistErrors(validateIpList(ipDenylist));
+    const timer = setTimeout(() => {
+      setDenylistErrors(validateIpList(ipDenylist));
+    }, 0);
+    return () => clearTimeout(timer);
   }, [ipDenylist]);
 
   const parseIpList = (value: string): string[] | null => {

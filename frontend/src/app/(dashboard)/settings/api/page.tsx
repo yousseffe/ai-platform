@@ -83,10 +83,6 @@ export default function ApiSettingsPage() {
   const [consumerLogs, setConsumerLogs] = useState<ConsumerInferenceLog[]>([]);
   const [loadingUsage, setLoadingUsage] = useState(true);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     setLoading(true);
     setLoadingUsage(true);
@@ -131,6 +127,13 @@ export default function ApiSettingsPage() {
       setLoadingUsage(false);
     }
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleGenerateKey = async (e: React.FormEvent) => {
     e.preventDefault();

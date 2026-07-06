@@ -70,7 +70,11 @@ export function AdminSystemLogs() {
     context?: string;
     traceId?: string;
     spanId?: string;
-    rawJson?: any;
+    rawJson?: {
+      attributes?: Record<string, unknown>;
+      resources?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
     isJson: boolean;
   }
 
@@ -445,7 +449,7 @@ export function AdminSystemLogs() {
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {parsed.rawJson.attributes && Object.keys(parsed.rawJson.attributes).length > 0 && (
+                          {parsed.rawJson?.attributes && Object.keys(parsed.rawJson.attributes).length > 0 && (
                             <div>
                               <div className="text-muted-foreground/75 font-semibold mb-1 text-[8px] uppercase tracking-wider select-none text-left">Attributes</div>
                               <div className="space-y-1 bg-secondary/40 p-2.5 rounded-xl border border-border max-h-48 overflow-y-auto text-left">
@@ -459,7 +463,7 @@ export function AdminSystemLogs() {
                             </div>
                           )}
 
-                          {parsed.rawJson.resources && Object.keys(parsed.rawJson.resources).length > 0 && (
+                          {parsed.rawJson?.resources && Object.keys(parsed.rawJson.resources).length > 0 && (
                             <div>
                               <div className="text-muted-foreground/75 font-semibold mb-1 text-[8px] uppercase tracking-wider select-none text-left">Resources</div>
                               <div className="space-y-1 bg-secondary/40 p-2.5 rounded-xl border border-border max-h-48 overflow-y-auto text-left">

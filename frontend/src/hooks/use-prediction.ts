@@ -103,12 +103,15 @@ export function usePrediction(model: Model, selectedVersionNumber?: number) {
 
   // Sync payload state if the version's example payload changes
   useEffect(() => {
-    if (activeVersion?.examplePayload) {
-      setPayload(activeVersion.examplePayload);
-    } else {
-      setPayload(fallbackPayload);
-    }
-  }, [activeVersion?.examplePayload]);
+    const timer = setTimeout(() => {
+      if (activeVersion?.examplePayload) {
+        setPayload(activeVersion.examplePayload);
+      } else {
+        setPayload(fallbackPayload);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [activeVersion?.examplePayload, fallbackPayload]);
 
   // Derive JSON validation state dynamically from current payload
   const isValidJson = (() => {

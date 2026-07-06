@@ -34,7 +34,10 @@ export default function LayoutShell({ session, children }: LayoutShellProps) {
 
   // Close the mobile drawer automatically whenever navigation happens.
   useEffect(() => {
-    setMobileSidebarOpen(false);
+    const timer = setTimeout(() => {
+      setMobileSidebarOpen(false);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [pathname]);
 
   // Global Ctrl/Cmd+K shortcut to toggle the command palette from anywhere.

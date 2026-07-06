@@ -41,7 +41,9 @@ export function PipelineRunDetailDialog({ runId, onOpenChange }: PipelineRunDeta
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    const timer = setTimeout(() => {
+      setLoading(true);
+    }, 0);
     getPipelineRun(runId).then((data) => {
       if (cancelled) return;
       setRun(data);
@@ -49,6 +51,7 @@ export function PipelineRunDetailDialog({ runId, onOpenChange }: PipelineRunDeta
     });
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [runId]);
 

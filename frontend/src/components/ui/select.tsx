@@ -11,14 +11,14 @@ const SelectItemsContext = React.createContext<{
   getItemLabel: (value: string) => React.ReactNode;
 } | null>(null);
 
-interface SelectProps<T = any> extends Omit<React.ComponentProps<typeof SelectPrimitive.Root>, 'value' | 'onValueChange'> {
+interface SelectProps<T = unknown> extends Omit<React.ComponentProps<typeof SelectPrimitive.Root>, 'value' | 'onValueChange'> {
   items?: { value: T; label: React.ReactNode }[];
   value?: T;
   onValueChange?: (value: T) => void;
   children?: React.ReactNode;
 }
 
-function Select<T = any>({ children, items, ...props }: SelectProps<T>) {
+function Select<T = unknown>({ children, items, ...props }: SelectProps<T>) {
   const [itemsMap, setItemsMap] = React.useState<Record<string, React.ReactNode>>(() => {
     if (!items) return {};
     const initial: Record<string, React.ReactNode> = {};
@@ -30,13 +30,16 @@ function Select<T = any>({ children, items, ...props }: SelectProps<T>) {
 
   React.useEffect(() => {
     if (items) {
-      setItemsMap((prev) => {
-        const next = { ...prev };
-        items.forEach((item) => {
-          next[String(item.value)] = item.label;
+      const timer = setTimeout(() => {
+        setItemsMap((prev) => {
+          const next = { ...prev };
+          items.forEach((item) => {
+            next[String(item.value)] = item.label;
+          });
+          return next;
         });
-        return next;
-      });
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [items]);
 
@@ -53,7 +56,7 @@ function Select<T = any>({ children, items, ...props }: SelectProps<T>) {
 
   return (
     <SelectItemsContext.Provider value={{ registerItem, getItemLabel }}>
-      <SelectPrimitive.Root {...(props as any)}>
+      <SelectPrimitive.Root {...(props as unknown as React.ComponentProps<typeof SelectPrimitive.Root>)}>
         {children}
       </SelectPrimitive.Root>
     </SelectItemsContext.Provider>
@@ -91,7 +94,7 @@ function SelectValue({ className, placeholder, children, ...props }: SelectPrimi
         }
 
         if (typeof children === "function") {
-          return (children as Function)(value);
+          return (children as (val: unknown) => React.ReactNode)(value);
         }
         return value;
       }}

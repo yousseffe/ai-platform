@@ -40,12 +40,13 @@ export function CacheSettingsCard({ model, modelId }: CacheSettingsCardProps) {
     const res = await getCacheStats(modelId);
     if (res) setStats(res);
   };
-
   useEffect(() => {
-    loadStats();
+    const timer = setTimeout(() => {
+      loadStats();
+    }, 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelId]);
-
   const handleSave = async () => {
     setSaving(true);
     try {

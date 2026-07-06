@@ -28,19 +28,24 @@ export function useModelRequestHistory(modelId: string) {
       );
       setHistory(data || []);
       setError(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching model request history:", err);
-      setError(err.message || "Failed to load request history");
+      setError(err instanceof Error ? err.message : "Failed to load request history");
     } finally {
       setIsLoading(false);
     }
   }, [modelId]);
 
   useEffect(() => {
-    fetchHistory();
+    const timer = setTimeout(() => {
+      fetchHistory();
+    }, 0);
     // Poll every 10 seconds for live updates
     const interval = setInterval(fetchHistory, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchHistory]);
 
   return { history, isLoading, error, refresh: fetchHistory };

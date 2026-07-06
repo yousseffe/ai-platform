@@ -28,7 +28,7 @@ interface EditPipelineStepDialogProps {
       modelVersionId: string;
       label?: string;
       role?: string;
-      pinPolicy?: string;
+      pinPolicy?: PipelinePinPolicy;
       maxRetries?: number;
     },
   ) => Promise<boolean>;

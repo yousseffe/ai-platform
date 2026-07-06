@@ -52,7 +52,10 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
 
   useEffect(() => {
     if (!open) {
-      setQuery("");
+      const timer = setTimeout(() => {
+        setQuery("");
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [open]);
 

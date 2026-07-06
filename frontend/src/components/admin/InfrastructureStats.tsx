@@ -5,11 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Database, HardDrive, Cpu, Terminal, Layers, RefreshCw, Layers3, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+interface InfrastructureContainer {
+  deploymentId: string;
+  modelName: string;
+  url: string;
+  modelType: string;
+  port?: number | string;
+  cpu: number;
+  ram: number;
+  tier?: string;
+  [key: string]: unknown;
+}
 
 interface InfrastructureStatsProps {
   infrastructure: {
     activeContainers: number;
-    containersList: any[];
+    containersList: InfrastructureContainer[];
     storage: {
       bucket: string;
       fallback: boolean;

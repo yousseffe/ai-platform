@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { toast } from "react-hot-toast";
@@ -212,20 +212,19 @@ export function useUploadModel(options?: { successRedirect?: (modelId: string) =
    * Debug helper: logs all current form errors to the console.
    * Called by handleSubmit as the error callback so we can see what is blocking submit.
    */
-  const onInvalidSubmit = (errors: Record<string, unknown>) => {
+  const onInvalidSubmit = (errors: FieldErrors<UploadModelFormInput>) => {
     const cleanErrors = Object.keys(errors).reduce((acc, key) => {
-      const err = errors[key] as any;
+      const err = errors[key as keyof UploadModelFormInput];
       if (err) {
         acc[key] = {
-          type: err.type,
-          message: err.message,
+          type: typeof err.type === "string" ? err.type : String(err.type),
+          message: typeof err.message === "string" ? err.message : String(err.message || ""),
         };
       }
       return acc;
-    }, {} as Record<string, any>);
+    }, {} as Record<string, { type?: string; message?: string }>);
     console.error("[UploadModel] Form validation failed — errors:", cleanErrors);
   };
-
   /**
    * Finalizes the model creation by registering the model in the database, 
    * uploading the artifacts, saving the schema configs, and starting the build.

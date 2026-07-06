@@ -23,19 +23,24 @@ export function useSystemAlerts() {
       const data = await smartFetch<SystemAlert[]>("/analytics/admin/alerts");
       setAlerts(data || []);
       setError(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching system alerts:", err);
-      setError(err.message || "Failed to load alerts");
+      setError(err instanceof Error ? err.message : "Failed to load alerts");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchAlerts();
+    const timer = setTimeout(() => {
+      fetchAlerts();
+    }, 0);
     const interval = setInterval(fetchAlerts, 13000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchAlerts]);
 
   return { alerts, isLoading, error, refresh: fetchAlerts };

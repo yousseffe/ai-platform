@@ -90,7 +90,10 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     if (isAdmin) {
-      loadUsers(false);
+      const timer = setTimeout(() => {
+        loadUsers(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isAdmin]);
 

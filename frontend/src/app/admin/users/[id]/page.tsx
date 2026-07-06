@@ -158,7 +158,10 @@ export default function AdminUserDetailsPage({ params }: { params: Promise<{ id:
 
   useEffect(() => {
     if (isAdmin) {
-      loadUserDetails(false);
+      const timer = setTimeout(() => {
+        loadUserDetails(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isAdmin, userId]);
 

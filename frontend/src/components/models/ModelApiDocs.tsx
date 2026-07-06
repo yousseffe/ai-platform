@@ -16,11 +16,23 @@ import {
 import { toast } from "react-hot-toast";
 import type { Model, ModelIntegrationSpec } from "@/types";
 
+/**
+ * Props for the ModelApiDocs component.
+ */
 interface ModelApiDocsProps {
+  /** The model entity containing metadata and versions. */
   model: Model;
+  /** The integration spec containing endpoint details, pricing, and OpenAPI spec. */
   integrationSpec: ModelIntegrationSpec | null;
 }
 
+/**
+ * Formats a value as a pretty JSON string. If the value is a stringified JSON,
+ * it parses it first, then stringifies it with indentation.
+ *
+ * @param value - The value or JSON string to format.
+ * @returns A formatted string representation of the JSON object.
+ */
 function formatJson(value: unknown): string {
   if (typeof value === "string") {
     try {
@@ -32,6 +44,15 @@ function formatJson(value: unknown): string {
   return JSON.stringify(value ?? {}, null, 2);
 }
 
+/**
+ * Renders the developer documentation for a specific model.
+ * It displays REST endpoints, authentication instructions, parameter tables,
+ * pricing details, code examples for multiple languages (cURL, Python, JS, Go),
+ * and links to the interactive Swagger UI playground and raw OpenAPI schema.
+ *
+ * @param props - The component props containing the model and its integration specs.
+ * @returns The rendered developer API documentation tab.
+ */
 export default function ModelApiDocs({
   model,
   integrationSpec,
@@ -327,7 +348,7 @@ func main() {
               <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 text-[11px] leading-relaxed text-muted-foreground flex gap-2">
                 <span className="text-primary font-bold text-base leading-none">i</span>
                 <span>
-                  You can create, delete, and view your workspaces' secure tokens inside your developer <strong>Dashboard Settings</strong>. Never commit keys to public git repositories.
+                  You can create, delete, and view your workspaces&apos; secure tokens inside your developer <strong>Dashboard Settings</strong>. Never commit keys to public git repositories.
                 </span>
               </div>
             </div>
@@ -340,7 +361,7 @@ func main() {
               </div>
 
               <p className="text-muted-foreground leading-relaxed text-[11px]">
-                JSON schema parameters supported by this model's predict configuration.
+                JSON schema parameters supported by this model&apos;s predict configuration.
               </p>
 
               <div className="overflow-x-auto">
@@ -360,7 +381,7 @@ func main() {
                           <td className="py-2.5 font-semibold font-mono text-foreground">messages</td>
                           <td className="py-2.5 font-mono text-muted-foreground">array[object]</td>
                           <td className="py-2.5"><span className="text-red-500 font-bold">Required</span></td>
-                          <td className="py-2.5 text-muted-foreground">List of objects containing <code className="font-mono text-foreground font-semibold">role</code> ("system", "user", "assistant") and <code className="font-mono text-foreground font-semibold">content</code>.</td>
+                          <td className="py-2.5 text-muted-foreground">List of objects containing <code className="font-mono text-foreground font-semibold">role</code> (&quot;system&quot;, &quot;user&quot;, &quot;assistant&quot;) and <code className="font-mono text-foreground font-semibold">content</code>.</td>
                         </tr>
                         <tr>
                           <td className="py-2.5 font-semibold font-mono text-foreground">temperature</td>

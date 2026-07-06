@@ -142,20 +142,20 @@ export default function AuthShell({
             {/* Code */}
             <div className="p-3.5 font-mono text-[10.5px] leading-relaxed text-slate-300">
               <div>
-                <span className="text-pink-500">import</span> {"{"} Qantara {"}"} <span className="text-pink-500">from</span> <span className="text-teal-400">"@qantara/sdk"</span>;
+                <span className="text-pink-500">import</span> {"{"} Qantara {"}"} <span className="text-pink-500">from</span> <span className="text-teal-400">&quot;@qantara/sdk&quot;</span>;
               </div>
               <div className="mt-1">
                 <span className="text-pink-500">const client</span> = <span className="text-pink-500">new</span> <span className="text-blue-400">Qantara</span>({`{ apiKey: process.env.QANTARA_KEY }`});
               </div>
-              <div className="mt-2 text-slate-500">// Bridge your codebase to scalable GPUs instantly</div>
+              <div className="mt-2 text-slate-500">{"// Bridge your codebase to scalable GPUs instantly"}</div>
               <div className="mt-1">
                 <span className="text-pink-500">const</span> deployment = <span className="text-pink-500">await</span> client.models.deploy({`{`}
               </div>
               <div className="pl-4">
-                model: <span className="text-teal-400">"llama-3.3-70b-instruct"</span>,
+                model: <span className="text-teal-400">&quot;llama-3.3-70b-instruct&quot;</span>,
               </div>
               <div className="pl-4">
-                hardware: <span className="text-teal-400">"nvidia-l4-multi"</span>,
+                hardware: <span className="text-teal-400">&quot;nvidia-l4-multi&quot;</span>,
               </div>
               <div className="pl-4">
                 autoscaling: {`{ min: 1, max: 10 }`}
@@ -213,7 +213,7 @@ export default function AuthShell({
           <Quote className="h-4 w-4 text-indigo-500 shrink-0 opacity-60 mt-1" />
           <div>
             <p className="text-[11px] leading-relaxed text-slate-300 italic">
-              "Deploying large neural network pipelines was our biggest engineering bottleneck. Qantara completely automated that. What took days now takes 10 seconds."
+              &quot;Deploying large neural network pipelines was our biggest engineering bottleneck. Qantara completely automated that. What took days now takes 10 seconds.&quot;
             </p>
             <p className="text-[9px] font-mono text-slate-500 mt-1.5">
               — Lead AI Platform Architect, Cortex Labs

@@ -103,7 +103,7 @@ export function ApiKeyQuotaDialog({ orgId, apiKey, open, onOpenChange, onUpdated
               onChange={(e) => setMaxDailySpendCredits(e.target.value)}
             />
             <p className="text-[11px] text-muted-foreground">
-              Once this key spends its daily cap, it's automatically suspended until the owner raises it or the next calendar day.
+              Once this key spends its daily cap, it&apos;s automatically suspended until the owner raises it or the next calendar day.
             </p>
           </div>
         </div>

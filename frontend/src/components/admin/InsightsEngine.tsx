@@ -7,11 +7,31 @@ import { Button } from "@/components/ui/button";
 import { smartFetch } from "@/lib/utils/smart-fetch";
 import { toast } from "react-hot-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+interface InsightsRecommendation {
+  modelId: string;
+  modelName: string;
+  actionType: string;
+  reason: string;
+  currentPrice: number;
+  suggestedPrice: number;
+  currentTier: string;
+  suggestedTier: string;
+  [key: string]: unknown;
+}
+
+interface InsightsAlert {
+  id: string;
+  alertName: string;
+  severity: string;
+  summary: string;
+  receivedAt: string | number;
+  [key: string]: unknown;
+}
 
 interface InsightsEngineProps {
   caps: Record<string, { cpuPercent: number; ramMb: number }>;
-  recommendations: any[];
-  alerts: any[];
+  recommendations: InsightsRecommendation[];
+  alerts: InsightsAlert[];
   onRefresh: () => void;
 }
 
@@ -24,10 +44,12 @@ export default function InsightsEngine({
   const [editedCaps, setEditedCaps] = useState<Record<string, { cpuPercent: number; ramMb: number }>>({});
   const [savingCaps, setSavingCaps] = useState(false);
   const [processingUpgradeId, setProcessingUpgradeId] = useState<string | null>(null);
-
   useEffect(() => {
     if (caps) {
-      setEditedCaps(JSON.parse(JSON.stringify(caps)));
+      const timer = setTimeout(() => {
+        setEditedCaps(JSON.parse(JSON.stringify(caps)));
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [caps]);
 
@@ -58,7 +80,9 @@ export default function InsightsEngine({
     }
   };
 
-  const handleUpgradeModel = async (rec: any) => {
+
+
+  const handleUpgradeModel = async (rec: InsightsRecommendation) => {
     setProcessingUpgradeId(rec.modelId);
     try {
       await smartFetch(`/admin/dashboard/insights/upgrade-model/${rec.modelId}`, {

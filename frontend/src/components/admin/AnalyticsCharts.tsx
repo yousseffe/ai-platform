@@ -24,10 +24,42 @@ import { Activity, Users, TrendingUp, Cpu, Info, Zap } from "lucide-react";
 interface AnalyticsChartsProps {
   userGrowth: { month: string; signups: number; totalUsers: number }[];
   planBreakdown: { name: string; value: number }[];
-  containerStats: any[];
+  containerStats: unknown[];
 }
 
 const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
+
+interface TooltipPayloadItem {
+  name: string;
+  value: number;
+  stroke?: string;
+  fill?: string;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  label?: string;
+}
+
+// Custom tooltips to match our glassmorphism aesthetics, declared globally to prevent re-creation during render
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-card/95 backdrop-blur-md border border-border/80 p-3 rounded-2xl shadow-xl space-y-1.5 text-left text-[10px] font-sans">
+        <p className="font-bold text-foreground mb-1 border-b border-border/40 pb-1">{label}</p>
+        {payload.map((pld, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: pld.stroke || pld.fill }} />
+            <span className="text-muted-foreground font-semibold">{pld.name}:</span>
+            <span className="text-foreground font-extrabold">{pld.value.toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function AnalyticsCharts({
   userGrowth,
@@ -53,25 +85,6 @@ export default function AnalyticsCharts({
     { name: "Sat", P50: 155, P95: 410 },
     { name: "Sun", P50: 145, P95: 380 },
   ];
-
-  // Custom tooltips to match our glassmorphism aesthetics
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-card/95 backdrop-blur-md border border-border/80 p-3 rounded-2xl shadow-xl space-y-1.5 text-left text-[10px] font-sans">
-          <p className="font-bold text-foreground mb-1 border-b border-border/40 pb-1">{label}</p>
-          {payload.map((pld: any, index: number) => (
-            <div key={index} className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: pld.stroke || pld.fill }} />
-              <span className="text-muted-foreground font-semibold">{pld.name}:</span>
-              <span className="text-foreground font-extrabold">{pld.value.toLocaleString()}</span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="grid gap-6 md:grid-cols-2 text-left">

@@ -66,7 +66,10 @@ export default function AdminModelsPage() {
 
   useEffect(() => {
     if (isAdmin) {
-      loadModels(false);
+      const timer = setTimeout(() => {
+        loadModels(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isAdmin]);
 

@@ -65,14 +65,15 @@ export default function StepInterfaceConfig({
   setValue,
 }: StepInterfaceConfigProps) {
   const [showOverride, setShowOverride] = React.useState(!hasDetected);
-
   // Sync state if hasDetected changes
   React.useEffect(() => {
     if (hasDetected) {
-      setShowOverride(false);
+      const timer = setTimeout(() => {
+        setShowOverride(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [hasDetected]);
-
   return (
     <div className="space-y-5 animate-in fade-in duration-300 font-sans text-left">
       

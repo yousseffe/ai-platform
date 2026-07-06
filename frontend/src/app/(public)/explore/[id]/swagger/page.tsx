@@ -4,10 +4,41 @@ import React, { useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
+/**
+ * Props for the SwaggerPage route page.
+ */
 interface Props {
+  /** Next.js routing parameters containing the dynamic model id. */
   params: Promise<{ id: string }>;
 }
 
+interface SwaggerUIBundleConfig {
+  url: string;
+  dom_id: string;
+  deepLinking: boolean;
+  presets: unknown[];
+  layout: string;
+}
+
+type SwaggerUIBundleFunction = ((config: SwaggerUIBundleConfig) => void) & {
+  presets: {
+    apis: unknown;
+  };
+};
+
+interface CustomWindow extends Window {
+  SwaggerUIBundle?: SwaggerUIBundleFunction;
+}
+
+/**
+ * Public route page that hosts the interactive Swagger UI sandbox for a model.
+ * It dynamically embeds Swagger UI CSS and JS scripts from unpkg CDN,
+ * binds it to the model's backend OpenAPI JSON schema, and enables developers
+ * to test inference requests with their own API tokens directly.
+ *
+ * @param props - Sibling parameters containing the dynamic model id.
+ * @returns The full-page interactive Swagger sandbox UI layout.
+ */
 export default function SwaggerPage({ params }: Props) {
   const resolvedParams = React.use(params);
   const id = resolvedParams.id;
@@ -34,13 +65,14 @@ export default function SwaggerPage({ params }: Props) {
     script.async = true;
     script.id = "swagger-ui-js";
     script.onload = () => {
-      if ((window as any).SwaggerUIBundle) {
-        (window as any).SwaggerUIBundle({
+      const customWindow = window as unknown as CustomWindow;
+      if (customWindow.SwaggerUIBundle) {
+        customWindow.SwaggerUIBundle({
           url: openApiUrl,
           dom_id: "#swagger-ui",
           deepLinking: true,
           presets: [
-            (window as any).SwaggerUIBundle.presets.apis,
+            customWindow.SwaggerUIBundle.presets.apis,
           ],
           layout: "BaseLayout",
         });

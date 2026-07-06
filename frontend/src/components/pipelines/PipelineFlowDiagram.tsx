@@ -15,11 +15,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CreateStepInput } from "@/lib/schemas";
 
 interface ReadyVersionOption {
   modelVersionId: string;
   label: string;
 }
+
+type StepInputPayload = CreateStepInput;
 
 interface PipelineFlowDiagramProps {
   steps: PipelineStep[];
@@ -27,8 +30,8 @@ interface PipelineFlowDiagramProps {
   layoutMode?: string;
   readyVersionOptions?: ReadyVersionOption[];
   isSubmitting?: boolean;
-  onAddStep?: (input: any, order: number) => Promise<boolean>;
-  onUpdateStep?: (stepId: string, input: any) => Promise<boolean>;
+  onAddStep?: (input: StepInputPayload, order: number) => Promise<boolean>;
+  onUpdateStep?: (stepId: string, input: StepInputPayload) => Promise<boolean>;
   onRemoveStep?: (stepId: string) => Promise<void>;
 }
 
@@ -264,7 +267,7 @@ interface FlowNodeProps {
   stageSteps?: PipelineStep[];
   readyVersionOptions?: ReadyVersionOption[];
   isSubmitting?: boolean;
-  onUpdateStep?: (stepId: string, input: any) => Promise<boolean>;
+  onUpdateStep?: (stepId: string, input: StepInputPayload) => Promise<boolean>;
   onRemoveStep?: (stepId: string) => Promise<void>;
 }
 
@@ -371,7 +374,7 @@ interface SimpleArrowProps {
   stages?: PipelineStep[][];
   readyVersionOptions?: ReadyVersionOption[];
   isSubmitting?: boolean;
-  onAddStep?: (input: any, order: number) => Promise<boolean>;
+  onAddStep?: (input: StepInputPayload, order: number) => Promise<boolean>;
   targetStageOrder?: number;
 }
 
@@ -419,7 +422,7 @@ interface FanConnectorProps {
   stages?: PipelineStep[][];
   readyVersionOptions?: ReadyVersionOption[];
   isSubmitting?: boolean;
-  onAddStep?: (input: any, order: number) => Promise<boolean>;
+  onAddStep?: (input: StepInputPayload, order: number) => Promise<boolean>;
   targetStageOrder?: number;
 }
 

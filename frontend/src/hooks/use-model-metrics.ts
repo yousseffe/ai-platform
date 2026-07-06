@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { smartFetch } from "@/lib/utils/smart-fetch";
 
 export interface ModelMetrics {
+  totalRequests: number;
+  successRate: number;
+  averageLatencyMs: number;
+  totalCreditsCharged: number;
   cpuPercent: number;
   ramMb: number;
   latencyP50: number;
@@ -20,9 +24,9 @@ export function useModelMetrics(modelId: string) {
       const data = await smartFetch<ModelMetrics>(`/analytics/models/${modelId}/metrics`);
       setMetrics(data);
       setError(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching model metrics:", err);
-      setError(err.message || "Failed to load metrics");
+      setError(err instanceof Error ? err.message : "Failed to load metrics");
     } finally {
       setIsLoading(false);
     }
@@ -31,10 +35,15 @@ export function useModelMetrics(modelId: string) {
   useEffect(() => {
     if (!modelId) return;
 
-    fetchMetrics();
+    const timer = setTimeout(() => {
+      fetchMetrics();
+    }, 0);
     const interval = setInterval(fetchMetrics, 10000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [modelId, fetchMetrics]);
 
   return { metrics, isLoading, error, refresh: fetchMetrics };

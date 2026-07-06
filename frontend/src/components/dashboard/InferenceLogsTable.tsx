@@ -23,7 +23,10 @@ export function InferenceLogsTable({ logs, title }: InferenceLogsTableProps) {
 
   // Reset page when filter inputs change
   React.useEffect(() => {
-    setCurrentPage(1);
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [search, statusFilter]);
 
   // Apply filters client-side
@@ -72,7 +75,7 @@ export function InferenceLogsTable({ logs, title }: InferenceLogsTableProps) {
             <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground hidden sm:block shrink-0" />
             <Select
               value={statusFilter}
-              onValueChange={(val: any) => setStatusFilter(val)}
+              onValueChange={(val) => setStatusFilter(val as "ALL" | "SUCCESS" | "FAILED")}
             >
               <SelectTrigger className="h-8.5 w-full sm:w-36 text-xs border-border bg-card">
                 <SelectValue placeholder="All Statuses" />

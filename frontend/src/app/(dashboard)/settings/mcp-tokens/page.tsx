@@ -107,9 +107,8 @@ export default function McpAccessTokensPage() {
   );
   const [tokenPendingAction, setTokenPendingAction] = useState<{ token: McpTokenInfo; action: "revoke" | "delete" } | null>(null);
 
-  useEffect(() => {
-    fetchTokens();
-  }, []);
+  const [staleTokens, setStaleTokens] = useState<McpTokenInfo[]>([]);
+  const [expiredTokenIds, setExpiredTokenIds] = useState<Record<string, boolean>>({});
 
   const fetchTokens = async () => {
     setLoading(true);
@@ -124,6 +123,36 @@ export default function McpAccessTokensPage() {
     }
   };
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchTokens();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    const currentNow = Date.now();
+    const stale = tokens.filter((t) => {
+      if (!t.isActive) return false;
+      const lastUsed = t.lastUsedAt
+        ? new Date(t.lastUsedAt).getTime()
+        : new Date(t.createdAt).getTime();
+      const ageDays = (currentNow - lastUsed) / (1000 * 60 * 60 * 24);
+      return ageDays >= 90;
+    });
+
+    const expired: Record<string, boolean> = {};
+    tokens.forEach((token) => {
+      if (token.expiresAt && new Date(token.expiresAt).getTime() < currentNow) {
+        expired[token.id] = true;
+      }
+    });
+
+    const timer = setTimeout(() => {
+      setStaleTokens(stale);
+      setExpiredTokenIds(expired);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [tokens]);
   const handleCreateToken = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tokenName.trim()) {
@@ -227,14 +256,6 @@ export default function McpAccessTokensPage() {
   const tokensWithNoExpiration = tokens.filter(
     (t) => t.isActive && !t.expiresAt,
   );
-  const staleTokens = tokens.filter((t) => {
-    if (!t.isActive) return false;
-    const lastUsed = t.lastUsedAt
-      ? new Date(t.lastUsedAt).getTime()
-      : new Date(t.createdAt).getTime();
-    const ageDays = (Date.now() - lastUsed) / (1000 * 60 * 60 * 24);
-    return ageDays >= 90;
-  });
 
   const getMcpConfigString = () => {
     const tokenVal = newRawToken || "mcp_your_token_here";
@@ -280,7 +301,7 @@ export default function McpAccessTokensPage() {
             <div className="flex gap-3 p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 text-blue-600 dark:text-blue-400 text-xs shadow-xs">
               <AlertCircle className="w-5 h-5 shrink-0" />
               <div>
-                <span className="font-bold">Optimization Alert:</span> You have tokens that haven't been used in 90+ days ({" "}
+                <span className="font-bold">Optimization Alert:</span> You have tokens that haven&apos;t been used in 90+ days ({" "}
                 {staleTokens.map((t) => t.name).join(", ")} ). Consider revoking or deleting them.
               </div>
             </div>
@@ -334,9 +355,7 @@ export default function McpAccessTokensPage() {
                   {tokens.map((token) => {
                     const isVisible = !!visibleTokens[token.id];
                     const maskedToken = token.keyPrefix;
-                    const isExpired =
-                      token.expiresAt &&
-                      new Date(token.expiresAt).getTime() < Date.now();
+                    const isExpired = !!expiredTokenIds[token.id];
 
                     let statusBadge = (
                       <span className="inline-flex items-center gap-1.5 text-[9px] font-bold text-emerald-500 select-none">
@@ -553,7 +572,7 @@ export default function McpAccessTokensPage() {
               <Sparkles className="w-5 h-5 text-emerald-500 animate-pulse" /> Token Generated Successfully
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground select-none mt-1">
-              Make sure to copy your personal access token now. You won't be able to see it again!
+              Make sure to copy your personal access token now. You won&apos;t be able to see it again!
             </DialogDescription>
           </DialogHeader>
 

@@ -48,7 +48,10 @@ export default function WalletAnalyticsPanel({ mode }: WalletAnalyticsPanelProps
   };
 
   useEffect(() => {
-    fetchAnalytics();
+    const timer = setTimeout(() => {
+      fetchAnalytics();
+    }, 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWorkspace?.id, viewMode]);
 
@@ -226,7 +229,7 @@ export default function WalletAnalyticsPanel({ mode }: WalletAnalyticsPanelProps
                   <div className="space-y-2 select-none">
                     <div className="flex justify-between text-[9px] text-muted-foreground">
                       <span>Model: <strong className="text-foreground">{key.modelName}</strong></span>
-                      <span>Today's Spend</span>
+                      <span>Today&apos;s Spend</span>
                     </div>
                     
                     {hasCap ? (

@@ -20,25 +20,38 @@ interface ModelAnalyticsProps {
   modelId: string;
 }
 
+interface AnalyticsHistoryPoint {
+  time: string;
+  cpu?: number;
+  ram?: number;
+  p50?: number;
+  p95?: number;
+  requests?: number;
+  errors?: number;
+}
+
 export function ModelAnalytics({ modelId }: ModelAnalyticsProps) {
   const { metrics, isLoading, error } = useModelMetrics(modelId);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<AnalyticsHistoryPoint[]>([]);
 
   useEffect(() => {
     if (metrics) {
-      setHistory((prev) => {
-        const newPoint = {
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          cpu: metrics.cpuPercent,
-          ram: metrics.ramMb,
-          p50: metrics.latencyP50,
-          p95: metrics.latencyP95,
-          requests: metrics.requestRate,
-          errors: metrics.errorRate,
-        };
-        // Keep last 15 points
-        return [...prev, newPoint].slice(-15);
-      });
+      const timer = setTimeout(() => {
+        setHistory((prev) => {
+          const newPoint = {
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            cpu: metrics.cpuPercent,
+            ram: metrics.ramMb,
+            p50: metrics.latencyP50,
+            p95: metrics.latencyP95,
+            requests: metrics.requestRate,
+            errors: metrics.errorRate,
+          };
+          // Keep last 15 points
+          return [...prev, newPoint].slice(-15);
+        });
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [metrics]);
 

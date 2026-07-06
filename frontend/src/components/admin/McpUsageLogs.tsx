@@ -55,9 +55,12 @@ export default function McpUsageLogs() {
       setLoading(false);
     }
   }, [limit]);
-
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
-
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchLogs();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchLogs]);
   const filtered = levelFilter === "all"
     ? logs
     : logs.filter((l) => (l.level ?? "info").toLowerCase() === levelFilter);

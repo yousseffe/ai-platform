@@ -36,30 +36,46 @@ export default function ActionsTerminal({
   // Sync / initial load
   useEffect(() => {
     if (buildLogs) {
-      setLines(parseLogs(buildLogs));
+      const timer = setTimeout(() => {
+        setLines(parseLogs(buildLogs));
+      }, 0);
+      return () => clearTimeout(timer);
     } else {
       // Fetch initial logs if not provided
-      const fetchInitial = async () => {
+      let cancelled = false;
+      const timer = setTimeout(() => {
         setIsLoading(true);
+      }, 0);
+      const fetchInitial = async () => {
         try {
           const res = await smartFetch<{ buildLogs: string | null }>(
             `/models/${modelId}/versions/${versionId}/build-logs`
           );
-          setLines(parseLogs(res?.buildLogs));
+          if (!cancelled) {
+            setLines(parseLogs(res?.buildLogs));
+          }
         } catch (err) {
           console.error("Failed to fetch initial build logs", err);
         } finally {
-          setIsLoading(false);
+          if (!cancelled) {
+            setIsLoading(false);
+          }
         }
       };
       fetchInitial();
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
     }
   }, [versionId, modelId, buildLogs]);
 
   // Polling for logs when build is active
   useEffect(() => {
-    setIsPolling(isBuildActive);
-    if (!isBuildActive) return;
+    const timer = setTimeout(() => {
+      setIsPolling(isBuildActive);
+    }, 0);
+    if (!isBuildActive) return () => clearTimeout(timer);
 
     const interval = setInterval(async () => {
       try {
@@ -74,7 +90,10 @@ export default function ActionsTerminal({
       }
     }, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [versionId, modelId, isBuildActive]);
 
   // Scroll to bottom of terminal when logs are appended

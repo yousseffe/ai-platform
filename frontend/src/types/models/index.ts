@@ -405,3 +405,13 @@ export interface ModelComparisonHistoryItem {
   summaryInsights: ModelComparisonSummaryInsights | null;
   resultsCount: number;
 }
+
+export interface ModelReview {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  user: User;
+  createdAt: string;
+  updatedAt: string;
+}
+

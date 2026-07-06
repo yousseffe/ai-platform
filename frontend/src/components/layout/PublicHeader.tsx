@@ -22,11 +22,14 @@ export default function PublicHeader({ session }: PublicHeaderProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
+    const timer = setTimeout(() => {
+      setMounted(true);
+      if (savedTheme) {
+        setTheme(savedTheme);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {

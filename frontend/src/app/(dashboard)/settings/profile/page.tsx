@@ -45,10 +45,18 @@ export default function ProfileSettingsPage() {
   // Load from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setDisplayName(localStorage.getItem("qantara_profile_display_name") || "Developer Elite");
-      setBio(localStorage.getItem("qantara_profile_bio") || "Full-stack AI developer serving automated pipelines & LLM fine-tunes.");
-      setGithubUrl(localStorage.getItem("qantara_profile_github") || "https://github.com/qantara-dev");
-      setWebsiteUrl(localStorage.getItem("qantara_profile_website") || "https://qantara.ai");
+      const name = localStorage.getItem("qantara_profile_display_name") || "Developer Elite";
+      const userBio = localStorage.getItem("qantara_profile_bio") || "Full-stack AI developer serving automated pipelines & LLM fine-tunes.";
+      const github = localStorage.getItem("qantara_profile_github") || "https://github.com/qantara-dev";
+      const website = localStorage.getItem("qantara_profile_website") || "https://qantara.ai";
+      
+      const timer = setTimeout(() => {
+        setDisplayName(name);
+        setBio(userBio);
+        setGithubUrl(github);
+        setWebsiteUrl(website);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, []);
 

@@ -63,17 +63,18 @@ export default function McpToolConsole({ activeToken }: Props) {
       setLoadingTools(false);
     }
   }, [activeToken]);
-
   useEffect(() => {
-    if (activeToken) {
-      setMessages([]);
-      fetchTools();
-    } else {
-      setTools([]);
-      setSelectedTool(null);
-    }
+    const timer = setTimeout(() => {
+      if (activeToken) {
+        setMessages([]);
+        fetchTools();
+      } else {
+        setTools([]);
+        setSelectedTool(null);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [activeToken, fetchTools]);
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);

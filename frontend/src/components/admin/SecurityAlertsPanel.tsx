@@ -71,9 +71,12 @@ export default function SecurityAlertsPanel() {
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchData]);
   const firingAlerts = alerts.filter((a) => a.status === "firing");
   const resolvedAlerts = alerts.filter((a) => a.status === "resolved");
 
