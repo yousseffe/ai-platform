@@ -139,16 +139,16 @@ export default function SystemConfigTab({
   }
 
   return (
-    <div className="animate-fade-in text-left max-w-5xl font-mono text-xs text-foreground">
+    <div className="animate-fade-in text-left max-w-5xl font-sans text-xs text-foreground">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         {/* LEFT SIDEBAR: Workspace fees, token economics, trial limits, commission tiers */}
         <div className="lg:col-span-5 space-y-6">
 
           {/* Workspace Creation Fees */}
-          <Card className="border border-border bg-card shadow-sm hover:shadow-md transition-shadow rounded-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-600" />
-            <CardHeader className="p-5 border-b border-border bg-muted/10">
+          <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl relative overflow-hidden hover-lift transition-all duration-300">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-indigo-500 to-purple-600" />
+            <CardHeader className="p-5 border-b border-border/60 bg-muted/10">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-indigo-500" />
                 Workspace Creation Fees
@@ -173,18 +173,18 @@ export default function SystemConfigTab({
                       step="0.01"
                       value={feeInput}
                       onChange={(e) => onFeeInputChange(e.target.value)}
-                      className="pl-11 bg-background border-border text-foreground font-bold rounded-lg h-9 text-xs focus-visible:ring-primary/20"
+                      className="pl-11 bg-background border-border text-foreground font-bold rounded-xl h-9 text-xs focus:outline-none focus:border-primary transition-all"
                     />
                   </div>
                   <Button
                     onClick={onUpdateFee}
                     disabled={updatingFee}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 text-xs px-4 rounded-lg border-none cursor-pointer flex items-center gap-1.5 transition-colors font-sans"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 text-xs px-4 rounded-xl border-none cursor-pointer flex items-center gap-1.5 transition-colors font-sans shadow-xs hover-lift"
                   >
                     {updatingFee ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Update Fee"}
                   </Button>
                 </div>
-                <div className="flex gap-2 p-3 bg-secondary/35 rounded-xl border border-border mt-3 text-muted-foreground leading-relaxed font-sans text-[10px]">
+                <div className="flex gap-2 p-3 bg-secondary/35 rounded-xl border border-border/80 mt-3 text-muted-foreground leading-relaxed font-sans text-[10px] text-left">
                   <Info className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
                   <p>
                     Charged to the user&apos;s Consumer wallet on workspace creation. Current rate:{" "}
@@ -196,9 +196,9 @@ export default function SystemConfigTab({
           </Card>
 
           {/* Credits Conversion Rate */}
-          <Card className="border border-border bg-card shadow-sm hover:shadow-md transition-shadow rounded-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
-            <CardHeader className="p-5 border-b border-border bg-muted/10">
+          <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl relative overflow-hidden hover-lift transition-all duration-300">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-emerald-500 to-teal-500" />
+            <CardHeader className="p-5 border-b border-border/60 bg-muted/10">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Coins className="w-4 h-4 text-emerald-500" />
                 Credits Conversion Rate
@@ -221,7 +221,7 @@ export default function SystemConfigTab({
                     min="1"
                     value={pricingDefaults.credits_per_egp}
                     onChange={(e) => handleInputChange("credits_per_egp", e.target.value)}
-                    className="bg-background border-border text-foreground font-bold rounded-lg h-9 text-xs pr-24"
+                    className="bg-background border-border text-foreground font-bold rounded-xl h-9 text-xs pr-24 focus:outline-none focus:border-primary transition-all"
                   />
                 </div>
                 <p className="text-[9px] text-muted-foreground leading-normal font-sans pt-1">
@@ -232,9 +232,9 @@ export default function SystemConfigTab({
           </Card>
 
           {/* Sandbox Execution Limits */}
-          <Card className="border border-border bg-card shadow-sm hover:shadow-md transition-shadow rounded-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
-            <CardHeader className="p-5 border-b border-border bg-muted/10">
+          <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl relative overflow-hidden hover-lift transition-all duration-300">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500 to-orange-500" />
+            <CardHeader className="p-5 border-b border-border/60 bg-muted/10">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 text-amber-500" />
                 Sandbox Execution Limits
@@ -257,7 +257,7 @@ export default function SystemConfigTab({
                     min="1"
                     value={pricingDefaults.playground_trial_limit}
                     onChange={(e) => handleInputChange("playground_trial_limit", e.target.value)}
-                    className="bg-background border-border text-foreground font-bold rounded-lg h-9 text-xs pr-24"
+                    className="bg-background border-border text-foreground font-bold rounded-xl h-9 text-xs pr-24 focus:outline-none focus:border-primary transition-all"
                   />
                 </div>
                 <p className="text-[9px] text-muted-foreground leading-normal font-sans pt-1">
@@ -268,9 +268,9 @@ export default function SystemConfigTab({
           </Card>
 
           {/* Commission Tier Schedule */}
-          <Card className="border border-border bg-card shadow-sm hover:shadow-md transition-shadow rounded-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-pink-500" />
-            <CardHeader className="p-5 border-b border-border bg-muted/10">
+          <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl relative overflow-hidden hover-lift transition-all duration-300">
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-rose-500 to-pink-500" />
+            <CardHeader className="p-5 border-b border-border/60 bg-muted/10">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-rose-500" />
                 Commission Tier Schedule
@@ -282,9 +282,9 @@ export default function SystemConfigTab({
             <CardContent className="p-5 space-y-3">
               {(
                 [
-                  { field: "commission_tier_free" as const, label: "Free Tier", color: "text-slate-500" },
-                  { field: "commission_tier_professional" as const, label: "Professional", color: "text-blue-500" },
-                  { field: "commission_tier_enterprise" as const, label: "Enterprise", color: "text-purple-500" },
+                  { field: "commission_tier_free" as const, label: "Free Tier", color: "text-slate-400" },
+                  { field: "commission_tier_professional" as const, label: "Professional", color: "text-blue-400" },
+                  { field: "commission_tier_enterprise" as const, label: "Enterprise", color: "text-purple-400" },
                 ] as const
               ).map(({ field, label, color }) => (
                 <div key={field} className="flex items-center gap-3">
@@ -297,7 +297,7 @@ export default function SystemConfigTab({
                       max="100"
                       value={pricingDefaults[field]}
                       onChange={(e) => handleInputChange(field, e.target.value)}
-                      className="bg-background border-border text-foreground font-bold h-8 text-xs pr-8"
+                      className="bg-background border-border text-foreground font-bold h-8 text-xs pr-8 rounded-lg focus:outline-none focus:border-primary transition-all"
                     />
                   </div>
                   <span className="text-[9px] text-muted-foreground whitespace-nowrap">
@@ -305,7 +305,7 @@ export default function SystemConfigTab({
                   </span>
                 </div>
               ))}
-              <p className="text-[9px] text-muted-foreground font-sans pt-1">
+              <p className="text-[9px] text-muted-foreground font-sans pt-1 text-left">
                 Changes apply to newly created models. Existing models retain their negotiated split.
               </p>
             </CardContent>
@@ -315,10 +315,10 @@ export default function SystemConfigTab({
         {/* RIGHT COLUMN: Inference pricing grid */}
         <div className="lg:col-span-7">
           <form onSubmit={handleSaveDefaults} className="h-full flex flex-col">
-            <Card className="border border-border bg-card shadow-sm flex-1 flex flex-col rounded-2xl relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
-              <CardHeader className="p-5 border-b border-border bg-muted/10">
-                <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md flex-1 flex flex-col rounded-2xl relative overflow-hidden hover-lift transition-all duration-300">
+              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-purple-500 to-pink-500" />
+              <CardHeader className="p-5 border-b border-border/60 bg-muted/10">
+                <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2 text-left">
                   <Sparkles className="w-4 h-4 text-purple-500" />
                   Global Inference Rate Defaults
                 </CardTitle>
@@ -332,7 +332,7 @@ export default function SystemConfigTab({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                   {/* Tabular */}
-                  <div className="space-y-1.5 p-3.5 rounded-xl border border-border bg-secondary/25 hover:border-primary/20 transition-colors">
+                  <div className="space-y-1.5 p-3.5 rounded-2xl border border-border/80 bg-secondary/15 hover:border-primary/20 transition-all text-left">
                     <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                       Tabular (Credits / Prediction)
                     </label>
@@ -344,14 +344,14 @@ export default function SystemConfigTab({
                         step="0.00001"
                         value={pricingDefaults.price_tabular}
                         onChange={(e) => handleInputChange("price_tabular", e.target.value)}
-                        className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs"
+                        className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs rounded-xl focus:outline-none focus:border-primary transition-all"
                       />
                     </div>
                     <p className="text-[8px] text-muted-foreground mt-1 font-sans">scikit-learn, XGBoost, time-series models.</p>
                   </div>
 
                   {/* NLP */}
-                  <div className="space-y-1.5 p-3.5 rounded-xl border border-border bg-secondary/25 hover:border-primary/20 transition-colors">
+                  <div className="space-y-1.5 p-3.5 rounded-2xl border border-border/80 bg-secondary/15 hover:border-primary/20 transition-all text-left">
                     <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                       NLP (Credits / Prediction)
                     </label>
@@ -363,14 +363,14 @@ export default function SystemConfigTab({
                         step="0.0001"
                         value={pricingDefaults.price_nlp}
                         onChange={(e) => handleInputChange("price_nlp", e.target.value)}
-                        className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs"
+                        className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs rounded-xl focus:outline-none focus:border-primary transition-all"
                       />
                     </div>
                     <p className="text-[8px] text-muted-foreground mt-1 font-sans">Text classifiers, embeddings, parsers.</p>
                   </div>
 
                   {/* Vision */}
-                  <div className="space-y-1.5 p-3.5 rounded-xl border border-border bg-secondary/25 hover:border-primary/20 transition-colors">
+                  <div className="space-y-1.5 p-3.5 rounded-2xl border border-border/80 bg-secondary/15 hover:border-primary/20 transition-all text-left">
                     <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                       Vision (Credits / Image)
                     </label>
@@ -382,14 +382,14 @@ export default function SystemConfigTab({
                         step="0.0001"
                         value={pricingDefaults.price_vision}
                         onChange={(e) => handleInputChange("price_vision", e.target.value)}
-                        className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs"
+                        className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs rounded-xl focus:outline-none focus:border-primary transition-all"
                       />
                     </div>
                     <p className="text-[8px] text-muted-foreground mt-1 font-sans">CNNs, object detection, OCR, classification.</p>
                   </div>
 
                   {/* Diffusion */}
-                  <div className="space-y-1.5 p-3.5 rounded-xl border border-border bg-secondary/25 hover:border-primary/20 transition-colors">
+                  <div className="space-y-1.5 p-3.5 rounded-2xl border border-border/80 bg-secondary/15 hover:border-primary/20 transition-all text-left">
                     <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
                       Diffusion (Credits / Image)
                     </label>
@@ -401,14 +401,14 @@ export default function SystemConfigTab({
                         step="0.0001"
                         value={pricingDefaults.price_diffusion}
                         onChange={(e) => handleInputChange("price_diffusion", e.target.value)}
-                        className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs"
+                        className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs rounded-xl focus:outline-none focus:border-primary transition-all"
                       />
                     </div>
                     <p className="text-[8px] text-muted-foreground mt-1 font-sans">Text-to-image generation pipelines.</p>
                   </div>
 
                   {/* Provider Share */}
-                  <div className="space-y-1.5 p-3.5 rounded-xl border border-border bg-secondary/25 hover:border-primary/20 transition-colors sm:col-span-2">
+                  <div className="space-y-1.5 p-3.5 rounded-2xl border border-border/80 bg-secondary/15 hover:border-primary/20 transition-all sm:col-span-2 text-left">
                     <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                       <Percent className="w-3 h-3 text-muted-foreground" />
                       Default Provider Revenue Share (%)
@@ -421,7 +421,7 @@ export default function SystemConfigTab({
                         max="100"
                         value={pricingDefaults.default_provider_share_percent}
                         onChange={(e) => handleInputChange("default_provider_share_percent", e.target.value)}
-                        className="bg-background border-border text-foreground font-bold h-9 text-xs pr-8"
+                        className="bg-background border-border text-foreground font-bold h-9 text-xs pr-8 rounded-xl focus:outline-none focus:border-primary transition-all"
                       />
                     </div>
                     <p className="text-[8px] text-muted-foreground font-sans">Provider&apos;s cut of each inference charge. Remainder is platform revenue.</p>
@@ -429,7 +429,7 @@ export default function SystemConfigTab({
                 </div>
 
                 {/* LLM Token Pricing — separate section */}
-                <div className="border-t border-border pt-5">
+                <div className="border-t border-border pt-5 text-left">
                   <div className="flex items-center gap-2 mb-3">
                     <Zap className="w-3.5 h-3.5 text-amber-500" />
                     <span className="text-[10px] font-bold text-foreground uppercase tracking-wider">
@@ -440,7 +440,7 @@ export default function SystemConfigTab({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                     {/* Input tokens */}
-                    <div className="space-y-1.5 p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/[0.03] hover:border-amber-500/30 transition-colors">
+                    <div className="space-y-1.5 p-3.5 rounded-2xl border border-amber-500/20 bg-amber-500/[0.03] hover:border-amber-500/35 transition-all">
                       <label className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
                         Input Tokens (Credits / 1M)
                       </label>
@@ -452,7 +452,7 @@ export default function SystemConfigTab({
                           step="0.1"
                           value={pricingDefaults.price_llm_gguf_input}
                           onChange={(e) => handleInputChange("price_llm_gguf_input", e.target.value)}
-                          className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs"
+                          className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs rounded-xl focus:outline-none focus:border-primary transition-all"
                         />
                       </div>
                       <p className="text-[8px] text-muted-foreground mt-1 font-sans">
@@ -461,7 +461,7 @@ export default function SystemConfigTab({
                     </div>
 
                     {/* Output tokens */}
-                    <div className="space-y-1.5 p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/[0.03] hover:border-amber-500/30 transition-colors">
+                    <div className="space-y-1.5 p-3.5 rounded-2xl border border-amber-500/20 bg-amber-500/[0.03] hover:border-amber-500/35 transition-all">
                       <label className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
                         Output Tokens (Credits / 1M)
                       </label>
@@ -473,7 +473,7 @@ export default function SystemConfigTab({
                           step="0.1"
                           value={pricingDefaults.price_llm_gguf_output}
                           onChange={(e) => handleInputChange("price_llm_gguf_output", e.target.value)}
-                          className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs"
+                          className="pl-9 bg-background border-border text-foreground font-bold h-9 text-xs rounded-xl focus:outline-none focus:border-primary transition-all"
                         />
                       </div>
                       <p className="text-[8px] text-muted-foreground mt-1 font-sans">
@@ -494,14 +494,14 @@ export default function SystemConfigTab({
               </CardContent>
 
               <div className="p-4 border-t border-border bg-muted/15 flex items-center justify-between font-sans">
-                <div className="text-[9px] text-muted-foreground flex items-center gap-1 select-none font-mono">
+                <div className="text-[9px] text-muted-foreground flex items-center gap-1 select-none font-sans">
                   <Sliders className="w-3.5 h-3.5 text-muted-foreground" />
                   <span>Config parameters synced</span>
                 </div>
                 <Button
                   type="submit"
                   disabled={savingDefaults}
-                  className="bg-primary hover:bg-primary/95 text-primary-foreground font-bold h-9 text-xs px-4 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                  className="bg-primary hover:bg-primary/95 text-primary-foreground font-bold h-9 text-xs px-4 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all hover-lift"
                 >
                   {savingDefaults ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

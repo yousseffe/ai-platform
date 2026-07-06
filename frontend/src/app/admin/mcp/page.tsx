@@ -47,7 +47,7 @@ export default function AdminMcpPage() {
 
   if (isWorkspaceLoading || !isAdmin) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] text-foreground font-mono">
+      <div className="flex items-center justify-center min-h-[60vh] text-foreground font-sans">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
         <span className="ml-2.5 text-xs">Authenticating Admin Access...</span>
       </div>
@@ -55,11 +55,15 @@ export default function AdminMcpPage() {
   }
 
   return (
-    <div className="w-full h-full flex flex-col gap-6 text-foreground font-mono text-xs animate-fade-in">
+    <div className="w-full h-full flex flex-col gap-6 text-foreground font-sans text-xs animate-fade-in relative min-h-screen pb-12">
+      {/* Decorative background glows */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border pb-5">
+      <div className="flex items-center justify-between border-b border-border pb-5 relative z-10">
         <div>
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2 font-sans">
             <Bot className="w-5 h-5 text-primary" />
             MCP Agent Console
           </h1>
@@ -76,14 +80,14 @@ export default function AdminMcpPage() {
       </div>
 
       {/* Tab nav */}
-      <div className="flex gap-1 border border-border rounded-xl p-1 bg-secondary/20 w-fit">
+      <div className="flex gap-1 border border-border rounded-xl p-1 bg-secondary/20 w-fit relative z-10">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
               activeTab === tab.id
-                ? "bg-card text-foreground shadow-sm border border-border"
+                ? "bg-card text-foreground shadow-xs border border-border"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -97,7 +101,7 @@ export default function AdminMcpPage() {
       </div>
 
       {/* Tab panels */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 relative z-10">
         {activeTab === "tokens" && (
           <div className="max-w-2xl">
             <McpTokenManager onTokenChange={setActiveToken} />

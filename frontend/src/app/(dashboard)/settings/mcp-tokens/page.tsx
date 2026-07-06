@@ -252,47 +252,47 @@ export default function McpAccessTokensPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in text-left">
+    <div className="relative space-y-6 animate-fade-in text-left font-sans">
+      {/* Background Decor */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
       <PageHeader
         title="MCP Access Tokens"
+        icon={<Plug className="w-5 h-5 text-primary" />}
         description="Personal access credentials used to securely connect external AI clients (Claude Code, Cursor, Antigravity) to the platform context services."
         className="mb-0"
       />
 
       {/* Security Warnings */}
       {(tokensWithNoExpiration.length > 0 || staleTokens.length > 0) && (
-        <div className="space-y-3 font-sans">
+        <div className="space-y-3 font-sans relative z-10 select-none">
           {tokensWithNoExpiration.length > 0 && (
-            <div className="flex gap-3 p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 text-yellow-600 dark:text-yellow-400 text-xs">
+            <div className="flex gap-3 p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 text-yellow-600 dark:text-yellow-400 text-xs shadow-xs">
               <ShieldAlert className="w-5 h-5 shrink-0" />
               <div>
-                <span className="font-bold">Security Alert:</span> You have
-                active tokens with no expiration date ({" "}
-                {tokensWithNoExpiration.map((t) => t.name).join(", ")} ). We
-                strongly recommend setting expiration dates to secure your
-                environment.
+                <span className="font-bold">Security Alert:</span> You have active tokens with no expiration date ({" "}
+                {tokensWithNoExpiration.map((t) => t.name).join(", ")} ). We strongly recommend setting expiration dates to secure your environment.
               </div>
             </div>
           )}
           {staleTokens.length > 0 && (
-            <div className="flex gap-3 p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 text-blue-600 dark:text-blue-400 text-xs">
+            <div className="flex gap-3 p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 text-blue-600 dark:text-blue-400 text-xs shadow-xs">
               <AlertCircle className="w-5 h-5 shrink-0" />
               <div>
-                <span className="font-bold">Optimization Alert:</span> You have
-                tokens that haven't been used in 90+ days ({" "}
-                {staleTokens.map((t) => t.name).join(", ")} ). Consider revoking
-                or deleting them.
+                <span className="font-bold">Optimization Alert:</span> You have tokens that haven't been used in 90+ days ({" "}
+                {staleTokens.map((t) => t.name).join(", ")} ). Consider revoking or deleting them.
               </div>
             </div>
           )}
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex flex-col lg:flex-row gap-6 relative z-10">
         {/* Left Side: Tokens list */}
-        <div className="flex-1 card p-5 rounded-xl border border-border bg-card shadow-sm space-y-4">
-          <div className="flex items-center gap-3 border-b border-border/60 pb-4 select-none">
-            <div className="w-9 h-9 rounded bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
+        <div className="flex-1 card rounded-xl border border-border bg-card/65 backdrop-blur-md shadow-xs space-y-4 premium-card p-5">
+          <div className="flex items-center gap-3 border-b border-border/50 pb-4 select-none">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
               <Plug className="w-4.5 h-4.5" />
             </div>
             <div>
@@ -306,9 +306,9 @@ export default function McpAccessTokensPage() {
           </div>
 
           {loading ? (
-            <div className="py-12 flex items-center justify-center text-muted-foreground">
-              <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
-              <span className="font-mono text-xs">Loading tokens...</span>
+            <div className="py-12 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <span className="font-mono text-[9px] font-semibold">Loading tokens...</span>
             </div>
           ) : tokens.length === 0 ? (
             <EmptyState
@@ -317,17 +317,17 @@ export default function McpAccessTokensPage() {
               description="Use the panel on the right to create your first token."
             />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto font-mono">
               <table className="w-full font-mono text-[10px] text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-border text-muted-foreground font-bold uppercase select-none">
-                    <th className="py-2.5 px-2">Label</th>
-                    <th className="py-2.5 px-2">Token</th>
-                    <th className="py-2.5 px-2">Scopes</th>
-                    <th className="py-2.5 px-2">Status</th>
-                    <th className="py-2.5 px-2">Last Used</th>
-                    <th className="py-2.5 px-2">Expires</th>
-                    <th className="py-2.5 px-2 text-right">Actions</th>
+                  <tr className="border-b border-border text-muted-foreground font-bold uppercase tracking-wider select-none text-[8.5px]">
+                    <th className="py-2.5 px-2 font-mono">Label</th>
+                    <th className="py-2.5 px-2 font-mono">Token</th>
+                    <th className="py-2.5 px-2 font-mono">Scopes</th>
+                    <th className="py-2.5 px-2 font-mono">Status</th>
+                    <th className="py-2.5 px-2 font-mono">Last Used</th>
+                    <th className="py-2.5 px-2 font-mono">Expires</th>
+                    <th className="py-2.5 px-2 text-right font-mono">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -339,21 +339,21 @@ export default function McpAccessTokensPage() {
                       new Date(token.expiresAt).getTime() < Date.now();
 
                     let statusBadge = (
-                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-500 select-none">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{" "}
+                      <span className="inline-flex items-center gap-1.5 text-[9px] font-bold text-emerald-500 select-none">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />{" "}
                         Active
                       </span>
                     );
                     if (!token.isActive) {
                       statusBadge = (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-500 select-none">
+                        <span className="inline-flex items-center gap-1.5 text-[9px] font-bold text-red-500 select-none">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500" />{" "}
                           Revoked
                         </span>
                       );
                     } else if (isExpired) {
                       statusBadge = (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-yellow-500 select-none">
+                        <span className="inline-flex items-center gap-1.5 text-[9px] font-bold text-yellow-550 select-none">
                           <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />{" "}
                           Expired
                         </span>
@@ -363,31 +363,31 @@ export default function McpAccessTokensPage() {
                     return (
                       <tr
                         key={token.id}
-                        className="border-b border-border/40 hover:bg-secondary/20 transition-colors"
+                        className="border-b border-border/30 hover:bg-secondary/15 transition-colors font-mono"
                       >
                         <td className="py-3 px-2 font-sans font-bold text-foreground max-w-[120px] truncate">
                           {token.name}
                         </td>
                         <td className="py-3 px-2">
                           <div className="flex items-center gap-1.5">
-                            <span className="bg-secondary/40 px-2 py-1 rounded text-foreground font-medium font-mono text-[9px] border border-border/50">
+                            <span className="bg-background border border-border/85 px-2 py-0.75 rounded-md text-foreground font-semibold font-mono text-[9px] shadow-inner select-all">
                               {maskedToken}
                             </span>
                           </div>
                         </td>
                         <td className="py-3 px-2">
-                          <div className="flex flex-wrap gap-1 max-w-[150px]">
+                          <div className="flex flex-wrap gap-1 max-w-[150px] font-sans">
                             {token.scopes.map((scope) => (
                               <span
                                 key={scope}
-                                className="px-1.5 py-0.5 rounded text-[8px] font-semibold bg-primary/10 text-primary border border-primary/20"
+                                className="px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-primary/10 text-primary border border-primary/20"
                               >
                                 {scope.replace(":read", "")}
                               </span>
                             ))}
                           </div>
                         </td>
-                        <td className="py-3 px-2">{statusBadge}</td>
+                        <td className="py-3 px-2 font-sans font-semibold">{statusBadge}</td>
                         <td className="py-3 px-2 text-muted-foreground font-sans text-[9px]">
                           {token.lastUsedAt
                             ? new Date(token.lastUsedAt).toLocaleDateString()
@@ -395,37 +395,37 @@ export default function McpAccessTokensPage() {
                         </td>
                         <td className="py-3 px-2 text-muted-foreground font-sans text-[9px]">
                           {token.expiresAt ? (
-                            <span
-                              className={
-                                isExpired ? "text-yellow-600 font-bold" : ""
-                              }
-                            >
+                            <span className={isExpired ? "text-yellow-600 font-bold" : ""}>
                               {new Date(token.expiresAt).toLocaleDateString()}
                             </span>
                           ) : (
-                            <span className="text-yellow-500 inline-flex items-center gap-1 select-none">
+                            <span className="text-yellow-650 font-bold inline-flex items-center gap-1 select-none font-sans">
                               Never <Clock className="w-3 h-3 shrink-0" />
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-2 text-right">
+                        <td className="py-3 px-2 text-right font-sans">
                           <div className="flex items-center justify-end gap-1.5">
                             {token.isActive && !isExpired && (
-                              <button
+                              <Button
                                 onClick={() => setTokenPendingAction({ token, action: "revoke" })}
-                                className="text-red-500 hover:text-red-600 hover:bg-red-500/10 px-2 py-1 rounded cursor-pointer transition-colors text-[9px] font-semibold font-sans border border-transparent"
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-650 hover:bg-red-500/10 px-2 py-1 h-7 text-[9px] font-bold border border-transparent shadow-none hover-lift active-shrink rounded-md"
                                 title="Revoke access"
                               >
                                 Revoke
-                              </button>
+                              </Button>
                             )}
-                            <button
+                            <Button
                               onClick={() => setTokenPendingAction({ token, action: "delete" })}
-                              className="text-muted-foreground hover:text-red-500 p-1.5 rounded cursor-pointer transition-colors"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="hover-lift active-shrink rounded-md hover:bg-secondary"
                               title="Delete token permanently"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -438,9 +438,9 @@ export default function McpAccessTokensPage() {
         </div>
 
         {/* Right Side: Generate token form */}
-        <div className="w-full lg:w-[360px] shrink-0 card p-5 rounded-xl border border-border bg-card shadow-sm space-y-4">
-          <div className="flex items-center gap-3 border-b border-border/60 pb-4 select-none">
-            <div className="w-9 h-9 rounded bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+        <div className="w-full lg:w-[360px] shrink-0 card rounded-xl border border-border bg-card/65 backdrop-blur-md shadow-xs space-y-4 premium-card p-5">
+          <div className="flex items-center gap-3 border-b border-border/50 pb-4 select-none">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
               <Sparkles className="w-4.5 h-4.5" />
             </div>
             <div>
@@ -455,7 +455,7 @@ export default function McpAccessTokensPage() {
 
           <form onSubmit={handleCreateToken} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+              <label className="form-label select-none">
                 Token Name
               </label>
               <input
@@ -463,13 +463,13 @@ export default function McpAccessTokensPage() {
                 placeholder="e.g. Claude Code (Laptop)"
                 value={tokenName}
                 onChange={(e) => setTokenName(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-sans font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-sans font-medium focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all form-input h-10"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+              <label className="form-label select-none">
                 Permissions & Scopes
               </label>
               <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
@@ -481,7 +481,7 @@ export default function McpAccessTokensPage() {
                   return (
                     <label
                       key={scope}
-                      className="flex items-start gap-2.5 p-2 rounded-lg border border-border/60 hover:bg-secondary/40 transition-colors cursor-pointer select-none"
+                      className="flex items-start gap-2.5 p-2.5 rounded-xl border border-border/60 hover:bg-secondary/40 transition-colors cursor-pointer select-none"
                     >
                       <input
                         type="checkbox"
@@ -495,12 +495,12 @@ export default function McpAccessTokensPage() {
                             {meta.label}
                           </span>
                           {meta.admin && (
-                            <span className="bg-red-500/10 text-red-500 text-[8px] font-bold px-1.5 py-0.25 rounded border border-red-500/20 inline-flex items-center gap-0.5">
+                            <span className="bg-red-500/10 text-red-550 text-[8px] font-bold px-1.5 py-0.25 rounded border border-red-500/20 inline-flex items-center gap-0.5">
                               <Lock className="w-2 h-2" /> Admin Only
                             </span>
                           )}
                         </div>
-                        <p className="text-[9px] text-muted-foreground mt-0.5 font-sans leading-relaxed">
+                        <p className="text-[9.5px] text-muted-foreground mt-0.5 font-sans leading-relaxed">
                           {meta.desc}
                         </p>
                       </div>
@@ -511,11 +511,11 @@ export default function McpAccessTokensPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+              <label className="form-label select-none">
                 Expiration
               </label>
               <Select value={expiresInDays} onValueChange={(value) => setExpiresInDays(value ?? "90")}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full form-input bg-background/50 h-10 border-border select-none">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -528,10 +528,10 @@ export default function McpAccessTokensPage() {
               </Select>
             </div>
 
-            <button
+            <Button
               type="submit"
               disabled={generating}
-              className="w-full btn-primary h-9 flex items-center justify-center gap-1.5 text-xs font-bold font-mono cursor-pointer rounded-lg border-none active:scale-[0.98]"
+              className="w-full h-10 flex items-center justify-center gap-1.5 text-xs font-bold btn-primary rounded-xl cursor-pointer"
             >
               {generating ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -540,51 +540,49 @@ export default function McpAccessTokensPage() {
                   <Plus className="w-4 h-4" /> Generate Token
                 </>
               )}
-            </button>
+            </Button>
           </form>
         </div>
       </div>
 
       {/* Post-creation one-time display modal */}
       <Dialog open={showCreatedModal} onOpenChange={setShowCreatedModal}>
-        <DialogContent className="sm:max-w-xl bg-card border border-border rounded-2xl shadow-xl text-left">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-foreground font-bold select-none text-sm">
-              <Sparkles className="w-5 h-5 text-emerald-500" /> Token Generated
-              Successfully
+            <DialogTitle className="flex items-center gap-2 text-foreground font-black select-none text-sm">
+              <Sparkles className="w-5 h-5 text-emerald-500 animate-pulse" /> Token Generated Successfully
             </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground select-none">
-              Make sure to copy your personal access token now. You won't be
-              able to see it again!
+            <DialogDescription className="text-xs text-muted-foreground select-none mt-1">
+              Make sure to copy your personal access token now. You won't be able to see it again!
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 my-2">
+          <div className="space-y-4.5 my-2">
             {/* The raw token container */}
-            <div className="p-3 bg-secondary/40 border border-border/80 rounded-lg flex items-center justify-between gap-3 font-mono text-xs">
-              <span className="text-foreground font-bold break-all">{newRawToken}</span>
+            <div className="p-3 bg-[#0b0c0f] border border-border/80 rounded-xl flex items-center justify-between gap-3 font-mono text-xs shadow-inner">
+              <span className="text-[#ebecf0] font-bold break-all select-all">{newRawToken}</span>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 onClick={() => handleCopyRaw(newRawToken || "")}
-                className="shrink-0 cursor-pointer"
+                className="shrink-0 cursor-pointer hover:bg-secondary rounded-lg hover-lift active-shrink"
                 title="Copy token secret"
               >
                 {copiedRawText ? (
                   <Check className="w-4.5 h-4.5 text-emerald-500 animate-fade-in" />
                 ) : (
-                  <Copy className="w-4.5 h-4.5" />
+                  <Copy className="w-4.5 h-4.5 text-muted-foreground hover:text-foreground" />
                 )}
               </Button>
             </div>
 
-            {/* Quick config installation tabs */}
-            <div className="space-y-2">
-              <div className="flex border-b border-border/60 select-none">
+            {/* Quick config installation tabs - Vercel layout triggers */}
+            <div className="space-y-3">
+              <div className="flex border-b border-border select-none">
                 <button
                   onClick={() => setActiveConfigTab("antigravity")}
-                  className={`px-3 py-1.5 text-[10px] font-bold font-mono transition-all border-b-2 cursor-pointer ${
+                  className={`px-3.5 py-2 text-[10px] font-bold font-mono transition-all border-b-2 cursor-pointer ${
                     activeConfigTab === "antigravity"
                       ? "border-primary text-primary"
                       : "border-transparent text-muted-foreground hover:text-foreground"
@@ -594,7 +592,7 @@ export default function McpAccessTokensPage() {
                 </button>
                 <button
                   onClick={() => setActiveConfigTab("cursor")}
-                  className={`px-3 py-1.5 text-[10px] font-bold font-mono transition-all border-b-2 cursor-pointer ${
+                  className={`px-3.5 py-2 text-[10px] font-bold font-mono transition-all border-b-2 cursor-pointer ${
                     activeConfigTab === "cursor"
                       ? "border-primary text-primary"
                       : "border-transparent text-muted-foreground hover:text-foreground"
@@ -604,7 +602,7 @@ export default function McpAccessTokensPage() {
                 </button>
                 <button
                   onClick={() => setActiveConfigTab("claude")}
-                  className={`px-3 py-1.5 text-[10px] font-bold font-mono transition-all border-b-2 cursor-pointer ${
+                  className={`px-3.5 py-2 text-[10px] font-bold font-mono transition-all border-b-2 cursor-pointer ${
                     activeConfigTab === "claude"
                       ? "border-primary text-primary"
                       : "border-transparent text-muted-foreground hover:text-foreground"
@@ -615,27 +613,27 @@ export default function McpAccessTokensPage() {
               </div>
 
               <div className="relative">
-                <div className="absolute top-2 right-2 text-[8px] font-bold text-muted-foreground/60 uppercase font-mono select-none">
+                <div className="absolute top-2.5 right-3.5 text-[8px] font-bold text-muted-foreground/60 uppercase font-mono select-none">
                   config.json snippet
                 </div>
-                <pre className="bg-[#121316] text-[#ededed] border border-[#222326] p-3 rounded-lg text-[9px] font-mono overflow-x-auto font-medium leading-relaxed max-h-[160px] overflow-y-auto">
+                <pre className="bg-[#0b0c0f] text-[#ebecf0] border border-border/80 p-4 rounded-xl text-[9.5px] font-mono overflow-x-auto font-medium leading-relaxed max-h-[160px] overflow-y-auto shadow-inner">
                   {getMcpConfigString()}
                 </pre>
               </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <button
+          <DialogFooter className="pt-2">
+            <Button
               onClick={() => {
                 setShowCreatedModal(false);
                 setNewRawToken(null);
                 setNewCreatedToken(null);
               }}
-              className="btn-primary text-xs font-bold font-mono px-4 h-9 cursor-pointer rounded-lg border-none active:scale-[0.97]"
+              className="h-10 px-4 text-xs font-bold btn-primary rounded-xl cursor-pointer"
             >
               I have copied my token
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

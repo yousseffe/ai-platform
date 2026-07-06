@@ -46,8 +46,10 @@ export async function smartFetch<T = unknown>(
   const isPredictionRequest = /^\/?models\/[^/]+\/(v[^/]+\/)?predict$/.test(
     path,
   );
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (
     activeWorkspaceId &&
+    uuidRegex.test(activeWorkspaceId) &&
     !isPredictionRequest &&
     !headers.has("X-Workspace-Id")
   ) {

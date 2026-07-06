@@ -1033,12 +1033,192 @@ export class OrganizationsService {
       WalletType.PROVIDER,
     );
 
+    const now = new Date();
+
+    // 1. Members trend
+    const members = await this.memberRepository.find({
+      where: { orgId },
+      order: { joinedAt: 'ASC' },
+    });
+    const membersTrend: Array<{ value: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const limit = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+      const count = members.filter((m) => m.joinedAt <= limit).length;
+      membersTrend.push({ value: count });
+    }
+
+    // 2. Projects trend
+    const projects = await this.dataSource.getRepository(Project).find({
+      where: { orgId, isActive: true },
+      order: { createdAt: 'ASC' },
+    });
+    const projectsTrend: Array<{ value: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const limit = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+      const count = projects.filter((p) => p.createdAt <= limit).length;
+      projectsTrend.push({ value: count });
+    }
+
+    // 3. Models trend
+    const models = await this.dataSource.getRepository(Model).find({
+      where: { organization: { id: orgId } },
+      order: { createdAt: 'ASC' },
+    });
+    const modelsTrend: Array<{ value: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const limit = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+      const count = models.filter((m) => m.createdAt <= limit).length;
+      modelsTrend.push({ value: count });
+    }
+
+    // 4. Consumer Wallet balance trend
+    const consumerWallet = await this.dataSource.getRepository(Wallet).findOne({
+      where: {
+        ownerId: orgId,
+        ownerType: OwnerType.ORG,
+        walletType: WalletType.CONSUMER,
+      },
+    });
+    const balanceTrend: Array<{ value: number }> = [];
+    if (consumerWallet) {
+      const transactions = await this.dataSource
+        .getRepository(Transaction)
+        .find({
+          where: {
+            walletId: consumerWallet.id,
+            status: TransactionStatus.COMPLETED,
+          },
+          order: { createdAt: 'ASC' },
+        });
+
+      let currentTrack = Number(consumerWallet.balance);
+      const monthlyBalances = new Map<string, number>();
+
+      const sortedTx = [...transactions].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
+      const currentMonthKey = now.toISOString().slice(0, 7);
+      monthlyBalances.set(currentMonthKey, currentTrack);
+
+      for (const tx of sortedTx) {
+        const txMonth = tx.createdAt.toISOString().slice(0, 7);
+        const amount = Number(tx.amount);
+        if (tx.type === TransactionType.CREDIT) {
+          currentTrack -= amount;
+        } else {
+          currentTrack += amount;
+        }
+        if (!monthlyBalances.has(txMonth)) {
+          monthlyBalances.set(txMonth, currentTrack);
+        }
+      }
+
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = d.toISOString().slice(0, 7);
+        let val = monthlyBalances.get(key);
+        if (val === undefined) {
+          const searchDate = new Date(d);
+          while (val === undefined) {
+            searchDate.setMonth(searchDate.getMonth() - 1);
+            const searchKey = searchDate.toISOString().slice(0, 7);
+            val = monthlyBalances.get(searchKey);
+            if (searchDate.getFullYear() < 2020) {
+              val = 0;
+              break;
+            }
+          }
+        }
+        balanceTrend.push({ value: val });
+      }
+    } else {
+      for (let i = 0; i < 6; i++) {
+        balanceTrend.push({ value: 0 });
+      }
+    }
+
+    // 5. Provider Wallet earnings trend
+    const providerWallet = await this.dataSource.getRepository(Wallet).findOne({
+      where: {
+        ownerId: orgId,
+        ownerType: OwnerType.ORG,
+        walletType: WalletType.PROVIDER,
+      },
+    });
+    const earningsTrend: Array<{ value: number }> = [];
+    if (providerWallet) {
+      const transactions = await this.dataSource
+        .getRepository(Transaction)
+        .find({
+          where: {
+            walletId: providerWallet.id,
+            status: TransactionStatus.COMPLETED,
+          },
+          order: { createdAt: 'ASC' },
+        });
+
+      let currentTrack = Number(providerWallet.balance);
+      const monthlyBalances = new Map<string, number>();
+
+      const sortedTx = [...transactions].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
+      const currentMonthKey = now.toISOString().slice(0, 7);
+      monthlyBalances.set(currentMonthKey, currentTrack);
+
+      for (const tx of sortedTx) {
+        const txMonth = tx.createdAt.toISOString().slice(0, 7);
+        const amount = Number(tx.amount);
+        if (tx.type === TransactionType.CREDIT) {
+          currentTrack -= amount;
+        } else {
+          currentTrack += amount;
+        }
+        if (!monthlyBalances.has(txMonth)) {
+          monthlyBalances.set(txMonth, currentTrack);
+        }
+      }
+
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = d.toISOString().slice(0, 7);
+        let val = monthlyBalances.get(key);
+        if (val === undefined) {
+          const searchDate = new Date(d);
+          while (val === undefined) {
+            searchDate.setMonth(searchDate.getMonth() - 1);
+            const searchKey = searchDate.toISOString().slice(0, 7);
+            val = monthlyBalances.get(searchKey);
+            if (searchDate.getFullYear() < 2020) {
+              val = 0;
+              break;
+            }
+          }
+        }
+        earningsTrend.push({ value: val });
+      }
+    } else {
+      for (let i = 0; i < 6; i++) {
+        earningsTrend.push({ value: 0 });
+      }
+    }
+
     return {
       memberCount,
       projectCount,
       modelCount,
       consumerBalance,
       totalEarnings,
+      trends: {
+        members: membersTrend,
+        projects: projectsTrend,
+        models: modelsTrend,
+        balance: balanceTrend,
+        earnings: earningsTrend,
+      },
     };
   }
 }

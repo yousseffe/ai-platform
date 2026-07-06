@@ -1,5 +1,6 @@
 import React from "react";
 import { Metadata } from "next";
+import { Workflow } from "lucide-react";
 import { getPipelines } from "@/lib/actions/pipelines.actions";
 import { PipelinesTable } from "@/components/pipelines/PipelinesTable";
 import { CreatePipelineDialog } from "@/components/pipelines/CreatePipelineDialog";
@@ -28,6 +29,7 @@ export default async function PipelinesPage() {
     <div className="w-full">
       <PageHeader
         title="Pipelines"
+        icon={<Workflow className="w-5 h-5 text-primary" />}
         description="Chain your models together — the output of one step feeds into the next."
         actions={<CreatePipelineDialog />}
       />

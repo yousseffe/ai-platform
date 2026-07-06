@@ -3,11 +3,33 @@
 import React from "react";
 import { PipelineStep, PipelineType } from "@/types";
 import { groupByStage } from "@/lib/utils/pipelines";
-import { Cpu, GitMerge, GitBranch, ArrowDown } from "lucide-react";
+import { Cpu, GitMerge, GitBranch, ArrowDown, MoreHorizontal, Bot, Plus, Pencil, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+
+import { AddPipelineStepDialog } from "./AddPipelineStepDialog";
+import { EditPipelineStepDialog } from "./EditPipelineStepDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+interface ReadyVersionOption {
+  modelVersionId: string;
+  label: string;
+}
 
 interface PipelineFlowDiagramProps {
   steps: PipelineStep[];
   pipelineType: PipelineType;
+  layoutMode?: string;
+  readyVersionOptions?: ReadyVersionOption[];
+  isSubmitting?: boolean;
+  onAddStep?: (input: any, order: number) => Promise<boolean>;
+  onUpdateStep?: (stepId: string, input: any) => Promise<boolean>;
+  onRemoveStep?: (stepId: string) => Promise<void>;
 }
 
 /**
@@ -17,24 +39,55 @@ interface PipelineFlowDiagramProps {
  * @param props - PipelineFlowDiagram component properties.
  * @returns The React component rendering the pipeline flow diagram.
  */
-export function PipelineFlowDiagram({ steps, pipelineType }: PipelineFlowDiagramProps) {
+export function PipelineFlowDiagram({
+  steps,
+  pipelineType,
+  layoutMode = "vertical",
+  readyVersionOptions = [],
+  isSubmitting = false,
+  onAddStep,
+  onUpdateStep,
+  onRemoveStep,
+}: PipelineFlowDiagramProps) {
   const stages = groupByStage(steps);
 
   if (steps.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-10 gap-3">
-        <div className="w-10 h-10 rounded-full border-2 border-dashed border-border flex items-center justify-center text-muted-foreground">
-          <Cpu className="w-4 h-4" />
+      <div className="flex flex-col items-center justify-center py-12 px-6 text-center gap-4 max-w-sm mx-auto">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+          <Cpu className="w-5 h-5" />
         </div>
-        <p className="text-xs text-muted-foreground font-mono text-center">
-          Add steps to visualize the pipeline flow
-        </p>
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-foreground">Pipeline is empty</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Add your first step to start building your inference workflow. Connect model versions and map input fields.
+          </p>
+        </div>
+        {onAddStep && (
+          <AddPipelineStepDialog
+            stages={stages}
+            readyVersionOptions={readyVersionOptions}
+            isSubmitting={isSubmitting}
+            onAddStep={onAddStep}
+            defaultStageChoice="__new_stage__"
+            trigger={
+              <Button className="h-9 px-4 text-xs font-bold gap-1.5 cursor-pointer hover:-translate-y-0.5 active:scale-[0.98] transition-all rounded-xl btn-primary">
+                <Plus className="w-3.5 h-3.5" /> Add First Step
+              </Button>
+            }
+          />
+        )}
       </div>
     );
   }
 
+  const isHorizontal = layoutMode === "horizontal";
+
   return (
-    <div className="flex flex-col items-center gap-0 py-4 select-none overflow-x-auto">
+    <div className={cn(
+      "flex items-center gap-0 py-4 select-none overflow-x-auto justify-center",
+      isHorizontal ? "flex-row" : "flex-col"
+    )}>
       {/* ── Input Node ── */}
       <FlowNode
         label="Input"
@@ -45,7 +98,16 @@ export function PipelineFlowDiagram({ steps, pipelineType }: PipelineFlowDiagram
 
       {/* ── Fan-out arrow (if first stage is parallel) ── */}
       {stages.length > 0 && (
-        <FanConnector count={stages[0].length} direction="out" />
+        <FanConnector
+          count={stages[0].length}
+          direction="out"
+          layoutMode={layoutMode}
+          stages={stages}
+          readyVersionOptions={readyVersionOptions}
+          isSubmitting={isSubmitting}
+          onAddStep={onAddStep}
+          targetStageOrder={0}
+        />
       )}
 
       {/* ── Stages ── */}
@@ -53,7 +115,7 @@ export function PipelineFlowDiagram({ steps, pipelineType }: PipelineFlowDiagram
         <React.Fragment key={stage[0].order}>
           {/* Parallel stage row */}
           {stage.length > 1 ? (
-            <div className="flex items-stretch gap-3 w-full justify-center">
+            <div className={cn("flex items-stretch gap-3 justify-center", isHorizontal ? "flex-col" : "flex-row")}>
               {stage.map((step, i) => (
                 <React.Fragment key={step.id}>
                   <FlowNode
@@ -66,6 +128,12 @@ export function PipelineFlowDiagram({ steps, pipelineType }: PipelineFlowDiagram
                     variant="step"
                     icon={<Cpu className="w-3.5 h-3.5" />}
                     badge={i === 0 ? "parallel" : undefined}
+                    step={step}
+                    stageSteps={stage}
+                    readyVersionOptions={readyVersionOptions}
+                    isSubmitting={isSubmitting}
+                    onUpdateStep={onUpdateStep}
+                    onRemoveStep={onRemoveStep}
                   />
                 </React.Fragment>
               ))}
@@ -81,6 +149,12 @@ export function PipelineFlowDiagram({ steps, pipelineType }: PipelineFlowDiagram
               }
               variant="step"
               icon={<Cpu className="w-3.5 h-3.5" />}
+              step={stage[0]}
+              stageSteps={stage}
+              readyVersionOptions={readyVersionOptions}
+              isSubmitting={isSubmitting}
+              onUpdateStep={onUpdateStep}
+              onRemoveStep={onRemoveStep}
             />
           )}
 
@@ -92,22 +166,69 @@ export function PipelineFlowDiagram({ steps, pipelineType }: PipelineFlowDiagram
 
             if (curCount > 1 && nextCount === 1) {
               // fan-in
-              return <FanConnector count={curCount} direction="in" />;
+              return (
+                <FanConnector
+                  count={curCount}
+                  direction="in"
+                  layoutMode={layoutMode}
+                  stages={stages}
+                  readyVersionOptions={readyVersionOptions}
+                  isSubmitting={isSubmitting}
+                  onAddStep={onAddStep}
+                  targetStageOrder={nextStage[0].order}
+                />
+              );
             }
             if (curCount === 1 && nextCount > 1) {
               // fan-out
-              return <FanConnector count={nextCount} direction="out" />;
+              return (
+                <FanConnector
+                  count={nextCount}
+                  direction="out"
+                  layoutMode={layoutMode}
+                  stages={stages}
+                  readyVersionOptions={readyVersionOptions}
+                  isSubmitting={isSubmitting}
+                  onAddStep={onAddStep}
+                  targetStageOrder={nextStage[0].order}
+                />
+              );
             }
-            // simple arrow down
-            return <SimpleArrow />;
+            // simple arrow
+            return (
+              <SimpleArrow
+                layoutMode={layoutMode}
+                stages={stages}
+                readyVersionOptions={readyVersionOptions}
+                isSubmitting={isSubmitting}
+                onAddStep={onAddStep}
+                targetStageOrder={nextStage[0].order}
+              />
+            );
           })()}
 
           {/* Last stage → fan-in to output */}
           {stageIndex === stages.length - 1 && stage.length > 1 && (
-            <FanConnector count={stage.length} direction="in" />
+            <FanConnector
+              count={stage.length}
+              direction="in"
+              layoutMode={layoutMode}
+              stages={stages}
+              readyVersionOptions={readyVersionOptions}
+              isSubmitting={isSubmitting}
+              onAddStep={onAddStep}
+              targetStageOrder={stages.length}
+            />
           )}
           {stageIndex === stages.length - 1 && stage.length === 1 && (
-            <SimpleArrow />
+            <SimpleArrow
+              layoutMode={layoutMode}
+              stages={stages}
+              readyVersionOptions={readyVersionOptions}
+              isSubmitting={isSubmitting}
+              onAddStep={onAddStep}
+              targetStageOrder={stages.length}
+            />
           )}
         </React.Fragment>
       ))}
@@ -129,7 +250,7 @@ export function PipelineFlowDiagram({ steps, pipelineType }: PipelineFlowDiagram
 
 function BoundaryIcon() {
   return (
-    <div className="w-2 h-2 rounded-full bg-current" />
+    <Bot className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
   );
 }
 
@@ -139,77 +260,239 @@ interface FlowNodeProps {
   variant: "boundary" | "step";
   icon: React.ReactNode;
   badge?: "parallel";
+  step?: PipelineStep;
+  stageSteps?: PipelineStep[];
+  readyVersionOptions?: ReadyVersionOption[];
+  isSubmitting?: boolean;
+  onUpdateStep?: (stepId: string, input: any) => Promise<boolean>;
+  onRemoveStep?: (stepId: string) => Promise<void>;
 }
 
-function FlowNode({ label, sublabel, variant, icon, badge }: FlowNodeProps) {
+function FlowNode({
+  label,
+  sublabel,
+  variant,
+  icon,
+  badge,
+  step,
+  stageSteps = [],
+  readyVersionOptions = [],
+  isSubmitting = false,
+  onUpdateStep,
+  onRemoveStep,
+}: FlowNodeProps) {
   if (variant === "boundary") {
     return (
-      <div className="flex flex-col items-center gap-1">
-        <div
-          className="
-            flex items-center gap-2 px-4 py-1.5
-            rounded-full border border-primary/40 bg-primary/10
-            text-primary text-xs font-bold font-mono
-            shadow-sm
-          "
-        >
+      <div className="flex flex-col items-center gap-1.5 bg-card rounded-2xl border border-indigo-500/20 px-5 py-2.5 shadow-sm text-center min-w-[155px] select-none">
+        <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400">
           {icon}
           {label}
         </div>
-        <span className="text-[9px] text-muted-foreground font-mono">{sublabel}</span>
+        <span className="text-[10px] text-muted-foreground">{sublabel}</span>
       </div>
     );
   }
 
   return (
-    <div className="relative flex flex-col items-center" style={{ minWidth: 140, maxWidth: 200 }}>
+    <div className="relative flex flex-col items-center select-none" style={{ minWidth: 220, maxWidth: 280 }}>
       {badge === "parallel" && (
         <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10">
-          <span className="px-1.5 py-0.5 rounded-sm bg-amber-500/20 text-amber-500 border border-amber-500/30 text-[8px] font-bold uppercase tracking-wider font-mono flex items-center gap-0.5">
+          <span className="px-1.5 py-0.5 rounded-sm bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[8px] font-bold uppercase tracking-wider flex items-center gap-0.5">
             <GitBranch className="w-2.5 h-2.5" /> Parallel
           </span>
         </div>
       )}
       <div
         className="
-          w-full flex flex-col gap-1 px-3 py-2.5
-          border border-border rounded-xl bg-card
-          shadow-sm hover:border-primary/40 hover:shadow-md
+          w-full flex items-center gap-3 px-4 py-3
+          border border-border rounded-2xl bg-card
+          shadow-xs hover:border-primary/50 hover:shadow-sm
           transition-all duration-200 cursor-default
-          group
+          group relative
         "
       >
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 shrink-0 rounded-md border border-border bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-            {icon}
-          </div>
-          <span className="text-xs font-bold font-mono text-foreground truncate leading-tight">
+        <div className="w-8 h-8 shrink-0 rounded-lg border border-primary/20 bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary/25 transition-colors">
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <span className="block text-xs font-bold text-foreground truncate leading-snug">
             {label}
           </span>
+          <span className="block text-[10px] text-muted-foreground truncate leading-normal">
+            {sublabel}
+          </span>
         </div>
-        <span className="text-[9px] text-muted-foreground font-mono truncate pl-8 leading-tight">
-          {sublabel}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[9px] font-bold">
+            Active
+          </span>
+          {variant === "step" && step && onUpdateStep && onRemoveStep ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="text-muted-foreground hover:text-foreground cursor-pointer flex items-center justify-center p-1 hover:bg-secondary/40 rounded">
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <EditPipelineStepDialog
+                  step={step}
+                  stageSteps={stageSteps}
+                  readyVersionOptions={readyVersionOptions}
+                  isSubmitting={isSubmitting}
+                  onUpdateStep={onUpdateStep}
+                  trigger={
+                    <button className="w-full text-left flex items-center gap-2 px-2 py-1.5 text-xs text-foreground hover:bg-accent rounded select-none cursor-pointer border-none bg-transparent">
+                      <Pencil className="w-3 h-3 text-muted-foreground" />
+                      Configure step
+                    </button>
+                  }
+                />
+                <DropdownMenuItem
+                  variant="destructive"
+                  className="cursor-pointer"
+                  onClick={() => onRemoveStep(step.id)}
+                >
+                  <Trash2 className="w-3 h-3 mr-2" />
+                  Delete step
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <button className="text-muted-foreground hover:text-foreground cursor-pointer">
+              <MoreHorizontal className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function SimpleArrow() {
+interface SimpleArrowProps {
+  layoutMode?: string;
+  stages?: PipelineStep[][];
+  readyVersionOptions?: ReadyVersionOption[];
+  isSubmitting?: boolean;
+  onAddStep?: (input: any, order: number) => Promise<boolean>;
+  targetStageOrder?: number;
+}
+
+function SimpleArrow({
+  layoutMode,
+  stages = [],
+  readyVersionOptions = [],
+  isSubmitting = false,
+  onAddStep,
+  targetStageOrder,
+}: SimpleArrowProps) {
+  const isHorizontal = layoutMode === "horizontal";
+  const buttonEl = (
+    <button className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5.5 h-5.5 rounded-full border border-border bg-card shadow-xs flex items-center justify-center text-xs text-muted-foreground hover:text-foreground hover:bg-secondary hover:scale-105 active:scale-95 transition-all cursor-pointer">
+      <Plus className="w-3 h-3" />
+    </button>
+  );
+
   return (
-    <div className="flex flex-col items-center gap-0 my-0.5">
-      <div className="w-px h-5 bg-border" />
-      <ArrowDown className="w-3 h-3 text-muted-foreground -mt-0.5" />
+    <div className={cn(
+      "flex items-center justify-center relative select-none",
+      isHorizontal ? "h-12 w-16 flex-row my-0 mx-1" : "h-16 w-12 flex-col my-1 mx-0"
+    )}>
+      <div className={cn("bg-border", isHorizontal ? "h-px w-full" : "w-px h-full")} />
+      {onAddStep ? (
+        <AddPipelineStepDialog
+          stages={stages}
+          readyVersionOptions={readyVersionOptions}
+          isSubmitting={isSubmitting}
+          onAddStep={onAddStep}
+          defaultStageChoice={targetStageOrder != null ? String(targetStageOrder) : undefined}
+          trigger={buttonEl}
+        />
+      ) : (
+        buttonEl
+      )}
     </div>
   );
+}
+
+interface FanConnectorProps {
+  count: number;
+  direction: "out" | "in";
+  layoutMode?: string;
+  stages?: PipelineStep[][];
+  readyVersionOptions?: ReadyVersionOption[];
+  isSubmitting?: boolean;
+  onAddStep?: (input: any, order: number) => Promise<boolean>;
+  targetStageOrder?: number;
 }
 
 /**
  * Renders a fan-out (split) or fan-in (merge) SVG connector between a
  * single node and multiple parallel nodes.
  */
-function FanConnector({ count, direction }: { count: number; direction: "out" | "in" }) {
-  if (count <= 1) return <SimpleArrow />;
+function FanConnector({
+  count,
+  direction,
+  layoutMode,
+  stages = [],
+  readyVersionOptions = [],
+  isSubmitting = false,
+  onAddStep,
+  targetStageOrder,
+}: FanConnectorProps) {
+  if (count <= 1) {
+    return (
+      <SimpleArrow
+        layoutMode={layoutMode}
+        stages={stages}
+        readyVersionOptions={readyVersionOptions}
+        isSubmitting={isSubmitting}
+        onAddStep={onAddStep}
+        targetStageOrder={targetStageOrder}
+      />
+    );
+  }
+  const isHorizontal = layoutMode === "horizontal";
+
+  if (isHorizontal) {
+    // Horizontal layout curve generator
+    const nodeHeight = 84; // approx height of each node card + gap in vertical
+    const totalHeight = count * nodeHeight;
+    const width = 48;
+    const cy = totalHeight / 2;
+    const points = Array.from({ length: count }, (_, i) => {
+      return cy - ((count - 1) / 2 - i) * nodeHeight;
+    });
+
+    return (
+      <div className="relative flex items-center justify-center select-none" style={{ height: totalHeight, width }}>
+        <svg
+          width={width}
+          height={totalHeight}
+          className="overflow-visible"
+          viewBox={`0 0 ${width} ${totalHeight}`}
+        >
+          {direction === "out"
+            ? points.map((py, i) => (
+                <path
+                  key={i}
+                  d={`M0,${cy} C${width * 0.5},${cy} ${width * 0.5},${py} ${width},${py}`}
+                  fill="none"
+                  stroke="var(--color-border)"
+                  strokeWidth="1.5"
+                  className="transition-all"
+                />
+              ))
+            : points.map((py, i) => (
+                <path
+                  key={i}
+                  d={`M0,${py} C${width * 0.5},${py} ${width * 0.5},${cy} ${width},${cy}`}
+                  fill="none"
+                  stroke="var(--color-border)"
+                  strokeWidth="1.5"
+                />
+              ))}
+        </svg>
+      </div>
+    );
+  }
 
   // Layout constants
   const nodeWidth = 168; // approx width of each node card + gap
@@ -222,7 +505,7 @@ function FanConnector({ count, direction }: { count: number; direction: "out" | 
   });
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: totalWidth, height }}>
+    <div className="relative flex items-center justify-center select-none" style={{ width: totalWidth, height }}>
       <svg
         width={totalWidth}
         height={height}

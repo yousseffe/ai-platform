@@ -43,7 +43,7 @@ export function PipelinesTable({ pipelines }: PipelinesTableProps) {
             action={<CreatePipelineDialog />}
           />
         ) : (
-          <table className="w-full text-left border-collapse font-mono text-xs text-foreground">
+          <table className="w-full text-left border-collapse text-xs text-foreground">
             <thead>
               <tr className="bg-background text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border select-none">
                 <th className="px-6 py-4">Pipeline</th>
@@ -75,9 +75,20 @@ export function PipelinesTable({ pipelines }: PipelinesTableProps) {
                     <span className="text-muted-foreground">{p.steps?.length ?? 0} step{p.steps?.length === 1 ? "" : "s"}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 select-none">
-                      <div className={`w-2 h-2 rounded-full ${getStatusDotClass(p.status)}`} />
-                      <span className="font-semibold text-foreground capitalize">{p.status}</span>
+                    <div className="flex items-center gap-2 select-none font-sans">
+                      {p.status === PipelineStatus.VALIDATED ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold uppercase tracking-wider">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Validated
+                        </span>
+                      ) : p.status === PipelineStatus.ARCHIVED ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-border bg-secondary/50 text-muted-foreground text-[9px] font-bold uppercase tracking-wider">
+                          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/45"></span> Archived
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[9px] font-bold uppercase tracking-wider">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Draft
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4">

@@ -295,7 +295,7 @@ export default function McpTokenManager({ onTokenChange }: Props) {
           {tokens.map((token) => (
             <div
               key={token.id}
-              className={`rounded-xl border p-3 transition-colors ${
+              className={`rounded-2xl border p-4 text-left transition-all duration-300 hover-lift ${
                 activeTokenId === token.id
                   ? "border-primary/40 bg-primary/[0.04]"
                   : "border-border bg-card"
@@ -310,15 +310,15 @@ export default function McpTokenManager({ onTokenChange }: Props) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => copyToClipboard(token.keyPrefix, token.id)} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
+                  <button onClick={() => copyToClipboard(token.keyPrefix, token.id)} className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground cursor-pointer border border-border/80 bg-card">
                     {copiedId === token.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                   </button>
                   {token.isActive && (
-                    <button onClick={() => handleRevoke(token.id)} title="Revoke" className="p-1.5 rounded-lg hover:bg-amber-500/10 transition-colors text-amber-500">
+                    <button onClick={() => handleRevoke(token.id)} title="Revoke" className="p-1.5 rounded-lg hover:bg-amber-500/10 transition-colors text-amber-500 cursor-pointer border border-border/80 bg-card">
                       <ShieldOff className="w-3 h-3" />
                     </button>
                   )}
-                  <button onClick={() => handleDelete(token.id)} title="Delete" className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-red-500">
+                  <button onClick={() => handleDelete(token.id)} title="Delete" className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-red-500 cursor-pointer border border-border/80 bg-card">
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
@@ -326,22 +326,22 @@ export default function McpTokenManager({ onTokenChange }: Props) {
 
               <div className="mt-2 flex items-center gap-2 flex-wrap">
                 {token.scopes.map((s) => (
-                  <span key={s} className="text-[8px] px-1.5 py-0.5 rounded bg-secondary border border-border font-mono text-muted-foreground">{s}</span>
+                  <span key={s} className="text-[8px] px-1.5 py-0.5 rounded-md bg-secondary border border-border font-sans text-muted-foreground">{s}</span>
                 ))}
-                <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ml-auto ${token.isActive ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}`}>
+                <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-bold ml-auto ${token.isActive ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" : "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"}`}>
                   {token.isActive ? "ACTIVE" : "REVOKED"}
                 </span>
               </div>
 
               {token.lastUsedAt && (
-                <p className="text-[8px] text-muted-foreground font-sans mt-1.5">
+                <p className="text-[8px] text-muted-foreground font-sans mt-2 text-left">
                   Last used: {new Date(token.lastUsedAt).toLocaleString()}
                 </p>
               )}
 
               {/* Load into console — one-click if cached, paste-input if not */}
               {token.isActive && (
-                <div className="mt-2.5 pt-2.5 border-t border-border/50">
+                <div className="mt-2.5 pt-2.5 border-t border-border/60">
                   {cachedIds.has(token.id) ? (
                     <button
                       onClick={() => handleLoadCached(token.id)}

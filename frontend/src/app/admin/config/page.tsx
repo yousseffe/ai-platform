@@ -104,7 +104,7 @@ export default function AdminConfigPage() {
 
   if (isWorkspaceLoading || !isAdmin) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] text-foreground font-mono">
+      <div className="flex items-center justify-center min-h-[60vh] text-foreground font-sans">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
         <span className="ml-2.5 text-xs">Authenticating Admin Access...</span>
       </div>
@@ -112,11 +112,15 @@ export default function AdminConfigPage() {
   }
 
   return (
-    <div className="w-full space-y-6 text-foreground font-mono text-xs animate-fade-in">
+    <div className="w-full space-y-6 text-foreground font-sans text-xs animate-fade-in relative">
+      {/* Decorative background glows */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border pb-5">
+      <div className="flex items-center justify-between border-b border-border/80 pb-5 relative z-10">
         <div className="text-left">
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2 font-mono">
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2 font-sans">
             <Shield className="w-5 h-5 text-primary" />
             System Configuration Console
           </h1>
@@ -127,51 +131,63 @@ export default function AdminConfigPage() {
         <button
           onClick={() => loadFeeConfig(true)}
           disabled={loadingFee}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 text-foreground font-bold"
+          className="btn-outline h-9 px-4 font-bold text-[10px] cursor-pointer"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loadingFee ? "animate-spin" : ""}`} />
-          <span>Refresh</span>
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loadingFee ? "animate-spin" : ""}`} />
+          <span>Refresh Config</span>
         </button>
       </div>
 
       {/* Configuration Status Analysis Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
         {/* Workspace Creation Dues */}
-        <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden group hover:border-primary/20 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-muted-foreground/15">
-              <DollarSign className="w-8 h-8" />
+        <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl hover-lift transition-all duration-300 relative overflow-hidden">
+          <CardContent className="p-5 flex flex-col justify-between h-28 text-left">
+            <div className="flex justify-between items-start">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                Workspace Setup Dues
+              </span>
+              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20 dark:bg-blue-500/5 shrink-0">
+                <DollarSign className="w-4 h-4" />
+              </div>
             </div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Workspace Setup Dues</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-foreground">{orgFee.toFixed(2)}</span>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-2xl font-extrabold text-foreground tracking-tight">{orgFee.toFixed(2)}</span>
               <span className="text-[10px] text-muted-foreground">Charge per organization setup</span>
             </div>
           </CardContent>
         </Card>
 
         {/* Credit Exchange Rates */}
-        <Card className="border border-border bg-card p-0 shadow-xs relative overflow-hidden group hover:border-primary/20 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-muted-foreground/15">
-              <Coins className="w-8 h-8" />
+        <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl hover-lift transition-all duration-300 relative overflow-hidden">
+          <CardContent className="p-5 flex flex-col justify-between h-28 text-left">
+            <div className="flex justify-between items-start">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                Exchange Rates Coefficient
+              </span>
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500 border border-purple-500/20 dark:bg-purple-500/5 shrink-0">
+                <Coins className="w-4 h-4" />
+              </div>
             </div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Exchange Rates Coefficient</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold text-foreground">{creditsPerEgp.toFixed(1)}</span>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-2xl font-extrabold text-foreground tracking-tight">{creditsPerEgp.toFixed(1)}</span>
               <span className="text-[10px] text-muted-foreground">Credits per 1.00 EGP</span>
             </div>
           </CardContent>
         </Card>
 
         {/* Configuration Status */}
-        <Card className="border border-emerald-500/20 bg-emerald-500/[0.02] p-0 shadow-xs relative overflow-hidden group hover:border-emerald-500/30 transition-all">
-          <CardContent className="p-4">
-            <div className="absolute right-3 top-3 text-emerald-500/10">
-              <CheckCircle className="w-8 h-8" />
+        <Card className="border border-emerald-500/25 bg-emerald-500/5 shadow-xs backdrop-blur-md rounded-2xl hover-lift transition-all duration-300 relative overflow-hidden">
+          <CardContent className="p-5 flex flex-col justify-between h-28 text-left">
+            <div className="flex justify-between items-start">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                Parameters Registry Status
+              </span>
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/25 shrink-0">
+                <CheckCircle className="w-4 h-4" />
+              </div>
             </div>
-            <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Parameters Registry Status</p>
-            <div className="flex items-baseline gap-2">
+            <div className="flex items-baseline gap-2 mt-2">
               <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">ACTIVE & SYNCED</span>
               <span className="text-[9px] text-muted-foreground">Global variables ready</span>
             </div>

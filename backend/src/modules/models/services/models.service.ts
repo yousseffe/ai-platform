@@ -21,6 +21,7 @@ import { ModelVersion } from '../entities/model-version.entity';
 import { ModelVersionTestCase } from '../entities/model-version-test-case.entity';
 import { ModelVersionReviewEvent } from '../entities/model-version-review-event.entity';
 import { ModelReview } from '../entities/model-review.entity';
+import { ModelLog } from '../entities/model-log.entity';
 import { ApiKey } from '../../auth/entities/api-key.entity';
 import { CreateReviewDto } from '../dto/create-review.dto';
 import { InitiateUploadDto } from '../dto/initiate-upload.dto';
@@ -1079,6 +1080,32 @@ export class ModelsService {
       byUploader.set(creatorKey, current);
     }
 
+    // Fetch all logs for the organization's models to aggregate actual earnings by month
+    const modelLogs = await this.modelsRepository.manager.getRepository(ModelLog).find({
+      where: { model: { organization: { id: orgId } } },
+      order: { createdAt: 'ASC' },
+    });
+
+    const earningsByMonthMap = new Map<string, number>();
+    for (const log of modelLogs) {
+      const month = log.createdAt.toISOString().slice(0, 7); // YYYY-MM
+      const current = earningsByMonthMap.get(month) ?? 0;
+      earningsByMonthMap.set(month, current + Number(log.creditsCharged ?? 0));
+    }
+
+    const earningsHistory: Array<{ name: string; Earnings: number }> = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = d.toISOString().slice(0, 7);
+      // Map to name format like "Jan", "Feb", etc.
+      const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+      earningsHistory.push({
+        name: monthName,
+        Earnings: earningsByMonthMap.get(key) ?? 0,
+      });
+    }
+
     return {
       totals: {
         models: models.length,
@@ -1111,6 +1138,7 @@ export class ModelsService {
           reviewedBy: version.reviewedBy?.email ?? null,
           createdAt: version.createdAt,
         })),
+      earningsHistory,
     };
   }
 

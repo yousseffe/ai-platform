@@ -7,6 +7,10 @@ import { DeploymentStatus } from '../../../modules/deployments/enums/deployment-
 import { ModelType } from '../../../modules/models/enums/model-type.enum';
 import { ApiKey } from '../../../modules/auth/entities/api-key.entity';
 import { ApiKeyType } from '../../../modules/auth/enums/api-key-type.enum';
+import { MailService } from '../../mail/mail.service';
+import { SystemConfig } from '../../../modules/wallets/entities/system-config.entity';
+import { Alert } from '../../../modules/analytics/entities/alert.entity';
+import { Model } from '../../../modules/models/entities/model.entity';
 import * as Docker from 'dockerode';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -34,6 +38,7 @@ export class DeployProcessor extends WorkerHost {
     private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
     @InjectQueue('deploy-queue') private readonly deployQueue: Queue,
+    private readonly mailService: MailService,
   ) {
     super();
     this.docker = new Docker(getDockerOptions());
@@ -49,6 +54,11 @@ export class DeployProcessor extends WorkerHost {
   async process(job: Job<any, void, string>): Promise<void> {
     if (job.name === 'check-idle-deployments') {
       await this.checkIdleDeployments();
+      return;
+    }
+
+    if (job.name === 'check-resource-caps') {
+      await this.checkResourceCaps();
       return;
     }
 
@@ -742,6 +752,173 @@ export class DeployProcessor extends WorkerHost {
       this.logger.error(
         `Failed to update Prometheus targets.json (remove): ${err.message}`,
       );
+    }
+  }
+
+  private async checkResourceCaps(): Promise<void> {
+    this.logger.log('Scanning for resource cap violations...');
+    try {
+      const running = await this.deploymentsRepository.find({
+        where: { status: DeploymentStatus.RUNNING },
+        relations: [
+          'modelVersion',
+          'modelVersion.model',
+          'modelVersion.model.user',
+        ],
+      });
+
+      const configs = await this.dataSource.getRepository(SystemConfig).find();
+      const configMap = new Map(configs.map((c) => [c.key, c.value]));
+
+      const DEFAULT_CAPS_LOCAL: Record<string, { cpuPercent: number; ramMb: number }> = {
+        TABULAR: { cpuPercent: 30, ramMb: 512 },
+        NLP: { cpuPercent: 60, ramMb: 1024 },
+        VISION: { cpuPercent: 70, ramMb: 1024 },
+        DIFFUSION: { cpuPercent: 85, ramMb: 2048 },
+        LLM_GGUF: { cpuPercent: 95, ramMb: 2048 },
+      };
+
+      const getCapCpu = (type: string) =>
+        parseFloat(
+          configMap.get(`cap_cpu_${type.toLowerCase()}`) ||
+            DEFAULT_CAPS_LOCAL[type.toUpperCase()]?.cpuPercent.toString() ||
+            '80',
+        );
+
+      const getCapRam = (type: string) =>
+        parseFloat(
+          configMap.get(`cap_ram_${type.toLowerCase()}`) ||
+            DEFAULT_CAPS_LOCAL[type.toUpperCase()]?.ramMb.toString() ||
+            '1024',
+        );
+
+      for (const dep of running) {
+        if (!dep.containerId || !dep.modelVersion?.model) continue;
+
+        const model = dep.modelVersion.model;
+        const modelType = model.type || 'TABULAR';
+        const capCpu = getCapCpu(modelType);
+        const capRam = getCapRam(modelType);
+
+        let cpuPercent = 0.0;
+        let ramMb = 0.0;
+        let statsCollected = false;
+
+        try {
+          const container = this.docker.getContainer(dep.containerId);
+          const stats = await container.stats({ stream: false });
+          const cpuDelta =
+            stats.cpu_stats.cpu_usage.total_usage -
+            stats.precpu_stats.cpu_usage.total_usage;
+          const systemDelta =
+            stats.cpu_stats.system_cpu_usage -
+            stats.precpu_stats.system_cpu_usage;
+          const numCpus = stats.cpu_stats.online_cpus || 1;
+
+          if (systemDelta > 0 && cpuDelta > 0) {
+            cpuPercent = parseFloat(
+              ((cpuDelta / systemDelta) * numCpus * 100).toFixed(1),
+            );
+          }
+          const usageBytes = stats.memory_stats.usage || 0;
+          ramMb = parseFloat((usageBytes / (1024 * 1024)).toFixed(1));
+          statsCollected = true;
+        } catch (err) {
+          // ignore
+        }
+
+        if (!statsCollected) continue;
+
+        const isCpuViolated = cpuPercent > capCpu;
+        const isRamViolated = ramMb > capRam;
+
+        if (isCpuViolated || isRamViolated) {
+          const redisKey = `model:violation-count:${model.id}`;
+          const currentCountStr = await this.redisService.get(redisKey);
+          const nextCount = (currentCountStr ? parseInt(currentCountStr, 10) : 0) + 1;
+          await this.redisService.set(redisKey, nextCount.toString());
+
+          this.logger.warn(
+            `Resource cap warning for model ${model.name} (${model.type}): CPU=${cpuPercent}% (Cap=${capCpu}%), RAM=${ramMb}MB (Cap=${capRam}MB). Violation count: ${nextCount}/3`,
+          );
+
+          if (nextCount >= 3) {
+            this.logger.error(
+              `Resource cap exceeded for model ${model.name} for 3 consecutive intervals. Upgrading tier & pricing...`,
+            );
+
+            // 1. Upgrade Tier & Price
+            const currentTier = model.tier?.toUpperCase() || 'SMALL';
+            const nextTierMap: Record<string, string> = {
+              SMALL: 'MEDIUM',
+              MEDIUM: 'LARGE',
+              LARGE: 'LARGE',
+            };
+            const nextTier = nextTierMap[currentTier] || 'LARGE';
+            const costVal = typeof model.costPerRequest === 'string' ? parseFloat(model.costPerRequest) : model.costPerRequest;
+            const newPrice = costVal === 0 ? 0.05 : parseFloat((costVal * 1.5).toFixed(2));
+
+            model.tier = nextTier;
+            model.costPerRequest = newPrice;
+            model.hasCustomPricing = true;
+            await this.dataSource.getRepository(Model).save(model);
+
+            // 2. Log Alert
+            const alert = new Alert();
+            alert.alertName = 'ModelResourceCapViolation';
+            alert.severity = 'critical';
+            alert.status = 'resolved';
+            alert.summary = `Model '${model.name}' exceeded limits: CPU=${cpuPercent}% (Cap=${capCpu}%), RAM=${ramMb}MB (Cap=${capRam}MB). Tier automatically upgraded to ${nextTier} and price adjusted to $${newPrice}.`;
+            alert.startsAt = new Date();
+            alert.endsAt = new Date();
+            alert.labels = { modelId: model.id, modelType: model.type, action: 'AUTO_UPGRADE' };
+            await this.dataSource.getRepository(Alert).save(alert);
+
+            // 3. Send Email Notification
+            const ownerEmail = model.user?.email || 'admin@mlhub.com';
+            const subject = `[MLHub Auto-Upgrade] Resource Cap Exceeded for Model: ${model.name}`;
+            const body = `Hello MLHub User,
+
+The container hosting your model "${model.name}" has consistently exceeded the resource limits allowed for its classification (${modelType}):
+- CPU Utilization: ${cpuPercent}% (Limit: ${capCpu}%)
+- Memory Utilization: ${ramMb} MB (Limit: ${capRam} MB)
+
+To ensure platform stability and maintain inference service levels, our Insights Engine has automatically upgraded your model hosting resources:
+- Upgraded Tier: ${currentTier} -> ${nextTier}
+- Adjusted Pricing: $${costVal} -> $${newPrice} per prediction request
+
+This change will apply automatically to all future predictions.
+If you have any questions or would like to request manual parameters adjustment, please contact system administration.
+
+Best regards,
+MLHub Operations Team`;
+
+            await this.mailService.sendSecurityAlert(ownerEmail, subject, body);
+            await this.mailService.sendSecurityAlert('admin@mlhub.com', subject, body);
+
+            // 4. Restart/Stop Container so it boots with upgraded tier limits
+            try {
+              const container = this.docker.getContainer(dep.containerId);
+              await container.stop();
+              await container.remove();
+            } catch (err: any) {
+              this.logger.warn(`Failed to remove container during auto-upgrade: ${err.message}`);
+            }
+
+            await this.deploymentsRepository.update(dep.id, {
+              status: DeploymentStatus.STOPPED,
+              port: null,
+              url: null,
+            });
+
+            await this.redisService.set(redisKey, '0');
+          }
+        } else {
+          await this.redisService.set(`model:violation-count:${model.id}`, '0');
+        }
+      }
+    } catch (err: any) {
+      this.logger.error(`Error executing checkResourceCaps check: ${err.message}`);
     }
   }
 

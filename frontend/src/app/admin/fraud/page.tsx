@@ -78,65 +78,79 @@ export default function AdminFraudPage() {
     {
       label: "Total Risk Events",
       value: summary?.totalEvents ?? "—",
-      icon: <Activity className="w-7 h-7" />,
+      icon: <Activity className="w-4.5 h-4.5" />,
       color: "text-blue-500",
       bgColor: "text-blue-500/10",
     },
     {
       label: "High Risk (≥75)",
       value: summary?.highRiskCount ?? "—",
-      icon: <AlertTriangle className="w-7 h-7" />,
+      icon: <AlertTriangle className="w-4.5 h-4.5" />,
       color: "text-red-500",
       bgColor: "text-red-500/10",
     },
     {
       label: "Firing Alerts",
       value: summary?.firingAlerts ?? "—",
-      icon: <ShieldAlert className="w-7 h-7" />,
+      icon: <ShieldAlert className="w-4.5 h-4.5" />,
       color: "text-amber-500",
       bgColor: "text-amber-500/10",
     },
     {
       label: "Models Scanned",
       value: summary?.modelsScanned ?? "—",
-      icon: <TrendingUp className="w-7 h-7" />,
+      icon: <TrendingUp className="w-4.5 h-4.5" />,
       color: "text-purple-500",
       bgColor: "text-purple-500/10",
     },
   ];
 
   return (
-    <div className="w-full space-y-6 text-foreground font-mono text-xs animate-fade-in">
+    <div className="w-full space-y-6 text-foreground font-sans text-xs animate-fade-in relative min-h-screen pb-12">
+      {/* Decorative background glows */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
       {/* Header */}
-      <div className="border-b border-border pb-5">
-        <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-          <ShieldAlert className="w-5 h-5 text-primary" />
-          Fraud & Security Intelligence
-        </h1>
-        <p className="text-xs text-muted-foreground mt-1 font-sans">
-          Real-time risk detection, security alerts, and per-model threat assessment.
-        </p>
+      <div className="flex items-center justify-between border-b border-border/80 pb-5 relative z-10">
+        <div className="text-left">
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2 font-sans">
+            <ShieldAlert className="w-5 h-5 text-primary" />
+            Fraud & Security Intelligence
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1 font-sans">
+            Real-time risk detection, security alerts, and per-model threat assessment.
+          </p>
+        </div>
       </div>
 
       {/* Summary stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {statCards.map(({ label, value, icon, color }) => (
-          <Card key={label} className="border border-border bg-card p-0 shadow-xs relative overflow-hidden hover:border-primary/20 transition-all">
-            <CardContent className="p-4">
-              <div className={`absolute right-3 top-3 ${color} opacity-10`}>{icon}</div>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
-              <p className={`text-2xl font-extrabold font-mono ${color}`}>{value}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
+        {statCards.map(({ label, value, icon, color, bgColor }) => (
+          <Card key={label} className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl hover-lift transition-all duration-300 relative overflow-hidden">
+            <CardContent className="p-5 flex flex-col justify-between h-28 text-left">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  {label}
+                </span>
+                <div className={`p-2 rounded-xl border border-border/40 ${bgColor} ${color} shrink-0`}>
+                  {icon}
+                </div>
+              </div>
+              <div className="flex items-baseline mt-2">
+                <p className={`text-2xl font-extrabold tracking-tight ${color}`}>{value}</p>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Main two-panel layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px] relative z-10">
         {/* Left: Security alerts */}
-        <div className="lg:col-span-5 border border-border rounded-2xl bg-card p-4 flex flex-col min-h-[560px]">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-            <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
+        <div className="lg:col-span-5 border border-border/80 rounded-2xl bg-card/65 shadow-xs backdrop-blur-md p-5 flex flex-col min-h-[560px] hover-lift transition-all duration-300">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2 text-left border-b border-border/30 pb-3">
+            <ShieldAlert className="w-4 h-4 text-red-500" />
             Security Alerts & Risk Events
           </p>
           <div className="flex-1 min-h-0">
@@ -145,9 +159,9 @@ export default function AdminFraudPage() {
         </div>
 
         {/* Right: Risk inspector */}
-        <div className="lg:col-span-7 border border-border rounded-2xl bg-card p-4 flex flex-col min-h-[560px]">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-            <TrendingUp className="w-3.5 h-3.5 text-purple-500" />
+        <div className="lg:col-span-7 border border-border/80 rounded-2xl bg-card/65 shadow-xs backdrop-blur-md p-5 flex flex-col min-h-[560px] hover-lift transition-all duration-300">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2 text-left border-b border-border/30 pb-3">
+            <TrendingUp className="w-4 h-4 text-purple-500" />
             Model Risk Inspector
           </p>
           <div className="flex-1 min-h-0">

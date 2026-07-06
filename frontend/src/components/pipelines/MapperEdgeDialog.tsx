@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Settings2, Bot, Cpu, Info } from "lucide-react";
 import { PipelineStep, PipelineEdge, MapperRule } from "@/types";
 import { MapperRuleRow } from "@/lib/schemas";
 import { pathsFromJsonSample } from "@/lib/utils/json-paths";
 import { groupByStage, stepNamespacePath } from "@/lib/utils/pipelines";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -31,14 +32,7 @@ const EMPTY_RULE: MapperRuleRow = {
   template: "",
 };
 
-/**
- * Tailwind classes for a native `<select>` styled to match the design system.
- * `bg-background` (not `bg-transparent`) is required so the OS renders the
- * native dropdown option list with the correct dark-mode background instead
- * of the browser's default white.
- */
-const nativeSelectCls =
-  "w-full h-8 rounded-lg border border-input bg-background text-foreground px-2.5 text-xs transition-colors focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/50 cursor-pointer font-mono";
+
 
 /**
  * Serialises a {@link MapperRuleRow} into the backend-facing {@link MapperRule}.
@@ -155,6 +149,7 @@ interface MapperEdgeDialogProps {
   ) => Promise<boolean>;
   /** When provided, the dialog opens pre-filled with this edge's from/to/rules for editing instead of creating a new mapper. */
   initialEdge?: PipelineEdge;
+  trigger?: React.ReactElement;
 }
 
 /**
@@ -169,7 +164,7 @@ interface MapperEdgeDialogProps {
  * @param props - MapperEdgeDialog component properties.
  * @returns The React component rendering the trigger button + dialog.
  */
-export function MapperEdgeDialog({ steps, isSubmitting, onUpsert, initialEdge }: MapperEdgeDialogProps) {
+export function MapperEdgeDialog({ steps, isSubmitting, onUpsert, initialEdge, trigger }: MapperEdgeDialogProps) {
   const isEditMode = Boolean(initialEdge);
   const [open, setOpen] = useState(false);
   const [fromStepId, setFromStepId] = useState<string>(initialEdge?.fromStep?.id ?? BOUNDARY);
@@ -269,76 +264,110 @@ export function MapperEdgeDialog({ steps, isSubmitting, onUpsert, initialEdge }:
       }}
     >
       <DialogTrigger
+        render={trigger ? trigger : undefined}
         className={
-          isEditMode
-            ? "p-1.5 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer shrink-0"
-            : "btn-outline text-xs"
+          trigger
+            ? undefined
+            : isEditMode
+              ? "p-1.5 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer shrink-0"
+              : "btn-outline text-xs"
         }
       >
-        {isEditMode ? (
+        {!trigger && (isEditMode ? (
           <Pencil className="w-3.5 h-3.5" />
         ) : (
           <>
             <Plus className="w-3.5 h-3.5" /> Add Mapper
           </>
-        )}
+        ))}
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[580px] bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
-        <DialogHeader className="space-y-1">
-          <DialogTitle className="text-sm font-bold text-foreground">
-            {isEditMode ? "Edit Mapper" : "Add / Replace Mapper"}
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            Choose which steps this edge connects, then build field rules.
-            Paths use{" "}
-            <code className="bg-secondary px-1 rounded text-[10px]">input.x</code>{" "}
-            <code className="bg-secondary px-1 rounded text-[10px]">previous.x</code>{" "}
-            <code className="bg-secondary px-1 rounded text-[10px]">steps.0.x</code>.
-          </DialogDescription>
+      <DialogContent className="sm:max-w-[580px] p-6">
+        <DialogHeader className="border-none pb-0 text-left">
+          <div className="flex items-start gap-4 mb-2">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <Settings2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <DialogTitle className="text-base font-bold text-foreground">
+                {isEditMode ? "Edit Mapper" : "Add / Replace Mapper"}
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground leading-normal">
+                Choose which steps this edge connects, then build field rules.
+                <br />
+                Paths use <code className="bg-secondary/60 px-1 py-0.5 rounded text-[10px] font-mono">input.x</code>, <code className="bg-secondary/60 px-1 py-0.5 rounded text-[10px] font-mono">previous.x</code>, or <code className="bg-secondary/60 px-1 py-0.5 rounded text-[10px] font-mono">steps.0.x</code>.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2 max-h-[60vh] overflow-y-auto pr-1">
-          {/* From / To step selectors — native <select> to avoid portal conflicts */}
-          <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-4 pt-3 max-h-[60vh] overflow-y-auto pr-1">
+          {/* From / To step selectors */}
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Edge From
               </Label>
-              <select
-                className={nativeSelectCls}
-                value={fromStepId}
-                onChange={(e) => setFromStepId(e.target.value)}
-              >
-                <option value={BOUNDARY}>Pipeline Input</option>
-                {sortedSteps.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {stepOptionLabel(s)}
-                  </option>
-                ))}
-              </select>
+              <Select value={fromStepId} onValueChange={(val) => setFromStepId(val)}>
+                <SelectTrigger className="w-full h-10 text-xs bg-card border-border/80 rounded-xl gap-2 font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={BOUNDARY}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                        <Bot className="w-3 h-3 text-indigo-500" />
+                      </div>
+                      Pipeline Input
+                    </div>
+                  </SelectItem>
+                  {sortedSteps.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded bg-primary/10 border border-primary/20 flex items-center justify-center">
+                          <Cpu className="w-3 h-3 text-primary" />
+                        </div>
+                        {stepOptionLabel(s)}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Edge To
               </Label>
-              <select
-                className={nativeSelectCls}
-                value={toStepId}
-                onChange={(e) => setToStepId(e.target.value)}
-              >
-                <option value={BOUNDARY}>Pipeline Output</option>
-                {sortedSteps.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {stepOptionLabel(s)}
-                  </option>
-                ))}
-              </select>
+              <Select value={toStepId} onValueChange={(val) => setToStepId(val)}>
+                <SelectTrigger className="w-full h-10 text-xs bg-card border-border/80 rounded-xl gap-2 font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={BOUNDARY}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                        <Bot className="w-3 h-3 text-indigo-500" />
+                      </div>
+                      Pipeline Output
+                    </div>
+                  </SelectItem>
+                  {sortedSteps.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded bg-primary/10 border border-primary/20 flex items-center justify-center">
+                          <Cpu className="w-3 h-3 text-primary" />
+                        </div>
+                        {stepOptionLabel(s)}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           {steps.length === 0 && (
-            <p className="text-xs text-amber-500 font-mono border border-amber-500/30 bg-amber-500/10 rounded-lg px-3 py-2">
+            <p className="text-xs text-amber-500 border border-amber-500/30 bg-amber-500/10 rounded-lg px-3 py-2">
               No steps added yet — add steps to this pipeline first before configuring mappers.
             </p>
           )}
@@ -352,7 +381,7 @@ export function MapperEdgeDialog({ steps, isSubmitting, onUpsert, initialEdge }:
               <button
                 type="button"
                 onClick={() => setRules((prev) => [...prev, { ...EMPTY_RULE }])}
-                className="text-[10px] text-primary hover:underline font-bold cursor-pointer"
+                className="text-xs text-primary hover:underline font-bold cursor-pointer flex items-center gap-1"
               >
                 + Add Rule
               </button>
@@ -372,10 +401,16 @@ export function MapperEdgeDialog({ steps, isSubmitting, onUpsert, initialEdge }:
             ))}
 
             {rules.length === 0 && (
-              <p className="text-xs text-muted-foreground font-mono text-center py-2">
+              <p className="text-xs text-muted-foreground text-center py-2">
                 No rules — empty mapper passes the previous step&apos;s output through unchanged.
               </p>
             )}
+          </div>
+
+          {/* Applied order callout note */}
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80 bg-slate-50/5 dark:bg-zinc-900/5 px-3 py-2.5 rounded-xl border border-border/40">
+            <Info className="w-3.5 h-3.5 text-muted-foreground/75 shrink-0" />
+            Rules are applied in order from top to bottom.
           </div>
 
           {error && (
@@ -383,12 +418,12 @@ export function MapperEdgeDialog({ steps, isSubmitting, onUpsert, initialEdge }:
           )}
         </div>
 
-        <DialogFooter className="flex gap-2 pt-2">
+        <DialogFooter className="flex sm:flex-row gap-3 mt-6 pt-0 border-none">
           <Button
             type="button"
             variant="outline"
             onClick={() => setOpen(false)}
-            className="flex-1"
+            className="flex-1 h-10 font-bold text-xs rounded-xl"
             disabled={isSubmitting}
           >
             Cancel
@@ -396,9 +431,10 @@ export function MapperEdgeDialog({ steps, isSubmitting, onUpsert, initialEdge }:
           <Button
             type="button"
             onClick={handleSubmit}
-            className="flex-1"
+            className="flex-1 h-10 font-bold text-xs btn-primary rounded-xl flex items-center justify-center gap-1.5"
             disabled={isSubmitting}
           >
+            <Settings2 className="w-3.5 h-3.5" />
             {isSubmitting ? "Saving..." : "Save Mapper"}
           </Button>
         </DialogFooter>

@@ -15,6 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import * as fs from 'fs';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { OrgRoleGuard, RequireOrgRole } from '../../auth/guards/org-role.guard';
 import { OrganizationsService } from '../services/organizations.service';
@@ -339,7 +340,13 @@ export class OrganizationsController {
     FileInterceptor('logo', {
       limits: { fileSize: 5 * 1024 * 1024 },
       storage: diskStorage({
-        destination: './uploads',
+        destination: (req, file, cb) => {
+          const dir = './uploads';
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+          cb(null, dir);
+        },
         filename: (req, file, cb) => {
           const uniqueSuffix =
             Date.now() + '-' + Math.round(Math.random() * 1e9);

@@ -68,3 +68,29 @@ export async function unblockModelFirewall(
     method: "POST",
   });
 }
+
+export interface FirewallAuditLog {
+  id: string;
+  userId: string;
+  action: string;
+  ipAddress: string | null;
+  metadata: {
+    modelId: string;
+    orgId: string | null;
+    reason?: string;
+    blockReason?: string;
+    scopeType?: string;
+    scopeId?: string;
+    enforcementMode?: string;
+    injectionMatch?: string;
+  } | null;
+  createdAt: string;
+}
+
+export async function getModelFirewallLogs(
+  modelId: string
+): Promise<FirewallAuditLog[]> {
+  return smartFetch<FirewallAuditLog[]>(`/firewall/models/${modelId}/logs`, {
+    cache: "no-store",
+  });
+}

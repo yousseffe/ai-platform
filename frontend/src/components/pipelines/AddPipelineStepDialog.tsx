@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
@@ -30,6 +30,8 @@ interface AddPipelineStepDialogProps {
   readyVersionOptions: ReadyVersionOption[];
   isSubmitting: boolean;
   onAddStep: (input: CreateStepInput, order: number) => Promise<boolean>;
+  trigger?: React.ReactElement;
+  defaultStageChoice?: string;
 }
 
 /** Sentinel stage-selector value meaning "append a brand-new stage after the last one." */
@@ -65,9 +67,18 @@ export function AddPipelineStepDialog({
   readyVersionOptions,
   isSubmitting,
   onAddStep,
+  trigger,
+  defaultStageChoice = NEW_STAGE,
 }: AddPipelineStepDialogProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [stageChoice, setStageChoice] = useState<string>(NEW_STAGE);
+  const [stageChoice, setStageChoice] = useState<string>(defaultStageChoice);
+
+  useEffect(() => {
+    if (dialogOpen) {
+      setStageChoice(defaultStageChoice);
+    }
+  }, [dialogOpen, defaultStageChoice]);
+
   const stageOptions = buildStageOptions(stages);
 
   const {
@@ -127,80 +138,87 @@ export function AddPipelineStepDialog({
 
   return (
     <Dialog open={dialogOpen} onOpenChange={(next) => { setDialogOpen(next); if (!next) resetDialog(); }}>
-      <DialogTrigger className="btn-outline text-xs">
-        <Plus className="w-3.5 h-3.5" /> Add Step
+      <DialogTrigger render={trigger ? trigger : undefined}>
+        {!trigger && (
+          <Button variant="outline" size="sm" className="h-7 text-xs font-bold gap-1.5 cursor-pointer">
+            <Plus className="w-3.5 h-3.5" /> Add Step
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[420px] bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
-        <DialogHeader className="space-y-1">
-          <DialogTitle className="text-sm font-bold text-foreground">Add Step</DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            Bind this step to one of your existing READY model versions.
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Add Pipeline Step</DialogTitle>
+          <DialogDescription>
+            Bind a new stage or parallel branch to one of your active READY model versions.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Stage</Label>
-            <Select value={stageChoice} onValueChange={(value) => setStageChoice(value ?? NEW_STAGE)}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose a stage" />
-              </SelectTrigger>
-              <SelectContent>
-                {stageOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-4">
+            <div className="space-y-1.5 text-left">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Stage</Label>
+              <Select value={stageChoice} onValueChange={(value) => setStageChoice(value ?? NEW_STAGE)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  {stageOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model Version</Label>
+              <Select value={selectedModelVersionId} onValueChange={(value) => setValue("modelVersionId", value ?? "", { shouldValidate: true })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a model version" />
+                </SelectTrigger>
+                <SelectContent>
+                  {readyVersionOptions.length === 0 ? (
+                    <SelectItem value="__none" disabled>No READY model versions available</SelectItem>
+                  ) : (
+                    readyVersionOptions.map((opt) => (
+                      <SelectItem key={opt.modelVersionId} value={opt.modelVersionId}>{opt.label}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {errors.modelVersionId && <p className="text-[10px] text-destructive font-semibold">{errors.modelVersionId.message}</p>}
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <Label htmlFor="step-label" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Label (optional)</Label>
+              <Input id="step-label" placeholder="caption-step" {...register("label")} />
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <Label htmlFor="step-role" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Role {roleRequired ? "(required — this stage has other steps)" : "(optional)"}
+              </Label>
+              <Input id="step-role" placeholder="summarizer" {...register("role")} />
+              {errors.role ? (
+                <p className="text-[10px] text-destructive font-semibold">{errors.role.message}</p>
+              ) : (
+                <p className="text-[10px] text-muted-foreground">
+                  Names this branch for mappers, e.g.{" "}
+                  <code className="bg-secondary/50 px-1 rounded font-mono text-[9.5px]">steps.{targetStage?.[0].order ?? "N"}.summarizer</code>.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <Label htmlFor="step-retries" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Max Retries</Label>
+              <Input id="step-retries" type="number" min={0} max={5} {...register("maxRetries", { valueAsNumber: true })} />
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model Version</Label>
-            <Select value={selectedModelVersionId} onValueChange={(value) => setValue("modelVersionId", value ?? "", { shouldValidate: true })}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a model version" />
-              </SelectTrigger>
-              <SelectContent>
-                {readyVersionOptions.length === 0 ? (
-                  <SelectItem value="__none" disabled>No READY model versions available</SelectItem>
-                ) : (
-                  readyVersionOptions.map((opt) => (
-                    <SelectItem key={opt.modelVersionId} value={opt.modelVersionId}>{opt.label}</SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {errors.modelVersionId && <p className="text-[10px] text-destructive font-semibold">{errors.modelVersionId.message}</p>}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="step-label" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Label (optional)</Label>
-            <Input id="step-label" placeholder="caption-step" {...register("label")} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="step-role" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Role {roleRequired ? "(required — this stage has other steps)" : "(optional)"}
-            </Label>
-            <Input id="step-role" placeholder="summarizer" {...register("role")} />
-            {errors.role ? (
-              <p className="text-[10px] text-destructive font-semibold">{errors.role.message}</p>
-            ) : (
-              <p className="text-[10px] text-muted-foreground">
-                Names this branch for mappers, e.g.{" "}
-                <code className="bg-secondary/50 px-1 rounded">steps.{targetStage?.[0].order ?? "N"}.summarizer</code>.
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="step-retries" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Max Retries</Label>
-            <Input id="step-retries" type="number" min={0} max={5} {...register("maxRetries", { valueAsNumber: true })} />
-          </div>
-
-          <DialogFooter className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1" disabled={isSubmitting}>
+          <DialogFooter className="flex sm:flex-row gap-2 mt-6">
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 h-9 font-bold text-xs" disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+            <Button type="submit" className="flex-1 h-9 font-bold text-xs" disabled={isSubmitting}>
               {isSubmitting ? "Adding..." : "Add Step"}
             </Button>
           </DialogFooter>

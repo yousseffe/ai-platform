@@ -1,21 +1,23 @@
 "use client";
 
 import React from "react";
-import { Coins, Receipt, Globe } from "lucide-react";
+import { Coins, TrendingUp, Wallet, Receipt, Key } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import WalletTopUpCard from "@/components/dashboard/WalletTopUpCard";
 import TransactionsTable from "@/components/dashboard/TransactionsTable";
+import WalletAnalyticsPanel from "@/components/dashboard/WalletAnalyticsPanel";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { WalletType } from "@/types";
 import { PageHeader } from "@/components/ui/page-header";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 /**
  * Settings Page: Billing & Wallet.
  * Handles depositing credits, cashing out withdrawable balance, and displays paginated transaction histories with advanced filters.
  */
 export default function BillingSettingsPage() {
-  const { balance, viewMode, canAccessBilling, activeWorkspace } = useWorkspace();
+  const { viewMode, canAccessBilling, activeWorkspace } = useWorkspace();
   const {
     transactions,
     total,
@@ -41,7 +43,8 @@ export default function BillingSettingsPage() {
     return (
       <div className="space-y-6 animate-fade-in text-left">
         <PageHeader
-          title={<><Coins /> Billing & Wallet Settings</>}
+          title="Billing & Wallet Settings"
+          icon={<Coins className="w-5 h-5 text-primary" />}
           description="Shared organization billing is restricted to workspace owners."
           className="mb-0"
         />
@@ -59,70 +62,99 @@ export default function BillingSettingsPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in text-left">
+    <div className="relative space-y-6 animate-fade-in text-left">
+      {/* Background Glow */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
       <PageHeader
-        title={<><Coins /> Billing & Wallet Settings</>}
+        title="Billing & Wallet Settings"
+        icon={<Coins className="w-5 h-5 text-primary" />}
         description="Top up your inference credits, cash out earnings, and audit complete transaction ledger histories."
         className="mb-0"
       />
 
-      {/* Top Metrics Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Metric 1: Active Balance */}
-        <Card className="border border-border bg-card border-l-4 border-l-primary shadow-sm hover:shadow-md transition-all duration-300 rounded-xl">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider font-mono">
-                {isConsumer ? "Credits Balance" : "EGP Revenue Balance"}
-              </p>
-              <p className="text-2xl font-extrabold text-foreground mt-1.5 font-mono">
-                {isConsumer ? `${Math.round(balance)} Credits` : `${balance.toFixed(2)} EGP`}
-              </p>
-            </div>
-            <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/15 shadow-xs">
-              <Coins className="w-5 h-5" strokeWidth={2} />
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="overview" className="w-full">
+        {/* Navigation Tabs Bar */}
+        <div className="border-b border-border/80 mb-6 w-full select-none">
+          <TabsList variant="line" className="gap-6 flex items-center w-full sm:w-fit bg-transparent pb-0 h-10 justify-start">
+            <TabsTrigger value="overview" className="flex items-center gap-1.5 px-1 pb-3 pt-2 cursor-pointer rounded-none text-xs font-bold font-sans transition-all border-none bg-transparent">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Analytics Overview</span>
+            </TabsTrigger>
 
-        {/* Metric 2: Total Transactions */}
-        <Card className="border border-border bg-card border-l-4 border-l-violet-500 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Total Ledger Logs</p>
-              <p className="text-2xl font-extrabold text-foreground mt-1.5 font-mono">{total} Records</p>
-            </div>
-            <div className="p-2.5 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/15 shadow-xs">
-              <Receipt className="w-5 h-5" strokeWidth={2} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Metric 3: Active Currency */}
-        <Card className="border border-border bg-card border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Platform Currency</p>
-              <p className="text-2xl font-extrabold text-foreground mt-1.5 font-mono">
-                {isConsumer ? "Credits" : "EGP"}
-              </p>
-            </div>
-            <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/15 shadow-xs">
-              <Globe className="w-5 h-5" strokeWidth={2} />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Grid content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Wallet Controls Card */}
-        <div className="lg:col-span-1">
-          <WalletTopUpCard onTransactionSuccess={refetch} />
+            <TabsTrigger value="caps" className="flex items-center gap-1.5 px-1 pb-3 pt-2 cursor-pointer rounded-none text-xs font-bold font-sans transition-all border-none bg-transparent">
+              <Key className="w-3.5 h-3.5" />
+              <span>API Key Limits</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="payments" className="flex items-center gap-1.5 px-1 pb-3 pt-2 cursor-pointer rounded-none text-xs font-bold font-sans transition-all border-none bg-transparent">
+              <Wallet className="w-3.5 h-3.5" />
+              <span>Deposit & Withdraw</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="transactions" className="flex items-center gap-1.5 px-1 pb-3 pt-2 cursor-pointer rounded-none text-xs font-bold font-sans transition-all border-none bg-transparent">
+              <Receipt className="w-3.5 h-3.5" />
+              <span>Transaction Logs</span>
+            </TabsTrigger>
+          </TabsList>
         </div>
 
-        {/* Wallet Transactions Table Card */}
-        <div className="lg:col-span-2 h-full">
+        {/* Tab 1: Overview & Analytics */}
+        <TabsContent value="overview" className="space-y-6 outline-none">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+            <div className="lg:col-span-3">
+              <WalletAnalyticsPanel mode="charts" />
+            </div>
+            
+            <div className="lg:col-span-1 space-y-4">
+              <Card className="border border-border/85 bg-card p-5 rounded-2xl shadow-sm space-y-4 font-sans select-none">
+                <h3 className="text-sm font-bold text-foreground">Billing Summary</h3>
+                <div className="space-y-3.5 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-medium">Workspace</span>
+                    <span className="text-foreground font-semibold truncate max-w-[120px]" title={activeWorkspace?.name || "Personal Workspace"}>
+                      {activeWorkspace?.name || "Personal Workspace"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-medium">Platform Currency</span>
+                    <span className="text-foreground font-semibold">
+                      {isConsumer ? "Credits" : "EGP"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-medium">Total Ledger Logs</span>
+                    <span className="text-foreground font-semibold font-mono">
+                      {total.toLocaleString()} Records
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-medium">Active Wallet</span>
+                    <span className="inline-flex items-center rounded-md bg-secondary/80 px-2 py-0.5 text-[9px] font-bold text-foreground border border-border/30">
+                      {viewMode === WalletType.CONSUMER ? "Consumer" : "Provider"}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Tab 2: API Key limits & Caps */}
+        <TabsContent value="caps" className="outline-none">
+          <WalletAnalyticsPanel mode="keys" />
+        </TabsContent>
+
+        {/* Tab 3: Payments & Funds */}
+        <TabsContent value="payments" className="outline-none">
+          <div className="max-w-4xl">
+            <WalletTopUpCard onTransactionSuccess={refetch} />
+          </div>
+        </TabsContent>
+
+        {/* Tab 4: Transaction Logs */}
+        <TabsContent value="transactions" className="outline-none">
           <TransactionsTable
             viewMode={viewMode}
             transactions={transactions}
@@ -142,8 +174,8 @@ export default function BillingSettingsPage() {
             endDate={endDate}
             onEndDateChange={setEndDate}
           />
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

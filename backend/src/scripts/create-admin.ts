@@ -19,7 +19,7 @@ const dataSource = new DataSource({
   password: process.env.DB_PASSWORD || 'password',
   database: process.env.DB_NAME || 'aidb',
   entities: [User],
-  synchronize: false,
+  synchronize: true,
 });
 
 async function main(): Promise<void> {

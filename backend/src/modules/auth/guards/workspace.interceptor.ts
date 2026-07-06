@@ -50,7 +50,12 @@ export class WorkspaceInterceptor implements NestInterceptor {
     let workspaceId = user.id;
     let workspaceType: OwnerType = OwnerType.USER;
 
-    if (workspaceIdHeader && workspaceIdHeader !== user.id) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (
+      workspaceIdHeader &&
+      uuidRegex.test(workspaceIdHeader) &&
+      workspaceIdHeader !== user.id
+    ) {
       workspaceId = workspaceIdHeader;
       workspaceType = OwnerType.ORG;
     }

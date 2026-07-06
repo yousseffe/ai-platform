@@ -2,7 +2,15 @@
 
 import * as modelsService from "@/lib/services/models.service";
 import * as searchService from "@/lib/services/search.service";
-import { Model, ModelVersion, ModelLog, SearchResult, SearchParams } from "@/types";
+import {
+  Model,
+  ModelVersion,
+  ModelLog,
+  ProviderInsights,
+  SearchResult,
+  SearchParams,
+  ModelIntegrationSpec,
+} from "@/types";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -51,16 +59,24 @@ export async function createModel(
   isPublic: boolean = false,
   type?: string,
   framework?: string,
-  taskType?: string
+  taskType?: string,
 ): Promise<{ success: true; data: Model } | { success: false; error: string }> {
   try {
-    const res = await modelsService.createModel(name, description, isPublic, type, framework, taskType);
+    const res = await modelsService.createModel(
+      name,
+      description,
+      isPublic,
+      type,
+      framework,
+      taskType,
+    );
     revalidatePath("/models");
     revalidatePath("/marketplace");
     revalidatePath("/");
     return { success: true, data: res };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to create model";
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to create model";
     return { success: false, error: errorMessage };
   }
 }
@@ -95,6 +111,16 @@ export async function getPublicModelById(id: string): Promise<Model | null> {
   }
 }
 
+export async function getModelIntegrationSpec(
+  id: string,
+): Promise<ModelIntegrationSpec | null> {
+  try {
+    return await modelsService.getModelIntegrationSpec(id);
+  } catch (error) {
+    console.error(`getModelIntegrationSpec error for ${id}:`, error);
+    return null;
+  }
+}
 
 /**
  * Uploads a raw model weight artifact/file version for an existing model.
@@ -106,8 +132,10 @@ export async function getPublicModelById(id: string): Promise<Model | null> {
  */
 export async function uploadModelVersion(
   id: string,
-  formData: FormData
-): Promise<{ success: true; data: ModelVersion } | { success: false; error: string }> {
+  formData: FormData,
+): Promise<
+  { success: true; data: ModelVersion } | { success: false; error: string }
+> {
   try {
     const res = await modelsService.uploadModelVersion(id, formData);
     revalidatePath(`/models/${id}`);
@@ -115,7 +143,8 @@ export async function uploadModelVersion(
     revalidatePath("/");
     return { success: true, data: res };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to upload model version";
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to upload model version";
     return { success: false, error: errorMessage };
   }
 }
@@ -130,13 +159,21 @@ export async function uploadModelVersion(
 export async function runPrediction(
   id: string,
   parsedPayload: unknown,
-  versionNumber?: number
-): Promise<{ success: true; data: Record<string, unknown> } | { success: false; error: string }> {
+  versionNumber?: number,
+): Promise<
+  | { success: true; data: Record<string, unknown> }
+  | { success: false; error: string }
+> {
   try {
-    const res = await modelsService.runPrediction(id, parsedPayload, versionNumber);
+    const res = await modelsService.runPrediction(
+      id,
+      parsedPayload,
+      versionNumber,
+    );
     return { success: true, data: res };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Prediction request failed";
+    const errorMessage =
+      error instanceof Error ? error.message : "Prediction request failed";
     return { success: false, error: errorMessage };
   }
 }
@@ -149,7 +186,7 @@ export async function runPrediction(
  * @returns A promise resolving to a success indicator or error message.
  */
 export async function deleteModel(
-  id: string
+  id: string,
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
     await modelsService.deleteModel(id);
@@ -157,7 +194,8 @@ export async function deleteModel(
     revalidatePath("/");
     return { success: true };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to delete model";
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to delete model";
     return { success: false, error: errorMessage };
   }
 }
@@ -171,7 +209,7 @@ export async function deleteModel(
  */
 export async function deleteModelVersion(
   id: string,
-  versionId: string
+  versionId: string,
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
     await modelsService.deleteModelVersion(versionId);
@@ -179,7 +217,8 @@ export async function deleteModelVersion(
     revalidatePath("/models");
     return { success: true };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to delete version";
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to delete version";
     return { success: false, error: errorMessage };
   }
 }
@@ -192,7 +231,7 @@ export async function deleteModelVersion(
  * @returns A promise resolving to ranked search results with pagination metadata and facets.
  */
 export async function searchModels(
-  params: SearchParams
+  params: SearchParams,
 ): Promise<SearchResult | null> {
   try {
     return await searchService.searchModels(params);
@@ -227,6 +266,20 @@ export async function getProviderLogs(): Promise<ModelLog[]> {
 }
 
 /**
+ * Server action to retrieve provider earnings and performance analytics.
+ */
+export async function getProviderInsights(
+  days: number = 30,
+): Promise<ProviderInsights | null> {
+  try {
+    return await modelsService.getProviderInsights(days);
+  } catch (error) {
+    console.error("getProviderInsights error:", error);
+    return null;
+  }
+}
+
+/**
  * Triggers the rebuild of a failed model version.
  *
  * @param modelId - The parent model UUID.
@@ -235,15 +288,18 @@ export async function getProviderLogs(): Promise<ModelLog[]> {
  */
 export async function rebuildModelVersion(
   modelId: string,
-  versionId: string
-): Promise<{ success: true; data: ModelVersion } | { success: false; error: string }> {
+  versionId: string,
+): Promise<
+  { success: true; data: ModelVersion } | { success: false; error: string }
+> {
   try {
     const res = await modelsService.buildModelVersion(versionId);
     revalidatePath(`/models/${modelId}`);
     revalidatePath("/models");
     return { success: true, data: res };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to rebuild version";
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to rebuild version";
     return { success: false, error: errorMessage };
   }
 }
@@ -256,15 +312,18 @@ export async function rebuildModelVersion(
  */
 export async function deprecateModelVersion(
   modelId: string,
-  versionId: string
-): Promise<{ success: true; data: ModelVersion } | { success: false; error: string }> {
+  versionId: string,
+): Promise<
+  { success: true; data: ModelVersion } | { success: false; error: string }
+> {
   try {
     const res = await modelsService.deprecateModelVersion(versionId);
     revalidatePath(`/models/${modelId}`);
     revalidatePath("/models");
     return { success: true, data: res };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to deprecate version";
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to deprecate version";
     return { success: false, error: errorMessage };
   }
 }
@@ -277,15 +336,18 @@ export async function deprecateModelVersion(
  */
 export async function undeprecateModelVersion(
   modelId: string,
-  versionId: string
-): Promise<{ success: true; data: ModelVersion } | { success: false; error: string }> {
+  versionId: string,
+): Promise<
+  { success: true; data: ModelVersion } | { success: false; error: string }
+> {
   try {
     const res = await modelsService.undeprecateModelVersion(versionId);
     revalidatePath(`/models/${modelId}`);
     revalidatePath("/models");
     return { success: true, data: res };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to activate version";
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to activate version";
     return { success: false, error: errorMessage };
   }
 }
@@ -303,14 +365,17 @@ export async function updateCacheSettings(
     cacheEnabled?: boolean;
     cacheTtlSeconds?: number;
     cacheHitDiscountPercent?: number;
-  }
+  },
 ): Promise<{ success: true; data: Model } | { success: false; error: string }> {
   try {
     const res = await modelsService.updateCacheSettings(modelId, settings);
     revalidatePath(`/models/${modelId}`);
     return { success: true, data: res };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to update cache settings";
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to update cache settings";
     return { success: false, error: errorMessage };
   }
 }
@@ -322,7 +387,7 @@ export async function updateCacheSettings(
  * @returns A promise resolving to the cache stats, or null on failure.
  */
 export async function getCacheStats(
-  modelId: string
+  modelId: string,
 ): Promise<modelsService.CacheStats | null> {
   try {
     return await modelsService.getCacheStats(modelId);
@@ -342,14 +407,17 @@ export async function getCacheStats(
  */
 export async function updateNetworkSettings(
   modelId: string,
-  allowEgress: boolean
+  allowEgress: boolean,
 ): Promise<{ success: true; data: Model } | { success: false; error: string }> {
   try {
     const res = await modelsService.updateNetworkSettings(modelId, allowEgress);
     revalidatePath(`/models/${modelId}`);
     return { success: true, data: res };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to update network settings";
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to update network settings";
     return { success: false, error: errorMessage };
   }
 }
@@ -363,15 +431,17 @@ export async function updateNetworkSettings(
  */
 export async function updateVisibilitySettings(
   modelId: string,
-  isPublic: boolean
+  isPublic: boolean,
 ): Promise<{ success: true; data: Model } | { success: false; error: string }> {
   try {
     const res = await modelsService.updateVisibilitySettings(modelId, isPublic);
     revalidatePath(`/models/${modelId}`);
     return { success: true, data: res };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Failed to update visibility settings";
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to update visibility settings";
     return { success: false, error: errorMessage };
   }
 }
-

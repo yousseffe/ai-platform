@@ -23,6 +23,7 @@ import { toast } from "react-hot-toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 
 interface ApiKeyInfo {
@@ -196,18 +197,23 @@ export default function ApiSettingsPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in text-left">
+    <div className="relative space-y-6 animate-fade-in text-left font-sans">
+      {/* Background Decor */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
       <PageHeader
         title="API Credentials"
+        icon={<Key className="w-5 h-5 text-primary" />}
         description="Generate and manage per-model API keys, and monitor consumer request activity."
         className="mb-0"
       />
 
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex flex-col lg:flex-row gap-6 relative z-10">
         {/* Left side: Subscriptions & keys listing */}
-        <div className="flex-1 card p-5 rounded-xl border border-border bg-card shadow-sm space-y-4">
-          <div className="flex items-center gap-3 border-b border-border/60 pb-4 select-none">
-            <div className="w-9 h-9 rounded bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
+        <div className="flex-1 card rounded-xl border border-border bg-card/65 backdrop-blur-md shadow-xs space-y-4 premium-card p-5">
+          <div className="flex items-center gap-3 border-b border-border/50 pb-4 select-none">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
               <Key className="w-4.5 h-4.5" />
             </div>
             <div>
@@ -215,17 +221,16 @@ export default function ApiSettingsPage() {
                 Active Subscriptions & Keys
               </h2>
               <p className="text-[10px] text-muted-foreground">
-                Manage your credentials and API access tokens split by
-                registered models.
+                Manage your credentials and API access tokens split by registered models.
               </p>
             </div>
           </div>
 
           {loading ? (
-            <div className="py-12 flex items-center justify-center text-muted-foreground">
-              <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
-              <span className="font-mono text-xs">
-                Loading active credentials...
+            <div className="py-12 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <span className="font-mono text-[10px] font-semibold">
+                Retrieving active credentials...
               </span>
             </div>
           ) : apiKeys.length === 0 ? (
@@ -238,11 +243,11 @@ export default function ApiSettingsPage() {
             <div className="overflow-x-auto">
               <table className="w-full font-mono text-[10px] text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-border text-muted-foreground font-bold uppercase select-none">
-                    <th className="py-2.5 px-2">Model</th>
-                    <th className="py-2.5 px-2">Key Label</th>
-                    <th className="py-2.5 px-2">Access Token</th>
-                    <th className="py-2.5 px-2 text-right">Actions</th>
+                  <tr className="border-b border-border text-muted-foreground font-bold uppercase tracking-wider select-none text-[9px]">
+                    <th className="py-3 px-2 font-mono">Model</th>
+                    <th className="py-3 px-2 font-mono">Key Label</th>
+                    <th className="py-3 px-2 font-mono">Access Token</th>
+                    <th className="py-3 px-2 text-right font-mono">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -255,22 +260,24 @@ export default function ApiSettingsPage() {
                     return (
                       <tr
                         key={key.id}
-                        className="border-b border-border/40 hover:bg-secondary/20 transition-colors"
+                        className="border-b border-border/30 hover:bg-secondary/15 transition-colors font-mono"
                       >
                         <td className="py-3 px-2 font-sans font-bold text-foreground">
                           {key.model?.name || "Deleted Model"}
                         </td>
-                        <td className="py-3 px-2 text-muted-foreground font-medium">
+                        <td className="py-3 px-2 text-muted-foreground font-medium font-sans">
                           {key.name}
                         </td>
                         <td className="py-3 px-2">
                           <div className="flex items-center gap-2">
-                            <span className="bg-secondary/40 px-2 py-1 rounded text-foreground font-medium font-mono text-[9px] border border-border/50">
+                            <span className="bg-background border border-border/80 px-2.5 py-1 rounded-lg text-foreground font-semibold font-mono text-[9px] shadow-inner select-all">
                               {isVisible ? key.key : maskedKey}
                             </span>
-                            <button
+                            <Button
                               onClick={() => toggleKeyVisibility(key.id)}
-                              className="text-muted-foreground hover:text-foreground cursor-pointer p-0.5 rounded hover:bg-secondary transition-colors"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="hover-lift active-shrink rounded-md hover:bg-secondary"
                               title={isVisible ? "Hide Key" : "Show Key"}
                             >
                               {isVisible ? (
@@ -278,33 +285,37 @@ export default function ApiSettingsPage() {
                               ) : (
                                 <Eye className="w-3.5 h-3.5" />
                               )}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => handleCopy(key.key, key.id)}
-                              className="text-muted-foreground hover:text-foreground cursor-pointer p-0.5 rounded hover:bg-secondary transition-colors"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="hover-lift active-shrink rounded-md hover:bg-secondary"
                               title="Copy key"
                             >
                               {copiedKeyId === key.id ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                <Check className="w-3.5 h-3.5 text-emerald-500 animate-fade-in" />
                               ) : (
                                 <Copy className="w-3.5 h-3.5" />
                               )}
-                            </button>
+                            </Button>
                           </div>
                         </td>
                         <td className="py-3 px-2 text-right">
-                          <button
+                          <Button
                             onClick={() => setKeyPendingRevoke(key)}
                             disabled={revokingId === key.id}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10 p-1.5 rounded cursor-pointer transition-colors"
+                            variant="destructive"
+                            size="icon-sm"
                             title="Revoke Key"
+                            className="h-7 w-7 bg-red-500/10 hover:bg-red-500/20 text-red-500 border-none shadow-none hover-lift active-shrink rounded-md"
                           >
                             {revokingId === key.id ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : (
                               <Trash2 className="w-3.5 h-3.5" />
                             )}
-                          </button>
+                          </Button>
                         </td>
                       </tr>
                     );
@@ -316,9 +327,9 @@ export default function ApiSettingsPage() {
         </div>
 
         {/* Right side: Generate new keys form */}
-        <div className="w-full lg:w-[320px] shrink-0 card p-5 rounded-xl border border-border bg-card shadow-sm space-y-4">
-          <div className="flex items-center gap-3 border-b border-border/60 pb-4 select-none">
-            <div className="w-9 h-9 rounded bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+        <div className="w-full lg:w-[320px] shrink-0 card rounded-xl border border-border bg-card/65 backdrop-blur-md shadow-xs space-y-4 premium-card p-5">
+          <div className="flex items-center gap-3 border-b border-border/50 pb-4 select-none">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
               <Sparkles className="w-4.5 h-4.5" />
             </div>
             <div>
@@ -333,7 +344,7 @@ export default function ApiSettingsPage() {
 
           <form onSubmit={handleGenerateKey} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+              <label className="form-label select-none">
                 Select Model
               </label>
               <Select
@@ -341,7 +352,7 @@ export default function ApiSettingsPage() {
                 onValueChange={(value) => setSelectedModelId(value ?? "")}
                 disabled={models.length === 0}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full form-input bg-background/50 h-10 border-border select-none">
                   <SelectValue placeholder="No models available" />
                 </SelectTrigger>
                 <SelectContent>
@@ -353,7 +364,7 @@ export default function ApiSettingsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+              <label className="form-label select-none">
                 Key Nickname / Label
               </label>
               <input
@@ -361,15 +372,15 @@ export default function ApiSettingsPage() {
                 placeholder="e.g. Production Key"
                 value={keyName}
                 onChange={(e) => setKeyName(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-mono font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-mono font-medium focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all form-input h-10"
                 required
               />
             </div>
 
-            <button
+            <Button
               type="submit"
               disabled={generating || models.length === 0}
-              className="w-full btn-primary h-9 flex items-center justify-center gap-1.5 text-xs font-bold font-mono cursor-pointer rounded-lg border-none active:scale-[0.98]"
+              className="w-full h-10 flex items-center justify-center gap-1.5 text-xs font-bold btn-primary rounded-xl cursor-pointer"
             >
               {generating ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -378,17 +389,17 @@ export default function ApiSettingsPage() {
                   <Plus className="w-4 h-4" /> Generate Token
                 </>
               )}
-            </button>
+            </Button>
           </form>
         </div>
       </div>
 
       {/* Model Usage Statistics Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
         {/* Model Statistics List */}
-        <div className="lg:col-span-1 card p-5 rounded-xl border border-border bg-card shadow-sm space-y-4">
-          <div className="flex items-center gap-3 border-b border-border/60 pb-4 select-none">
-            <div className="w-9 h-9 rounded bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
+        <div className="lg:col-span-1 card rounded-xl border border-border bg-card/65 backdrop-blur-md shadow-xs space-y-4 premium-card p-5">
+          <div className="flex items-center gap-3 border-b border-border/50 pb-4 select-none">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
               <BarChart3 className="w-4.5 h-4.5" />
             </div>
             <div>
@@ -402,9 +413,9 @@ export default function ApiSettingsPage() {
           </div>
 
           {loadingUsage ? (
-            <div className="py-12 flex items-center justify-center text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
-              <span className="font-mono text-xs">Loading statistics...</span>
+            <div className="py-12 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <span className="font-mono text-[9px] font-semibold">Loading stats...</span>
             </div>
           ) : consumerStats.length === 0 ? (
             <EmptyState
@@ -413,17 +424,17 @@ export default function ApiSettingsPage() {
               description="Run a model prediction to start generating usage metrics."
             />
           ) : (
-            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+            <div className="space-y-3.5 max-h-[350px] overflow-y-auto pr-1">
               {consumerStats.map((stat) => (
                 <div
                   key={stat.modelId}
-                  className="p-3.5 rounded-xl border border-border/60 bg-secondary/10 hover:bg-secondary/20 transition-all font-mono text-xs"
+                  className="p-3.5 rounded-xl border border-border/60 bg-secondary/15 hover:bg-secondary/30 transition-all font-mono text-xs hover-lift"
                 >
                   <div className="flex justify-between items-center select-none mb-2">
-                    <span className="font-sans font-bold text-foreground truncate max-w-[120px]">
+                    <span className="font-sans font-bold text-foreground truncate max-w-[125px]">
                       {stat.modelName}
                     </span>
-                    <span className="bg-secondary/60 px-1.5 py-0.5 rounded text-[8px] border border-border/40 font-semibold">
+                    <span className="bg-secondary px-2 py-0.5 rounded-md text-[8px] border border-border/60 font-bold uppercase tracking-wider text-muted-foreground">
                       {stat.modelFramework}
                     </span>
                   </div>
@@ -433,15 +444,15 @@ export default function ApiSettingsPage() {
                         Call Volume
                       </span>
                       <span className="font-bold text-foreground text-xs">
-                        {stat.callCount} calls
+                        {stat.callCount.toLocaleString()} calls
                       </span>
                     </div>
                     <div className="text-right">
                       <span className="block text-[8px] text-muted-foreground/60 uppercase">
                         Credits Spent
                       </span>
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-                        {Math.round(stat.totalSpent)} Credits
+                      <span className="font-bold text-emerald-605 dark:text-emerald-400 text-xs">
+                        {Math.round(stat.totalSpent).toLocaleString()} Credits
                       </span>
                     </div>
                   </div>
@@ -452,9 +463,9 @@ export default function ApiSettingsPage() {
         </div>
 
         {/* Detailed Inference Logs */}
-        <div className="lg:col-span-2 card p-5 rounded-xl border border-border bg-card shadow-sm space-y-4">
-          <div className="flex items-center gap-3 border-b border-border/60 pb-4 select-none">
-            <div className="w-9 h-9 rounded bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
+        <div className="lg:col-span-2 card rounded-xl border border-border bg-card/65 backdrop-blur-md shadow-xs space-y-4 premium-card p-5">
+          <div className="flex items-center gap-3 border-b border-border/50 pb-4 select-none">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
               <Activity className="w-4.5 h-4.5" />
             </div>
             <div>
@@ -468,9 +479,9 @@ export default function ApiSettingsPage() {
           </div>
 
           {loadingUsage ? (
-            <div className="py-12 flex items-center justify-center text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
-              <span className="font-mono text-xs">
+            <div className="py-12 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <span className="font-mono text-[9px] font-semibold">
                 Loading execution logs...
               </span>
             </div>
@@ -484,7 +495,7 @@ export default function ApiSettingsPage() {
             <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
               <table className="w-full font-mono text-[9px] text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-border text-muted-foreground font-bold uppercase select-none">
+                  <tr className="border-b border-border text-muted-foreground font-bold uppercase tracking-wider select-none text-[8.5px]">
                     <th className="py-2.5 px-2">Status</th>
                     <th className="py-2.5 px-2">Model</th>
                     <th className="py-2.5 px-2">Latency</th>
@@ -512,9 +523,9 @@ export default function ApiSettingsPage() {
                     return (
                       <tr
                         key={log.id}
-                        className="border-b border-border/40 hover:bg-secondary/20 transition-colors"
+                        className="border-b border-border/30 hover:bg-secondary/15 transition-colors font-mono"
                       >
-                        <td className="py-2 px-2 select-none">
+                        <td className="py-2.5 px-2 select-none">
                           <span
                             className={`inline-flex items-center gap-1 font-bold ${
                               isSuccess ? "text-emerald-500" : "text-red-500"
@@ -528,16 +539,16 @@ export default function ApiSettingsPage() {
                             {log.statusCode}
                           </span>
                         </td>
-                        <td className="py-2 px-2 font-sans font-bold text-foreground">
+                        <td className="py-2.5 px-2 font-sans font-bold text-foreground">
                           {log.model?.name || "Unknown Model"}
                         </td>
-                        <td className="py-2 px-2 text-muted-foreground">
+                        <td className="py-2.5 px-2 text-muted-foreground font-semibold">
                           {log.responseTimeMs}ms
                         </td>
-                        <td className="py-2 px-2 text-muted-foreground">
+                        <td className="py-2.5 px-2 text-muted-foreground">
                           {authText}
                         </td>
-                        <td className="py-2 px-2 text-right text-muted-foreground font-mono">
+                        <td className="py-2.5 px-2 text-right text-muted-foreground font-mono">
                           {formattedLogTime}
                         </td>
                       </tr>
@@ -551,27 +562,22 @@ export default function ApiSettingsPage() {
       </div>
 
       {/* Integration Code Snippet */}
-      <div className="card p-5 rounded-xl border border-border bg-card shadow-sm space-y-3.5">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
-          <Terminal className="w-4 h-4" />
-          <span className="font-semibold text-foreground text-[11px] font-mono">
+      <div className="card rounded-xl border border-border bg-card/60 backdrop-blur-md shadow-xs space-y-3.5 premium-card p-5 relative z-10">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground select-none">
+          <Terminal className="w-4 h-4 text-primary animate-pulse" />
+          <span className="font-bold text-foreground text-[10px] font-mono uppercase tracking-widest">
             Integration Code Example
           </span>
         </div>
-        <p className="text-[10px] text-muted-foreground font-sans">
-          To run inference, send authenticated HTTP requests to the target model
-          ID execution endpoint:
+        <p className="text-[10px] text-muted-foreground font-sans leading-relaxed">
+          To run inference, send authenticated HTTP requests to the target model ID execution endpoint:
         </p>
-        <pre className="bg-[#121316] text-[#ededed] border border-[#222326] p-3.5 rounded-lg text-[10px] font-mono overflow-x-auto font-medium leading-relaxed">
-          curl -X POST &quot;http://localhost:3000/models/
-          <span className="text-emerald-400">MODEL_ID</span>/predict&quot; \
+        <pre className="bg-[#0b0c0f] text-[#ebecf0] border border-border/80 p-4 rounded-xl text-[10px] font-mono overflow-x-auto font-medium leading-relaxed shadow-inner">
+          curl -X POST &quot;http://localhost:3000/models/<span className="text-emerald-400">MODEL_ID</span>/predict&quot; \
           <br />
-          &nbsp;&nbsp;-H &quot;Authorization: Bearer{" "}
-          <span className="text-indigo-400">YOUR_PER_MODEL_API_KEY</span>&quot;
-          \<br />
+          &nbsp;&nbsp;-H &quot;Authorization: Bearer <span className="text-indigo-400">YOUR_PER_MODEL_API_KEY</span>&quot; \<br />
           &nbsp;&nbsp;-H &quot;Content-Type: application/json&quot; \<br />
-          &nbsp;&nbsp;-d &apos;&#123;&quot;features&quot;: [1.2, 3.4,
-          5.6]&#125;&apos;
+          &nbsp;&nbsp;-d &apos;&#123;&quot;features&quot;: [1.2, 3.4, 5.6]&#125;&apos;
         </pre>
       </div>
 

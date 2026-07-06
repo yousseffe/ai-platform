@@ -26,6 +26,7 @@ import {
   Workflow,
   X,
   ReceiptText,
+  GitCompareArrows,
 } from "lucide-react";
 import { useWorkspace, Workspace } from "@/hooks/use-workspace";
 import { smartFetch } from "@/lib/utils/smart-fetch";
@@ -67,14 +68,11 @@ function SidebarLink({ href, active, icon, children }: SidebarLinkProps) {
       href={href}
       className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium transition-all text-sm select-none ${
         active
-          ? "bg-primary/[0.06] text-primary font-semibold shadow-xs"
-          : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+          ? "bg-secondary text-foreground font-semibold shadow-xs"
+          : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
       }`}
     >
-      {active && (
-        <span className="absolute left-1 top-2.5 bottom-2.5 w-0.75 rounded-full bg-primary" />
-      )}
-      <span className={`transition-colors ${active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}>
+      <span className={`transition-colors ${active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`}>
         {icon}
       </span>
       {children}
@@ -209,6 +207,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   }
 
   const handleLogout = async () => {
+    document.cookie = "activeWorkspaceId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "viewMode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     await signOut({ callbackUrl: "/login" });
   };
 
@@ -275,25 +275,29 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Logo Area */}
       <div className="h-14 flex items-center justify-between px-6 border-b border-border/60">
         <Link href="/dashboard" className="flex items-center gap-2 text-primary font-bold text-sm tracking-tight hover:opacity-90 transition-opacity">
-          <div className="w-7 h-7 relative flex items-center justify-center shrink-0">
+          <div className="h-8 relative flex items-center justify-center shrink-0">
             <Image
-              src="/qantara-assets/dark-normal.svg"
+              src="/qantara-assets/dark-full.svg"
               alt="Qantara Logo"
-              width={26}
-              height={26}
+              width={130}
+              height={32}
               className="object-contain hidden dark:block"
-              style={{ width: "auto" }}
+              style={{ height: "32px", width: "auto" }}
+              priority
             />
             <Image
-              src="/qantara-assets/light-normal.svg"
+              src="/qantara-assets/light-full.svg"
               alt="Qantara Logo"
-              width={26}
-              height={26}
+              width={130}
+              height={32}
               className="object-contain block dark:hidden"
-              style={{ width: "auto" }}
+              style={{ height: "32px", width: "auto" }}
+              priority
             />
           </div>
-          <span className="font-sans text-sm font-bold text-foreground tracking-tight">Qantara Console</span>
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-[7px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest font-mono select-none ml-1">
+            <span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" /> Online
+          </span>
         </Link>
         <button
           type="button"
@@ -408,9 +412,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Navigation */}
       <div className="flex-1 py-3 px-2 flex flex-col gap-0.5 overflow-y-auto">
-        <SidebarLink href="/dashboard" active={isActive("/dashboard")} icon={<LayoutGrid className="w-4 h-4" strokeWidth={1.5} />}>
+        <SidebarLink href="/dashboard" active={pathname === "/dashboard"} icon={<LayoutGrid className="w-4 h-4" strokeWidth={1.5} />}>
           Dashboard Overview
         </SidebarLink>
+
+        {viewMode === WalletType.CONSUMER && (
+          <SidebarLink
+            href="/dashboard/compare-models"
+            active={isActive("/dashboard/compare-models")}
+            icon={<GitCompareArrows className="w-4 h-4" strokeWidth={1.5} />}
+          >
+            Compare Models
+          </SidebarLink>
+        )}
 
         {isAdmin && (
           <SidebarLink href="/admin" active={isActive("/admin")} icon={<Shield className="w-4 h-4" strokeWidth={1.5} />}>
@@ -444,15 +458,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             onClick={() => setSettingsOpen(!settingsOpen)}
             className={`group relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg font-medium transition-all text-sm cursor-pointer text-left focus:outline-none select-none ${
               isSettingsActive
-                ? "bg-primary/[0.06] text-primary font-semibold"
+                ? "bg-secondary text-foreground font-semibold"
                 : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
             }`}
           >
-            {isSettingsActive && (
-              <span className="absolute left-1 top-2.5 bottom-2.5 w-0.75 rounded-full bg-primary" />
-            )}
             <div className="flex items-center gap-3">
-              <Settings className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+              <Settings className={`w-4 h-4 transition-colors ${isSettingsActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`} strokeWidth={1.5} />
               Settings
             </div>
             <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-all duration-200 ${settingsOpen ? "rotate-180" : ""}`} strokeWidth={1.5} />
@@ -464,11 +475,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 href="/settings/profile"
                 className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   pathname === "/settings/profile"
-                    ? "text-primary font-semibold bg-primary/[0.04]"
+                    ? "text-foreground font-semibold bg-secondary"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
                 }`}
               >
-                <User className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+                <User className={`w-3.5 h-3.5 transition-colors ${pathname === "/settings/profile" ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`} strokeWidth={1.5} />
                 Profile & Role
               </Link>
               {canAccessBilling && (
@@ -476,11 +487,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   href="/settings/billing"
                   className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                     pathname === "/settings/billing"
-                      ? "text-primary font-semibold bg-primary/[0.04]"
+                      ? "text-foreground font-semibold bg-secondary"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
                   }`}
                 >
-                  <Coins className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+                  <Coins className={`w-3.5 h-3.5 transition-colors ${pathname === "/settings/billing" ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`} strokeWidth={1.5} />
                   Billing & Wallet
                 </Link>
               )}
@@ -488,22 +499,22 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 href="/settings/api"
                 className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   pathname === "/settings/api"
-                    ? "text-primary font-semibold bg-primary/[0.04]"
+                    ? "text-foreground font-semibold bg-secondary"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
                 }`}
               >
-                <Key className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+                <Key className={`w-3.5 h-3.5 transition-colors ${pathname === "/settings/api" ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`} strokeWidth={1.5} />
                 API Credentials
               </Link>
               <Link
                 href="/settings/mcp-tokens"
                 className={`group flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   pathname === "/settings/mcp-tokens"
-                    ? "text-primary font-semibold bg-primary/[0.04]"
+                    ? "text-foreground font-semibold bg-secondary"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
                 }`}
               >
-                <Plug className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+                <Plug className={`w-3.5 h-3.5 transition-colors ${pathname === "/settings/mcp-tokens" ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`} strokeWidth={1.5} />
                 MCP Access Tokens
               </Link>
             </div>
@@ -583,7 +594,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           setOtpError("");
         }
       }}>
-        <DialogContent className="sm:max-w-[340px] bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
+        <DialogContent className="sm:max-w-[420px] bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
           <DialogHeader className="space-y-1">
             <DialogTitle className="text-sm font-bold text-foreground">Workspace Access Verification</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">

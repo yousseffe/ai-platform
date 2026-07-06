@@ -1,12 +1,33 @@
 "use client";
 
-import React from "react";
-import { ArrowRight, BadgeInfo, Crown, Layers3, Pencil, Plus, RefreshCw, Save, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import {
+  Layers3,
+  ShieldCheck,
+  BadgeInfo,
+  Sparkles,
+  Crown,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Save,
+  Trash2,
+  Check,
+  X,
+  Shield,
+  Coins,
+  ArrowRight,
+  Sliders,
+  Settings,
+  Info,
+  Loader2
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 import { AdminPageHeader } from "@/components/admin/common/AdminPageHeader";
 import { AdminStatusBadge } from "@/components/admin/common/AdminStatusBadge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -17,7 +38,6 @@ import {
   listAdminProviderPlans,
   updateAdminProviderPlan,
 } from "@/lib/services/admin-provider-plans.service";
-import { cn } from "@/lib/utils";
 
 type TierFormState = Record<keyof AdminProviderTierPayload, string | boolean>;
 
@@ -50,28 +70,28 @@ const EMPTY_FORM: TierFormState = {
   sortOrder: "0",
 };
 
-const LIMIT_FIELDS: Array<{ name: keyof AdminProviderTierPayload; label: string }> = [
-  { name: "maxModels", label: "Total models" },
-  { name: "maxPublicModels", label: "Public models" },
-  { name: "maxVersionsPerModel", label: "Versions / model" },
-  { name: "maxLLMModels", label: "LLM models" },
-  { name: "maxVisionModels", label: "Vision models" },
-  { name: "maxNLPModels", label: "NLP models" },
-  { name: "maxTabularModels", label: "Tabular models" },
-  { name: "maxDiffusionModels", label: "Diffusion models" },
-  { name: "maxAudioModels", label: "Audio models" },
-  { name: "maxEmbeddingModels", label: "Embedding models" },
+const LIMIT_FIELDS: Array<{ name: keyof AdminProviderTierPayload; label: string; placeholder: string }> = [
+  { name: "maxModels", label: "Max Total Models", placeholder: "Unlimited" },
+  { name: "maxPublicModels", label: "Max Public Models", placeholder: "Unlimited" },
+  { name: "maxVersionsPerModel", label: "Max Versions / Model", placeholder: "Unlimited" },
+  { name: "maxLLMModels", label: "Max LLM Models", placeholder: "Unlimited" },
+  { name: "maxVisionModels", label: "Max Vision Models", placeholder: "Unlimited" },
+  { name: "maxNLPModels", label: "Max NLP Models", placeholder: "Unlimited" },
+  { name: "maxTabularModels", label: "Max Tabular Models", placeholder: "Unlimited" },
+  { name: "maxDiffusionModels", label: "Max Diffusion Models", placeholder: "Unlimited" },
+  { name: "maxAudioModels", label: "Max Audio Models", placeholder: "Unlimited" },
+  { name: "maxEmbeddingModels", label: "Max Embedding Models", placeholder: "Unlimited" },
 ];
 
-const FEATURE_FIELDS: Array<{ name: keyof AdminProviderTierPayload; label: string }> = [
-  { name: "allowPrivateModels", label: "Private models" },
-  { name: "allowCustomPricing", label: "Custom pricing" },
-  { name: "allowPriorityReview", label: "Priority review" },
-  { name: "allowOrgPublishing", label: "Org publishing" },
-  { name: "allowDedicatedSupport", label: "Dedicated support" },
-  { name: "allowFeaturedPlacement", label: "Featured placement" },
-  { name: "allowAdvancedAnalytics", label: "Advanced analytics" },
-  { name: "isActive", label: "Plan is active" },
+const FEATURE_FIELDS: Array<{ name: keyof AdminProviderTierPayload; label: string; description: string }> = [
+  { name: "allowPrivateModels", label: "Allow Private Models", description: "Allow hosting proprietary or private models." },
+  { name: "allowCustomPricing", label: "Allow Custom Pricing", description: "Let providers override default platform token coefficients." },
+  { name: "allowPriorityReview", label: "Allow Priority Review", description: "Expedite listing checks for models published under this tier." },
+  { name: "allowOrgPublishing", label: "Allow Org Publishing", description: "Publish model artifacts under organization workspaces." },
+  { name: "allowDedicatedSupport", label: "Dedicated Support Dues", description: "Direct communication channels to platform operations." },
+  { name: "allowFeaturedPlacement", label: "Allow Featured Placement", description: "Feature model artifacts on the marketplace explorer page." },
+  { name: "allowAdvancedAnalytics", label: "Allow Advanced Analytics", description: "Detailed charts, EWMA baselines, and loki aggregated logs." },
+  { name: "isActive", label: "Tier Status is Active", description: "Enable this subscription tier for marketplace enrollment." },
 ];
 
 function toNumber(value: string | boolean): number {
@@ -83,18 +103,15 @@ function nullableNumber(value: string | boolean): number | null {
   return Number(value);
 }
 
-function formatLimit(value: number | null): string {
-  return value === null ? "Unlimited" : value.toLocaleString();
+function formatLimit(value: number | string | null): string {
+  if (value === null || value === "") return "Unlimited";
+  return typeof value === "number" ? value.toLocaleString() : value;
 }
 
 function formatMoney(value: number | string | null | undefined): string {
   if (value === null || value === undefined) return "0 EGP";
   const numeric = typeof value === "string" ? Number(value) || 0 : value;
   return `${numeric.toLocaleString()} EGP`;
-}
-
-function formatSplitLabel(tier: AdminProviderTier): string {
-  return `${tier.providerSharePercent}% provider / ${tier.platformCommissionPercent}% platform`;
 }
 
 function tierToForm(tier: AdminProviderTier): TierFormState {
@@ -159,49 +176,70 @@ function formToPayload(form: TierFormState): AdminProviderTierPayload {
   };
 }
 
-/**
- * Admin page for managing provider subscription plan definitions.
- */
 export default function AdminProviderPlansPage() {
-  const [tiers, setTiers] = React.useState<AdminProviderTier[]>([]);
-  const [form, setForm] = React.useState<TierFormState>(EMPTY_FORM);
-  const [editingId, setEditingId] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [saving, setSaving] = React.useState(false);
+  const [tiers, setTiers] = useState<AdminProviderTier[]>([]);
+  const [form, setForm] = useState<TierFormState>(EMPTY_FORM);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const loadTiers = React.useCallback(async () => {
-    const nextTiers = await listAdminProviderPlans();
-    setTiers(nextTiers);
+  // Modal dialog view states
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [formTab, setFormTab] = useState<"general" | "limits" | "features">("general");
+
+  // Confirm delete dialog states
+  const [deleteTarget, setDeleteTarget] = useState<AdminProviderTier | null>(null);
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
-  React.useEffect(() => {
-    let active = true;
+  const loadTiers = useCallback(async () => {
+    try {
+      const nextTiers = await listAdminProviderPlans();
+      setTiers(nextTiers.sort((a, b) => a.sortOrder - b.sortOrder));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load provider plans");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    Promise.resolve()
-      .then(() => loadTiers())
-      .catch((err) => {
-        const message = err instanceof Error ? err.message : "Failed to load provider plans";
-        toast.error(message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
+  useEffect(() => {
+    loadTiers();
   }, [loadTiers]);
 
-  const resetForm = () => {
-    setEditingId(null);
+  const handleCreateNewClick = () => {
     setForm(EMPTY_FORM);
+    setEditingId(null);
+    setFormTab("general");
+    setShowFormModal(true);
+  };
+
+  const handleEditClick = (tier: AdminProviderTier) => {
+    setForm(tierToForm(tier));
+    setEditingId(tier.id);
+    setFormTab("general");
+    setShowFormModal(true);
   };
 
   const updateField = (name: keyof AdminProviderTierPayload, value: string | boolean) => {
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => {
+      const next = { ...current, [name]: value };
+      // Keep split adding up to 100% automatically if provider share is updated
+      if (name === "providerSharePercent") {
+        const valNum = Number(value) || 0;
+        next.platformCommissionPercent = String(Math.max(0, 100 - valNum));
+      } else if (name === "platformCommissionPercent") {
+        const valNum = Number(value) || 0;
+        next.providerSharePercent = String(Math.max(0, 100 - valNum));
+      }
+      return next;
+    });
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const payload = formToPayload(form);
     if (payload.platformCommissionPercent + payload.providerSharePercent !== 100) {
@@ -219,460 +257,558 @@ export default function AdminProviderPlansPage() {
         toast.success("Provider plan created.");
       }
       await loadTiers();
-      resetForm();
+      setShowFormModal(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to save provider plan";
-      toast.error(message);
+      toast.error(err instanceof Error ? err.message : "Failed to save provider plan");
     } finally {
       setSaving(false);
     }
   };
-
-  const [deleteTarget, setDeleteTarget] = React.useState<AdminProviderTier | null>(null);
 
   const handleDelete = async (tier: AdminProviderTier) => {
     try {
       const result = await deleteAdminProviderPlan(tier.id);
       toast.success(result.deleted ? "Provider plan deleted." : "Provider plan deactivated.");
       await loadTiers();
-      if (editingId === tier.id) resetForm();
       setDeleteTarget(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to delete provider plan";
-      toast.error(message);
+      toast.error(err instanceof Error ? err.message : "Failed to delete provider plan");
     }
   };
 
-  const activeCount = tiers.filter((tier) => tier.isActive).length;
-  const paidCount = tiers.filter((tier) => toNumber(String(tier.monthlyPriceEgp)) > 0).length;
+  const activeCount = tiers.filter((t) => t.isActive).length;
+  const paidCount = tiers.filter((t) => Number(t.monthlyPriceEgp) > 0).length;
 
   return (
-    <div className="space-y-6">
-      <AdminPageHeader
-        title="Provider Plans"
-        description="Create, price, activate, and limit provider subscription tiers used by marketplace billing and provider publishing rules."
-      />
+    <div className="space-y-6  animate-fade-in pb-12 font-sans text-left">
+      {/* Decorative background glows */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-        <Card className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-          <div className="bg-linear-to-r from-primary/10 via-transparent to-emerald-500/10 px-6 py-6">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl space-y-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-primary">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Provider Plan Studio
+      {/* Header and Sync controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border/80 pb-5 gap-4 relative z-10">
+        <div className="text-left space-y-1">
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Crown className="w-5 h-5 text-primary animate-pulse" />
+            Provider Subscription Studio
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            Configure developer pricing tiers, platform revenue cuts, model publishing caps, and feature unlocks.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setLoading(true);
+              loadTiers().then(() => toast.success("Synced tiers."));
+            }}
+            disabled={loading}
+            className="btn-outline h-9 px-4 font-bold text-[10px] cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            <span>Sync Registry</span>
+          </button>
+          <Button
+            onClick={handleCreateNewClick}
+            className="btn-primary h-9 px-4 font-bold text-[10px] flex items-center gap-1.5 cursor-pointer hover-lift shadow-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Create Custom Plan</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Statistics widgets */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
+        <div className="border border-border/80 bg-card/65 rounded-2xl p-4 shadow-xs backdrop-blur-md hover-lift transition-all duration-300">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Registered Plans</span>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className="text-2xl font-extrabold text-foreground">{tiers.length}</span>
+            <span className="text-[9px] text-muted-foreground">Available tiers</span>
+          </div>
+        </div>
+        <div className="border border-border/80 bg-card/65 rounded-2xl p-4 shadow-xs backdrop-blur-md hover-lift transition-all duration-300">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Active Tiers</span>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className="text-2xl font-extrabold text-emerald-500">{activeCount}</span>
+            <span className="text-[9px] text-muted-foreground">Accepting signups</span>
+          </div>
+        </div>
+        <div className="border border-border/80 bg-card/65 rounded-2xl p-4 shadow-xs backdrop-blur-md hover-lift transition-all duration-300">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Commercial Paid</span>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className="text-2xl font-extrabold text-indigo-500">{paidCount}</span>
+            <span className="text-[9px] text-muted-foreground">Premium price tiers</span>
+          </div>
+        </div>
+        <div className="border border-border/80 bg-card/65 rounded-2xl p-4 shadow-xs backdrop-blur-md hover-lift transition-all duration-300">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Revenue Commission</span>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className="text-2xl font-extrabold text-primary">Avg 15%</span>
+            <span className="text-[9px] text-muted-foreground">Default platform split</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Interactive Grid of Plans */}
+      <div className="relative z-10">
+        {loading ? (
+          <div className="py-24 flex flex-col items-center justify-center bg-card/60 border border-border rounded-2xl">
+            <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
+            <span className="text-xs text-muted-foreground">Retrieving platform tier matrix...</span>
+          </div>
+        ) : tiers.length === 0 ? (
+          <div className="py-16 text-center border border-dashed border-border rounded-2xl bg-card/30">
+            <Crown className="w-10 h-10 mx-auto text-muted-foreground/35 mb-2.5" />
+            <p className="text-sm font-bold text-foreground">No Pricing Tiers Defined</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto leading-normal">
+              No developer tiers are setup yet. Click &quot;Create Custom Plan&quot; to build the first listing.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {tiers.map((tier) => {
+              const isPaid = Number(tier.monthlyPriceEgp) > 0;
+              return (
+                <div
+                  key={tier.id}
+                  className={`border rounded-2xl bg-card/65 backdrop-blur-md overflow-hidden flex flex-col hover-lift transition-all duration-300 relative shadow-sm text-left ${
+                    tier.isActive ? "border-border/80" : "border-red-500/20 opacity-75"
+                  }`}
+                >
+                  {/* Decorative indicator lines */}
+                  <div
+                    className={`absolute top-0 left-0 right-0 h-[3px] ${
+                      !tier.isActive
+                        ? "bg-red-500/40"
+                        : isPaid
+                        ? "bg-gradient-to-r from-primary to-indigo-500"
+                        : "bg-emerald-500"
+                    }`}
+                  />
+
+                  {/* Plan core body */}
+                  <div className="p-5 flex-1 space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div className="text-left space-y-0.5">
+                        <span className="text-[9px] font-mono tracking-widest text-muted-foreground uppercase">
+                          PLAN: {tier.code}
+                        </span>
+                        <h3 className="text-base font-bold text-foreground">{tier.displayName}</h3>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {!tier.isActive && (
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/10 text-red-500 border border-red-500/20">
+                            INACTIVE
+                          </span>
+                        )}
+                        {tier.isActive && isPaid && (
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-primary/10 text-primary border border-primary/20">
+                            PREMIUM
+                          </span>
+                        )}
+                        {tier.isActive && !isPaid && (
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                            FREE TIER
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-muted-foreground line-clamp-2 h-7 font-sans leading-relaxed text-left">
+                      {tier.description || "No description provided for this tier listing."}
+                    </p>
+
+                    {/* Price banner */}
+                    <div className="p-3 bg-secondary/25 border border-border/60 rounded-xl flex items-baseline justify-between">
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Price Rate</span>
+                      <div className="text-right">
+                        <span className="text-lg font-extrabold text-foreground">{formatMoney(tier.monthlyPriceEgp)}</span>
+                        <span className="text-[8px] text-muted-foreground block">monthly subscription</span>
+                      </div>
+                    </div>
+
+                    {/* Revenue share */}
+                    <div className="flex items-center justify-between text-[10px] font-semibold border-b border-border/40 pb-2.5">
+                      <span className="text-muted-foreground">Revenue Split</span>
+                      <span className="text-foreground">
+                        {tier.providerSharePercent}% Dev / {tier.platformCommissionPercent}% Platform
+                      </span>
+                    </div>
+
+                    {/* Key limits preview */}
+                    <div className="space-y-1.5 pt-1 text-[10px]">
+                      <div className="flex justify-between items-center text-muted-foreground">
+                        <span>Max Total Models:</span>
+                        <span className="font-bold text-foreground">{formatLimit(tier.maxModels)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-muted-foreground">
+                        <span>Max Public Models:</span>
+                        <span className="font-bold text-foreground">{formatLimit(tier.maxPublicModels)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-muted-foreground">
+                        <span>LLM/NLP Limits:</span>
+                        <span className="font-bold text-foreground">
+                          {formatLimit(tier.maxLLMModels)} LLM / {formatLimit(tier.maxNLPModels)} NLP
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions buttons */}
+                  <div className="p-3 bg-muted/15 border-t border-border/80 flex items-center justify-between">
+                    <span className="text-[9px] text-muted-foreground font-mono">Sort Order: {tier.sortOrder}</span>
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditClick(tier)}
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground border border-border/80 bg-card rounded-lg hover-lift cursor-pointer"
+                        title="Configure plan specifications"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteTarget(tier)}
+                        className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10 border border-red-500/20 bg-red-500/5 rounded-lg hover-lift cursor-pointer"
+                        title="Purge subscription plan"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-black tracking-tight text-foreground">
-                    Design tiers, pricing, and publishing rules from one place.
-                  </h2>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                    This console controls what providers can sell, how much they keep, and which limits apply to each subscription tier.
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Plan Studio Overlay Modal Dialog */}
+      {showFormModal && mounted && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in text-left">
+          <div className="bg-card border border-border/80 rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scale-in flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-border bg-muted/20 flex items-center justify-between shrink-0">
+              <div className="space-y-0.5 text-left">
+                <span className="text-[9px] font-mono tracking-widest text-primary uppercase font-bold">
+                  {editingId ? "Update Plan Parameters" : "Draft New Subscription"}
+                </span>
+                <h2 className="text-base font-bold text-foreground">
+                  {editingId ? `Editing: ${form.displayName}` : "Create Custom Developer Tier"}
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowFormModal(false)}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg border border-border bg-card cursor-pointer hover-lift"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content area: Sidebar visualizer preview + form tabs */}
+            <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
+              {/* Tab Selector Left/Top controls */}
+              <div className="w-full md:w-48 bg-muted/10 border-r border-border/60 p-4 flex md:flex-col gap-1.5 shrink-0 overflow-x-auto md:overflow-x-visible">
+                {[
+                  { id: "general" as const, label: "Identity & Splits", icon: <Sliders className="w-3.5 h-3.5" /> },
+                  { id: "limits" as const, label: "Resource Limits", icon: <Layers3 className="w-3.5 h-3.5" /> },
+                  { id: "features" as const, label: "Feature Flags", icon: <Settings className="w-3.5 h-3.5" /> },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setFormTab(tab.id)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold transition-all w-full shrink-0 cursor-pointer ${
+                      formTab === tab.id
+                        ? "bg-primary text-primary-foreground shadow-xs border border-primary/20"
+                        : "text-muted-foreground hover:bg-secondary/40"
+                    }`}
+                  >
+                    {tab.icon}
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Form columns */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <form onSubmit={handleSubmit} id="tier-studio-form" className="space-y-6">
+                  {/* Tab 1: Identity & Splits */}
+                  {formTab === "general" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <label className="space-y-1.5 text-xs font-semibold block text-left">
+                          Unique Code (eg. FREE, ENTERPRISE)
+                          <input
+                            value={String(form.code)}
+                            onChange={(e) => updateField("code", e.target.value)}
+                            required
+                            disabled={!!editingId}
+                            placeholder="PRO_X"
+                            className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs uppercase shadow-xs outline-hidden focus:border-primary transition-all disabled:opacity-50"
+                          />
+                        </label>
+                        <label className="space-y-1.5 text-xs font-semibold block text-left">
+                          Display Name
+                          <input
+                            value={String(form.displayName)}
+                            onChange={(e) => updateField("displayName", e.target.value)}
+                            required
+                            placeholder="Professional Tier"
+                            className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-xs outline-hidden focus:border-primary transition-all"
+                          />
+                        </label>
+                      </div>
+
+                      <label className="space-y-1.5 text-xs font-semibold block text-left">
+                        Description / Value Pitch
+                        <textarea
+                          value={String(form.description)}
+                          onChange={(e) => updateField("description", e.target.value)}
+                          rows={3}
+                          placeholder="What capabilities are unlocked under this pricing tier?"
+                          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs shadow-xs outline-hidden focus:border-primary transition-all resize-none"
+                        />
+                      </label>
+
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                        <label className="space-y-1.5 text-xs font-semibold block text-left">
+                          Monthly Price (EGP)
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-[9px]">EGP</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={String(form.monthlyPriceEgp)}
+                              onChange={(e) => updateField("monthlyPriceEgp", e.target.value)}
+                              className="h-10 w-full pl-11 rounded-xl border border-border bg-background px-3 text-xs shadow-xs outline-hidden focus:border-primary transition-all"
+                            />
+                          </div>
+                        </label>
+                        <label className="space-y-1.5 text-xs font-semibold block text-left">
+                          Annual Price (EGP - Optional)
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-[9px]">EGP</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={String(form.annualPriceEgp)}
+                              onChange={(e) => updateField("annualPriceEgp", e.target.value)}
+                              placeholder="Leave blank if not available"
+                              className="h-10 w-full pl-11 rounded-xl border border-border bg-background px-3 text-xs shadow-xs outline-hidden focus:border-primary transition-all"
+                            />
+                          </div>
+                        </label>
+                      </div>
+
+                      <div className="border-t border-border/60 pt-4 space-y-4">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground uppercase tracking-wider">
+                          <Coins className="w-3.5 h-3.5 text-primary" />
+                          <span>Revenue Share Schedule</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <label className="space-y-1.5 text-xs font-semibold block text-left">
+                            Developer Share (%)
+                            <div className="relative">
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">%</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={String(form.providerSharePercent)}
+                                onChange={(e) => updateField("providerSharePercent", e.target.value)}
+                                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-xs outline-hidden focus:border-primary transition-all pr-8"
+                              />
+                            </div>
+                          </label>
+                          <label className="space-y-1.5 text-xs font-semibold block text-left">
+                            Platform Cut (%)
+                            <div className="relative">
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">%</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={String(form.platformCommissionPercent)}
+                                onChange={(e) => updateField("platformCommissionPercent", e.target.value)}
+                                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-xs outline-hidden focus:border-primary transition-all pr-8"
+                              />
+                            </div>
+                          </label>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground font-sans text-left leading-normal">
+                          Platform cut commission schedule dictates revenue deductions on provider earnings. Commission + share must equal 100%.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tab 2: Resource Limits */}
+                  {formTab === "limits" && (
+                    <div className="space-y-4 text-left">
+                      <div className="flex gap-2 p-3 bg-secondary/35 rounded-xl border border-border/80 text-muted-foreground leading-normal font-sans text-[10px] mb-2">
+                        <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <p>
+                          Define constraints on model artifact registry. Leave any fields completely blank to represent an <span className="font-bold text-foreground">Unlimited</span> threshold limit.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        {LIMIT_FIELDS.map((field) => (
+                          <label key={field.name} className="space-y-1.5 text-xs font-semibold block text-left">
+                            {field.label}
+                            <input
+                              type="number"
+                              min="0"
+                              value={String(form[field.name])}
+                              onChange={(e) => updateField(field.name, e.target.value)}
+                              placeholder={field.placeholder}
+                              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-xs outline-hidden focus:border-primary transition-all"
+                            />
+                          </label>
+                        ))}
+                        <label className="space-y-1.5 text-xs font-semibold block text-left">
+                          Matrix Sort Order index
+                          <input
+                            type="number"
+                            min="0"
+                            value={String(form.sortOrder)}
+                            onChange={(e) => updateField("sortOrder", e.target.value)}
+                            className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-xs outline-hidden focus:border-primary transition-all"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tab 3: Feature Flags */}
+                  {formTab === "features" && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                        {FEATURE_FIELDS.map((field) => (
+                          <label
+                            key={field.name}
+                            className="flex items-start justify-between rounded-2xl border border-border bg-secondary/20 p-4 text-xs font-semibold shadow-xs transition-all hover:border-primary/20 cursor-pointer select-none"
+                          >
+                            <div className="space-y-0.5 pr-2">
+                              <span className="text-xs font-bold text-foreground block">{field.label}</span>
+                              <span className="text-[9px] text-muted-foreground block font-medium leading-relaxed">
+                                {field.description}
+                              </span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(form[field.name])}
+                              onChange={(e) => updateField(field.name, e.target.checked)}
+                              className="h-4.5 w-4.5 accent-primary shrink-0 mt-0.5 cursor-pointer"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </form>
+              </div>
+
+              {/* Right Side: Interactive Mock Plan Preview (Stellar visual addition) */}
+              <div className="w-full md:w-72 bg-muted/5 border-t md:border-t-0 md:border-l border-border/60 p-5 shrink-0 overflow-y-auto hidden md:block">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-4">
+                  Live Plan Preview
+                </span>
+                {/* Mini card mimicking final design */}
+                <div className="border border-border bg-background rounded-2xl shadow-sm overflow-hidden flex flex-col p-4 text-left space-y-3 scale-95 origin-top">
+                  <div className="space-y-0.5">
+                    <span className="text-[8px] font-mono tracking-widest text-muted-foreground uppercase">
+                      PREVIEW: {String(form.code) || "DRAFT"}
+                    </span>
+                    <h4 className="text-sm font-bold text-foreground truncate">
+                      {String(form.displayName) || "Untitled Plan"}
+                    </h4>
+                  </div>
+
+                  <p className="text-[9px] text-muted-foreground line-clamp-2 h-7 font-sans leading-relaxed">
+                    {String(form.description) || "No description drafted yet."}
                   </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm">
-                    <Layers3 className="h-3.5 w-3.5 text-primary" />
-                    {tiers.length} plans
+
+                  <div className="p-2.5 bg-secondary/20 border border-border/60 rounded-xl flex items-baseline justify-between">
+                    <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-wider">Price</span>
+                    <span className="text-sm font-extrabold text-foreground">
+                      {formatMoney(form.monthlyPriceEgp as string)}
+                    </span>
                   </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                    {activeCount} active
+
+                  <div className="space-y-1.5 pt-1 text-[9px]">
+                    <div className="flex justify-between items-center text-muted-foreground">
+                      <span>Total Models:</span>
+                      <span className="font-bold text-foreground">{formatLimit(form.maxModels as string)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-muted-foreground">
+                      <span>Public Limit:</span>
+                      <span className="font-bold text-foreground">{formatLimit(form.maxPublicModels as string)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-muted-foreground">
+                      <span>Revenue Split:</span>
+                      <span className="font-bold text-foreground">{form.providerSharePercent}% / {form.platformCommissionPercent}%</span>
+                    </div>
                   </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-foreground shadow-sm">
-                    <BadgeInfo className="h-3.5 w-3.5 text-amber-500" />
-                    Revenue split must equal 100%
+
+                  <div className="border-t border-border/40 pt-2 flex flex-wrap gap-1">
+                    {Boolean(form.allowPrivateModels) && (
+                      <span className="px-1 py-0.5 rounded-sm text-[7px] font-bold bg-primary/10 text-primary">Private</span>
+                    )}
+                    {Boolean(form.allowCustomPricing) && (
+                      <span className="px-1 py-0.5 rounded-sm text-[7px] font-bold bg-indigo-500/10 text-indigo-500">Pricing</span>
+                    )}
+                    {Boolean(form.allowPriorityReview) && (
+                      <span className="px-1 py-0.5 rounded-sm text-[7px] font-bold bg-amber-500/10 text-amber-500">Priority</span>
+                    )}
+                    {Boolean(form.isActive) && (
+                      <span className="px-1 py-0.5 rounded-sm text-[7px] font-bold bg-emerald-500/10 text-emerald-500">Active</span>
+                    )}
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="grid min-w-[280px] gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                <div className="rounded-2xl border border-border bg-background/80 p-4 shadow-sm backdrop-blur-xs">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Plans</p>
-                  <p className="mt-2 text-3xl font-black text-foreground">{tiers.length}</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-background/80 p-4 shadow-sm backdrop-blur-xs">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Active</p>
-                  <p className="mt-2 text-3xl font-black text-foreground">{activeCount}</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-background/80 p-4 shadow-sm backdrop-blur-xs">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Paid</p>
-                  <p className="mt-2 text-3xl font-black text-foreground">{paidCount}</p>
-                </div>
+            {/* Footer actions */}
+            <div className="px-6 py-4 border-t border-border bg-muted/15 flex items-center justify-between shrink-0 font-sans">
+              <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
+                <BadgeInfo className="w-3.5 h-3.5 text-primary" />
+                <span>Validation splits applied</span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowFormModal(false)}
+                  className="h-9 px-4 rounded-xl text-xs cursor-pointer btn-outline"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  form="tier-studio-form"
+                  disabled={saving}
+                  className="btn-primary h-9 px-4 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer hover-lift"
+                >
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>{editingId ? "Save Changes" : "Publish Plan"}</span>
+                </Button>
               </div>
             </div>
           </div>
-        </Card>
+        </div>,
+        document.body
+      )}
 
-        <Card className="rounded-3xl border border-border bg-card shadow-sm">
-          <CardContent className="space-y-4 p-6">
-            <div className="flex items-center gap-2">
-              <div className="rounded-2xl border border-primary/15 bg-primary/10 p-2 text-primary">
-                <Crown className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-foreground">Plan governance</p>
-                <p className="text-xs text-muted-foreground">Keep the catalog clean and predictable.</p>
-              </div>
-            </div>
-            <div className="space-y-3 rounded-2xl border border-border bg-secondary/20 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Revenue split rule</p>
-                  <p className="mt-1 text-sm font-semibold text-foreground">Platform commission and provider share should always add to 100%.</p>
-                </div>
-                <ArrowRight className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="h-px bg-border/60" />
-              <p className="text-xs leading-6 text-muted-foreground">
-                Use the editor to keep pricing, limits, and feature entitlements aligned before promoting a plan to providers.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-              <div className="rounded-2xl border border-border bg-background p-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Best practice</p>
-                <p className="mt-1 text-sm font-semibold text-foreground">Edit a plan by selecting it from the table.</p>
-              </div>
-              <div className="rounded-2xl border border-border bg-background p-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Pricing</p>
-                <p className="mt-1 text-sm font-semibold text-foreground">Use monthly and annual pricing to guide upgrades.</p>
-              </div>
-              <div className="rounded-2xl border border-border bg-background p-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Limits</p>
-                <p className="mt-1 text-sm font-semibold text-foreground">Unlimited means blank, not zero.</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_390px]">
-        <Card className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-          <CardHeader className="flex flex-col gap-4 border-b border-border/70 bg-secondary/20 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2 text-sm font-bold text-foreground">
-                <Crown className="h-4 w-4 text-primary" />
-                Provider Plan Catalog
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Select any row to edit its pricing, access rules, or publishing limits.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setLoading(true);
-                loadTiers()
-                  .catch((err) => {
-                    const message = err instanceof Error ? err.message : "Failed to refresh provider plans";
-                    toast.error(message);
-                  })
-                  .finally(() => setLoading(false));
-              }}
-              className="h-9 gap-1.5 rounded-xl border-border/80 text-xs shadow-sm"
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-              Refresh
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border/70 bg-muted/30">
-                  <TableHead className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Plan</TableHead>
-                  <TableHead className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Price</TableHead>
-                  <TableHead className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Revenue Split</TableHead>
-                  <TableHead className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Limits</TableHead>
-                  <TableHead className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Status</TableHead>
-                  <TableHead className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  [0, 1, 2].map((item) => (
-                    <TableRow key={item} className="border-border/40">
-                      <TableCell className="px-5 py-5"><div className="h-4 w-32 animate-pulse rounded bg-muted" /></TableCell>
-                      <TableCell className="px-5 py-5"><div className="h-4 w-20 animate-pulse rounded bg-muted" /></TableCell>
-                      <TableCell className="px-5 py-5"><div className="h-4 w-28 animate-pulse rounded bg-muted" /></TableCell>
-                      <TableCell className="px-5 py-5"><div className="h-4 w-24 animate-pulse rounded bg-muted" /></TableCell>
-                      <TableCell className="px-5 py-5"><div className="h-4 w-16 animate-pulse rounded bg-muted" /></TableCell>
-                      <TableCell className="px-5 py-5"><div className="ml-auto h-4 w-20 animate-pulse rounded bg-muted" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : tiers.length > 0 ? (
-                  tiers.map((tier) => (
-                    <TableRow key={tier.id} className="border-border/40 transition-colors hover:bg-secondary/30">
-                      <TableCell className="px-5 py-5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingId(tier.id);
-                            setForm(tierToForm(tier));
-                          }}
-                          className="group text-left"
-                        >
-                          <span className="block font-semibold text-foreground transition-colors group-hover:text-primary">
-                            {tier.displayName}
-                          </span>
-                          <span className="text-xs font-mono text-muted-foreground">{tier.code}</span>
-                        </button>
-                      </TableCell>
-                      <TableCell className="px-5 py-5">
-                        <div className="space-y-1">
-                          <p className="font-mono text-sm font-semibold text-foreground">{formatMoney(tier.monthlyPriceEgp)} / month</p>
-                          <p className="text-xs text-muted-foreground">
-                            Annual: {tier.annualPriceEgp !== null ? formatMoney(tier.annualPriceEgp) : "Custom"}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-5 text-xs">
-                        <div className="space-y-1.5">
-                          <p className="font-semibold text-foreground">{formatSplitLabel(tier)}</p>
-                          <p className="text-muted-foreground">
-                            Sort order {tier.sortOrder.toLocaleString("en-US")}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-5 text-xs text-muted-foreground">
-                        <div className="space-y-1.5">
-                          <p>
-                            {formatLimit(tier.maxPublicModels)} public / {formatLimit(tier.maxModels)} total
-                          </p>
-                          <p>
-                            {formatLimit(tier.maxVersionsPerModel)} versions per model
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-5">
-                        <AdminStatusBadge value={tier.isActive ? "ACTIVE" : "SUSPENDED"} />
-                      </TableCell>
-                      <TableCell className="px-5 py-5 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingId(tier.id);
-                              setForm(tierToForm(tier));
-                            }}
-                            className="h-9 gap-1.5 rounded-xl border-border/80 text-xs shadow-sm"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDeleteTarget(tier)}
-                            className="h-9 gap-1.5 rounded-xl border-rose-500/30 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="px-5 py-14 text-center">
-                      <div className="mx-auto flex max-w-md flex-col items-center gap-3">
-                        <div className="rounded-full border border-primary/15 bg-primary/10 p-3 text-primary">
-                          <Crown className="h-5 w-5" />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-foreground">No provider plans configured yet.</p>
-                          <p className="text-sm text-muted-foreground">
-                            Create the first plan to define provider pricing, revenue split, and publishing limits.
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="sticky top-6 h-fit overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-          <CardHeader className="border-b border-border/70 bg-secondary/20 p-5">
-            <CardTitle className="flex items-center gap-2 text-sm font-bold text-foreground">
-              {editingId ? <Pencil className="h-4 w-4 text-primary" /> : <Plus className="h-4 w-4 text-primary" />}
-              {editingId ? "Edit Provider Plan" : "Create Provider Plan"}
-            </CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {editingId ? "Update the selected plan and keep the split consistent." : "Add a new plan with pricing, limits, and capability flags."}
-            </p>
-          </CardHeader>
-          <CardContent className="max-h-[calc(100vh-180px)] overflow-y-auto p-5">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-3">
-                <label className="space-y-1.5 text-xs font-semibold">
-                  Code
-                  <input
-                    value={String(form.code)}
-                    onChange={(event) => updateField("code", event.target.value)}
-                    required
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs uppercase shadow-sm outline-none transition-colors focus:border-primary"
-                  />
-                </label>
-                <label className="space-y-1.5 text-xs font-semibold">
-                  Sort order
-                  <input
-                    type="number"
-                    value={String(form.sortOrder)}
-                    onChange={(event) => updateField("sortOrder", event.target.value)}
-                    required
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-sm outline-none transition-colors focus:border-primary"
-                  />
-                </label>
-              </div>
-
-              <label className="space-y-1.5 text-xs font-semibold">
-                Display name
-                <input
-                  value={String(form.displayName)}
-                  onChange={(event) => updateField("displayName", event.target.value)}
-                  required
-                  className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-sm outline-none transition-colors focus:border-primary"
-                />
-              </label>
-
-              <label className="space-y-1.5 text-xs font-semibold">
-                Description
-                <textarea
-                  value={String(form.description)}
-                  onChange={(event) => updateField("description", event.target.value)}
-                  rows={3}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs shadow-sm outline-none transition-colors focus:border-primary"
-                />
-              </label>
-
-              <div className="grid grid-cols-2 gap-3">
-                <label className="space-y-1.5 text-xs font-semibold">
-                  Monthly EGP
-                  <input
-                    type="number"
-                    min={0}
-                    value={String(form.monthlyPriceEgp)}
-                    onChange={(event) => updateField("monthlyPriceEgp", event.target.value)}
-                    required
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-sm outline-none transition-colors focus:border-primary"
-                  />
-                </label>
-                <label className="space-y-1.5 text-xs font-semibold">
-                  Annual EGP
-                  <input
-                    type="number"
-                    min={0}
-                    value={String(form.annualPriceEgp)}
-                    onChange={(event) => updateField("annualPriceEgp", event.target.value)}
-                    placeholder="Optional"
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-sm outline-none transition-colors focus:border-primary"
-                  />
-                </label>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <label className="space-y-1.5 text-xs font-semibold">
-                  Platform %
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={String(form.platformCommissionPercent)}
-                    onChange={(event) => updateField("platformCommissionPercent", event.target.value)}
-                    required
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-sm outline-none transition-colors focus:border-primary"
-                  />
-                </label>
-                <label className="space-y-1.5 text-xs font-semibold">
-                  Provider %
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={String(form.providerSharePercent)}
-                    onChange={(event) => updateField("providerSharePercent", event.target.value)}
-                    required
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-sm outline-none transition-colors focus:border-primary"
-                  />
-                </label>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Limits</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {LIMIT_FIELDS.map((field) => (
-                    <label key={field.name} className="space-y-1.5 text-xs font-semibold">
-                      {field.label}
-                      <input
-                        type="number"
-                        min={0}
-                        value={String(form[field.name])}
-                        onChange={(event) => updateField(field.name, event.target.value)}
-                        placeholder="Unlimited"
-                        className="h-10 w-full rounded-xl border border-border bg-background px-3 text-xs shadow-sm outline-none transition-colors focus:border-primary"
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Capabilities</p>
-                <div className="grid grid-cols-1 gap-2">
-                  {FEATURE_FIELDS.map((field) => (
-                    <label
-                      key={field.name}
-                      className="flex items-center justify-between rounded-2xl border border-border bg-secondary/20 px-4 py-3 text-xs font-semibold shadow-sm transition-colors hover:border-primary/20"
-                    >
-                      {field.label}
-                      <input
-                        type="checkbox"
-                        checked={Boolean(form[field.name])}
-                        onChange={(event) => updateField(field.name, event.target.checked)}
-                        className="h-4 w-4 accent-primary"
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-secondary/20 p-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Current draft</p>
-                <p className="mt-1 text-sm font-semibold text-foreground">
-                  {String(form.displayName).trim() || "Untitled plan"} · {formatMoney(String(form.monthlyPriceEgp))} / month
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {String(form.providerSharePercent)}% provider share / {String(form.platformCommissionPercent)}% platform cut
-                </p>
-              </div>
-
-              <div className="flex gap-2 border-t border-border pt-4">
-                <Button type="submit" disabled={saving} className="h-10 flex-1 gap-1.5 rounded-xl text-xs shadow-sm">
-                  <Save className="h-3.5 w-3.5" />
-                  {saving ? "Saving..." : editingId ? "Save Changes" : "Create Plan"}
-                </Button>
-                <Button type="button" variant="outline" onClick={resetForm} className="h-10 rounded-xl text-xs shadow-sm">
-                  Reset
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-
+      {/* Confirmation dialog targeting delete */}
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title="Delete provider plan"
-        description={`Delete or deactivate provider plan "${deleteTarget?.displayName}"? Assigned plans will be deactivated instead of removed.`}
-        confirmLabel="Delete plan"
+        description={`Are you sure you want to delete or deactivate provider plan "${deleteTarget?.displayName}"? Assigned plans will be deactivated instead of removed.`}
+        confirmLabel="Confirm Delete"
         onConfirm={async () => {
           if (deleteTarget) await handleDelete(deleteTarget);
         }}

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { smartFetch } from "@/lib/utils/smart-fetch";
@@ -113,11 +113,15 @@ export default function ProviderSubscriptionPaymentsPage() {
   const isSubscriptionExpired = subscription?.status === "EXPIRED";
 
   return (
-    <div className="space-y-6 animate-fade-in text-left">
-      <div className="border-b border-border pb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <div className="relative space-y-6 animate-fade-in text-left font-sans">
+      {/* Background decoration */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
+      <div className="border-b border-border/80 pb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 relative z-10 select-none">
         <div>
           <h1 className="text-lg font-bold text-foreground flex items-center gap-2 tracking-tight">
-            <ReceiptText className="w-5 h-5 text-primary" strokeWidth={2.5} />
+            <ReceiptText className="w-5 h-5 text-primary" strokeWidth={2} />
             Subscription Payments
           </h1>
           <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
@@ -126,7 +130,10 @@ export default function ProviderSubscriptionPaymentsPage() {
         </div>
         <Link
           href="/provider/subscriptions"
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background hover:bg-secondary px-4 h-9 text-xs font-bold text-foreground hover:text-primary transition-all shadow-sm"
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "h-9 px-4 text-xs font-bold gap-1.5 hover-lift active-shrink rounded-lg"
+          )}
         >
           <Crown className="w-3.5 h-3.5" />
           Manage Plans
@@ -136,19 +143,19 @@ export default function ProviderSubscriptionPaymentsPage() {
 
       <Card
         className={cn(
-          "border rounded-xl shadow-sm",
+          "border rounded-xl shadow-xs relative z-10 overflow-hidden premium-card p-0",
           isSubscriptionActive
-            ? "border-emerald-500/25 bg-emerald-500/[0.03]"
+            ? "border-emerald-500/25 bg-emerald-500/[0.02]"
             : isSubscriptionExpired
-              ? "border-amber-500/25 bg-amber-500/[0.04]"
-              : "border-border bg-card",
+              ? "border-amber-500/25 bg-amber-500/[0.02]"
+              : "border-border bg-card/60 backdrop-blur-md",
         )}
       >
-        <CardContent className="p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex items-start gap-3">
+        <CardContent className="p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 select-none">
+          <div className="flex items-start gap-3.5">
             <div
               className={cn(
-                "p-2.5 rounded-lg border",
+                "p-3 rounded-xl border shrink-0 shadow-xs",
                 isSubscriptionActive
                   ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
                   : isSubscriptionExpired
@@ -156,20 +163,20 @@ export default function ProviderSubscriptionPaymentsPage() {
                     : "bg-primary/10 text-primary border-primary/15",
               )}
             >
-              {isSubscriptionExpired ? <AlertTriangle className="w-5 h-5" /> : <CalendarDays className="w-5 h-5" />}
+              {isSubscriptionExpired ? <AlertTriangle className="w-5 h-5" /> : <CalendarDays className="w-5 h-5 animate-pulse" />}
             </div>
-            <div>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider font-mono">
+            <div className="space-y-1">
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest font-mono">
                 Current subscription
               </p>
-              <h2 className="mt-1 text-lg font-extrabold text-foreground">
+              <h2 className="text-base font-extrabold text-foreground">
                 {isSubscriptionActive
                   ? `Active until ${subscription?.expiresAt ? formatDate(subscription.expiresAt) : "next renewal"}`
                   : isSubscriptionExpired
                     ? "Expired and reverted to the default plan"
                     : "No active paid subscription"}
               </h2>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-lg">
                 {isSubscriptionActive &&
                 subscription?.daysRemaining !== null &&
                 subscription?.daysRemaining !== undefined
@@ -181,74 +188,78 @@ export default function ProviderSubscriptionPaymentsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-            <div className="rounded-lg border border-border bg-background/70 px-3 py-2">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Cycle</p>
-              <p className="mt-1 font-bold text-foreground">{subscription?.billingCycle ?? "None"}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs shrink-0">
+            <div className="rounded-xl border border-border/80 bg-background/50 px-3.5 py-2.5 shadow-inner">
+              <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground font-mono">Cycle</p>
+              <p className="mt-1 font-bold text-foreground font-sans">{subscription?.billingCycle ?? "None"}</p>
             </div>
-            <div className="rounded-lg border border-border bg-background/70 px-3 py-2">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Started</p>
-              <p className="mt-1 font-bold text-foreground">
-                {subscription?.startedAt ? formatDate(subscription.startedAt) : "-"}
+            <div className="rounded-xl border border-border/80 bg-background/50 px-3.5 py-2.5 shadow-inner">
+              <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground font-mono">Started</p>
+              <p className="mt-1 font-bold text-foreground font-sans">
+                {subscription?.startedAt ? formatDate(subscription.startedAt).split(",")[0] : "-"}
               </p>
             </div>
-            <div className="rounded-lg border border-border bg-background/70 px-3 py-2 col-span-2 sm:col-span-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Expires</p>
-              <p className="mt-1 font-bold text-foreground">
-                {subscription?.expiresAt ? formatDate(subscription.expiresAt) : "-"}
+            <div className="rounded-xl border border-border/80 bg-background/50 px-3.5 py-2.5 shadow-inner col-span-2 sm:col-span-1">
+              <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground font-mono">Expires</p>
+              <p className="mt-1 font-bold text-foreground font-sans">
+                {subscription?.expiresAt ? formatDate(subscription.expiresAt).split(",")[0] : "-"}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <Card className="border border-border bg-card border-l-4 border-l-primary rounded-xl shadow-sm">
-          <CardContent className="p-5 flex items-center justify-between">
+      {/* Stripe-style Metrics grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 relative z-10 select-none">
+        <Card className="border border-border/80 bg-card/60 backdrop-blur-md rounded-xl shadow-xs premium-card overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-primary to-indigo-500" />
+          <CardContent className="p-5 pt-6 flex items-center justify-between">
             <div>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Total Paid</p>
-              <p className="text-2xl font-extrabold text-foreground mt-1.5 font-mono">
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest font-mono">Total Paid</p>
+              <p className="text-2xl font-black text-foreground mt-2 font-mono">
                 {totalPaidEgp.toLocaleString()} EGP
               </p>
             </div>
-            <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/15">
-              <CreditCard className="w-5 h-5" />
+            <div className="p-3 rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-xs shrink-0">
+              <CreditCard className="w-5 h-5 animate-pulse" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border bg-card border-l-4 border-l-emerald-500 rounded-xl shadow-sm">
-          <CardContent className="p-5 flex items-center justify-between">
+        <Card className="border border-border/80 bg-card/60 backdrop-blur-md rounded-xl shadow-xs premium-card overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+          <CardContent className="p-5 pt-6 flex items-center justify-between">
             <div>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Payments</p>
-              <p className="text-2xl font-extrabold text-foreground mt-1.5 font-mono">{total} Records</p>
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest font-mono">Payments</p>
+              <p className="text-2xl font-black text-foreground mt-2 font-mono">{total.toLocaleString()} Records</p>
             </div>
-            <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/15">
+            <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-xs shrink-0">
               <ReceiptText className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border bg-card border-l-4 border-l-amber-500 rounded-xl shadow-sm">
-          <CardContent className="p-5 flex items-center justify-between">
+        <Card className="border border-border/80 bg-card/60 backdrop-blur-md rounded-xl shadow-xs premium-card overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
+          <CardContent className="p-5 pt-6 flex items-center justify-between">
             <div>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Last Payment</p>
-              <p className="text-sm font-extrabold text-foreground mt-2 font-mono">
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest font-mono">Last Payment</p>
+              <p className="text-xs font-extrabold text-foreground mt-3.5 font-mono truncate max-w-[160px]">
                 {lastPayment ? formatDate(lastPayment.createdAt) : "No payments yet"}
               </p>
             </div>
-            <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/15">
+            <div className="p-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shadow-xs shrink-0">
               <Clock className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="overflow-hidden border border-border bg-card rounded-xl shadow-sm">
-        <CardHeader className="p-4.5 border-b border-border bg-secondary/5 flex flex-row items-center justify-between space-y-0">
-          <div className="space-y-0.5">
+      <Card className="overflow-hidden border border-border/80 bg-card/60 backdrop-blur-md rounded-xl shadow-xs relative z-10 premium-card p-0">
+        <CardHeader className="p-5 border-b border-border bg-secondary/20 flex flex-row items-center justify-between space-y-0 select-none">
+          <div className="space-y-1">
             <CardTitle className="font-bold text-foreground text-xs flex items-center gap-2">
-              <ReceiptText className="w-4 h-4 text-primary" />
+              <ReceiptText className="w-4 h-4 text-primary animate-pulse" />
               Provider Subscription Ledger
             </CardTitle>
             <p className="text-[10px] text-muted-foreground">
@@ -268,7 +279,7 @@ export default function ProviderSubscriptionPaymentsPage() {
                 })
                 .finally(() => setLoading(false));
             }}
-            className="h-8 text-[10px] font-bold gap-1.5"
+            className="h-8 text-[10px] font-bold gap-1.5 hover-lift active-shrink rounded-lg"
           >
             <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
             Refresh
@@ -279,53 +290,53 @@ export default function ProviderSubscriptionPaymentsPage() {
           <div className="overflow-x-auto">
             <Table className="w-full text-left border-collapse text-xs">
               <TableHeader>
-                <TableRow className="bg-secondary/15 border-b border-border hover:bg-secondary/15">
-                  <TableHead className="px-4.5 py-3.5 font-bold text-[9px] uppercase tracking-widest text-muted-foreground h-auto">Status</TableHead>
-                  <TableHead className="px-4.5 py-3.5 font-bold text-[9px] uppercase tracking-widest text-muted-foreground h-auto">Amount</TableHead>
-                  <TableHead className="px-4.5 py-3.5 font-bold text-[9px] uppercase tracking-widest text-muted-foreground h-auto">Stripe Session</TableHead>
-                  <TableHead className="px-4.5 py-3.5 font-bold text-[9px] uppercase tracking-widest text-muted-foreground h-auto">Date</TableHead>
+                <TableRow className="bg-secondary/10 border-b border-border/60 hover:bg-secondary/10 select-none">
+                  <TableHead className="px-5 py-3.5 font-bold text-[9px] uppercase tracking-widest text-muted-foreground h-auto">Status</TableHead>
+                  <TableHead className="px-5 py-3.5 font-bold text-[9px] uppercase tracking-widest text-muted-foreground h-auto">Amount</TableHead>
+                  <TableHead className="px-5 py-3.5 font-bold text-[9px] uppercase tracking-widest text-muted-foreground h-auto">Stripe Session</TableHead>
+                  <TableHead className="px-5 py-3.5 font-bold text-[9px] uppercase tracking-widest text-muted-foreground h-auto">Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   [0, 1, 2].map((item) => (
-                    <TableRow key={item} className="border-b border-border/30">
-                      <TableCell className="px-4.5 py-4"><div className="h-4 w-20 rounded bg-muted animate-pulse" /></TableCell>
-                      <TableCell className="px-4.5 py-4"><div className="h-4 w-24 rounded bg-muted animate-pulse" /></TableCell>
-                      <TableCell className="px-4.5 py-4"><div className="h-4 w-52 rounded bg-muted animate-pulse" /></TableCell>
-                      <TableCell className="px-4.5 py-4"><div className="h-4 w-32 rounded bg-muted animate-pulse" /></TableCell>
+                    <TableRow key={item} className="border-b border-border/20">
+                      <TableCell className="px-5 py-4"><div className="h-4 w-20 rounded bg-muted animate-pulse" /></TableCell>
+                      <TableCell className="px-5 py-4"><div className="h-4 w-24 rounded bg-muted/80 animate-pulse" /></TableCell>
+                      <TableCell className="px-5 py-4"><div className="h-4 w-52 rounded bg-muted/60 animate-pulse" /></TableCell>
+                      <TableCell className="px-5 py-4"><div className="h-4 w-32 rounded bg-muted/40 animate-pulse" /></TableCell>
                     </TableRow>
                   ))
                 ) : payments.length > 0 ? (
                   payments.map((payment) => (
-                    <TableRow key={payment.id} className="border-b border-border/30 hover:bg-secondary/25">
-                      <TableCell className="px-4.5 py-3.5">
+                    <TableRow key={payment.id} className="border-b border-border/30 hover:bg-secondary/15 transition-colors">
+                      <TableCell className="px-5 py-3.5 select-none">
                         <Badge
                           variant="outline"
                           className={cn(
-                            "gap-1.5 text-[9px] font-bold uppercase tracking-wider",
+                            "gap-1.5 text-[9px] font-bold uppercase tracking-wider rounded-md",
                             payment.status === "COMPLETED" && "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-                            payment.status === "FAILED" && "border-red-500/25 bg-red-500/10 text-red-600 dark:text-red-400",
+                            payment.status === "FAILED" && "border-red-500/25 bg-red-500/10 text-red-650 dark:text-red-400",
                           )}
                         >
                           {statusIcon(payment.status)}
                           {payment.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="px-4.5 py-3.5 font-mono font-bold text-foreground">
+                      <TableCell className="px-5 py-3.5 font-mono font-bold text-foreground">
                         {toNumber(payment.amount).toLocaleString()} EGP
                       </TableCell>
-                      <TableCell className="px-4.5 py-3.5 font-mono text-[10.5px] text-muted-foreground">
+                      <TableCell className="px-5 py-3.5 font-mono text-[10.5px] text-muted-foreground">
                         {payment.stripeEventId || "Manual/legacy payment"}
                       </TableCell>
-                      <TableCell className="px-4.5 py-3.5 font-mono text-[10.5px] text-muted-foreground">
+                      <TableCell className="px-5 py-3.5 font-mono text-[10.5px] text-muted-foreground">
                         {formatDate(payment.createdAt)}
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="px-4.5 py-12 text-center">
+                    <TableCell colSpan={4} className="px-5 py-12 text-center select-none">
                       <div className="mx-auto max-w-md space-y-2">
                         <p className="text-sm font-bold text-foreground">No subscription payments yet.</p>
                         <p className="text-xs text-muted-foreground leading-relaxed">

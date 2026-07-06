@@ -89,7 +89,7 @@ export default function PublicHeader({ session }: PublicHeaderProps) {
         <Link href="/explore" className="hover:text-foreground transition-colors flex items-center gap-1">
           Models Marketplace <Sparkles className="w-3 h-3 text-primary animate-pulse" />
         </Link>
-        <a href="/CLAUDE.md" className="hover:text-foreground transition-colors">Documentation</a>
+        <Link href="/docs" className="hover:text-foreground transition-colors">Documentation</Link>
         <span className="hover:text-foreground cursor-pointer transition-colors">Pricing</span>
       </nav>
 
@@ -179,13 +179,13 @@ export default function PublicHeader({ session }: PublicHeaderProps) {
             >
               Models Marketplace <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
             </Link>
-            <a
-              href="/CLAUDE.md"
+            <Link
+              href="/docs"
               onClick={() => setMobileMenuOpen(false)}
               className="hover:text-foreground transition-colors"
             >
               Documentation
-            </a>
+            </Link>
             <span
               onClick={() => setMobileMenuOpen(false)}
               className="hover:text-foreground cursor-pointer transition-colors"

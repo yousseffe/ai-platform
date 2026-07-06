@@ -26,15 +26,21 @@ export default async function AdminProviderDetailsPage({
   const provider = await getAdminProviderDetails(id);
 
   return (
-    <div className="space-y-6">
-      <AdminPageHeader
-        title={provider.providerName}
-        description="Provider lifecycle, subscription posture, utilization, revenue, models, and audit activity."
-        backHref="/admin/providers"
-        backLabel="Back to Providers"
-      />
+    <div className="space-y-6 relative animate-fade-in pb-12 font-sans text-left">
+      {/* Decorative background glows */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
 
-      <Card className="rounded-2xl border-border">
+      <div className="relative z-10">
+        <AdminPageHeader
+          title={provider.providerName}
+          description="Provider lifecycle, subscription posture, utilization, revenue, models, and audit activity."
+          backHref="/admin/providers"
+          backLabel="Back to Providers"
+        />
+      </div>
+
+      <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl relative z-10 hover-lift transition-all duration-300">
         <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -75,10 +81,12 @@ export default async function AdminProviderDetailsPage({
         </CardContent>
       </Card>
 
-      <ProviderSummaryCards provider={provider} />
-      <ProviderSubscriptionPanel provider={provider} />
-      <ProviderUtilizationPanel provider={provider} />
-      <ProviderActivityPanels provider={provider} />
+      <div className="relative z-10 space-y-6">
+        <ProviderSummaryCards provider={provider} />
+        <ProviderSubscriptionPanel provider={provider} />
+        <ProviderUtilizationPanel provider={provider} />
+        <ProviderActivityPanels provider={provider} />
+      </div>
     </div>
   );
 }

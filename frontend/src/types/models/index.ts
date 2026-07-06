@@ -1,5 +1,13 @@
 import { User } from "../user";
-import { DeploymentStatus, VersionStatus, VersionReviewStatus, SchemaDetectionStatus, PredictionStatus, ModelType, Framework } from "../enums";
+import {
+  DeploymentStatus,
+  VersionStatus,
+  VersionReviewStatus,
+  SchemaDetectionStatus,
+  PredictionStatus,
+  ModelType,
+  Framework,
+} from "../enums";
 
 export type FirewallMode = "MONITOR" | "ENFORCE";
 
@@ -69,7 +77,10 @@ export interface ModelVersionReviewEvent {
   message?: string | null;
   metadata?: Record<string, unknown> | null;
   actor?: User | null;
-  version?: Pick<ModelVersion, "id" | "versionNumber" | "status" | "reviewStatus"> | null;
+  version?: Pick<
+    ModelVersion,
+    "id" | "versionNumber" | "status" | "reviewStatus"
+  > | null;
   createdAt: string;
 }
 
@@ -105,6 +116,52 @@ export interface Model {
   reviewCount?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ModelIntegrationSpec {
+  model: {
+    id: string;
+    name: string;
+    type: string;
+    framework: string;
+    taskType: string;
+    description: string | null;
+    isPublic: boolean;
+    averageRating: number;
+    reviewCount: number;
+  };
+  endpoint: {
+    method: "POST";
+    url: string;
+    apiStyle: "openai-chat" | "json-predict";
+  };
+  authentication: {
+    type: "bearer";
+    headerFormat: string;
+    keyPrefix: string;
+    note: string;
+  };
+  request: {
+    contentType: "application/json";
+    example: unknown | null;
+    exampleRaw: string | null;
+  };
+  response: {
+    contentType: "application/json";
+    example: unknown | null;
+    exampleRaw: string | null;
+  };
+  classLabels: Record<string, unknown> | null;
+  pricing: {
+    billingUnit: string;
+    currency: "CREDITS";
+    inputCreditsPerMToken?: number;
+    outputCreditsPerMToken?: number;
+    creditsPerRequest?: number;
+    note: string;
+  };
+  notes: string[];
+  openapi: Record<string, unknown>;
 }
 
 export interface HistoryItem {
@@ -179,8 +236,172 @@ export interface ModelLog {
   id: string;
   model: Model;
   apiKey: string | null;
+  creditsCharged?: number;
   responseTimeMs: number;
   status: string;
   statusCode: number;
+  errorMessage?: string | null;
   createdAt: string;
+}
+
+export interface ProviderInsightsSummary {
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  grossCredits: number;
+  estimatedRevenueEgp: number;
+  averageLatencyMs: number;
+  successRate: number;
+  averageRevenuePerRequestEgp: number;
+  activeModels: number;
+  activeTypes: number;
+  activeTaskTypes: number;
+}
+
+export interface ProviderInsightsWindow {
+  revenueEgp: number;
+  requests: number;
+  successRate: number;
+}
+
+export interface ProviderInsightsSeriesPoint {
+  date: string;
+  requests: number;
+  successes: number;
+  failures: number;
+  grossCredits: number;
+  revenueEgp: number;
+  successRate: number;
+}
+
+export interface ProviderInsightsTopModel {
+  modelId: string;
+  modelName: string;
+  type: string;
+  taskType: string;
+  framework: string;
+  requests: number;
+  successes: number;
+  failures: number;
+  grossCredits: number;
+  revenueEgp: number;
+  avgLatencyMs: number;
+  successRate: number;
+}
+
+export interface ProviderInsightsBreakdown {
+  requests: number;
+  successes: number;
+  failures: number;
+  grossCredits: number;
+  revenueEgp: number;
+  successRate: number;
+}
+
+export interface ProviderInsights {
+  generatedAt: string;
+  periodDays: number;
+  creditsPerEgp: number;
+  summary: ProviderInsightsSummary;
+  comparison: {
+    current: ProviderInsightsWindow;
+    previous: ProviderInsightsWindow;
+    revenueDeltaPercent: number;
+    requestsDeltaPercent: number;
+    successRateDeltaPercent: number;
+  };
+  series: ProviderInsightsSeriesPoint[];
+  topModels: ProviderInsightsTopModel[];
+  typeBreakdown: Array<ProviderInsightsBreakdown & { type: string }>;
+  taskBreakdown: Array<ProviderInsightsBreakdown & { taskType: string }>;
+}
+
+export interface ComparableModel {
+  id: string;
+  name: string;
+  providerName: string;
+  category: string;
+  taskType: string;
+  framework: string;
+  modality: string;
+  priceCredits: number;
+  status: "RUNNING" | "INACTIVE";
+  popularity: number;
+  averageRating: number;
+  reviewCount: number;
+  versionLabel: string | null;
+}
+
+export interface ComparisonSettings {
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  stream?: boolean;
+  jsonMode?: boolean;
+}
+
+export interface ModelComparisonResult {
+  id: string;
+  modelId: string | null;
+  modelName: string;
+  providerName: string | null;
+  modelType: string | null;
+  taskType: string | null;
+  framework: string | null;
+  modality: string | null;
+  modelVersion: string | null;
+  responseOutput: string | null;
+  responseJson: Record<string, unknown> | null;
+  latencyMs: number | null;
+  costCredits: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  status: string;
+  statusCode: number | null;
+  errorMessage: string | null;
+  qualityScore: number | null;
+  valueScore: number | null;
+  resultRank: number | null;
+  createdAt: string;
+}
+
+export interface ModelComparisonSummaryInsights {
+  fastestModelId: string | null;
+  fastestModelName: string | null;
+  cheapestModelId: string | null;
+  cheapestModelName: string | null;
+  bestValueModelId: string | null;
+  bestValueModelName: string | null;
+  lowestErrorModelId: string | null;
+  lowestErrorModelName: string | null;
+  recommendedModelId: string | null;
+  recommendedModelName: string | null;
+}
+
+export interface ModelComparisonSession {
+  id: string;
+  title: string | null;
+  inputPrompt: string;
+  requestPayload: Record<string, unknown>;
+  settings: Record<string, unknown> | null;
+  status: string;
+  modelCount: number;
+  summaryInsights: ModelComparisonSummaryInsights | null;
+  rerunOfSessionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  results: ModelComparisonResult[];
+}
+
+export interface ModelComparisonHistoryItem {
+  id: string;
+  title: string | null;
+  inputPrompt: string;
+  modelCount: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  summaryInsights: ModelComparisonSummaryInsights | null;
+  resultsCount: number;
 }

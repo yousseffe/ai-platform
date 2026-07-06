@@ -205,10 +205,10 @@ export class UsersService {
   }
 
   /**
-   * Rotates the API Key for the authenticated user.
+   * Deprecated: prediction keys are scoped to a model and must be generated
+   * through generateUserApiKey so they can be authorized on predict calls.
    *
-   * @param userId - Target user UUID.
-   * @returns Newly created active ApiKey entity.
+   * @throws {BadRequestException} Always, with guidance for callers.
    */
   async rotateApiKey(userId: string): Promise<ApiKey> {
     const user = await this.usersRepository.findOneBy({ id: userId });
@@ -216,20 +216,9 @@ export class UsersService {
       throw new NotFoundException('User profile not found');
     }
 
-    await this.apiKeyRepository.update(
-      { user: { id: userId }, isActive: true },
-      { isActive: false },
+    throw new BadRequestException(
+      'Prediction API keys are model-scoped. Generate a key for the target model from API settings or POST /users/me/api-keys with modelId.',
     );
-
-    const apiKeyVal = 'ml_sk_live_' + crypto.randomBytes(24).toString('hex');
-    const newApiKey = this.apiKeyRepository.create({
-      key: apiKeyVal,
-      user,
-      name: 'Default Key',
-      isActive: true,
-    });
-
-    return this.apiKeyRepository.save(newApiKey);
   }
 
   /**
@@ -239,11 +228,14 @@ export class UsersService {
    * @returns Active API keys array.
    */
   async getUserApiKeys(userId: string): Promise<ApiKey[]> {
-    return this.apiKeyRepository.find({
-      where: { user: { id: userId }, type: ApiKeyType.LIVE, isActive: true },
-      relations: ['model'],
-      order: { createdAt: 'DESC' },
-    });
+    return this.apiKeyRepository
+      .createQueryBuilder('apiKey')
+      .innerJoinAndSelect('apiKey.model', 'model')
+      .where('apiKey.user_id = :userId', { userId })
+      .andWhere('apiKey.type = :type', { type: ApiKeyType.LIVE })
+      .andWhere('apiKey.is_active = true')
+      .orderBy('apiKey.created_at', 'DESC')
+      .getMany();
   }
 
   /**

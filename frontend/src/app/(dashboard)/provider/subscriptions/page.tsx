@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowRight, Crown, ReceiptText } from "lucide-react";
 import { ProviderPlansPanel } from "@/components/dashboard/ProviderPlansPanel";
 import { Card, CardContent } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /**
  * Provider subscription management page.
@@ -21,7 +23,10 @@ export default function ProviderSubscriptionsPage() {
         </div>
         <Link
           href="/provider/payments"
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background hover:bg-secondary px-4 h-9 text-xs font-bold text-foreground hover:text-primary transition-all shadow-sm"
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "h-9 px-4 text-xs font-bold gap-1.5"
+          )}
         >
           <ReceiptText className="w-3.5 h-3.5" />
           Subscription Payments

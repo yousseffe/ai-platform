@@ -10,6 +10,7 @@ import { Request } from 'express';
 import {
   ModelIntegrationService,
   ModelIntegrationSpec,
+  OpenApiDocument,
 } from '../services/model-integration.service';
 
 /**
@@ -36,6 +37,25 @@ export class IntegrationController {
     @Param('id') id: string,
     @Req() req: Request,
   ): Promise<ModelIntegrationSpec> {
+    const actorId = await this.resolveActorId(req);
+
+    return this.modelIntegrationService.getIntegrationSpec(id, actorId);
+  }
+
+  /**
+   * Returns a standards-compliant OpenAPI document for this model's predict API.
+   */
+  @Get(':id/openapi.json')
+  async getOpenApiDocument(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ): Promise<OpenApiDocument> {
+    const actorId = await this.resolveActorId(req);
+
+    return this.modelIntegrationService.getOpenApiDocument(id, actorId);
+  }
+
+  private async resolveActorId(req: Request): Promise<string | undefined> {
     let actorId: string | undefined;
 
     const authHeader = req.headers.authorization;
@@ -65,6 +85,6 @@ export class IntegrationController {
       }
     }
 
-    return this.modelIntegrationService.getIntegrationSpec(id, actorId);
+    return actorId;
   }
 }

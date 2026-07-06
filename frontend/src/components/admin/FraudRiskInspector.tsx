@@ -160,21 +160,21 @@ export default function FraudRiskInspector() {
           {/* Score card */}
           <div className={`rounded-xl border p-4 flex items-center gap-4 ${RISK_BG(report.currentRiskScore)}`}>
             <div className="text-center">
-              <p className={`text-4xl font-extrabold font-mono ${RISK_COLOR(report.currentRiskScore)}`}>
+              <p className={`text-4xl font-extrabold ${RISK_COLOR(report.currentRiskScore)}`}>
                 {report.currentRiskScore}
               </p>
               <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold mt-0.5">Risk Score</p>
             </div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-foreground">{report.modelName}</p>
-              {report.ownerEmail && <p className="text-[10px] text-muted-foreground font-sans">{report.ownerEmail}</p>}
+              <p className="text-sm font-bold text-foreground text-left">{report.modelName}</p>
+              {report.ownerEmail && <p className="text-[10px] text-muted-foreground font-sans text-left">{report.ownerEmail}</p>}
               {report.currentThreatClass && (
                 <span className={`inline-block mt-1.5 text-[9px] font-bold px-2 py-0.5 rounded-full border ${RISK_BG(report.currentRiskScore)} ${RISK_COLOR(report.currentRiskScore)}`}>
                   {report.currentThreatClass}
                 </span>
               )}
               {!report.currentThreatClass && (
-                <span className="inline-block mt-1.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
+                <span className="inline-block mt-1.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-500">
                   CLEAN
                 </span>
               )}
@@ -189,23 +189,23 @@ export default function FraudRiskInspector() {
           {report.baseline && (
             <Card className="border border-border bg-card rounded-xl">
               <CardHeader className="px-4 pt-4 pb-2">
-                <CardTitle className="text-xs font-bold flex items-center gap-2">
+                <CardTitle className="text-xs font-bold flex items-center gap-2 text-left">
                   <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
                   EWMA Traffic Baseline
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4 grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-border bg-secondary/20 p-3 text-center">
-                  <p className="text-lg font-bold font-mono text-foreground">
+                  <p className="text-lg font-extrabold text-foreground">
                     {Number(report.baseline.ewmaRequestRatePerMin).toFixed(2)}
                   </p>
-                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider">req/min (EWMA)</p>
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold">req/min (EWMA)</p>
                 </div>
                 <div className="rounded-lg border border-border bg-secondary/20 p-3 text-center">
-                  <p className="text-lg font-bold font-mono text-foreground">
+                  <p className="text-lg font-extrabold text-foreground">
                     {(Number(report.baseline.ewmaErrorRate) * 100).toFixed(1)}%
                   </p>
-                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider">error rate (EWMA)</p>
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold">error rate (EWMA)</p>
                 </div>
               </CardContent>
             </Card>

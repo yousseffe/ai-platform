@@ -19,6 +19,7 @@ import { Model } from '../../models/entities/model.entity';
 import { FirewallService } from '../services/firewall.service';
 import { FirewallScopeType } from '../enums/firewall-scope-type.enum';
 import { UpdateFirewallPolicyDto } from '../dto/update-firewall-policy.dto';
+import { AuditLog } from '../../users/entities/audit-log.entity';
 
 interface RequestWithUser {
   user: { id: string; isAdmin?: boolean };
@@ -133,5 +134,24 @@ export class FirewallController {
       orgId,
       body,
     );
+  }
+
+  /** Retrieves recent firewall audit logs for a model. */
+  @UseGuards(JwtAuthGuard)
+  @Get('models/:modelId/logs')
+  async getModelFirewallLogs(
+    @Param('modelId') modelId: string,
+    @Request() req: RequestWithUser,
+  ) {
+    await this.assertModelAccess(modelId, req);
+    
+    // Fetch logs relating to firewall blocks/violations for this model
+    return this.modelRepository.manager
+      .createQueryBuilder(AuditLog, 'log')
+      .where("log.action LIKE 'firewall.%'")
+      .andWhere("log.metadata->>'modelId' = :modelId", { modelId })
+      .orderBy('log.created_at', 'DESC')
+      .limit(10)
+      .getMany();
   }
 }

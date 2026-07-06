@@ -25,24 +25,24 @@ export function AlertsPanel() {
   }
 
   return (
-    <div className="bg-slate-900/30 border border-slate-800/50 rounded-xl overflow-hidden shadow-lg">
-      <div className="px-4 py-3 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between">
+    <div className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl overflow-hidden hover-lift transition-all duration-300">
+      <div className="px-5 py-4 border-b border-border bg-muted/20 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-amber-500" />
-          <h4 className="text-slate-200 font-semibold text-xs uppercase tracking-wider">Active System Alerts</h4>
+          <h4 className="text-foreground font-bold text-xs uppercase tracking-wider">Active System Alerts</h4>
         </div>
         <button
           onClick={refresh}
-          className="p-1 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded transition-colors cursor-pointer"
+          className="p-1.5 hover:bg-secondary text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer border border-border/60 bg-card"
           title="Refresh alerts"
         >
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="divide-y divide-slate-800/50 max-h-96 overflow-y-auto">
+      <div className="divide-y divide-border/60 max-h-[500px] overflow-y-auto">
         {alerts.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center gap-2">
+          <div className="p-8 text-center text-muted-foreground text-xs flex flex-col items-center justify-center gap-2">
             <CheckCircle2 className="w-8 h-8 text-emerald-500/50" />
             <span>All systems nominal. No firing alerts.</span>
           </div>
@@ -56,10 +56,10 @@ export function AlertsPanel() {
                 key={alert.id}
                 className={`p-3.5 flex items-start gap-3 transition-colors ${
                   isResolved
-                    ? "bg-slate-950/10 hover:bg-slate-950/20"
+                    ? "hover:bg-muted/25 transition-all"
                     : isCritical
-                    ? "bg-red-500/5 hover:bg-red-500/10"
-                    : "bg-amber-500/5 hover:bg-amber-500/10"
+                    ? "bg-red-500/5 hover:bg-red-500/[0.08] transition-all"
+                    : "bg-amber-500/5 hover:bg-amber-500/[0.08] transition-all"
                 }`}
               >
                 {/* Status Icon */}
@@ -77,31 +77,31 @@ export function AlertsPanel() {
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <span
-                      className={`font-semibold text-xs ${
+                      className={`font-bold text-xs ${
                         isResolved
-                          ? "text-slate-400 line-through"
+                          ? "text-muted-foreground line-through"
                           : isCritical
-                          ? "text-red-400"
-                          : "text-amber-400"
+                          ? "text-red-500"
+                          : "text-amber-500"
                       }`}
                     >
                       {alert.alertName}
                     </span>
 
                     <span
-                      className={`text-[9px] uppercase tracking-wider font-semibold rounded px-1.5 py-0.5 ${
+                      className={`px-1.5 py-0.5 rounded text-[8px] font-bold border ${
                         isResolved
-                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                           : isCritical
-                          ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                          : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                          ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
                       }`}
                     >
-                      {alert.status}
+                      {alert.status.toUpperCase()}
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                  <p className="text-xs text-foreground/80 font-sans leading-relaxed text-left">
                     {alert.summary}
                   </p>
 
@@ -109,12 +109,11 @@ export function AlertsPanel() {
                   {alert.labels && Object.keys(alert.labels).length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {Object.entries(alert.labels).map(([key, val]) => {
-                        // Skip alertname and severity as they are rendered above
                         if (key === "alertname" || key === "severity") return null;
                         return (
                           <span
                             key={key}
-                            className="bg-slate-800/80 border border-slate-700/50 text-slate-400 text-[9px] font-mono rounded px-1.5 py-0.5"
+                            className="bg-secondary border border-border text-muted-foreground text-[9px] font-mono rounded px-2 py-0.5"
                           >
                             {key}: {val}
                           </span>
@@ -124,8 +123,8 @@ export function AlertsPanel() {
                   )}
 
                   {/* Timestamp */}
-                  <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium pt-1">
-                    <Clock className="w-3 h-3" />
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground pt-1.5 font-sans">
+                    <Clock className="w-3 h-3 text-muted-foreground/75" />
                     <span>
                       Triggered: {new Date(alert.startsAt).toLocaleString()}
                       {isResolved && alert.endsAt && (

@@ -11,7 +11,10 @@ import { InferenceDeploymentResolverService } from './services/inference-deploym
 import { InferenceCallPreparerService } from './services/inference-call-preparer.service';
 import { InferenceCacheService } from './services/inference-cache.service';
 import { InferenceClient } from './services/inference-client.service';
+import { ModelComparisonsService } from './services/model-comparisons.service';
+import { ProviderInsightsService } from './services/provider-insights.service';
 import { ModelsController } from './controllers/models.controller';
+import { ModelComparisonsController } from './controllers/model-comparisons.controller';
 import { UploadCleanupProcessor } from '../../shared/queue/processors/upload-cleanup.processor';
 import { SearchController } from './controllers/search.controller';
 import { SchemaController } from './controllers/schema.controller';
@@ -23,6 +26,8 @@ import { ModelVersionTestCase } from './entities/model-version-test-case.entity'
 import { ModelVersionReviewEvent } from './entities/model-version-review-event.entity';
 import { ModelLog } from './entities/model-log.entity';
 import { ModelReview } from './entities/model-review.entity';
+import { ModelComparisonSession } from './entities/model-comparison-session.entity';
+import { ModelComparisonResult } from './entities/model-comparison-result.entity';
 import { ApiKey } from '../auth/entities/api-key.entity';
 import { SystemConfig } from '../wallets/entities/system-config.entity';
 import { OrgApiKey } from '../organizations/entities/org-api-key.entity';
@@ -51,6 +56,8 @@ import { FirewallModule } from '../firewall/firewall.module';
       ModelVersionReviewEvent,
       ModelLog,
       ModelReview,
+      ModelComparisonSession,
+      ModelComparisonResult,
       ApiKey,
       SystemConfig,
       OrgApiKey,
@@ -84,11 +91,14 @@ import { FirewallModule } from '../firewall/firewall.module';
     InferenceCallPreparerService,
     InferenceCacheService,
     InferenceClient,
+    ModelComparisonsService,
+    ProviderInsightsService,
     UploadCleanupProcessor,
   ],
   controllers: [
     SearchController,
     ModelsController,
+    ModelComparisonsController,
     SchemaController,
     IntegrationController,
     ModelsAdminController,
@@ -99,6 +109,7 @@ import { FirewallModule } from '../firewall/firewall.module';
     ModelsRepository,
     ModelVersionsRepository,
     InferenceClient,
+    ModelComparisonsService,
   ],
 })
 export class ModelsModule {}

@@ -104,7 +104,7 @@ export default function AdminModelsPage() {
 
   if (isWorkspaceLoading || !isAdmin) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] text-foreground font-mono">
+      <div className="flex items-center justify-center min-h-[60vh] text-foreground font-sans">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
         <span className="ml-2.5 text-xs">Authenticating Admin Access...</span>
       </div>
@@ -128,26 +128,30 @@ export default function AdminModelsPage() {
     : 0;
 
   return (
-    <div className="w-full space-y-6 text-foreground font-mono text-xs animate-fade-in">
+    <div className="w-full space-y-6 text-foreground font-sans text-xs animate-fade-in relative min-h-screen pb-12">
+      {/* Decorative background glows */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
       <PageHeader
         title={<><Shield /> Model Registry Console</>}
         description="Overseeing registered Machine Learning model artifacts, editing public marketplace listings, and deleting model entries."
-        className="mb-0"
+        className="mb-0 relative z-10 font-sans"
         actions={
           <Button
             variant="outline"
             onClick={() => loadModels(true)}
             disabled={loading}
-            className="gap-1.5 cursor-pointer font-bold"
+            className="gap-1.5 cursor-pointer font-bold btn-outline h-9 px-4 text-[10px]"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            <span>Refresh Catalog</span>
           </Button>
         }
       />
 
       {/* Model Catalog Statistics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
         <StatCard icon={<Database />} label="Catalog Registrations" value={totalModels} caption="ML Artifacts" />
         <StatCard icon={<Globe />} label="Public Listings" value={publicModels} caption="In Marketplace" />
         <StatCard icon={<Server />} label="Active Telemetry" value={activeServers} caption="Containers live" />
@@ -155,9 +159,9 @@ export default function AdminModelsPage() {
       </div>
 
       {/* Models Directory Card */}
-      <Card className="border border-border bg-card shadow-xs p-0 overflow-hidden">
-        <CardHeader className="p-5 border-b border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
+      <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl p-0 overflow-hidden relative z-10 hover-lift transition-all duration-300">
+        <CardHeader className="p-5 border-b border-border/80 bg-muted/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="text-left">
             <CardTitle className="text-sm font-bold text-foreground">System Models Catalog</CardTitle>
             <CardDescription className="text-[10px] text-muted-foreground mt-0.5 font-sans">
               Manage developer-registered models, override marketplace visibility listings, and force purge entries.
@@ -169,7 +173,7 @@ export default function AdminModelsPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by name, description, owner..."
-              className="w-64 h-8 px-3 rounded-md border border-border bg-background text-foreground text-xs font-mono placeholder:text-muted-foreground/60 outline-hidden focus:border-primary transition-all"
+              className="w-64 h-9 px-3 rounded-xl border border-border bg-background text-foreground text-xs font-sans placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary transition-all"
             />
           </div>
         </CardHeader>
@@ -183,7 +187,7 @@ export default function AdminModelsPage() {
             <div className="overflow-x-auto">
               <Table className="w-full text-left border-collapse">
                 <TableHeader>
-                  <TableRow className="bg-muted/10 border-b border-border">
+                  <TableRow className="bg-muted/10 border-b border-border/60">
                     <TableHead className="px-5 py-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider h-auto">Model details</TableHead>
                     <TableHead className="px-5 py-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider h-auto">Tier Level</TableHead>
                     <TableHead className="px-5 py-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider h-auto">Marketplace Visibility</TableHead>
@@ -193,12 +197,12 @@ export default function AdminModelsPage() {
                     <TableHead className="px-5 py-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider h-auto text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody className="divide-y divide-border text-xs font-mono">
+                <TableBody className="divide-y divide-border/60 text-xs font-sans">
                   {filteredModels.map((model) => {
                     const isActive = model.status === "ACTIVE";
                     const costVal = typeof model.costPerRequest === "string" ? parseFloat(model.costPerRequest) : model.costPerRequest;
                     return (
-                      <TableRow key={model.id} className="hover:bg-muted/30 border-b border-border">
+                      <TableRow key={model.id} className="hover:bg-muted/25 transition-all border-b border-border/60">
                         <TableCell className="px-5 py-3.5">
                           <div className="flex flex-col">
                             <span className="font-bold text-foreground text-xs">{model.name}</span>
@@ -255,7 +259,7 @@ export default function AdminModelsPage() {
                               size="icon"
                               title={model.isPublic ? "Hide from Marketplace" : "Publish to Marketplace"}
                               onClick={() => toggleVisibility(model.id)}
-                              className="h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer border border-border/80 bg-card rounded-lg hover-lift"
                             >
                               {model.isPublic ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                             </Button>
@@ -264,7 +268,7 @@ export default function AdminModelsPage() {
                               size="icon"
                               title="Inspect Active Container"
                               onClick={() => router.push("/admin/deployments")}
-                              className="h-7 w-7 text-primary hover:text-primary-foreground hover:bg-primary cursor-pointer"
+                              className="h-7 w-7 text-primary hover:text-primary/90 hover:bg-primary/10 border border-primary/20 bg-primary/5 rounded-lg hover-lift cursor-pointer"
                             >
                               <Server className="w-3.5 h-3.5" />
                             </Button>
@@ -273,7 +277,7 @@ export default function AdminModelsPage() {
                               size="icon"
                               title="Delete Model Registry"
                               onClick={() => setModelPendingDelete(model)}
-                              className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer"
+                              className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10 border border-red-500/20 bg-red-500/5 rounded-lg hover-lift cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>

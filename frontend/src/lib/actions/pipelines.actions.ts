@@ -176,6 +176,35 @@ export async function addPipelineStep(
 }
 
 /**
+ * Edits an existing pipeline step.
+ *
+ * @param pipelineId - The parent pipeline UUID.
+ * @param stepId - The step UUID.
+ * @param body - The step fields to update.
+ * @returns A promise resolving to a discriminated union containing the updated PipelineStep or an error.
+ */
+export async function updatePipelineStep(
+  pipelineId: string,
+  stepId: string,
+  body: Partial<{
+    modelVersionId: string;
+    label: string;
+    role: string;
+    pinPolicy: string;
+    maxRetries: number;
+  }>
+): Promise<{ success: true; data: PipelineStep } | { success: false; error: string }> {
+  try {
+    const res = await pipelinesService.updatePipelineStep(pipelineId, stepId, body);
+    revalidatePath(`/pipelines/${pipelineId}`);
+    return { success: true, data: res };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to update step";
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
  * Removes a step from a pipeline.
  *
  * @param pipelineId - The parent pipeline UUID.

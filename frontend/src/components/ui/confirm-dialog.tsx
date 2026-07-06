@@ -63,24 +63,23 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isConfirming && onOpenChange(next)}>
-      <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader className="flex-row items-start gap-3 space-y-0">
-          {variant === "danger" && (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-              <AlertTriangle className="w-4.5 h-4.5" strokeWidth={2} />
-            </div>
-          )}
+      <DialogContent className="sm:max-w-[460px]">
+        <DialogHeader className="flex flex-row items-start gap-4 select-none pr-6">
+          <div className="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 shrink-0 mt-0.5">
+            <AlertTriangle className="h-5.5 w-5.5" strokeWidth={2} />
+          </div>
           <div className="space-y-1">
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>{description}</DialogDescription>
+            <DialogDescription className="text-xs leading-relaxed">{description}</DialogDescription>
           </div>
         </DialogHeader>
 
-        <DialogFooter>
+        <DialogFooter className="flex sm:flex-row gap-2 mt-6">
           <Button
             type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
+            className="flex-1 h-9 font-bold text-xs"
             disabled={isConfirming}
           >
             {cancelLabel}
@@ -89,6 +88,7 @@ export function ConfirmDialog({
             type="button"
             variant={variant === "danger" ? "destructive" : "default"}
             onClick={handleConfirm}
+            className="flex-1 h-9 font-bold text-xs"
             disabled={isConfirming}
           >
             {isConfirming ? "Working..." : confirmLabel}

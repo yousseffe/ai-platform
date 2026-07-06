@@ -15,7 +15,7 @@ const PRESET_AMOUNTS = [10, 25, 50, 100];
 
 /**
  * Premium payment & withdrawal card enabling users to top up credits or cash out balance.
- * Integrates Stripe Checkout for deposits and mock bank transactions for withdrawals.
+ * Integrates Stripe Checkout for deposits and backend wallet ledger withdrawals.
  * Re-styled for settings dashboard tab layout integration.
  *
  * @returns The React component rendering the credit ledger management card.
@@ -124,18 +124,18 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
   const activeAmount = selectedPreset !== null ? selectedPreset : parseFloat(customAmount) || 0;
 
   return (
-    <Card className="border border-border bg-card shadow-sm overflow-hidden font-sans text-xs text-foreground rounded-xl">
-      <CardHeader className="flex flex-row items-center gap-3.5 pb-4 border-b border-border bg-secondary/10">
-        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20">
+    <Card className="border border-border/80 bg-card/60 backdrop-blur-md shadow-xs overflow-hidden font-sans text-xs text-foreground rounded-xl premium-card p-0">
+      <CardHeader className="flex flex-row items-center gap-3.5 p-5 border-b border-border bg-secondary/20">
+        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20 shadow-xs select-none">
           <Coins className="w-4.5 h-4.5" />
         </div>
-        <div className="flex-1 text-left">
+        <div className="flex-1 text-left select-none">
           <CardTitle className="text-xs font-bold text-foreground">Workspace Credits Ledger</CardTitle>
           <CardDescription className="text-[11px] text-muted-foreground mt-0.5">
             {isConsumer ? (
-              <>Current credits balance: <span className="font-mono font-bold text-foreground">{Math.round(balance)} Credits</span></>
+              <>Current balance: <span className="font-mono font-bold text-foreground">{Math.round(balance).toLocaleString()} Credits</span></>
             ) : (
-              <>Current withdrawable balance: <span className="font-mono font-bold text-foreground">{balance.toFixed(2)} EGP</span></>
+              <>Withdrawable: <span className="font-mono font-bold text-foreground">{balance.toFixed(2)} EGP</span></>
             )}
           </CardDescription>
         </div>
@@ -146,8 +146,8 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
         {isConsumer ? (
           <div className="space-y-5 animate-fade-in">
             {/* Preset Amounts Grid */}
-            <div className="space-y-2">
-              <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider select-none font-mono">
+            <div className="space-y-2.5">
+              <label className="form-label select-none">
                 Select Package Amount
               </label>
               <div className="grid grid-cols-2 gap-3.5">
@@ -159,9 +159,9 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                       key={amt}
                       type="button"
                       onClick={() => selectPreset(amt)}
-                      className={`relative flex flex-col items-start p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer focus:outline-none group select-none ${
+                      className={`relative flex flex-col items-start p-4.5 rounded-xl border text-left transition-all duration-200 cursor-pointer focus:outline-none group select-none hover-lift active-shrink ${
                         isSelected
-                          ? "bg-primary/[0.04] border-primary text-primary shadow-xs"
+                          ? "bg-primary/[0.04] border-primary text-primary shadow-xs ring-2 ring-primary/10"
                           : "bg-secondary/15 hover:bg-secondary/40 border-border text-foreground"
                       }`}
                     >
@@ -169,7 +169,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                         <span className="text-[13px] font-extrabold tracking-tight font-sans">
                           {creditsCount.toLocaleString()}
                         </span>
-                        <div className={`p-1.5 rounded-lg border transition-colors shrink-0 ${
+                        <div className={`p-1.5 rounded-lg border transition-all shrink-0 ${
                           isSelected
                             ? "bg-primary/10 border-primary/20 text-primary"
                             : "bg-background border-border text-muted-foreground group-hover:text-foreground"
@@ -181,10 +181,10 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                         Credits
                       </span>
                       <div className="mt-4 flex items-baseline gap-1 font-mono">
-                        <span className={`text-xs font-extrabold ${isSelected ? "text-primary" : "text-foreground"}`}>
+                        <span className={`text-xs font-bold ${isSelected ? "text-primary" : "text-foreground"}`}>
                           {amt}
                         </span>
-                        <span className="text-[9.5px] text-muted-foreground font-medium font-sans">
+                        <span className="text-[9px] text-muted-foreground font-medium font-sans">
                           EGP
                         </span>
                       </div>
@@ -201,9 +201,9 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
             </div>
 
             {/* Custom Amount Form & Calculator */}
-            <div className="space-y-3 border-t border-border pt-4 mt-2">
+            <div className="space-y-3.5 border-t border-border/60 pt-4 mt-2">
               <div className="flex items-center justify-between">
-                <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider select-none font-mono">
+                <label className="form-label select-none mb-0">
                   Custom Deposit
                 </label>
                 {selectedPreset !== null && (
@@ -228,7 +228,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                   value={customAmount}
                   onChange={(e) => handleCustomChange(e.target.value)}
                   placeholder="Enter custom amount"
-                  className="pl-12 pr-12 h-10 bg-background border-border text-foreground font-bold text-xs focus-visible:ring-primary/20 focus-visible:border-primary rounded-xl font-mono"
+                  className="pl-12 pr-12 h-10 bg-background border-border text-foreground font-bold text-xs focus-visible:ring-primary/10 focus-visible:border-primary rounded-xl font-mono form-input"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-bold select-none uppercase tracking-wider font-mono">
                   EGP
@@ -236,10 +236,10 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
               </div>
               
               {activeAmount > 0 && (
-                <div className="p-3.5 bg-secondary/15 rounded-xl border border-border flex items-center justify-between gap-3 font-sans">
+                <div className="p-3.5 bg-secondary/15 rounded-xl border border-border flex items-center justify-between gap-3 font-sans shadow-inner">
                   <div className="text-left">
                     <span className="text-[8px] font-bold text-muted-foreground/60 uppercase block font-mono">You Pay</span>
-                    <span className="text-sm font-extrabold text-foreground font-mono">{activeAmount.toFixed(2)} EGP</span>
+                    <span className="text-sm font-bold text-foreground font-mono">{activeAmount.toFixed(2)} EGP</span>
                   </div>
                   <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
                     <ArrowRight className="w-4 h-4" />
@@ -247,7 +247,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                   <div className="text-right">
                     <span className="text-[8px] font-bold text-muted-foreground/60 uppercase block font-mono">You Receive</span>
                     <span className="text-sm font-extrabold text-primary flex items-center justify-end gap-1 font-mono">
-                      <Coins className="w-3.5 h-3.5 text-primary" />
+                      <Coins className="w-3.5 h-3.5 text-primary animate-bounce" />
                       {Math.round(activeAmount * creditsPerEgp).toLocaleString()} Credits
                     </span>
                   </div>
@@ -256,10 +256,10 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
             </div>
 
             {/* Info Alert */}
-            <div className="flex gap-2.5 items-start bg-secondary/30 border border-border p-3.5 rounded-xl text-[11px] text-muted-foreground leading-normal font-sans">
+            <div className="flex gap-2.5 items-start bg-secondary/30 border border-border/80 p-3.5 rounded-xl text-[11px] text-muted-foreground leading-normal font-sans select-none">
               <Info className="w-4.5 h-4.5 text-primary shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold text-foreground">Simulation Mode:</span> Redirects to Stripe Sandbox Checkout. Use test card <span className="font-mono text-primary font-semibold select-all">4242 4242 4242 4242</span> to verify payouts.
+                <span className="font-semibold text-foreground">Stripe Checkout:</span> Redirects to the configured checkout flow. In local sandbox mode, use test card <span className="font-mono text-primary font-semibold select-all bg-secondary px-1 py-0.5 rounded border border-border/40">4242 4242 4242 4242</span>.
               </div>
             </div>
 
@@ -267,7 +267,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
             <Button
               onClick={handleTopUp}
               disabled={loading || activeAmount < 5}
-              className="w-full btn-primary font-bold py-2.5 text-xs flex items-center justify-center gap-1.5 shadow-sm rounded-xl h-10 cursor-pointer"
+              className="w-full btn-primary font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm rounded-xl h-10 cursor-pointer"
             >
               {loading ? (
                 <>
@@ -286,8 +286,8 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
           /* Tab Contents: WITHDRAWAL */
           <div className="space-y-5 animate-fade-in">
             {/* Amount Form */}
-            <div className="space-y-1.5">
-              <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-wider select-none">
+            <div className="space-y-2">
+              <label className="form-label select-none">
                 Withdrawal Amount (EGP)
               </label>
               <div className="relative">
@@ -301,14 +301,14 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
                   placeholder="Enter cash out amount"
-                  className="pl-12 h-9 bg-background border-border text-foreground font-semibold text-xs focus-visible:ring-primary/20 focus-visible:border-primary rounded-lg"
+                  className="pl-12 h-10 bg-background border-border text-foreground font-bold text-xs focus-visible:ring-primary/10 focus-visible:border-primary rounded-xl form-input"
                 />
               </div>
             </div>
 
             {/* Bank Info Alert */}
-            <div className="flex gap-2 items-start bg-secondary/35 border border-border p-3 rounded-lg text-[11px] text-muted-foreground leading-normal font-sans">
-              <HelpCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <div className="flex gap-2 items-start bg-secondary/35 border border-border/80 p-3.5 rounded-xl text-[11px] text-muted-foreground leading-normal font-sans select-none">
+              <HelpCircle className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
               <div>
                 <span className="font-semibold text-foreground">Instant Transfer:</span> Earnings withdraw instantly from ledger balance into your payouts bank account context.
               </div>
@@ -318,7 +318,7 @@ export default function WalletTopUpCard({ onTransactionSuccess }: { onTransactio
             <Button
               onClick={handleWithdraw}
               disabled={withdrawLoading || !withdrawAmount || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > balance}
-              className="w-full bg-emerald-600 hover:bg-emerald-600/95 text-white font-bold py-2 text-xs flex items-center justify-center gap-1.5 shadow-sm rounded-lg border-none h-9"
+              className="w-full bg-emerald-600 hover:bg-emerald-650 text-white font-bold py-2 text-xs flex items-center justify-center gap-1.5 shadow-sm hover-lift active-shrink transition-all rounded-xl border-none h-10 cursor-pointer disabled:opacity-50"
             >
               {withdrawLoading ? (
                 <>

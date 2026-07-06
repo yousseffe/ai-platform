@@ -8,6 +8,14 @@ import { VersionStatus } from '../enums/version-status.enum';
 import { BillingUnit, getBillingUnit } from '../enums/billing-unit.enum';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
 /**
  * A consumer-facing description of how to call a deployed model's prediction API.
  * Contains only the *format* of authentication — never a live key.
@@ -37,12 +45,12 @@ export interface ModelIntegrationSpec {
   };
   request: {
     contentType: 'application/json';
-    example: unknown | null;
+    example: JsonValue;
     exampleRaw: string | null;
   };
   response: {
     contentType: 'application/json';
-    example: unknown | null;
+    example: JsonValue;
     exampleRaw: string | null;
   };
   classLabels: Record<string, any> | null;
@@ -58,6 +66,23 @@ export interface ModelIntegrationSpec {
     note: string;
   };
   notes: string[];
+  openapi: OpenApiDocument;
+}
+
+export interface OpenApiDocument {
+  openapi: '3.1.0';
+  info: {
+    title: string;
+    version: string;
+    description?: string;
+  };
+  servers: Array<{ url: string }>;
+  paths: Record<string, unknown>;
+  components: {
+    securitySchemes: Record<string, unknown>;
+    schemas: Record<string, unknown>;
+  };
+  security: Array<Record<string, string[]>>;
 }
 
 /**
@@ -72,7 +97,7 @@ export class ModelIntegrationService {
     private readonly modelsService: ModelsService,
     @InjectRepository(SystemConfig)
     private readonly systemConfigRepository: Repository<SystemConfig>,
-  ) { }
+  ) {}
 
   /**
    * Builds the {@link ModelIntegrationSpec} for a model the actor may access.
@@ -104,7 +129,7 @@ export class ModelIntegrationService {
     ).replace(/\/$/, '');
     const isLlm = model.type === ModelType.LLM_GGUF;
 
-    return {
+    const specWithoutOpenApi: Omit<ModelIntegrationSpec, 'openapi'> = {
       model: {
         id: model.id,
         name: model.name,
@@ -133,6 +158,19 @@ export class ModelIntegrationService {
       pricing: await this.buildPricingSpec(model),
       notes: this.buildNotes(isLlm),
     };
+
+    return {
+      ...specWithoutOpenApi,
+      openapi: this.buildOpenApiDocument(specWithoutOpenApi),
+    };
+  }
+
+  async getOpenApiDocument(
+    modelId: string,
+    actorId?: string,
+  ): Promise<OpenApiDocument> {
+    const spec = await this.getIntegrationSpec(modelId, actorId);
+    return spec.openapi;
   }
 
   /**
@@ -153,7 +191,7 @@ export class ModelIntegrationService {
    */
   private parseSample(raw: string | null): {
     contentType: 'application/json';
-    example: unknown | null;
+    example: JsonValue;
     exampleRaw: string | null;
   } {
     if (!raw) {
@@ -166,7 +204,7 @@ export class ModelIntegrationService {
     try {
       return {
         contentType: 'application/json',
-        example: JSON.parse(raw) as unknown,
+        example: JSON.parse(raw) as JsonValue,
         exampleRaw: null,
       };
     } catch {
@@ -176,6 +214,167 @@ export class ModelIntegrationService {
         exampleRaw: raw,
       };
     }
+  }
+
+  private buildOpenApiDocument(
+    spec: Omit<ModelIntegrationSpec, 'openapi'>,
+  ): OpenApiDocument {
+    const endpointUrl = new URL(spec.endpoint.url);
+    const serverUrl = `${endpointUrl.protocol}//${endpointUrl.host}`;
+    const requestExample = this.ensureOpenApiRequestExample(
+      spec.request.example,
+      spec.request.exampleRaw,
+      spec.endpoint.apiStyle,
+    );
+    const responseExample = this.ensureOpenApiResponseExample(
+      spec.response.example,
+      spec.response.exampleRaw,
+    );
+
+    return {
+      openapi: '3.1.0',
+      info: {
+        title: `${spec.model.name} Prediction API`,
+        version: '1.0.0',
+        description:
+          spec.model.description ??
+          `OpenAPI documentation for invoking ${spec.model.name} through the prediction API.`,
+      },
+      servers: [{ url: serverUrl }],
+      paths: {
+        [endpointUrl.pathname]: {
+          post: {
+            summary: `Run prediction with ${spec.model.name}`,
+            operationId: `predict_${spec.model.id.replace(/-/g, '_')}`,
+            tags: [spec.model.type, spec.model.taskType],
+            security: [{ bearerAuth: [] }],
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema:
+                    spec.endpoint.apiStyle === 'openai-chat'
+                      ? { $ref: '#/components/schemas/OpenAIChatRequest' }
+                      : { $ref: '#/components/schemas/PredictionRequest' },
+                  example: requestExample,
+                },
+              },
+            },
+            responses: {
+              '200': {
+                description: 'Prediction result returned by the model.',
+                content: {
+                  'application/json': {
+                    schema: { $ref: '#/components/schemas/PredictionResponse' },
+                    example: responseExample,
+                  },
+                },
+              },
+              '401': {
+                description: 'Missing, invalid, or revoked API key.',
+              },
+              '403': {
+                description:
+                  'The API key is not allowed to call this model or workspace.',
+              },
+              '404': {
+                description: 'Model or ready deployment could not be found.',
+              },
+              '429': {
+                description: 'Rate limit or spend limit exceeded.',
+              },
+              '500': {
+                description: 'Prediction failed inside the model container.',
+              },
+            },
+          },
+        },
+      },
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'API key',
+            description: spec.authentication.headerFormat,
+          },
+        },
+        schemas: {
+          PredictionRequest: {
+            type: 'object',
+            additionalProperties: true,
+            description:
+              'JSON payload accepted by this model. Shape is inferred from the latest ready version sample when available.',
+          },
+          OpenAIChatRequest: {
+            type: 'object',
+            required: ['messages'],
+            properties: {
+              messages: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['role', 'content'],
+                  properties: {
+                    role: {
+                      type: 'string',
+                      enum: ['system', 'user', 'assistant'],
+                    },
+                    content: { type: 'string' },
+                  },
+                },
+              },
+              temperature: { type: 'number' },
+              max_tokens: { type: 'integer' },
+              top_p: { type: 'number' },
+              stream: { type: 'boolean' },
+            },
+            additionalProperties: true,
+          },
+          PredictionResponse: {
+            type: 'object',
+            additionalProperties: true,
+            description:
+              'Model response. Exact fields depend on the uploaded model and optional post-processing script.',
+          },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+    };
+  }
+
+  private ensureOpenApiRequestExample(
+    parsed: JsonValue,
+    raw: string | null,
+    apiStyle: ModelIntegrationSpec['endpoint']['apiStyle'],
+  ): JsonValue {
+    if (parsed !== null) {
+      return parsed;
+    }
+    if (raw) {
+      return { raw };
+    }
+    if (apiStyle === 'openai-chat') {
+      return {
+        messages: [{ role: 'user', content: 'Explain what this model does.' }],
+        temperature: 0.7,
+        stream: false,
+      };
+    }
+    return { features: [1.2, 3.4, 5.6] };
+  }
+
+  private ensureOpenApiResponseExample(
+    parsed: JsonValue,
+    raw: string | null,
+  ): JsonValue {
+    if (parsed !== null) {
+      return parsed;
+    }
+    if (raw) {
+      return { raw };
+    }
+    return { prediction: 'model_output' };
   }
 
   /**
@@ -203,7 +402,7 @@ export class ModelIntegrationService {
    * per-request or per-prediction rate.
    */
   private async buildPricingSpec(model: {
-    type: string;
+    type: ModelType;
     costPerRequest: number;
     hasCustomPricing: boolean;
   }): Promise<ModelIntegrationSpec['pricing']> {

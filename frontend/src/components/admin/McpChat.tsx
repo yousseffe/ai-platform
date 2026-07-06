@@ -215,7 +215,7 @@ export default function McpChat({ activeToken }: Props) {
                 <button
                   key={prompt}
                   onClick={() => void sendMessage(prompt)}
-                  className="text-[10px] px-3 py-1.5 rounded-lg border border-border bg-secondary hover:bg-card hover:border-primary/30 transition-colors text-foreground font-sans"
+                  className="text-[10px] px-3 py-1.5 rounded-lg border border-border bg-secondary hover:bg-card hover:border-primary/30 transition-all text-foreground font-sans cursor-pointer hover-lift"
                 >
                   {prompt}
                 </button>
@@ -229,14 +229,14 @@ export default function McpChat({ activeToken }: Props) {
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {msg.role === "user" ? (
-                <div className="max-w-[75%] px-3 py-2 rounded-xl bg-primary text-primary-foreground text-[11px] font-sans">
+                <div className="max-w-[75%] px-3.5 py-2 rounded-2xl bg-primary text-primary-foreground text-[11px] font-sans shadow-xs hover-lift transition-all duration-300 text-left">
                   {msg.content}
                 </div>
               ) : (
-                <div className="max-w-[85%] space-y-2">
+                <div className="max-w-[85%] space-y-2 text-left">
                   {/* Tool call pills */}
                   {msg.toolCalls.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-1.5 justify-start">
                       {msg.toolCalls.map((tc, ti) => (
                         <span
                           key={ti}

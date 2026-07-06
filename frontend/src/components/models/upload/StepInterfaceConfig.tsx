@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertCircle, Terminal, Sparkles, Loader2, Settings2, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertCircle, Terminal, Sparkles, Loader2, Settings2, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { UseFormRegister, UseFormSetValue, FieldErrors } from "react-hook-form";
 import { type UploadModelFormInput } from "@/lib/schemas";
 import { Label } from "@/components/ui/label";
@@ -50,14 +50,6 @@ interface StepInterfaceConfigProps {
   setValue: UseFormSetValue<UploadModelFormInput>;
 }
 
-/**
- * Step 3 component of Model Upload: Interface Configuration.
- * Displays editable text areas validating custom sample prediction payloads and expected outputs,
- * showing transfer speeds/progress when submissions are active with a premium dark editor aesthetic.
- *
- * @param props - Form parameters and progress states.
- * @returns The React component rendering Step 3.
- */
 export default function StepInterfaceConfig({
   register,
   errors,
@@ -73,7 +65,6 @@ export default function StepInterfaceConfig({
   setValue,
 }: StepInterfaceConfigProps) {
   const [showOverride, setShowOverride] = React.useState(!hasDetected);
-  const [showAdvanced, setShowAdvanced] = React.useState(false);
 
   // Sync state if hasDetected changes
   React.useEffect(() => {
@@ -83,20 +74,24 @@ export default function StepInterfaceConfig({
   }, [hasDetected]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-5 animate-in fade-in duration-300 font-sans text-left">
       
-      {/* Automated Schema Discovery Card */}
-      <div className="bg-slate-50/50 dark:bg-slate-900/20 p-5 rounded-2xl border border-border/80 space-y-4">
+      {/* Automated Schema Discovery Box */}
+      <div className="p-3.5 bg-card/45 border border-border/80 rounded-2xl space-y-3.5">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Automated Schema Discovery</h4>
-            <p className="text-[10px] text-muted-foreground">Analyze your uploaded weights file to generate payload templates.</p>
+            <h4 className="text-xs font-bold text-foreground">Automated Schema Discovery</h4>
+            <p className="text-[10px] text-muted-foreground leading-normal">
+              {hasDetected 
+                ? "Qantara detected the following input/output schema from your model weights." 
+                : "Analyze your uploaded weights file to generate payload templates."}
+            </p>
           </div>
           <button
             type="button"
             disabled={!hasModelFile || isDetectingSchema || isUploading}
             onClick={handleDetectSchema}
-            className="h-8 px-4 text-[10px] font-extrabold tracking-wide uppercase bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
+            className="h-7.5 px-3 text-[10px] font-bold bg-background hover:bg-secondary border border-border text-foreground rounded-lg disabled:opacity-50 flex items-center gap-1.5 cursor-pointer transition-all active:scale-[0.98] select-none shrink-0"
           >
             {isDetectingSchema ? (
               <>
@@ -105,51 +100,103 @@ export default function StepInterfaceConfig({
               </>
             ) : (
               <>
-                <Sparkles className="w-3.5 h-3.5" />
-                Auto-Detect Schema
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                {hasDetected ? "Auto-detect Again" : "Auto-detect Schema"}
               </>
             )}
           </button>
         </div>
 
-        {/* Badges Container for Detected Parameters */}
-        {hasDetected && (
-          <div className="p-4 rounded-xl bg-emerald-50/40 border border-emerald-500/20 dark:bg-emerald-950/10 dark:border-emerald-500/10 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-              <span className="text-[9px] uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10">
-                Type: {TYPE_LABELS[detectedType] || detectedType}
-              </span>
-              <span className="text-[9px] uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10">
-                Framework: {FRAMEWORK_LABELS[detectedFramework] || detectedFramework}
-              </span>
-              <span className="text-[9px] uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10">
-                Task: {TASK_LABELS[detectedTaskType] || detectedTaskType}
-              </span>
+        {/* Side-by-side JSON Request & Response editors */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          
+          {/* Example Payload Code Input */}
+          <div className="space-y-2 flex flex-col">
+            <div className="relative rounded-xl overflow-hidden border border-border/80 shadow-2xs flex-1 flex flex-col bg-[#0b0b0c]">
+              <div className="bg-[#101113] border-b border-border/70 px-3 py-2 flex items-center justify-between text-[10px] font-bold text-muted-foreground select-none">
+                <span className="font-mono text-[9.5px]">INPUT (Example)</span>
+                <span className="text-[8.5px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.25 rounded border border-emerald-500/10 flex items-center gap-1">
+                  <Check className="w-2.5 h-2.5" /> Validated
+                </span>
+              </div>
+              <textarea
+                id="examplePayload"
+                {...register("examplePayload")}
+                className={`w-full bg-transparent text-indigo-200 dark:text-indigo-200/90 font-mono text-[10px] p-3 resize-none h-32 focus:outline-none focus:ring-0 leading-relaxed border-0 ${
+                  errors.examplePayload ? "text-red-400" : ""
+                }`}
+                spellCheck="false"
+                disabled={isUploading}
+                placeholder={`{\n  "text": "sample input",\n  "max_length": 50\n}`}
+              />
             </div>
-            
-            <button
-              type="button"
-              onClick={() => setShowOverride(!showOverride)}
-              className="h-7 px-3 text-[9px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 border border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700 bg-background rounded-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-[0.98]"
-            >
-              <Settings2 className="w-3 h-3" />
-              Adjust Parameters
-              {showOverride ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
+            {errors.examplePayload && (
+              <p className="text-[10px] text-red-500 font-bold flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {errors.examplePayload.message}
+              </p>
+            )}
           </div>
-        )}
+
+          {/* Expected Result Code Input */}
+          <div className="space-y-2 flex flex-col">
+            <div className="relative rounded-xl overflow-hidden border border-border/80 shadow-2xs flex-1 flex flex-col bg-[#0b0b0c]">
+              <div className="bg-[#101113] border-b border-border/70 px-3 py-2 flex items-center justify-between text-[10px] font-bold text-muted-foreground select-none">
+                <span className="font-mono text-[9.5px]">OUTPUT (Example)</span>
+                <span className="text-[8.5px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.25 rounded border border-emerald-500/10 flex items-center gap-1">
+                  <Check className="w-2.5 h-2.5" /> Validated
+                </span>
+              </div>
+              <textarea
+                id="expectedResult"
+                {...register("expectedResult")}
+                className={`w-full bg-transparent text-indigo-200 dark:text-indigo-200/90 font-mono text-[10px] p-3 resize-none h-32 focus:outline-none focus:ring-0 leading-relaxed border-0 ${
+                  errors.expectedResult ? "text-red-400" : ""
+                }`}
+                spellCheck="false"
+                disabled={isUploading}
+                placeholder={`{\n  "label": "positive",\n  "confidence": 0.98\n}`}
+              />
+            </div>
+            {errors.expectedResult && (
+              <p className="text-[10px] text-red-500 font-bold flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {errors.expectedResult.message}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Smart Suggestions alert card */}
+        <div className="p-2.5 px-3.5 bg-primary/5 border border-primary/10 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 select-none">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-primary shrink-0 animate-pulse" />
+            <div className="text-[10.5px] text-foreground font-semibold">
+              Smart Suggestions: <span className="text-muted-foreground font-normal">We will optimize container GPU inference and auto-scaling based on traffic.</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowOverride(!showOverride)}
+            className="h-7 px-2.5 text-[9.5px] font-bold text-foreground hover:bg-background border border-border/80 rounded-lg flex items-center gap-1 cursor-pointer transition-all shrink-0 active:scale-[0.98]"
+          >
+            <Settings2 className="w-3 h-3 text-primary" />
+            Customize Settings
+            {showOverride ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
+          </button>
+        </div>
 
         {/* Collapsible Manual Override selectors */}
         {showOverride && (
-          <div className="pt-4 border-t border-dashed border-border/80 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-2 duration-300">
+          <div className="p-3.5 rounded-xl border border-dashed border-border/80 bg-background/50 grid grid-cols-1 md:grid-cols-3 gap-3 animate-in slide-in-from-top-2 duration-300">
             <div className="space-y-1.5">
-              <label htmlFor="type" className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block font-sans">
+              <label htmlFor="type" className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block font-mono">
                 Model Type
               </label>
               <select
                 id="type"
                 {...register("type")}
-                className="h-9 px-3 border border-border focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary rounded-lg bg-background text-[10px] w-full transition-all duration-200 dark:bg-slate-950 dark:border-border/60 dark:text-slate-200"
+                className="h-9 px-3 border border-border focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary rounded-lg bg-background text-[10px] w-full transition-all duration-200"
                 disabled={isUploading}
               >
                 <option value="TABULAR">Tabular & Analytics</option>
@@ -161,13 +208,13 @@ export default function StepInterfaceConfig({
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="framework" className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block font-sans">
+              <label htmlFor="framework" className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block font-mono">
                 Framework
               </label>
               <select
                 id="framework"
                 {...register("framework")}
-                className="h-9 px-3 border border-border focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary rounded-lg bg-background text-[10px] w-full transition-all duration-200 dark:bg-slate-950 dark:border-border/60 dark:text-slate-200"
+                className="h-9 px-3 border border-border focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary rounded-lg bg-background text-[10px] w-full transition-all duration-200"
                 disabled={isUploading}
               >
                 <option value="SKLEARN">Scikit-Learn</option>
@@ -181,13 +228,13 @@ export default function StepInterfaceConfig({
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="taskType" className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block font-sans">
+              <label htmlFor="taskType" className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block font-mono">
                 Task Type
               </label>
               <select
                 id="taskType"
                 {...register("taskType")}
-                className="h-9 px-3 border border-border focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary rounded-lg bg-background text-[10px] w-full transition-all duration-200 dark:bg-slate-950 dark:border-border/60 dark:text-slate-200"
+                className="h-9 px-3 border border-border focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary rounded-lg bg-background text-[10px] w-full transition-all duration-200"
                 disabled={isUploading}
               >
                 <option value="CLASSIFICATION">Classification</option>
@@ -204,127 +251,6 @@ export default function StepInterfaceConfig({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-
-        {/* Example Payload Code Input */}
-        <div className="space-y-2 flex flex-col">
-          <Label htmlFor="examplePayload" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 font-sans">
-            <Terminal className="w-3.5 h-3.5 text-primary" /> Example Payload Input{" "}
-            {isLargeModel ? (
-              <span className="text-amber-500 font-extrabold uppercase text-[9px] tracking-wider">(auto-detected during build)</span>
-            ) : (
-              <span className="text-red-500 font-extrabold uppercase text-[9px] tracking-wider">(required)</span>
-            )}
-          </Label>
-          <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm flex-1 flex flex-col bg-slate-950">
-            <div className="bg-slate-900/60 border-b border-border/40 px-4 py-2 flex items-center justify-between text-[8px] font-bold text-slate-500 tracking-wider">
-              <span>JSON REQUEST</span>
-              <span className="text-emerald-500 font-extrabold uppercase">Validatable</span>
-            </div>
-            <textarea
-              id="examplePayload"
-              {...register("examplePayload")}
-              className={`w-full bg-transparent text-indigo-200 font-mono text-[11px] p-5 resize-y h-56 focus:outline-none focus:ring-0 leading-relaxed border-0 ${
-                errors.examplePayload ? "text-red-400" : ""
-              }`}
-              spellCheck="false"
-              disabled={isUploading}
-            />
-          </div>
-          {errors.examplePayload ? (
-            <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              {errors.examplePayload.message}
-            </p>
-          ) : (
-            <p className="text-[10px] text-slate-400 leading-relaxed font-sans font-medium">Provide a sample request payload. The system performs a dry-run execution with this data inside the compiled container before deploying the active endpoint.</p>
-          )}
-        </div>
-
-        {/* Expected Result Code Input */}
-        <div className="space-y-2 flex flex-col">
-          <Label htmlFor="expectedResult" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 font-sans">
-            <Terminal className="w-3.5 h-3.5 text-primary" /> Expected Prediction Result{" "}
-            {isLargeModel ? (
-              <span className="text-amber-500 font-extrabold uppercase text-[9px] tracking-wider">(auto-detected during build)</span>
-            ) : (
-              <span className="text-red-500 font-extrabold uppercase text-[9px] tracking-wider">(required)</span>
-            )}
-          </Label>
-          <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm flex-1 flex flex-col bg-slate-950">
-            <div className="bg-slate-900/60 border-b border-border/40 px-4 py-2 flex items-center justify-between text-[8px] font-bold text-slate-500 tracking-wider">
-              <span>JSON RESPONSE</span>
-              <span className="text-emerald-500 font-extrabold uppercase">Validatable</span>
-            </div>
-            <textarea
-              id="expectedResult"
-              {...register("expectedResult")}
-              className={`w-full bg-transparent text-indigo-200 font-mono text-[11px] p-5 resize-y h-56 focus:outline-none focus:ring-0 leading-relaxed border-0 ${
-                errors.expectedResult ? "text-red-400" : ""
-              }`}
-              spellCheck="false"
-              disabled={isUploading}
-            />
-          </div>
-          {errors.expectedResult ? (
-            <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              {errors.expectedResult.message}
-            </p>
-          ) : (
-            <p className="text-[10px] text-slate-400 leading-relaxed font-sans font-medium">Provide the expected response JSON structure. Used to auto-generate the prediction schema and build interactive playground sandboxes.</p>
-          )}
-        </div>
-      </div>
-
-      {/* Advanced Schemas Collapsible Section */}
-      <div className="pt-4 border-t border-dashed border-border/80">
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="h-9 px-4 text-[10px] font-bold text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100 border border-border bg-slate-50/50 dark:bg-slate-900/20 rounded-xl flex items-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
-        >
-          <Settings2 className="w-4 h-4 text-primary" />
-          Advanced Model Class Labels (Optional)
-          {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </button>
-
-        {showAdvanced && (
-          <div className="mt-6 space-y-6 animate-in slide-in-from-top-2 duration-300">
-            {/* Class Labels Map */}
-            <div className="space-y-2 flex flex-col">
-              <Label htmlFor="classLabels" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 font-sans">
-                <Terminal className="w-3.5 h-3.5 text-primary" /> Class Labels Mapping (JSON)
-              </Label>
-              <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm flex-1 flex flex-col bg-slate-950">
-                <div className="bg-slate-900/60 border-b border-border/40 px-4 py-2 flex items-center justify-between text-[8px] font-bold text-slate-500 tracking-wider">
-                  <span>JSON KEY-VALUE</span>
-                  <span className="text-emerald-500 font-extrabold uppercase">Optional</span>
-                </div>
-                <textarea
-                  id="classLabels"
-                  {...register("classLabels")}
-                  placeholder='{&#10;  "0": "airplane",&#10;  "1": "automobile",&#10;  "2": "bird"&#10;}'
-                  className={`w-full bg-transparent text-indigo-200 font-mono text-[11px] p-5 resize-y h-32 focus:outline-none focus:ring-0 leading-relaxed border-0 ${
-                    errors.classLabels ? "text-red-400" : ""
-                  }`}
-                  spellCheck="false"
-                  disabled={isUploading}
-                />
-              </div>
-              {errors.classLabels ? (
-                <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  {errors.classLabels.message}
-                </p>
-              ) : (
-                <p className="text-[10px] text-slate-400 leading-relaxed font-sans font-medium">Define a JSON map from index to string class names. Essential for classification models so external clients can render labels instead of raw numbers.</p>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

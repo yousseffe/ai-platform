@@ -13,6 +13,7 @@ import {
   UploadedFiles,
   Res,
   Req,
+  Query,
   BadRequestException,
   NotFoundException,
   ForbiddenException,
@@ -62,6 +63,10 @@ import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import * as crypto from 'crypto';
 import { InferenceClient } from '../services/inference-client.service';
 import { InferenceCacheService } from '../services/inference-cache.service';
+import {
+  ProviderInsightsResponse,
+  ProviderInsightsService,
+} from '../services/provider-insights.service';
 import {
   ClientRequestMeta,
   PredictionActor,
@@ -124,6 +129,7 @@ export class ModelsController {
     private readonly orgApiKeyRepository: Repository<OrgApiKey>,
     private readonly inferenceClient: InferenceClient,
     private readonly inferenceCacheService: InferenceCacheService,
+    private readonly providerInsightsService: ProviderInsightsService,
     private readonly firewallService: FirewallService,
   ) {}
 
@@ -259,17 +265,35 @@ export class ModelsController {
   @UseInterceptors(WorkspaceInterceptor)
   @Get('logs/provider')
   async getProviderLogs(@Request() req: RequestWithUser): Promise<ModelLog[]> {
-    const where =
-      req.workspaceType === OwnerType.ORG
-        ? { model: { organization: { id: req.workspaceId } } }
-        : { model: { user: { id: req.user.id } } };
-
     return this.modelLogRepository.find({
-      where,
+      where: { model: { user: { id: req.user.id } } },
       relations: ['model', 'model.organization'],
       order: { createdAt: 'DESC' },
       take: 50,
     });
+  }
+
+  /**
+   * Aggregated provider analytics used by the provider dashboard decision-support view.
+   *
+   * @param req - Authenticated workspace request context.
+   * @param days - Optional lookback window, clamped server-side between 7 and 90 days.
+   */
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(WorkspaceInterceptor)
+  @Get('logs/provider/insights')
+  async getProviderInsights(
+    @Request() req: RequestWithUser,
+    @Query('days') days?: string,
+  ): Promise<ProviderInsightsResponse> {
+    return this.providerInsightsService.getInsights(
+      {
+        userId: req.user.id,
+        workspaceId: req.user.id,
+        workspaceType: OwnerType.USER,
+      },
+      days ? parseInt(days, 10) : 30,
+    );
   }
 
   /**
@@ -832,6 +856,7 @@ export class ModelsController {
       orgId: model.organization?.id ?? req.user.orgId ?? null,
       ipAddress: clientMeta.ipAddress,
       injectionMatch: detectInjection(JSON.stringify(data ?? {})),
+      userId: req.user?.id ?? null,
     });
 
     if (data.stream === true) {

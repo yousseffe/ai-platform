@@ -26,6 +26,7 @@ import { RedisService } from '../../../shared/redis/redis.service';
 import { OrganizationsService } from '../../organizations/services/organizations.service';
 import { OrgType } from '../../organizations/enums/org-type.enum';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
+import { ApiKey } from '../../auth/entities/api-key.entity';
 
 /**
  * Service governing ledger balance operations, wallet initializations, additions, and deductions.
@@ -719,5 +720,95 @@ export class WalletsService {
       });
     }
     return config ? parseInt(config.value, 10) || 10 : 10;
+  }
+
+  async getWalletAnalytics(
+    ownerId: string,
+    ownerType: OwnerType,
+    walletType: WalletType,
+  ): Promise<{
+    dailyTransactions: { date: string; credits: number; debits: number }[];
+    apiKeysUsage: {
+      id: string;
+      name: string;
+      keyPrefix: string;
+      modelName: string;
+      maxDailySpendCredits: number | null;
+      todaySpend: number;
+      maxRequestsPerMinute: number | null;
+    }[];
+  }> {
+    const wallet = await this.walletRepository.findOne({
+      where: { ownerId, ownerType, walletType },
+    });
+
+    if (!wallet) {
+      return { dailyTransactions: [], apiKeysUsage: [] };
+    }
+
+    // 1. Fetch daily transaction summaries for the last 30 days
+    const rows: { date: string; type: TransactionType; total: string }[] = await this.transactionRepository
+      .createQueryBuilder('tx')
+      .select("DATE_TRUNC('day', tx.created_at)::text", 'date')
+      .addSelect('tx.type', 'type')
+      .addSelect('SUM(tx.amount)', 'total')
+      .where('tx.wallet_id = :walletId', { walletId: wallet.id })
+      .andWhere('tx.status = :status', { status: TransactionStatus.COMPLETED })
+      .andWhere("tx.created_at >= NOW() - INTERVAL '30 days'")
+      .groupBy("DATE_TRUNC('day', tx.created_at)")
+      .addGroupBy('tx.type')
+      .orderBy("DATE_TRUNC('day', tx.created_at)", 'ASC')
+      .getRawMany();
+
+    // Pivot by date
+    const dailyMap = new Map<string, { date: string; credits: number; debits: number }>();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      dailyMap.set(dateStr, { date: dateStr, credits: 0, debits: 0 });
+    }
+
+    for (const row of rows) {
+      const dateStr = row.date.split(' ')[0];
+      const entry = dailyMap.get(dateStr) || { date: dateStr, credits: 0, debits: 0 };
+      const amount = parseFloat(row.total);
+      if (row.type === TransactionType.CREDIT) {
+        entry.credits = amount;
+      } else if (row.type === TransactionType.DEBIT) {
+        entry.debits = amount;
+      }
+      dailyMap.set(dateStr, entry);
+    }
+
+    const dailyTransactions = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+    // 2. Fetch active API keys for this owner to check caps and today's spend
+    const apiKeysUsage: any[] = [];
+    if (ownerType === OwnerType.USER) {
+      const apiKeys = await this.walletRepository.manager.getRepository(ApiKey).find({
+        where: { user: { id: ownerId }, isActive: true },
+        relations: ['model'],
+      });
+
+      const today = new Date().toISOString().slice(0, 10);
+      for (const key of apiKeys) {
+        const spendKey = `spend:${key.id}:${today}`;
+        const rawSpend = await this.redisService.get(spendKey);
+        const todaySpend = rawSpend ? parseFloat(rawSpend) : 0;
+
+        apiKeysUsage.push({
+          id: key.id,
+          name: key.name,
+          keyPrefix: key.key.slice(0, 12) + '...',
+          modelName: key.model?.name || 'All Models',
+          maxDailySpendCredits: key.maxDailySpendCredits ? parseFloat(key.maxDailySpendCredits as any) : null,
+          todaySpend,
+          maxRequestsPerMinute: key.maxRequestsPerMinute,
+        });
+      }
+    }
+
+    return { dailyTransactions, apiKeysUsage };
   }
 }

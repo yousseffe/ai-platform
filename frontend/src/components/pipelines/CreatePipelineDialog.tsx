@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus } from "lucide-react";
+import { Plus, GitCommit, GitMerge, GitFork, Workflow, Sparkles } from "lucide-react";
 import { createPipeline } from "@/lib/actions/pipelines.actions";
 import { createPipelineSchema, type CreatePipelineInput } from "@/lib/schemas";
 import { PipelineType } from "@/types";
@@ -18,39 +18,32 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 /**
- * The three pipeline-type presets offered when creating a pipeline. Purely
- * descriptive — every pipeline runs through the same stage-grouped mapper
- * engine regardless of type; this only sets a starting point/expectation.
+ * Three pipeline options laid out in a 3-column configuration.
  */
-const PIPELINE_TYPE_OPTIONS: { value: PipelineType; label: string; description: string }[] = [
+const PIPELINE_TYPE_OPTIONS = [
   {
     value: PipelineType.SEQUENTIAL_CHAIN,
-    label: "Sequential (Chain)",
-    description: "One step at a time — each step's output maps into the next.",
+    label: "Sequential",
+    description: "Linear stage chain",
+    icon: <GitCommit className="w-4 h-4 text-indigo-500 shrink-0" />,
   },
   {
     value: PipelineType.CONTEXT_AUGMENTED,
-    label: "Context-Augmented",
-    description: "Later steps pull fields from several earlier steps, not just the one before them.",
+    label: "Augmented",
+    description: "Multi-stage context",
+    icon: <GitMerge className="w-4 h-4 text-emerald-500 dark:text-emerald-450 shrink-0" />,
   },
   {
     value: PipelineType.PARALLEL,
     label: "Parallel",
-    description: "Multiple steps run at once, then a join step combines their outputs.",
+    description: "Fork-join pathways",
+    icon: <GitFork className="w-4 h-4 text-amber-500 shrink-0" />,
   },
 ];
 
-/**
- * Dialog form for creating a new, empty pipeline. On success, navigates the
- * user straight into the pipeline builder to start adding steps.
- *
- * @returns The React component rendering the "New Pipeline" trigger + dialog.
- */
 export function CreatePipelineDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -71,11 +64,6 @@ export function CreatePipelineDialog() {
 
   const selectedType = watch("type");
 
-  /**
-   * Submits the create-pipeline form and redirects into the builder on success.
-   *
-   * @param data - The validated pipeline name/description/type.
-   */
   const onSubmit = async (data: CreatePipelineInput) => {
     setSubmitError("");
     const res = await createPipeline(data.name, data.description, data.type);
@@ -99,71 +87,113 @@ export function CreatePipelineDialog() {
         }
       }}
     >
-      <DialogTrigger className="btn-primary">
-        <Plus className="w-4 h-4" /> New Pipeline
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[420px] bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
-        <DialogHeader className="space-y-1">
-          <DialogTitle className="text-sm font-bold text-foreground">Create Pipeline</DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            Start with a name — you&apos;ll add steps and mappers next.
-          </DialogDescription>
+      <DialogTrigger render={
+        <Button className="h-9 px-4 text-xs font-bold gap-1.5 cursor-pointer hover:-translate-y-0.5 active:scale-[0.98] transition-all rounded-xl btn-primary">
+          <Plus className="w-4 h-4" /> New Pipeline
+        </Button>
+      } />
+      <DialogContent className="sm:max-w-[480px]">
+
+        <DialogHeader className="flex flex-row items-start gap-4 select-none relative z-10 pr-6">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 mt-0.5">
+            <Workflow className="w-5 h-5" />
+          </div>
+          <div className="space-y-1">
+            <DialogTitle>New Inference Pipeline</DialogTitle>
+            <DialogDescription>
+              Chain deployed models together by mapping upstream execution outputs to downstream inputs.
+            </DialogDescription>
+          </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="pipeline-name" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Name
-            </Label>
-            <Input id="pipeline-name" placeholder="caption-then-classify" {...register("name")} />
-            {errors.name && <p className="text-[10px] text-destructive font-semibold">{errors.name.message}</p>}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="pipeline-description" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Description (optional)
-            </Label>
-            <Textarea
-              id="pipeline-description"
-              placeholder="What does this chain do?"
-              rows={3}
-              {...register("description")}
-            />
-            {errors.description && (
-              <p className="text-[10px] text-destructive font-semibold">{errors.description.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Pipeline Type
-            </Label>
-            <div className="space-y-1.5">
-              {PIPELINE_TYPE_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setValue("type", option.value, { shouldValidate: true })}
-                  className={`w-full text-left rounded-lg border px-3 py-2 transition-colors cursor-pointer ${
-                    selectedType === option.value
-                      ? "border-primary bg-primary/10"
-                      : "border-input bg-background hover:bg-secondary/50"
-                  }`}
-                >
-                  <div className="text-xs font-bold text-foreground font-mono">{option.label}</div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">{option.description}</div>
-                </button>
-              ))}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 relative z-10">
+            
+            <div className="space-y-2">
+              <Label htmlFor="pipeline-name" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 select-none">
+                Pipeline Alias / Identifier
+              </Label>
+              <input
+                id="pipeline-name"
+                placeholder="e.g. caption-then-classify"
+                className="w-full px-3.5 py-2.5 bg-background/50 border border-border rounded-lg text-xs text-foreground outline-none font-medium focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all form-input h-10 shadow-inner"
+                required
+                {...register("name")}
+              />
+              {errors.name && (
+                <p className="text-[10px] text-red-500 font-bold mt-1 animate-fade-in">{errors.name.message}</p>
+              )}
             </div>
-          </div>
 
-          {submitError && <p className="text-[10px] text-destructive font-semibold">{submitError}</p>}
+            <div className="space-y-2">
+              <Label htmlFor="pipeline-description" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 select-none">
+                Description <span className="text-[9px] font-normal text-muted-foreground lowercase font-sans">(optional)</span>
+              </Label>
+              <textarea
+                id="pipeline-description"
+                placeholder="Briefly describe what this orchestration pipeline accomplishes..."
+                rows={2}
+                className="w-full px-3.5 py-2.5 bg-background/50 border border-border rounded-lg text-xs text-foreground outline-none font-sans font-medium focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all form-input resize-none leading-relaxed shadow-inner"
+                {...register("description")}
+              />
+              {errors.description && (
+                <p className="text-[10px] text-red-500 font-bold mt-1 animate-fade-in">{errors.description.message}</p>
+              )}
+            </div>
 
-          <DialogFooter className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1" disabled={isSubmitting}>
+            <div className="space-y-2.5">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 select-none">
+                Orchestration Schema Type
+              </Label>
+              <div className="grid grid-cols-3 gap-3.5">
+                {PIPELINE_TYPE_OPTIONS.map((option) => {
+                  const isSelected = selectedType === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setValue("type", option.value, { shouldValidate: true })}
+                      className={`flex flex-col items-center justify-center p-4 rounded-xl border text-center transition-all cursor-pointer select-none hover:-translate-y-0.5 active:scale-[0.98] duration-150 relative overflow-hidden ${
+                        isSelected
+                          ? "border-primary bg-primary/[0.04] ring-1 ring-primary/80"
+                          : "border-border bg-background/30 hover:bg-secondary/40 hover:border-border/80"
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center border mb-2 shrink-0 shadow-xs ${
+                        isSelected ? "bg-primary/10 border-primary/20" : "bg-secondary/40 border-border/50"
+                      }`}>
+                        {option.icon}
+                      </div>
+                      <span className="text-[10px] font-bold text-foreground font-sans truncate w-full">
+                        {option.label}
+                      </span>
+                      <span className="text-[8px] text-muted-foreground mt-0.5 leading-tight block w-full font-sans scale-90">
+                        {option.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {submitError && (
+              <p className="text-[10px] text-red-500 font-bold text-left animate-fade-in">{submitError}</p>
+            )}
+
+          <DialogFooter className="flex sm:flex-row gap-2 mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              className="flex-1 h-9 font-bold text-xs"
+              disabled={isSubmitting}
+            >
               Cancel
             </Button>
-            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              className="flex-1 h-9 font-bold text-xs"
+              disabled={isSubmitting}
+            >
               {isSubmitting ? "Creating..." : "Create Pipeline"}
             </Button>
           </DialogFooter>

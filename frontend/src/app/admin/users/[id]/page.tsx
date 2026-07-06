@@ -232,18 +232,22 @@ export default function AdminUserDetailsPage({ params }: { params: Promise<{ id:
   };
 
   return (
-    <div className="w-full space-y-6 text-foreground font-mono text-xs animate-fade-in">
+    <div className="w-full space-y-6 text-foreground font-sans text-xs animate-fade-in relative min-h-screen pb-12">
+      {/* Decorative background glows */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
       {/* Header & Back Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border pb-5 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border/80 pb-5 gap-4 relative z-10">
         <div className="text-left space-y-1">
           <button
             onClick={() => router.push("/admin/users")}
-            className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer mb-2 font-sans font-semibold"
+            className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-all cursor-pointer mb-2 font-sans font-semibold border border-border/80 bg-card px-2.5 py-1 rounded-lg hover-lift"
           >
             <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
             Back to User Registry
           </button>
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2 font-mono">
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2 font-sans">
             <User className="w-5 h-5 text-primary" />
             Developer Profile Controls
           </h1>
@@ -254,7 +258,7 @@ export default function AdminUserDetailsPage({ params }: { params: Promise<{ id:
         <button
           onClick={() => loadUserDetails(true)}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 text-foreground font-bold font-mono self-start sm:self-center"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 text-foreground font-bold font-sans self-start sm:self-center btn-outline h-9 px-4 text-[10px]"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           <span>Refresh Profile</span>
@@ -262,23 +266,23 @@ export default function AdminUserDetailsPage({ params }: { params: Promise<{ id:
       </div>
 
       {/* Main Details Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
         {/* Left Side: General Profile Info Card */}
         <div className="lg:col-span-1 space-y-6">
-          <Card className="border border-border bg-card shadow-xs overflow-hidden">
+          <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl overflow-hidden hover-lift transition-all duration-300">
             <CardHeader className="border-b border-border bg-muted/15 p-4">
-              <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+              <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2 text-left">
                 <User className="w-4 h-4 text-primary" />
                 Account Overview
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4 text-left">
               {/* Profile Avatar / Badge */}
-              <div className="flex items-center gap-3 bg-secondary/20 p-3 rounded-lg border border-border">
-                <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-sans font-bold text-primary text-base">
+              <div className="flex items-center gap-3 bg-secondary/10 p-3 rounded-xl border border-border">
+                <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-sans font-bold text-primary text-base shrink-0">
                   {userDetails.fullName.charAt(0).toUpperCase()}
                 </div>
-                <div>
+                <div className="text-left">
                   <span className="font-bold text-foreground block font-sans text-sm">{userDetails.fullName}</span>
                   <span className="text-[10px] text-muted-foreground block font-sans mt-0.5">{userDetails.email}</span>
                 </div>

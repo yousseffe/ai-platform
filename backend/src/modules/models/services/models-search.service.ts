@@ -143,6 +143,7 @@ export class ModelsSearchService implements OnModuleInit {
    */
   async indexModel(model: Model): Promise<void> {
     try {
+      await this.ensureIndexExists();
       const doc = this.buildDocument(model);
       await this.openSearchService.index(
         INDEX_NAME,
@@ -171,6 +172,7 @@ export class ModelsSearchService implements OnModuleInit {
    * @param models - Array of Model entities to index.
    */
   async bulkIndex(models: Model[]): Promise<void> {
+    await this.ensureIndexExists();
     const documents = models.map((model) => ({
       id: model.id,
       body: this.buildDocument(model) as unknown as Record<string, unknown>,

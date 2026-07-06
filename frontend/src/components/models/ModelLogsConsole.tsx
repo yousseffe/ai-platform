@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useContainerLogs } from "@/hooks/use-container-logs";
 import { Terminal, RefreshCw, Trash2, Search, Play, Pause, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ModelLogsConsoleProps {
   deploymentId: string;
@@ -43,17 +44,21 @@ export function ModelLogsConsole({ deploymentId }: ModelLogsConsoleProps) {
           />
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap text-left select-none">
           {/* Stream Selector */}
-          <select
+          <Select
             value={filter}
-            onChange={(e: any) => setFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 text-slate-300 text-xs px-2 py-1.5 rounded-lg focus:outline-none focus:border-purple-500 cursor-pointer"
+            onValueChange={(val: any) => setFilter(val)}
           >
-            <option value="all">All Channels</option>
-            <option value="stdout">stdout (Info)</option>
-            <option value="stderr">stderr (Errors)</option>
-          </select>
+            <SelectTrigger className="h-8 w-32 border-slate-800 bg-slate-900 text-slate-350 text-xs focus:ring-purple-500/20 focus:border-purple-500 hover:bg-slate-800/60 transition duration-150">
+              <SelectValue placeholder="All Channels" />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-950 border-slate-800 text-slate-300">
+              <SelectItem value="all">All Channels</SelectItem>
+              <SelectItem value="stdout">stdout (Info)</SelectItem>
+              <SelectItem value="stderr">stderr (Errors)</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Search bar */}
           <div className="relative">

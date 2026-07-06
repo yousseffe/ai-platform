@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   Activity,
   BarChart3,
+  GitCompareArrows,
 } from "lucide-react";
 import { useOrgContext } from "@/hooks/use-org-context";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -91,6 +92,9 @@ export default function OrgSidebar() {
     (org.type === OrgType.PROVIDER || org.type === OrgType.HYBRID) &&
     can(OrgAction.VIEW_MODELS);
   const showUsage =
+    (org.type === OrgType.CONSUMER || org.type === OrgType.HYBRID) &&
+    can(OrgAction.VIEW_USAGE);
+  const showCompareModels =
     (org.type === OrgType.CONSUMER || org.type === OrgType.HYBRID) &&
     can(OrgAction.VIEW_USAGE);
   const orgModeLabel =
@@ -187,6 +191,16 @@ export default function OrgSidebar() {
             icon={<BarChart3 className="w-4 h-4" strokeWidth={1.5} />}
           >
             Usage Tracking
+          </OrgSidebarLink>
+        )}
+
+        {showCompareModels && (
+          <OrgSidebarLink
+            href={`${base}/compare-models`}
+            active={isActive(`${base}/compare-models`)}
+            icon={<GitCompareArrows className="w-4 h-4" strokeWidth={1.5} />}
+          >
+            Compare Models
           </OrgSidebarLink>
         )}
 

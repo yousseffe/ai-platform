@@ -15,6 +15,7 @@ import {
   Shield,
   Compass,
   Building2,
+  Search,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -119,16 +120,20 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
+        showTopLine={false}
         className="sm:max-w-[480px] p-0 gap-0 top-[20%] translate-y-0 overflow-hidden"
       >
         <DialogTitle className="sr-only">Command Palette</DialogTitle>
-        <input
-          autoFocus
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search or jump to..."
-          className="w-full px-4 py-3.5 bg-transparent border-b border-border text-sm text-foreground placeholder-muted-foreground focus:outline-none"
-        />
+        <div className="flex items-center gap-2.5 px-4 border-b border-border bg-secondary/10">
+          <Search className="w-4 h-4 text-muted-foreground/60 shrink-0" />
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Type a command or search..."
+            className="w-full py-3.5 bg-transparent text-sm text-foreground placeholder-muted-foreground/60 focus:outline-none"
+          />
+        </div>
 
         <div className="max-h-80 overflow-y-auto p-1.5">
           {filteredCommands.length === 0 && (
@@ -142,7 +147,7 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
 
           {groups.map((group) => (
             <div key={group} className="mb-1 last:mb-0">
-              <p className="px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              <p className="px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest font-mono select-none">
                 {group}
               </p>
               {filteredCommands
@@ -152,10 +157,15 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
                     key={command.id}
                     type="button"
                     onClick={command.onSelect}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-sm text-foreground hover:bg-secondary focus:bg-secondary transition-colors cursor-pointer outline-none"
+                    className="group w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-sm text-foreground hover:bg-secondary/70 focus:bg-secondary/70 transition-all cursor-pointer outline-none select-none animate-fade-in"
                   >
-                    <span className="text-muted-foreground">{command.icon}</span>
-                    {command.label}
+                    <div className="flex items-center gap-3">
+                      <span className="text-muted-foreground group-hover:text-foreground transition-colors">{command.icon}</span>
+                      <span className="font-semibold text-xs">{command.label}</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground/50 group-hover:opacity-100 opacity-0 transition-opacity flex items-center gap-1 font-sans">
+                      Go <kbd className="font-mono text-[9px] border border-border bg-background px-1 py-0.25 rounded">⏎</kbd>
+                    </span>
                   </button>
                 ))}
             </div>

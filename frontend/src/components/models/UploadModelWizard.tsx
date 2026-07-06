@@ -65,108 +65,24 @@ export default function UploadModelWizard({
   const { register, setValue, handleSubmit, trigger, formState: { errors } } = form;
 
   return (
-    <div className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 font-mono text-xs">
+    <div className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 font-sans text-xs">
       <form onSubmit={handleSubmit(onSubmit as SubmitHandler<Record<string, unknown>>, onInvalidSubmit as (errors: Record<string, unknown>) => void)} className="space-y-4">
-        <Card className="border border-border/70 shadow-xl shadow-slate-200/20 dark:shadow-black/20 p-0 overflow-hidden bg-card/90 text-foreground backdrop-blur-md rounded-2xl transition-all duration-300">
+        <Card className="border border-border/80 shadow-xs p-0 overflow-hidden bg-card/70 text-foreground rounded-2xl transition-all duration-300">
           
-          {/* Stepper Wizard Indicator */}
-          <div className="px-8 py-6 bg-slate-50/60 dark:bg-slate-900/30 border-b border-border/80 flex items-center justify-between text-[10px] font-semibold font-mono shrink-0 select-none">
-            
-            {/* Step 1 button */}
-            <button
-              type="button"
-              onClick={() => !isUploading && step > 1 && setStep(1)}
-              className={`flex items-center gap-2.5 transition-all duration-300 text-left cursor-pointer group ${
-                step >= 1 ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
-              }`}
-              disabled={isUploading}
-            >
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center border text-[10px] transition-all duration-300 shadow-sm ${
-                step > 1 
-                  ? "bg-emerald-500 border-emerald-500 text-white shadow-emerald-500/10" 
-                  : step === 1
-                    ? "bg-primary border-primary text-primary-foreground shadow-primary/20 ring-4 ring-primary/10"
-                    : "border-border bg-background"
-              }`}>
-                {step > 1 ? <Check className="w-4 h-4" /> : "1"}
-              </span>
-              <div className="flex flex-col">
-                <span className="text-[10px] tracking-wider uppercase font-extrabold">Step 01</span>
-                <span className="text-[9px] text-muted-foreground/80 font-normal">General Info</span>
-              </div>
-            </button>
-            
-            {/* Divider 1-2 */}
-            <div className={`flex-1 h-0.5 mx-6 transition-all duration-500 ${
-              step >= 2 ? "bg-primary/80" : "bg-slate-200 dark:bg-slate-800"
-            }`} />
-            
-            {/* Step 2 button */}
-            <button
-              type="button"
-              onClick={async () => {
-                if (!isUploading && (step === 3 || (step === 1 && await trigger(["name", "description"])))) {
-                  setStep(2);
-                }
-              }}
-              className={`flex items-center gap-2.5 transition-all duration-300 text-left cursor-pointer group ${
-                step >= 2 ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
-              }`}
-              disabled={isUploading}
-            >
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center border text-[10px] transition-all duration-300 shadow-sm ${
-                step > 2 
-                  ? "bg-emerald-500 border-emerald-500 text-white shadow-emerald-500/10" 
-                  : step === 2
-                    ? "bg-primary border-primary text-primary-foreground shadow-primary/20 ring-4 ring-primary/10"
-                    : "border-border bg-background"
-              }`}>
-                {step > 2 ? <Check className="w-4 h-4" /> : "2"}
-              </span>
-              <div className="flex flex-col">
-                <span className="text-[10px] tracking-wider uppercase font-extrabold">Step 02</span>
-                <span className="text-[9px] text-muted-foreground/80 font-normal">Artifacts & Scripts</span>
-              </div>
-            </button>
-            
-            {/* Divider 2-3 */}
-            <div className={`flex-1 h-0.5 mx-6 transition-all duration-500 ${
-              step >= 3 ? "bg-primary/80" : "bg-slate-200 dark:bg-slate-800"
-            }`} />
-            
-            {/* Step 3 button */}
-            <button
-              type="button"
-              onClick={async () => {
-                if (!isUploading) {
-                  const isS1Valid = await trigger(["name", "description"]);
-                  const isS2Valid = await trigger(["modelFile"]);
-                  if (isS1Valid && isS2Valid) {
-                    setStep(3);
-                  }
-                }
-              }}
-              className={`flex items-center gap-2.5 transition-all duration-300 text-left cursor-pointer group ${
-                step === 3 ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
-              }`}
-              disabled={isUploading}
-            >
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center border text-[10px] transition-all duration-300 shadow-sm ${
-                step === 3 
-                  ? "bg-primary border-primary text-primary-foreground shadow-primary/20 ring-4 ring-primary/10" 
-                  : "border-border bg-background"
-              }`}>
-                3
-              </span>
-              <div className="flex flex-col">
-                <span className="text-[10px] tracking-wider uppercase font-extrabold">Step 03</span>
-                <span className="text-[9px] text-muted-foreground/80 font-normal">Configurations</span>
-              </div>
-            </button>
+          {/* Card Step Header */}
+          <div className="px-6 py-4 border-b border-border/80 text-left select-none bg-secondary/10">
+            <h2 className="text-sm font-extrabold text-foreground tracking-tight">
+              {step === 1 ? "Step 1: General Model Info" : "Step 2: Upload Model & Detect Schema"}
+            </h2>
+            <p className="text-[10px] text-muted-foreground mt-0.5 font-medium leading-normal">
+              {step === 1 
+                ? "Provide your model's name, description, tags and visibility access settings."
+                : "Upload your model weights and scripts, and let Qantara automatically analyze and detect the payload schemas."}
+            </p>
           </div>
  
           {/* Form Content */}
-          <CardContent className="p-8 space-y-6">
+          <CardContent className="p-6 space-y-5">
             {submitError && (
               <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/40 dark:border-red-500/30 dark:text-red-400 text-xs font-semibold leading-relaxed animate-in shake duration-300">
                 {submitError}
@@ -182,47 +98,62 @@ export default function UploadModelWizard({
               />
             )}
  
-            {/* STEP 2: Artifacts & Scripts */}
+            {/* STEP 2: Upload & Configure (Side-by-Side layout) */}
             {step === 2 && (
-              <StepArtifacts
-                register={register}
-                setValue={setValue}
-                errors={errors}
-                isUploading={isUploading}
-                modelFile={modelFile}
-                scalerFile={scalerFile}
-                preprocessFile={preprocessFile}
-                preprocessMode={preprocessMode}
-                postprocessFile={postprocessFile}
-                postprocessMode={postprocessMode}
-              />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                
+                {/* Left Column: File Uploader & Code Files */}
+                <div className="space-y-6">
+                  <StepArtifacts
+                    register={register}
+                    setValue={setValue}
+                    errors={errors}
+                    isUploading={isUploading}
+                    modelFile={modelFile}
+                    scalerFile={scalerFile}
+                    preprocessFile={preprocessFile}
+                    preprocessMode={preprocessMode}
+                    postprocessFile={postprocessFile}
+                    postprocessMode={postprocessMode}
+                  />
+
+                  {/* Upload security assurance */}
+                  <div className="p-4 rounded-xl bg-secondary/15 border border-border/80 flex items-start gap-3 select-none">
+                    <ShieldCheck className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                    <div className="text-left text-[10px] text-muted-foreground leading-normal font-medium">
+                      We never store your raw weights or scripts. Files are used only for containerized compilation, configuration checking, and dry-run validation.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Schema Detection & Editors */}
+                <div className="space-y-6">
+                  <StepInterfaceConfig
+                    register={register}
+                    errors={errors}
+                    isUploading={isUploading}
+                    isDetectingSchema={isDetectingSchema}
+                    handleDetectSchema={handleDetectSchema}
+                    hasModelFile={!!modelFile}
+                    isLargeModel={!!modelFile && modelFile.size > LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES}
+                    hasDetected={hasDetected}
+                    detectedType={detectedType}
+                    detectedFramework={detectedFramework}
+                    detectedTaskType={detectedTaskType}
+                    setValue={setValue}
+                  />
+                </div>
+
+              </div>
             )}
  
-            {/* STEP 3: Interface Configuration */}
-            {step === 3 && (
-              <StepInterfaceConfig
-                register={register}
-                errors={errors}
-                isUploading={isUploading}
-                isDetectingSchema={isDetectingSchema}
-                handleDetectSchema={handleDetectSchema}
-                hasModelFile={!!modelFile}
-                isLargeModel={!!modelFile && modelFile.size > LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES}
-                hasDetected={hasDetected}
-                detectedType={detectedType}
-                detectedFramework={detectedFramework}
-                detectedTaskType={detectedTaskType}
-                setValue={setValue}
-              />
-            )}
-
             {/* Global Stepper Loading & Progress Card */}
             {isUploading && (
-              <div className="bg-slate-50 dark:bg-slate-900/30 p-6 rounded-2xl border border-border/80 animate-fade-in text-xs space-y-3.5 shadow-sm mt-6">
+              <div className="bg-secondary/20 p-6 rounded-2xl border border-border animate-fade-in text-xs space-y-3.5 shadow-sm mt-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-primary animate-ping" />
-                    <span className="font-extrabold text-slate-800 dark:text-slate-200">{uploadStatus}</span>
+                    <span className="font-extrabold text-foreground">{uploadStatus}</span>
                   </div>
                   <span className="font-extrabold text-primary font-mono text-xs bg-primary/10 px-2 py-0.5 rounded-full">{uploadProgress}%</span>
                 </div>
@@ -232,18 +163,18 @@ export default function UploadModelWizard({
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 leading-normal font-sans font-medium text-center">Your weights artifacts are being securely transferred to the containerization build queue.</p>
+                <p className="text-[10px] text-muted-foreground leading-normal font-sans font-medium text-center">Your weights artifacts are being securely transferred to the containerization build queue.</p>
               </div>
             )}
           </CardContent>
-
+ 
           {/* Footer Actions */}
-          <div className="px-8 py-5 border-t border-border/80 bg-slate-50/50 dark:bg-slate-900/10 flex items-center justify-between font-mono">
-            {step > 1 ? (
+          <div className="px-6 py-3.5 border-t border-border bg-secondary/10 flex items-center justify-between">
+            {step === 2 ? (
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => !isUploading && setStep((step - 1) as 1 | 2)}
+                onClick={() => !isUploading && setStep(1)}
                 className="py-2 h-10 text-xs cursor-pointer border-border hover:bg-accent text-foreground transition-all rounded-xl"
                 disabled={isUploading}
               >
@@ -260,12 +191,12 @@ export default function UploadModelWizard({
                 Cancel
               </Button>
             )}
-
-            <div className="flex items-center gap-2 font-sans text-[10px] text-muted-foreground hidden sm:flex font-semibold">
-              <ShieldCheck className="w-4 h-4 text-emerald-500 animate-pulse" /> Securing scans enabled
+ 
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground hidden sm:flex font-semibold select-none">
+              <ShieldCheck className="w-4 h-4 text-emerald-500 animate-pulse" /> Secure compilation scanning enabled
             </div>
-
-            {step < 3 ? (
+ 
+            {step === 1 ? (
               <Button
                 key="btn-next-step"
                 type="button"
@@ -276,14 +207,14 @@ export default function UploadModelWizard({
                 }}
                 className="bg-primary hover:bg-primary/95 text-primary-foreground py-2 h-10 px-5 text-xs flex items-center gap-2 cursor-pointer font-extrabold transition-all hover:translate-x-0.5 rounded-xl shadow-md shadow-primary/10"
               >
-                Next Step <ArrowRight className="w-4 h-4 animate-pulse" />
+                Next Step <ArrowRight className="w-4 h-4" />
               </Button>
             ) : (
               <Button
                 key="btn-submit-form"
                 type="submit"
                 disabled={isUploading}
-                className="py-2 h-10 px-6 text-xs flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 border-none shadow-md shadow-emerald-500/20 text-white cursor-pointer font-extrabold transition-all disabled:opacity-50 rounded-xl"
+                className="py-2 h-10 px-6 text-xs flex items-center gap-2 bg-primary hover:bg-primary/95 text-primary-foreground cursor-pointer font-extrabold transition-all disabled:opacity-50 rounded-xl shadow-md shadow-primary/10"
               >
                 {isUploading ? (
                   <>
@@ -292,7 +223,7 @@ export default function UploadModelWizard({
                   </>
                 ) : (
                   <>
-                    Submit to Queue <Check className="w-4 h-4" />
+                    Continue to Build <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </Button>

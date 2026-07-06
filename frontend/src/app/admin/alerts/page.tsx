@@ -30,28 +30,34 @@ export default function AdminAlertsPage() {
 
   if (isWorkspaceLoading || !isAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-100 text-slate-400">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-500 mb-2" />
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-foreground font-sans">
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-2.5" />
         <span>Authenticating administrator credentials...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
-          <Bell className="w-6 h-6" />
+    <div className="space-y-6 max-w-4xl font-sans relative animate-fade-in">
+      {/* Decorative background glows */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
+      <div className="flex items-center gap-3 border-b border-border/80 pb-5 relative z-10">
+        <div className="p-2.5 bg-amber-500/10 rounded-xl text-amber-500 border border-amber-500/20 shrink-0">
+          <Bell className="w-5 h-5" />
         </div>
-        <div>
-          <h2 className="text-xl font-bold text-slate-100">System Alerts</h2>
-          <p className="text-xs text-slate-400">
+        <div className="text-left">
+          <h2 className="text-xl font-bold text-foreground">System Alerts</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Real-time infrastructure health warnings and Prometheus Alertmanager events
           </p>
         </div>
       </div>
 
-      <AlertsPanel />
+      <div className="relative z-10">
+        <AlertsPanel />
+      </div>
     </div>
   );
 }

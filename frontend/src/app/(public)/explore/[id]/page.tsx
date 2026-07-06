@@ -3,7 +3,10 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { Metadata } from "next";
 
-import { getPublicModelById } from "@/lib/actions/models.actions";
+import {
+  getModelIntegrationSpec,
+  getPublicModelById,
+} from "@/lib/actions/models.actions";
 import PublicModelDetailClient from "./PublicModelDetailClient";
 
 interface PageProps {
@@ -16,7 +19,9 @@ interface PageProps {
  * @param props - Page props containing the model ID route param.
  * @returns Metadata object for Next.js head injection.
  */
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   const { id } = await params;
   const model = await getPublicModelById(id);
   if (!model) {
@@ -24,10 +29,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
   return {
     title: `${model.name} — Qantara Model Registry`,
-    description: model.description || `Explore ${model.name} on Qantara. Deploy and run this model via the serverless inference API.`,
+    description:
+      model.description ||
+      `Explore ${model.name} on Qantara. Deploy and run this model via the serverless inference API.`,
     openGraph: {
       title: `${model.name} on Qantara`,
-      description: model.description || `Run ${model.name} via serverless ML API`,
+      description:
+        model.description || `Run ${model.name} via serverless ML API`,
       type: "website",
     },
   };
@@ -42,14 +50,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
  */
 export default async function PublicModelDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const [model, session] = await Promise.all([
+  const [model, session, integrationSpec] = await Promise.all([
     getPublicModelById(id),
     getServerSession(authOptions),
+    getModelIntegrationSpec(id),
   ]);
 
   if (!model) {
     notFound();
   }
 
-  return <PublicModelDetailClient model={model} isAuthenticated={!!session} />;
+  return (
+    <PublicModelDetailClient
+      model={model}
+      isAuthenticated={!!session}
+      integrationSpec={integrationSpec}
+    />
+  );
 }

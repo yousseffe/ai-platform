@@ -84,10 +84,10 @@ export default function AdjustBalanceModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md font-mono text-xs text-foreground bg-card border border-border">
+      <DialogContent className="sm:max-w-md font-sans text-xs text-foreground bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="text-sm font-bold text-foreground">Adjust Wallet Balance</DialogTitle>
-          <DialogDescription className="text-[10px] text-muted-foreground mt-1 font-sans">
+          <DialogTitle className="text-sm font-bold text-foreground text-left">Adjust Wallet Balance</DialogTitle>
+          <DialogDescription className="text-[10px] text-muted-foreground mt-1 font-sans text-left">
             Manually credit or debit user balances. Target: {user.fullName}
           </DialogDescription>
         </DialogHeader>

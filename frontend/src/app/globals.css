@@ -4,7 +4,6 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
-
 @theme {
   --color-primary-50: #eef4ff;
   --color-primary-100: #dbe8ff;
@@ -18,30 +17,79 @@
 }
 
 body {
-  @apply bg-background text-foreground font-sans antialiased;
+  @apply bg-background text-foreground font-sans antialiased selection:bg-primary/10 selection:text-primary;
 }
 
+/* Premium Card & Containers */
 .card {
-  @apply bg-card border border-border rounded-xl shadow-xs hover:border-muted-foreground/30 transition-all duration-200 p-6;
+  @apply bg-card border border-border rounded-xl shadow-xs hover:border-muted-foreground/20 transition-all duration-200 p-6;
+}
+
+.premium-card {
+  @apply relative overflow-hidden bg-card border border-border/80 rounded-xl shadow-xs hover:shadow-sm hover:border-border transition-all duration-300 p-6;
+}
+
+.glass-panel {
+  @apply bg-card/70 backdrop-blur-md border border-border/50 rounded-xl;
+}
+
+/* Premium Interactive Elements */
+.hover-lift {
+  @apply hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200;
+}
+
+.active-shrink {
+  @apply active:scale-[0.98] transition-all;
 }
 
 .btn-primary {
-  @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm;
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/95 hover:-translate-y-0.5 hover:shadow-sm active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm;
 }
 
 .btn-outline {
-  @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-secondary border border-border text-foreground rounded-lg font-medium hover:bg-accent hover:border-muted-foreground/30 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm;
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-background border border-border text-foreground rounded-lg font-semibold hover:bg-accent hover:border-muted-foreground/20 hover:-translate-y-0.5 hover:shadow-sm active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm;
+}
+
+.btn-danger {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:opacity-90 hover:-translate-y-0.5 hover:shadow-sm active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm;
+}
+
+/* Stripe-style Form Controls */
+.form-input {
+  @apply w-full px-3.5 py-2.5 bg-input border border-border rounded-lg text-sm text-foreground transition-all duration-150 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 shadow-xs;
+}
+
+.form-label {
+  @apply block text-[10px] font-bold mb-2 text-muted-foreground uppercase tracking-widest font-mono;
+}
+
+/* GitHub-style Danger Zone */
+.danger-zone {
+  @apply border border-destructive/20 bg-destructive/[0.02] rounded-xl overflow-hidden;
+}
+
+.danger-zone-header {
+  @apply p-4.5 border-b border-destructive/15 bg-destructive/[0.03] flex items-center gap-2.5;
+}
+
+/* Glow Decoration (Vercel/Linear Style) */
+.glow-spot {
+  @apply absolute top-0 right-0 w-80 h-80 bg-primary/5 blur-[100px] rounded-full pointer-events-none;
+}
+
+.glow-spot-secondary {
+  @apply absolute bottom-0 left-0 w-64 h-64 bg-primary/2.5 blur-[80px] rounded-full pointer-events-none;
 }
 
 .badge {
-  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide gap-1.5 border border-border;
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider gap-1.5 border border-border;
 }
 
-.badge-success { @apply bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-500/30; }
-.badge-warning { @apply bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-500/30; }
-.badge-danger { @apply bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-500/30; }
-.badge-info { @apply bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-500/30; }
-.badge-neutral { @apply bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-900/60 dark:text-slate-400 dark:border-slate-700/50; }
+.badge-success { @apply bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-400 dark:border-emerald-500/15; }
+.badge-warning { @apply bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-400 dark:border-amber-500/15; }
+.badge-danger { @apply bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/5 dark:text-red-400 dark:border-red-500/15; }
+.badge-info { @apply bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-blue-500/5 dark:text-blue-400 dark:border-blue-500/15; }
+.badge-neutral { @apply bg-secondary text-muted-foreground border-border; }
 
 .badge-dot {
   @apply w-1.5 h-1.5 rounded-full;
@@ -51,24 +99,16 @@ body {
 .badge-warning .badge-dot { @apply bg-amber-500 dark:bg-amber-400; }
 .badge-danger .badge-dot { @apply bg-red-500 dark:bg-red-400; }
 .badge-info .badge-dot { @apply bg-blue-500 dark:bg-blue-400; }
-.badge-neutral .badge-dot { @apply bg-slate-400 dark:bg-slate-500; }
-
-.form-label {
-  @apply block text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wider;
-}
-
-.form-input {
-  @apply w-full px-3.5 py-2.5 bg-input border border-border rounded-lg text-sm text-foreground transition-all focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20;
-}
+.badge-neutral .badge-dot { @apply bg-muted-foreground; }
 
 .code-block {
-  @apply bg-black/45 text-slate-200 p-6 rounded-xl font-mono text-sm overflow-x-auto leading-relaxed border border-border;
+  @apply bg-black/40 text-slate-200 p-6 rounded-xl font-mono text-sm overflow-x-auto leading-relaxed border border-border;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(3px);
   }
   to {
     opacity: 1;
@@ -77,7 +117,7 @@ body {
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @theme inline {
@@ -131,7 +171,7 @@ body {
   --card-foreground: oklch(0.23 0.02 255);
   --popover: oklch(0.998 0.002 250);
   --popover-foreground: oklch(0.23 0.02 255);
-  --primary: oklch(0.56 0.2 259); /* clean professional blue */
+  --primary: #5e6ad2; /* Linear signature premium periwinkle-violet */
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.952 0.008 248); /* clearer panel tint */
   --secondary-foreground: oklch(0.23 0.02 255);
@@ -142,56 +182,55 @@ body {
   --destructive: oklch(0.58 0.19 28); /* clearer red in light mode */
   --border: oklch(0.93 0.008 250); /* refined hairline edge, not a hard outline */
   --input: oklch(0.998 0.002 250);
-  --ring: oklch(0.56 0.2 259);
+  --ring: #5e6ad2;
   --radius: 0.625rem;
   --sidebar: oklch(0.989 0.003 248);
   --sidebar-foreground: oklch(0.23 0.02 255);
-  --sidebar-primary: oklch(0.56 0.2 259);
+  --sidebar-primary: #5e6ad2;
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.952 0.008 248);
   --sidebar-accent-foreground: oklch(0.23 0.02 255);
   --sidebar-border: oklch(0.93 0.008 250);
-  --sidebar-ring: oklch(0.56 0.2 259);
+  --sidebar-ring: #5e6ad2;
 }
 
 .dark {
-  --background: oklch(0.12 0.004 240); /* Expo Dark Background #0b0c0e */
-  --foreground: oklch(0.95 0.003 240); /* Off-white #ededed */
-  --card: oklch(0.15 0.006 240); /* Deep grey card #131417 */
-  --card-foreground: oklch(0.95 0.003 240);
-  --popover: oklch(0.15 0.006 240);
-  --popover-foreground: oklch(0.95 0.003 240);
-  --primary: oklch(0.58 0.22 281.3); /* Expo Light Purple #7e6aff */
-  --primary-foreground: oklch(1 0 0); /* White */
-  --secondary: oklch(0.18 0.006 240); /* Grey #18191d */
-  --secondary-foreground: oklch(0.95 0.003 240);
-  --muted: oklch(0.16 0.006 240); /* #16171b */
-  --muted-foreground: oklch(0.65 0.01 240); /* Muted text #8c8c8c */
-  --accent: oklch(0.18 0.006 240);
-  --accent-foreground: oklch(0.95 0.003 240);
-  --destructive: oklch(0.54 0.21 25.5); /* Red #f87171 */
-  --border: oklch(0.2 0.007 240); /* refined hairline edge, less contrast than before */
-  --input: oklch(0.12 0.004 240);
-  --ring: oklch(0.58 0.22 281.3);
-  --sidebar: oklch(0.13 0.004 240); /* Deep sidebar #0e0f11 */
-  --sidebar-foreground: oklch(0.95 0.003 240);
-  --sidebar-primary: oklch(0.58 0.22 281.3);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.18 0.006 240);
-  --sidebar-accent-foreground: oklch(0.95 0.003 240);
-  --sidebar-border: oklch(0.2 0.007 240);
-  --sidebar-ring: oklch(0.58 0.22 281.3);
+  --background: #0b0b0c; /* Expo Go deep canvas background */
+  --foreground: #f3f4f6; /* Soft readable text */
+  --card: #101113; /* Expo Go sidebar and card container background */
+  --card-foreground: #f3f4f6;
+  --popover: #101113;
+  --popover-foreground: #f3f4f6;
+  --primary: #5e6ad2; /* Linear signature premium periwinkle-violet */
+  --primary-foreground: #ffffff;
+  --secondary: #1f2023; /* Distinct lighter dark background for panels and secondary buttons */
+  --secondary-foreground: #f3f4f6;
+  --muted: #16171a;
+  --muted-foreground: #888d96; /* Expo Go muted label gray */
+  --accent: #2c2e33; /* Distinct accent hover state */
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --border: #202124; /* Expo Go soft border */
+  --input: #101113;
+  --ring: #5e6ad2;
+  --sidebar: #101113;
+  --sidebar-foreground: #f3f4f6;
+  --sidebar-primary: #5e6ad2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2c2e33;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #202124;
+  --sidebar-ring: #5e6ad2;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  html {
+  html, body, button, input, select, textarea, optgroup {
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
-  body {
-    @apply bg-background text-foreground;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  .font-mono, code, pre, kbd, samp {
+    font-family: "JetBrains Mono", monospace !important;
   }
 }

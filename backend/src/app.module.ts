@@ -30,6 +30,8 @@ import { ApiKey } from './modules/auth/entities/api-key.entity';
 import { ModelLog } from './modules/models/entities/model-log.entity';
 import { SystemConfig } from './modules/wallets/entities/system-config.entity';
 import { ModelReview } from './modules/models/entities/model-review.entity';
+import { ModelComparisonSession } from './modules/models/entities/model-comparison-session.entity';
+import { ModelComparisonResult } from './modules/models/entities/model-comparison-result.entity';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { OpenSearchModule } from './shared/opensearch/opensearch.module';
@@ -101,6 +103,8 @@ import { TenantScopeModule } from './shared/security/tenant-scope.module';
         PipelineRun,
         PipelineStepRun,
         ModelReview,
+        ModelComparisonSession,
+        ModelComparisonResult,
         ProviderAccount,
         ProviderTierDefinition,
         ProviderOffer,

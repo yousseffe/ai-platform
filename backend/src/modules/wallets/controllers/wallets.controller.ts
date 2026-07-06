@@ -316,6 +316,35 @@ export class WalletsController {
     );
   }
 
+  @Get('analytics')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(WorkspaceInterceptor)
+  async getAnalytics(
+    @Req()
+    req: Record<string, unknown> & {
+      user: { id: string };
+      workspaceId: string;
+      workspaceType: OwnerType;
+    },
+    @Query('type') type: WalletType = WalletType.CONSUMER,
+  ) {
+    if (type !== WalletType.CONSUMER && type !== WalletType.PROVIDER) {
+      throw new BadRequestException('Invalid wallet type');
+    }
+
+    await this.walletsService.assertBillingAccess(
+      req.workspaceId,
+      req.workspaceType,
+      req.user.id,
+    );
+
+    return this.walletsService.getWalletAnalytics(
+      req.workspaceId,
+      req.workspaceType,
+      type,
+    );
+  }
+
   /**
    * Retrieves the current system configuration parameter for credits per EGP.
    *

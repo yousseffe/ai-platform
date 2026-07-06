@@ -49,14 +49,11 @@ function SidebarLink({ href, active, icon, children }: SidebarLinkProps) {
       href={href}
       className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-lg font-medium transition-all text-sm select-none ${
         active
-          ? "bg-primary/8 text-primary font-semibold shadow-sm"
-          : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+          ? "bg-secondary text-foreground font-semibold shadow-xs"
+          : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
       }`}
     >
-      {active && (
-        <span className="absolute left-1 top-2.5 bottom-2.5 w-0.75 rounded-full bg-primary" />
-      )}
-      <span className={`transition-colors ${active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}>
+      <span className={`transition-colors ${active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`}>
         {icon}
       </span>
       {children}
@@ -78,30 +75,29 @@ export default function AdminSidebar() {
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col shrink-0">
       {/* Branding Header */}
-      <div className="h-16 px-6 border-b border-border flex items-center gap-2.5 select-none bg-secondary/5 backdrop-blur-xs">
-        <div className="w-7 h-7 relative flex items-center justify-center shrink-0">
+      <div className="h-16 px-6 border-b border-border flex items-center gap-3 select-none bg-secondary/5 backdrop-blur-xs">
+        <div className="h-8 relative flex items-center justify-center shrink-0">
           <Image
-            src="/qantara-assets/dark-normal.svg"
+            src="/qantara-assets/dark-full.svg"
             alt="Qantara Logo"
-            width={26}
-            height={26}
+            width={130}
+            height={32}
             className="object-contain hidden dark:block"
-            style={{ width: "auto" }}
+            style={{ height: "32px", width: "auto" }}
+            priority
           />
           <Image
-            src="/qantara-assets/light-normal.svg"
+            src="/qantara-assets/light-full.svg"
             alt="Qantara Logo"
-            width={26}
-            height={26}
+            width={130}
+            height={32}
             className="object-contain block dark:hidden"
-            style={{ width: "auto" }}
+            style={{ height: "32px", width: "auto" }}
+            priority
           />
         </div>
-        <span className="font-sans text-sm font-extrabold tracking-tight text-foreground flex items-center gap-1.5">
-          Qantara
-          <span className="text-primary text-[9px] px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 font-bold font-mono">
-            ADMIN
-          </span>
+        <span className="text-primary text-[9px] px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 font-bold font-mono">
+          ADMIN
         </span>
       </div>
 
@@ -175,9 +171,8 @@ export default function AdminSidebar() {
         </button>
       </div>
 
-      {/* Sign Out Confirmation Modal */}
       <Dialog open={showLogoutModal} onOpenChange={setShowLogoutModal}>
-        <DialogContent className="sm:max-w-85 bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
+        <DialogContent className="sm:max-w-[420px] bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
           <DialogHeader className="space-y-1 text-left">
             <DialogTitle className="text-sm font-bold text-foreground">Confirm Sign Out</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
@@ -197,6 +192,8 @@ export default function AdminSidebar() {
             <Button
               type="button"
               onClick={async () => {
+                document.cookie = "activeWorkspaceId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+                document.cookie = "viewMode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
                 await signOut({ callbackUrl: "/login" });
               }}
               className="bg-red-500 hover:bg-red-600 text-white py-1.5 h-8 text-[11px] flex-1 cursor-pointer font-bold rounded-lg border-none"

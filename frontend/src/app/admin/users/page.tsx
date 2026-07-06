@@ -163,46 +163,50 @@ export default function AdminUsersPage() {
       u.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Compute live user stats details
+  // Compute live users statistics analysis
   const totalUsers = users.length;
-  const adminCount = users.filter((u) => u.isAdmin).length;
-  const providerCount = users.filter((u) => u.providerMode).length;
-  const totalCreditsCirculating = users.reduce((sum, u) => sum + u.consumerBalance, 0);
+  const adminUsers = users.filter((u) => u.isAdmin).length;
+  const providerUsers = users.filter((u) => u.providerMode).length;
+  const totalConsumerBalance = users.reduce((sum, u) => sum + (u.consumerBalance || 0), 0);
 
   return (
-    <div className="w-full space-y-6 text-foreground font-mono text-xs animate-fade-in">
+    <div className="w-full space-y-6 text-foreground font-sans text-xs animate-fade-in relative min-h-screen pb-12">
+      {/* Decorative background glows */}
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
       <PageHeader
-        title={<><Shield /> User Registry Console</>}
-        description="Overseeing registered developer accounts, administrative authorization privileges, and manual balance adjustments."
-        className="mb-0"
+        title={<><Shield /> User Accounts Registry</>}
+        description="Oversee active customer records, developer profiles, role upgrades, balance adjustments, and API credential management."
+        className="mb-0 relative z-10 font-sans"
         actions={
           <Button
             variant="outline"
             onClick={() => loadUsers(true)}
             disabled={loading}
-            className="gap-1.5 cursor-pointer font-bold"
+            className="gap-1.5 cursor-pointer font-bold btn-outline h-9 px-4 text-[10px]"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            <span>Sync Accounts</span>
           </Button>
         }
       />
 
-      {/* User Statistics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard icon={<UsersIcon />} label="Developer Registries" value={totalUsers} caption="Active profiles" />
-        <StatCard icon={<Award />} label="Administrators" value={adminCount} caption="Auth controllers" />
-        <StatCard icon={<Sparkles />} label="Service Providers" value={providerCount} caption="Hosts enabled" />
-        <StatCard icon={<Coins />} label="Circulating Credits" value={Math.round(totalCreditsCirculating)} caption="In consumer wallets" tone="primary" />
+      {/* Model Catalog Statistics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
+        <StatCard icon={<UsersIcon />} label="Total Registered Accounts" value={totalUsers} caption="Customer base" />
+        <StatCard icon={<Award />} label="System Administrators" value={adminUsers} caption="Admin permissions" tone="primary" />
+        <StatCard icon={<Sparkles />} label="Registered Providers" value={providerUsers} caption="Developer mode" />
+        <StatCard icon={<Coins />} label="Aggregate User Balance" value={`$${totalConsumerBalance.toFixed(2)}`} caption="Total credits allocated" />
       </div>
 
-      {/* Main content table */}
-      <Card className="border border-border bg-card shadow-xs p-0 overflow-hidden">
-        <CardHeader className="p-5 border-b border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <CardTitle className="text-sm font-bold text-foreground">Registered User Directory</CardTitle>
+      {/* Models Directory Card */}
+      <Card className="border border-border/80 bg-card/65 shadow-xs backdrop-blur-md rounded-2xl p-0 overflow-hidden relative z-10 hover-lift transition-all duration-300">
+        <CardHeader className="p-5 border-b border-border/80 bg-muted/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="text-left">
+            <CardTitle className="text-sm font-bold text-foreground">User Records Ledger</CardTitle>
             <CardDescription className="text-[10px] text-muted-foreground mt-0.5 font-sans">
-              Manage credentials, assign system roles, adjust account balances, and delete user contexts.
+              Override roles, perform wallet adjustments, and delete accounts from the ledger.
             </CardDescription>
           </div>
           <div>
@@ -210,8 +214,8 @@ export default function AdminUsersPage() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name, email or ID..."
-              className="w-64 h-8 px-3 rounded-md border border-border bg-background text-foreground text-xs font-mono placeholder:text-muted-foreground/60 outline-hidden focus:border-primary transition-all"
+              placeholder="Search by name, email, ID..."
+              className="w-64 h-9 px-3 rounded-xl border border-border bg-background text-foreground text-xs font-sans placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary transition-all"
             />
           </div>
         </CardHeader>
@@ -225,7 +229,7 @@ export default function AdminUsersPage() {
             <div className="overflow-x-auto">
               <Table className="w-full text-left border-collapse">
                 <TableHeader>
-                  <TableRow className="bg-muted/10 border-b border-border">
+                  <TableRow className="bg-muted/10 border-b border-border/60">
                     <TableHead className="px-5 py-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider h-auto">Developer Details</TableHead>
                     <TableHead className="px-5 py-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider h-auto">Platform Roles</TableHead>
                     <TableHead className="px-5 py-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider h-auto">Consumer Balance</TableHead>
@@ -234,11 +238,11 @@ export default function AdminUsersPage() {
                     <TableHead className="px-5 py-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider h-auto text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody className="divide-y divide-border text-xs font-mono">
+                <TableBody className="divide-y divide-border/60 text-xs font-sans">
                   {filteredUsers.map((user) => (
-                    <TableRow key={user.id} className="hover:bg-muted/30 border-b border-border">
+                    <TableRow key={user.id} className="hover:bg-muted/25 transition-all border-b border-border/60">
                       <TableCell
-                        className="px-5 py-3.5 cursor-pointer hover:bg-secondary/40 transition-colors"
+                        className="px-5 py-3.5 cursor-pointer hover:bg-secondary/45 transition-colors"
                         onClick={() => router.push(`/admin/users/${user.id}`)}
                         title="Click to view full developer credentials and models"
                       >
@@ -253,17 +257,17 @@ export default function AdminUsersPage() {
                       <TableCell className="px-5 py-3.5 text-left">
                         <div className="flex flex-wrap gap-1.5 font-sans">
                           {user.isAdmin && (
-                            <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                            <span className="px-1.5 py-0.5 rounded-md text-[8px] font-bold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
                               ADMIN
                             </span>
                           )}
                           {user.providerMode && (
-                            <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            <span className="px-1.5 py-0.5 rounded-md text-[8px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                               PROVIDER
                             </span>
                           )}
                           {!user.isAdmin && !user.providerMode && (
-                            <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-muted text-muted-foreground border border-border">
+                            <span className="px-1.5 py-0.5 rounded-md text-[8px] font-bold bg-muted text-muted-foreground border border-border">
                               CONSUMER
                             </span>
                           )}
@@ -285,7 +289,7 @@ export default function AdminUsersPage() {
                             size="icon"
                             title="View Credentials & Models"
                             onClick={() => router.push(`/admin/users/${user.id}`)}
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground border border-border/80 bg-card rounded-lg hover-lift cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </Button>
@@ -294,8 +298,10 @@ export default function AdminUsersPage() {
                             size="icon"
                             title={user.isAdmin ? "Revoke Admin Status" : "Promote to Admin"}
                             onClick={() => setUserPendingAdminToggle(user)}
-                            className={`h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer ${
-                              user.isAdmin ? "text-red-500 hover:text-red-600 bg-red-500/5 hover:bg-red-500/15" : ""
+                            className={`h-7 w-7 border rounded-lg hover-lift cursor-pointer ${
+                              user.isAdmin
+                                ? "text-red-500 hover:text-red-600 bg-red-500/10 border-red-500/20"
+                                : "text-muted-foreground hover:text-foreground border-border/80 bg-card"
                             }`}
                           >
                             {user.isAdmin ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
@@ -305,8 +311,10 @@ export default function AdminUsersPage() {
                             size="icon"
                             title={user.providerMode ? "Revoke Provider Access" : "Grant Provider Access"}
                             onClick={() => toggleProvider(user.id)}
-                            className={`h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer ${
-                              user.providerMode ? "text-emerald-500 hover:text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/15" : ""
+                            className={`h-7 w-7 border rounded-lg hover-lift cursor-pointer ${
+                              user.providerMode
+                                ? "text-emerald-500 hover:text-emerald-600 bg-emerald-500/10 border-emerald-500/20"
+                                : "text-muted-foreground hover:text-foreground border-border/80 bg-card"
                             }`}
                           >
                             <UserCheck className="w-3.5 h-3.5" />
@@ -316,7 +324,7 @@ export default function AdminUsersPage() {
                             size="icon"
                             title="Adjust Balances"
                             onClick={() => openAdjustModal(user)}
-                            className="h-7 w-7 text-primary hover:text-primary-foreground hover:bg-primary cursor-pointer"
+                            className="h-7 w-7 text-primary hover:text-primary/90 hover:bg-primary/10 border border-primary/20 bg-primary/5 rounded-lg hover-lift cursor-pointer"
                           >
                             <DollarSign className="w-3.5 h-3.5" />
                           </Button>
@@ -326,7 +334,7 @@ export default function AdminUsersPage() {
                             title="Delete Account"
                             disabled={user.email.toLowerCase().includes("admin")}
                             onClick={() => setUserPendingDelete(user)}
-                            className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10 border border-red-500/20 bg-red-500/5 rounded-lg hover-lift cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>

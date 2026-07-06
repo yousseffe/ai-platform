@@ -476,9 +476,14 @@ export class AuthService {
         )
       : 0.0;
 
-    const apiKeyEntity = await this.apiKeyRepository.findOne({
-      where: { user: { id: userId }, type: ApiKeyType.LIVE, isActive: true },
-    });
+    const apiKeyEntity = await this.apiKeyRepository
+      .createQueryBuilder('apiKey')
+      .innerJoin('apiKey.model', 'model')
+      .where('apiKey.user_id = :userId', { userId })
+      .andWhere('apiKey.type = :type', { type: ApiKeyType.LIVE })
+      .andWhere('apiKey.is_active = true')
+      .orderBy('apiKey.created_at', 'DESC')
+      .getOne();
 
     return {
       user: {

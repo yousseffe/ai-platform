@@ -82,24 +82,24 @@ export default function SecurityAlertsPanel() {
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-3">
         <div className="border border-red-500/20 bg-red-500/[0.04] rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold font-mono text-red-500">{firingAlerts.length}</p>
+          <p className="text-2xl font-extrabold text-red-500">{firingAlerts.length}</p>
           <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold mt-0.5">Firing Alerts</p>
         </div>
         <div className="border border-border bg-card rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold font-mono text-foreground">{riskEvents.length}</p>
+          <p className="text-2xl font-extrabold text-foreground">{riskEvents.length}</p>
           <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold mt-0.5">Risk Events</p>
         </div>
       </div>
 
       {/* Tab toggle */}
-      <div className="flex gap-1 border border-border rounded-lg p-0.5 bg-secondary/30 w-fit">
+      <div className="flex gap-1.5 border border-border/80 rounded-xl p-1 bg-secondary/35 backdrop-blur-md w-fit">
         {(["alerts", "events"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1.5 rounded-md text-[10px] font-bold capitalize transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold capitalize transition-all cursor-pointer ${
               activeTab === tab
-                ? "bg-card text-foreground shadow-sm"
+                ? "bg-card text-foreground shadow-xs border border-border/80"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -172,16 +172,16 @@ export default function SecurityAlertsPanel() {
             : score >= 50 ? "text-amber-500 border-amber-500/20 bg-amber-500/[0.04]"
             : "text-yellow-500 border-yellow-500/20 bg-yellow-500/[0.04]";
           return (
-            <div key={event.id} className={`rounded-xl border p-3 flex items-center gap-3 ${colorClass}`}>
+            <div key={event.id} className={`rounded-xl border p-3 flex items-center gap-3 ${colorClass} hover-lift transition-all duration-300`}>
               <div className="text-center shrink-0">
-                <p className={`text-xl font-bold font-mono ${colorClass.split(" ")[0]}`}>{score}</p>
-                <p className="text-[8px] text-muted-foreground">score</p>
+                <p className={`text-xl font-extrabold ${colorClass.split(" ")[0]}`}>{score}</p>
+                <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-wider">score</p>
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`text-[10px] font-bold ${colorClass.split(" ")[0]}`}>{event.threatClass}</p>
-                <p className="text-[9px] text-muted-foreground font-mono truncate">model: {event.modelId}</p>
+                <p className={`text-[10px] font-bold text-left ${colorClass.split(" ")[0]}`}>{event.threatClass}</p>
+                <p className="text-[9px] text-muted-foreground font-mono text-left truncate">model: {event.modelId}</p>
               </div>
-              <p className="text-[8px] text-muted-foreground font-mono shrink-0">
+              <p className="text-[8px] text-muted-foreground shrink-0 font-sans">
                 {new Date(event.createdAt).toLocaleString()}
               </p>
             </div>
@@ -189,8 +189,8 @@ export default function SecurityAlertsPanel() {
         })}
       </div>
 
-      <Button onClick={fetchData} disabled={loading} variant="outline" className="h-7 text-[10px] w-full flex items-center gap-1.5">
-        {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+      <Button onClick={fetchData} disabled={loading} variant="outline" className="btn-outline h-8 text-[10px] w-full flex items-center justify-center gap-1.5 cursor-pointer">
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
         Refresh
       </Button>
     </div>

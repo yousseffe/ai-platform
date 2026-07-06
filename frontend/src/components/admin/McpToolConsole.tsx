@@ -137,32 +137,32 @@ export default function McpToolConsole({ activeToken }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-full gap-4 text-left">
       {/* Tool selector */}
-      <div className="grid grid-cols-12 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Tool list */}
-        <div className="col-span-4 border border-border rounded-xl bg-card overflow-hidden">
-          <div className="px-3 py-2 border-b border-border bg-muted/10 flex items-center justify-between">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tools</span>
-            <button onClick={fetchTools} disabled={loadingTools} className="text-muted-foreground hover:text-foreground transition-colors">
-              {loadingTools ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+        <div className="lg:col-span-4 border border-border/80 rounded-2xl bg-card/65 backdrop-blur-md overflow-hidden flex flex-col hover-lift transition-all duration-300">
+          <div className="px-4 py-2.5 border-b border-border bg-muted/20 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tools Catalog</span>
+            <button onClick={fetchTools} disabled={loadingTools} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-1 hover:bg-secondary rounded-md border border-border bg-card">
+              {loadingTools ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
             </button>
           </div>
           <div className="overflow-y-auto max-h-64">
             {tools.length === 0 && !loadingTools && (
-              <p className="text-[10px] text-muted-foreground px-3 py-4 font-sans text-center">No tools loaded</p>
+              <p className="text-[10px] text-muted-foreground px-3 py-5 font-sans text-center">No tools loaded</p>
             )}
             {tools.map((tool) => (
               <button
                 key={tool.name}
                 onClick={() => handleSelectTool(tool)}
-                className={`w-full text-left px-3 py-2 text-[10px] font-mono border-b border-border/50 last:border-b-0 transition-colors flex items-center gap-1.5 ${
+                className={`w-full text-left px-4 py-2.5 text-[10px] font-mono border-b border-border/40 last:border-b-0 transition-all flex items-center gap-1.5 cursor-pointer ${
                   selectedTool?.name === tool.name
-                    ? "bg-primary/8 text-primary font-bold"
-                    : "text-foreground hover:bg-secondary/50"
+                    ? "bg-primary/10 text-primary font-bold border-l-2 border-l-primary"
+                    : "text-foreground hover:bg-secondary/40"
                 }`}
               >
-                <ChevronRight className="w-2.5 h-2.5 shrink-0" />
+                <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground/60" />
                 <span className="truncate">{tool.name}</span>
               </button>
             ))}
@@ -170,31 +170,31 @@ export default function McpToolConsole({ activeToken }: Props) {
         </div>
 
         {/* Args + execute */}
-        <div className="col-span-8 border border-border rounded-xl bg-card overflow-hidden flex flex-col">
-          <div className="px-3 py-2 border-b border-border bg-muted/10 flex items-center justify-between">
+        <div className="lg:col-span-8 border border-border/80 rounded-2xl bg-card/65 backdrop-blur-md overflow-hidden flex flex-col hover-lift transition-all duration-300">
+          <div className="px-4 py-2.5 border-b border-border bg-muted/20 flex items-center justify-between">
             <span className="text-[10px] font-bold text-foreground font-mono">
               {selectedTool ? selectedTool.name : "Select a tool"}
             </span>
             {selectedTool && (
-              <span className="text-[8px] text-muted-foreground font-sans truncate max-w-48">{selectedTool.description}</span>
+              <span className="text-[9px] text-muted-foreground font-sans truncate max-w-sm">{selectedTool.description}</span>
             )}
           </div>
           <textarea
             value={argsJson}
             onChange={(e) => setArgsJson(e.target.value)}
             disabled={!selectedTool}
-            className="flex-1 resize-none bg-background text-foreground font-mono text-[11px] p-3 outline-none min-h-[120px] disabled:opacity-40"
+            className="flex-1 resize-none bg-background text-foreground font-mono text-[11px] p-3.5 outline-hidden min-h-[140px] disabled:opacity-40"
             placeholder='{\n  "param": "value"\n}'
             spellCheck={false}
           />
-          <div className="px-3 py-2 border-t border-border bg-muted/5 flex justify-end">
+          <div className="px-4 py-2.5 border-t border-border bg-muted/5 flex justify-end">
             <Button
               onClick={handleExecute}
               disabled={!selectedTool || executing}
-              className="h-7 text-[10px] bg-primary text-primary-foreground font-bold flex items-center gap-1.5"
+              className="h-8 text-[10px] font-bold flex items-center gap-1.5 cursor-pointer btn-primary px-3 rounded-lg"
             >
-              {executing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-              Execute
+              {executing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              <span>Execute Tool</span>
             </Button>
           </div>
         </div>

@@ -54,15 +54,15 @@ export function PipelineRunDetailDialog({ runId, onOpenChange }: PipelineRunDeta
 
   return (
     <Dialog open={runId !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[640px] bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader className="space-y-1">
-          <DialogTitle className="text-sm font-bold text-foreground">Run Trace</DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
+      <DialogContent className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Run Trace</DialogTitle>
+          <DialogDescription>
             {run ? `Status: ${run.status} · Total cost: ${run.totalCost} credits` : "Loading run details..."}
           </DialogDescription>
         </DialogHeader>
 
-        {loading && <p className="text-xs text-muted-foreground font-mono py-6 text-center">Loading...</p>}
+        {loading && <p className="text-xs text-muted-foreground py-6 text-center">Loading...</p>}
 
         {!loading && run && (
           <div className="space-y-4 pt-2 font-mono text-xs">

@@ -161,12 +161,14 @@ export default function Header({ session, onMenuClick, onSearchClick }: HeaderPr
         <button
           type="button"
           onClick={onSearchClick}
-          className="hidden sm:flex items-center gap-2 px-2.5 h-8 rounded-lg border border-border bg-background/50 text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors text-xs cursor-pointer ml-1"
+          className="hidden sm:flex items-center justify-between w-48 lg:w-56 px-3 h-8 rounded-lg border border-border/80 bg-secondary/30 hover:bg-secondary/60 text-muted-foreground hover:text-foreground/80 transition-all text-xs cursor-pointer ml-1 select-none active:scale-[0.98]"
         >
-          <Search className="w-3.5 h-3.5" />
-          <span className="hidden md:inline">Search or jump to...</span>
-          <kbd className="hidden md:inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[9px] font-mono font-semibold text-muted-foreground">
-            Ctrl K
+          <div className="flex items-center gap-2">
+            <Search className="w-3.5 h-3.5 text-muted-foreground/80" />
+            <span>Search...</span>
+          </div>
+          <kbd className="inline-flex items-center gap-0.5 rounded border border-border/70 bg-background/60 px-1.5 py-0.5 text-[9px] font-mono font-medium text-muted-foreground/80 shadow-2xs">
+            ⌘K
           </kbd>
         </button>
       </div>

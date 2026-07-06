@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Split, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ModelVersion } from "@/types";
 import { VersionStatus, DeploymentStatus } from "@/types";
 import {
@@ -143,18 +144,22 @@ export function CanaryTrafficPanel({ versions, modelId }: CanaryTrafficPanelProp
       {deployableVersions.length > 0 && (
         <div className="px-4 py-3 border-t border-border bg-secondary/10 flex flex-wrap items-center gap-2 text-xs font-mono">
           <Rocket className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          <select
-            className="h-8 rounded-lg border border-input bg-transparent px-2 text-xs"
-            value={canaryVersionId}
-            onChange={(e) => setCanaryVersionId(e.target.value)}
+          <Select
+            value={canaryVersionId || "SELECT_VERSION"}
+            onValueChange={(val) => setCanaryVersionId(val === "SELECT_VERSION" || !val ? "" : val)}
           >
-            <option value="">Select a version to canary...</option>
-            {deployableVersions.map((v) => (
-              <option key={v.id} value={v.id}>
-                v{v.versionNumber}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="h-8 w-60 border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 text-xs">
+              <SelectValue placeholder="Select a version to canary..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="SELECT_VERSION">Select a version to canary...</SelectItem>
+              {deployableVersions.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  v{v.versionNumber}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Input
             type="number"
             min={0}

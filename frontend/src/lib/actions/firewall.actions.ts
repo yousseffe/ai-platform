@@ -77,3 +77,20 @@ export async function unblockModelFirewall(
     return { success: false, error: errorMessage };
   }
 }
+
+/**
+ * Retrieves the recent firewall audit logs for a model.
+ *
+ * @param modelId - The model UUID.
+ * @returns A promise resolving to the list of audit logs, or empty array on failure.
+ */
+export async function getModelFirewallLogs(
+  modelId: string
+): Promise<firewallService.FirewallAuditLog[]> {
+  try {
+    return await firewallService.getModelFirewallLogs(modelId);
+  } catch (error) {
+    console.error(`getModelFirewallLogs error for ${modelId}:`, error);
+    return [];
+  }
+}

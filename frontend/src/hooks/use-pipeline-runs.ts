@@ -38,6 +38,9 @@ export function usePipelineRuns(pipelineId: string, runs: PipelineRun[]) {
       }
       router.refresh();
       return true;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to trigger pipeline run");
+      return false;
     } finally {
       setIsTriggering(false);
     }

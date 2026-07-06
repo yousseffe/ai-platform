@@ -1,89 +1,53 @@
 import React from "react";
 import { Metadata } from "next";
-import { Plus } from "lucide-react";
+import { Plus, Layers } from "lucide-react";
 import Link from "next/link";
 import { getModels } from "@/lib/actions/models.actions";
-import type { Model, ModelVersion } from "@/types";
-import { DeploymentStatus, VersionStatus } from "@/types";
 import { RegistryStatsOverview } from "@/components/models/RegistryStatsOverview";
-import { ModelsTable, RegistryModelItem } from "@/components/models/ModelsTable";
-import { PageHeader } from "@/components/ui/page-header";
+import { ModelsTable } from "@/components/models/ModelsTable";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export const revalidate = 0;
 
-/**
- * Static metadata configuration for the Models Registry page.
- */
 export const metadata: Metadata = {
   title: "Models Registry - Qantara",
   description: "Browse, version, and manage machine learning models, preprocess scalers, and custom scripts in the Qantara model catalog.",
 };
 
-/**
- * Server Component representing the Model Registry listing page.
- * Fetches models lists, aggregates details, and renders dashboard metrics & tables.
- *
- * @returns The page component rendering the models registry container.
- */
 export default async function ModelsRegistryPage() {
-  const rawModels = await getModels();
-
-  // Maps backend model list into RegistryModelItem objects
-  const models: RegistryModelItem[] = rawModels.map((m: Model) => {
-    const versions = m.versions || [];
-    const latestVersionNumber = versions.length
-      ? Math.max(...versions.map((v: ModelVersion) => v.versionNumber))
-      : 0;
-    const prevVersionNumber = latestVersionNumber > 1 ? latestVersionNumber - 1 : 0;
-    const latestVersion = versions.find((v) => v.versionNumber === latestVersionNumber);
-
-    let status = "Draft";
-    if (latestVersion) {
-      status = latestVersion.status === VersionStatus.READY ? "Ready" : latestVersion.status;
-      if (latestVersion.status !== VersionStatus.BUILDING && latestVersion.status !== VersionStatus.UPLOADED) {
-        const activeDeployment = latestVersion.deployments?.find((d) => d.status === DeploymentStatus.RUNNING);
-        if (activeDeployment) {
-          status = "Deployed";
-        }
-      }
-    }
-
-    return {
-      id: m.id,
-      initials: m.name.substring(0, 2).toUpperCase(),
-      name: m.name,
-      time: new Date(m.createdAt).toLocaleDateString(),
-      type: m.description || "Unknown",
-      version: latestVersionNumber > 0 ? `v${latestVersionNumber}` : "-",
-      prevVersion: prevVersionNumber > 0 ? `v${prevVersionNumber}` : "",
-      status: status,
-    };
-  });
-
-  // Calculate status counts for stats grid
-  const productionReadyCount = models.filter((m) => m.status === "Deployed" || m.status === "Ready").length;
-  const buildingCount = models.filter((m) => m.status === VersionStatus.BUILDING).length;
-  const failedCount = models.filter((m) => m.status === VersionStatus.FAILED || m.status === DeploymentStatus.FAILED).length;
+  const models = await getModels();
 
   return (
-    <div className="w-full">
-      <PageHeader
-        title="Models Registry"
-        description="Manage, version, and deploy your machine learning assets across environments."
-        actions={
-          <Link href="/models/upload" className="btn-primary">
-            <Plus className="w-4 h-4" /> New Model
-          </Link>
-        }
-      />
+    <div className="w-full pb-12 animate-in fade-in duration-500 text-foreground space-y-6 text-left font-sans">
+      
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 select-none">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-3xs">
+            <Layers className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-foreground tracking-tight">Models Registry</h1>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-normal">
+              Manage, version, and deploy your machine learning assets across environments.
+            </p>
+          </div>
+        </div>
+        
+        <Link
+          href="/models/upload"
+          className={cn(
+            buttonVariants({ variant: "default" }),
+            "h-9 px-4 text-xs font-bold gap-1.5 shrink-0 w-fit shadow-md shadow-primary/10 active:scale-[0.98] transition-transform"
+          )}
+        >
+          <Plus className="w-4 h-4" /> New Model
+        </Link>
+      </div>
 
       {/* Registry Specific Status Metric Cards */}
-      <RegistryStatsOverview
-        totalModels={models.length}
-        productionReadyCount={productionReadyCount}
-        buildingCount={buildingCount}
-        failedCount={failedCount}
-      />
+      <RegistryStatsOverview models={models} />
 
       {/* Models Interactive Registry Table */}
       <ModelsTable models={models} />

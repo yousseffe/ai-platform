@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   addPipelineStep,
   removePipelineStep,
+  updatePipelineStep,
   upsertPipelineEdge,
   removePipelineEdge,
   validatePipeline,
@@ -73,6 +74,37 @@ export function usePipelineBuilder(pipelineId: string) {
         return;
       }
       router.refresh();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * Updates a step's bound model/configuration.
+   *
+   * @param stepId - The UUID of the step to edit.
+   * @param input - The mutable fields to persist.
+   */
+  const handleUpdateStep = async (
+    stepId: string,
+    input: {
+      modelVersionId: string;
+      label?: string;
+      role?: string;
+      pinPolicy?: string;
+      maxRetries?: number;
+    },
+  ) => {
+    setError("");
+    setIsSubmitting(true);
+    try {
+      const res = await updatePipelineStep(pipelineId, stepId, input);
+      if (!res.success) {
+        setError(res.error);
+        return false;
+      }
+      router.refresh();
+      return true;
     } finally {
       setIsSubmitting(false);
     }
@@ -181,15 +213,36 @@ export function usePipelineBuilder(pipelineId: string) {
     }
   };
 
+  /**
+   * Updates the pipeline's name.
+   */
+  const handleRenamePipeline = async (name: string) => {
+    setError("");
+    setIsSubmitting(true);
+    try {
+      const res = await updatePipeline(pipelineId, { name });
+      if (!res.success) {
+        setError(res.error);
+        return false;
+      }
+      router.refresh();
+      return true;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return {
     isSubmitting,
     error,
     handleAddStep,
     handleRemoveStep,
+    handleUpdateStep,
     handleUpsertEdge,
     handleRemoveEdge,
     handleValidate,
     handleUpdateVisibility,
     handleDeletePipeline,
+    handleRenamePipeline,
   };
 }

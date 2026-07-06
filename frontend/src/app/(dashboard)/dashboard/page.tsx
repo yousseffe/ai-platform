@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getModels, getConsumerLogs, getProviderLogs } from "@/lib/actions/models.actions";
-import { Model, ModelLog, WalletType } from "@/types";
+import { getModels, getConsumerLogs, getProviderInsights, getProviderLogs } from "@/lib/actions/models.actions";
+import { Model, ModelLog, ProviderInsights, WalletType } from "@/types";
 import { useWorkspace } from "@/hooks/use-workspace";
 import ConsumerDashboard from "@/components/dashboard/ConsumerDashboard";
 import PublisherDashboard from "@/components/dashboard/PublisherDashboard";
@@ -14,10 +14,12 @@ import PublisherDashboard from "@/components/dashboard/PublisherDashboard";
  */
 export default function DashboardPage() {
   const router = useRouter();
-  const { viewMode, balance, isAdmin } = useWorkspace();
+  const { activeWorkspace, viewMode, balance, isAdmin, isLoading: workspaceLoading } = useWorkspace();
   const [models, setModels] = useState<Model[]>([]);
   const [logs, setLogs] = useState<ModelLog[]>([]);
+  const [providerInsights, setProviderInsights] = useState<ProviderInsights | null>(null);
   const [loading, setLoading] = useState(true);
+  const activeWorkspaceId = activeWorkspace?.id;
 
   // Redirect admin users to their console
   useEffect(() => {
@@ -28,6 +30,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let active = true;
+
+    if (workspaceLoading || !activeWorkspaceId) {
+      Promise.resolve().then(() => {
+        if (active) setLoading(true);
+      });
+      return () => {
+        active = false;
+      };
+    }
     
     const loadingTimeout = setTimeout(() => {
       if (active) setLoading(true);
@@ -35,25 +46,35 @@ export default function DashboardPage() {
 
     const loadDashboardData = async () => {
       try {
-        // Fetch all models
-        const fetchedModels = await getModels();
-        
-        // Fetch logs matching the view mode
+        let fetchedModels: Model[] = [];
         let fetchedLogs: ModelLog[] = [];
+        let fetchedInsights: ProviderInsights | null = null;
+
         if (viewMode === WalletType.PROVIDER) {
-          fetchedLogs = await getProviderLogs();
+          [fetchedModels, fetchedLogs, fetchedInsights] = await Promise.all([
+            getModels(),
+            getProviderLogs(),
+            getProviderInsights(30),
+          ]);
         } else {
-          fetchedLogs = await getConsumerLogs();
+          [fetchedModels, fetchedLogs] = await Promise.all([
+            getModels(),
+            getConsumerLogs(),
+          ]);
         }
 
         if (active) {
           setModels(fetchedModels);
           setLogs(fetchedLogs);
+          setProviderInsights(fetchedInsights);
           setLoading(false);
         }
       } catch (err) {
         console.error("Dashboard controller loading failed:", err);
         if (active) {
+          setModels([]);
+          setLogs([]);
+          setProviderInsights(null);
           setLoading(false);
         }
       }
@@ -65,7 +86,7 @@ export default function DashboardPage() {
       active = false;
       clearTimeout(loadingTimeout);
     };
-  }, [viewMode]);
+  }, [activeWorkspaceId, viewMode, workspaceLoading]);
 
   if (loading) {
     return (
@@ -131,7 +152,14 @@ export default function DashboardPage() {
   }
 
   if (viewMode === WalletType.PROVIDER) {
-    return <PublisherDashboard models={models} balance={balance} logs={logs} />;
+    return (
+      <PublisherDashboard
+        models={models}
+        balance={balance}
+        logs={logs}
+        insights={providerInsights}
+      />
+    );
   }
 
   return <ConsumerDashboard logs={logs} />;

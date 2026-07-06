@@ -245,7 +245,13 @@ export class ApiKeyOrJwtGuard implements CanActivate {
         );
       }
 
-      if (!apiKeyEntity.model || apiKeyEntity.model.id !== modelId) {
+      if (!apiKeyEntity.model) {
+        throw new UnauthorizedException(
+          'API Key is not bound to a model. Generate a model-scoped key for this model.',
+        );
+      }
+
+      if (apiKeyEntity.model.id !== modelId) {
         throw new UnauthorizedException(
           'API Key does not authorize access to this model',
         );

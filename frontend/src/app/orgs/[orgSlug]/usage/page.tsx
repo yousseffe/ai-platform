@@ -12,6 +12,7 @@ import {
   KeyRound,
   Layers,
   Loader2,
+  Calendar,
 } from "lucide-react";
 import { useOrgContext } from "@/hooks/use-org-context";
 import { OrgAction, OrgType } from "@/types";
@@ -24,6 +25,62 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
+
+const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-lg border border-border bg-popover p-3 shadow-md text-xs space-y-1">
+        <p className="font-bold text-foreground">{label}</p>
+        {payload.map((p: any) => (
+          <p key={p.name} className="flex items-center gap-2" style={{ color: p.color || p.fill }}>
+            <span className="h-2 w-2 rounded-full animate-pulse" style={{ backgroundColor: p.color || p.fill }} />
+            <span className="text-muted-foreground">{p.name}:</span>
+            <span className="font-semibold text-foreground">
+              {p.name.includes("Credits") ? `${Number(p.value).toFixed(2)} cr` : p.value.toLocaleString()}
+            </span>
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+const CustomPieTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="rounded-lg border border-border bg-popover p-3 shadow-md text-xs space-y-1">
+        <p className="font-bold text-foreground">{data.name}</p>
+        <p className="flex items-center gap-2">
+          <span className="text-muted-foreground">Volume/Credits:</span>
+          <span className="font-semibold text-foreground">{Number(data.value).toLocaleString()}</span>
+        </p>
+        <p className="text-[10px] text-muted-foreground">({data.percentage}% of total)</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 function formatNumber(value: number) {
   return value.toLocaleString("en-US");
@@ -83,6 +140,12 @@ export default function OrgUsagePage() {
   const { org, can } = useOrgContext();
   const [summary, setSummary] = useState<OrganizationUsageSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<"7" | "14" | "30">("14");
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const fetchUsage = useCallback(async () => {
     if (!org) return;
@@ -102,10 +165,54 @@ export default function OrgUsagePage() {
     Promise.resolve().then(fetchUsage);
   }, [fetchUsage]);
 
-  const daily = useMemo(() => summary?.daily.slice(-14) ?? [], [summary]);
+  const daily = useMemo(() => {
+    if (!summary?.daily) return [];
+    const limit = parseInt(timeRange);
+    return summary.daily.slice(-limit);
+  }, [summary, timeRange]);
+
   const monthly = useMemo(() => summary?.monthly.slice(-6) ?? [], [summary]);
   const maxDaily = Math.max(...daily.map((item) => item.requests), 0);
   const maxMonthly = Math.max(...monthly.map((item) => item.requests), 0);
+
+  const dailyChartData = useMemo(() => {
+    return daily.map(d => ({
+      dateStr: new Date(d.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      Success: d.requests - d.failedRequests,
+      Failed: d.failedRequests,
+      Total: d.requests,
+      Credits: d.creditsCharged
+    }));
+  }, [daily]);
+
+  const monthlyChartData = useMemo(() => {
+    return monthly.map(m => ({
+      month: m.month,
+      Requests: m.requests,
+      Credits: m.creditsCharged
+    }));
+  }, [monthly]);
+
+  const modelBreakdownData = useMemo(() => {
+    if (!summary?.models) return [];
+    const total = summary.models.reduce((sum, m) => sum + m.requests, 0) || 1;
+    return summary.models.map(m => ({
+      name: m.name,
+      value: m.requests,
+      percentage: ((m.requests / total) * 100).toFixed(1)
+    })).sort((a, b) => b.value - a.value).slice(0, 7);
+  }, [summary]);
+
+  const projectBreakdownData = useMemo(() => {
+    if (!summary?.projects) return [];
+    const total = summary.projects.reduce((sum, p) => sum + p.creditsCharged, 0) || 1;
+    return summary.projects.map(p => ({
+      name: p.name,
+      value: p.creditsCharged,
+      percentage: ((p.creditsCharged / total) * 100).toFixed(1)
+    })).sort((a, b) => b.value - a.value).slice(0, 7);
+  }, [summary]);
+
   const canUseUsage =
     !!org &&
     (org.type === OrgType.CONSUMER || org.type === OrgType.HYBRID) &&
@@ -215,72 +322,218 @@ export default function OrgUsagePage() {
             />
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-lg border border-border bg-card p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">
-                    Daily Usage
-                  </p>
-                  <h2 className="mt-1 text-base font-bold text-foreground">
-                    Last 14 days
-                  </h2>
-                </div>
-                <BarChart3 className="h-4 w-4 text-primary" strokeWidth={1.8} />
-              </div>
-              <div className="mt-5 space-y-3">
-                {daily.length > 0 ? (
-                  daily.map((item) => (
-                    <MiniBar
-                      key={item.date}
-                      label={new Date(item.date).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                      value={item.requests}
-                      max={maxDaily}
-                      failed={item.failedRequests}
-                    />
-                  ))
-                ) : (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    No daily usage recorded yet.
-                  </p>
-                )}
+          <Tabs defaultValue="trends" className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <TabsList className="bg-secondary/40 border border-border/80 w-fit">
+                <TabsTrigger value="trends">Consumption Trends</TabsTrigger>
+                <TabsTrigger value="breakdown">Distribution Breakdown</TabsTrigger>
+              </TabsList>
+
+              {/* Time Range Selector for trends */}
+              <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card p-1 self-start sm:self-auto">
+                {(["7", "14", "30"] as const).map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => setTimeRange(range)}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                      timeRange === range
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                    }`}
+                  >
+                    {range} Days
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="rounded-lg border border-border bg-card p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">
-                    Monthly Usage
-                  </p>
-                  <h2 className="mt-1 text-base font-bold text-foreground">
-                    Recent months
-                  </h2>
-                </div>
-                <Coins className="h-4 w-4 text-primary" strokeWidth={1.8} />
+            <TabsContent value="trends" className="space-y-4 outline-none">
+              <div className="grid gap-4 lg:grid-cols-2">
+                {/* Daily Volume AreaChart */}
+                <Card className="border border-border bg-card">
+                  <CardHeader className="border-b border-border/50 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-sm font-bold text-foreground">Daily Request Volume</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">
+                          Successful and failed requests over the selected window
+                        </CardDescription>
+                      </div>
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    <div className="h-72 w-full">
+                      {isMounted && dailyChartData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={dailyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="colorSuccess" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                              </linearGradient>
+                              <linearGradient id="colorFailed" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/>
+                                <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/50" />
+                            <XAxis dataKey="dateStr" tickLine={false} axisLine={false} className="text-[10px] fill-muted-foreground" />
+                            <YAxis tickLine={false} axisLine={false} className="text-[10px] fill-muted-foreground" />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Area type="monotone" dataKey="Success" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorSuccess)" name="Success" />
+                            <Area type="monotone" dataKey="Failed" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorFailed)" name="Failed" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                          No trend data available
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Monthly Credit Spend BarChart */}
+                <Card className="border border-border bg-card">
+                  <CardHeader className="border-b border-border/50 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-sm font-bold text-foreground">Monthly Credit Spend</CardTitle>
+                        <CardDescription className="text-xs text-muted-foreground">
+                          Consumer wallet credit utilization over recent months
+                        </CardDescription>
+                      </div>
+                      <Coins className="h-4 w-4 text-primary" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    <div className="h-72 w-full">
+                      {isMounted && monthlyChartData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={monthlyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/50" />
+                            <XAxis dataKey="month" tickLine={false} axisLine={false} className="text-[10px] fill-muted-foreground" />
+                            <YAxis tickLine={false} axisLine={false} className="text-[10px] fill-muted-foreground" />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Bar dataKey="Credits" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Credits Charged" />
+                            <Bar dataKey="Requests" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Requests" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                          No monthly data available
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              <div className="mt-5 space-y-3">
-                {monthly.length > 0 ? (
-                  monthly.map((item) => (
-                    <MiniBar
-                      key={item.month}
-                      label={item.month}
-                      value={item.requests}
-                      max={maxMonthly}
-                      failed={item.failedRequests}
-                    />
-                  ))
-                ) : (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    No monthly usage recorded yet.
-                  </p>
-                )}
+            </TabsContent>
+
+            <TabsContent value="breakdown" className="space-y-4 outline-none">
+              <div className="grid gap-4 lg:grid-cols-2">
+                {/* Pie Chart: Model Breakdown */}
+                <Card className="border border-border bg-card">
+                  <CardHeader className="border-b border-border/50 pb-4">
+                    <CardTitle className="text-sm font-bold text-foreground">Inference Volume by Model</CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">
+                      Breakdown of total model request distributions
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6 h-72">
+                      {isMounted && modelBreakdownData.length > 0 ? (
+                        <>
+                          <div className="h-56 w-56 flex-shrink-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Tooltip content={<CustomPieTooltip />} />
+                                <Pie
+                                  data={modelBreakdownData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={50}
+                                  outerRadius={75}
+                                  paddingAngle={3}
+                                  dataKey="value"
+                                >
+                                  {modelBreakdownData.map((entry, idx) => (
+                                    <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                                  ))}
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <div className="flex flex-col gap-2 max-h-56 overflow-y-auto w-full sm:w-auto text-xs">
+                            {modelBreakdownData.map((entry, idx) => (
+                              <div key={entry.name} className="flex items-center gap-2">
+                                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                                <span className="truncate max-w-[150px] font-semibold text-foreground">{entry.name}:</span>
+                                <span className="text-muted-foreground font-mono text-[11px] ml-auto">{entry.percentage}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">No model distribution data available</div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Pie Chart: Project Breakdown */}
+                <Card className="border border-border bg-card">
+                  <CardHeader className="border-b border-border/50 pb-4">
+                    <CardTitle className="text-sm font-bold text-foreground">Spend Distribution by Project</CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">
+                      Breakdown of total credit spend across active projects
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6 h-72">
+                      {isMounted && projectBreakdownData.length > 0 ? (
+                        <>
+                          <div className="h-56 w-56 flex-shrink-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Tooltip content={<CustomPieTooltip />} />
+                                <Pie
+                                  data={projectBreakdownData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={50}
+                                  outerRadius={75}
+                                  paddingAngle={3}
+                                  dataKey="value"
+                                >
+                                  {projectBreakdownData.map((entry, idx) => (
+                                    <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                                  ))}
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <div className="flex flex-col gap-2 max-h-56 overflow-y-auto w-full sm:w-auto text-xs">
+                            {projectBreakdownData.map((entry, idx) => (
+                              <div key={entry.name} className="flex items-center gap-2">
+                                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                                <span className="truncate max-w-[150px] font-semibold text-foreground">{entry.name}:</span>
+                                <span className="text-muted-foreground font-mono text-[11px] ml-auto">{entry.percentage}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">No project distribution data available</div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </div>
-          </section>
+            </TabsContent>
+          </Tabs>
 
           <section className="grid gap-4 xl:grid-cols-2">
             <div className="overflow-hidden rounded-lg border border-border bg-card">

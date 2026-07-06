@@ -18,8 +18,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Transaction } from "@/lib/services/wallets.service";
 import { WalletType } from "@/types";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface TransactionsTableProps {
   viewMode?: WalletType;
@@ -127,60 +129,66 @@ export default function TransactionsTable({
 
           {/* Type filter */}
           <div className="space-y-1.5 md:col-span-2">
-            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono select-none">
               Type
             </label>
-            <select
-              value={txType || ""}
-              onChange={(e) => onTxTypeChange?.(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+            <Select
+              value={txType || "ALL"}
+              onValueChange={(val) => onTxTypeChange?.(val === "ALL" || !val ? "" : val)}
             >
-              <option value="">All Types</option>
-              <option value="CREDIT">CREDIT</option>
-              <option value="DEBIT">DEBIT</option>
-            </select>
+              <SelectTrigger className="w-full text-xs">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Types</SelectItem>
+                <SelectItem value="CREDIT">CREDIT</SelectItem>
+                <SelectItem value="DEBIT">DEBIT</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Status filter */}
           <div className="space-y-1.5 md:col-span-2">
-            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono select-none">
               Status
             </label>
-            <select
-              value={status || ""}
-              onChange={(e) => onStatusChange?.(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+            <Select
+              value={status || "ALL"}
+              onValueChange={(val) => onStatusChange?.(val === "ALL" || !val ? "" : val)}
             >
-              <option value="">All Statuses</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="PENDING">PENDING</option>
-              <option value="FAILED">FAILED</option>
-            </select>
+              <SelectTrigger className="w-full text-xs">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                <SelectItem value="COMPLETED">COMPLETED</SelectItem>
+                <SelectItem value="PENDING">PENDING</SelectItem>
+                <SelectItem value="FAILED">FAILED</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Date range filter: From */}
           <div className="space-y-1.5 md:col-span-2">
-            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono select-none">
               From Date
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={startDate || ""}
-              onChange={(e) => onStartDateChange?.(e.target.value)}
-              className="w-full px-2.5 py-1 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-sans focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer font-medium"
+              onChange={(date) => onStartDateChange?.(date)}
+              placeholder="From Date"
             />
           </div>
 
           {/* Date range filter: To */}
           <div className="space-y-1.5 md:col-span-2">
-            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono">
+            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block font-mono select-none">
               To Date
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={endDate || ""}
-              onChange={(e) => onEndDateChange?.(e.target.value)}
-              className="w-full px-2.5 py-1 bg-background border border-border rounded-lg text-xs text-foreground outline-none font-sans focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer font-medium"
+              onChange={(date) => onEndDateChange?.(date)}
+              placeholder="To Date"
             />
           </div>
         </div>

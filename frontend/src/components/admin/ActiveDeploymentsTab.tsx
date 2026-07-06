@@ -73,16 +73,16 @@ export default function ActiveDeploymentsTab({
                     <TableHead className="px-5 py-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider h-auto text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody className="divide-y divide-border text-xs font-mono">
+                <TableBody className="divide-y divide-border text-xs font-sans">
                   {models.map((model) => {
                     const isActive = model.status === "ACTIVE";
                     const costVal = typeof model.costPerRequest === "string" ? parseFloat(model.costPerRequest) : model.costPerRequest;
                     return (
-                      <TableRow key={model.id} className="hover:bg-accent/40 border-b border-border">
+                      <TableRow key={model.id} className="hover:bg-muted/25 transition-all border-b border-border/80">
                         <TableCell className="px-5 py-3.5">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col text-left">
                             <span className="font-bold text-foreground">{model.name}</span>
-                            <span className="text-[9px] text-muted-foreground mt-0.5">Owner: {model.owner}</span>
+                            <span className="text-[9px] text-muted-foreground mt-0.5 font-sans">Owner: {model.owner}</span>
                           </div>
                         </TableCell>
                         <TableCell className="px-5 py-3.5">
@@ -98,19 +98,19 @@ export default function ActiveDeploymentsTab({
                         <TableCell className="px-5 py-3.5 font-bold text-primary">
                           {model.port ? `:${model.port}` : "—"}
                         </TableCell>
-                        <TableCell className="px-5 py-3.5 text-foreground font-mono">
-                          <span className="flex items-center gap-1.5">
-                            <Cpu className="w-3.5 h-3.5 text-muted-foreground" />
+                        <TableCell className="px-5 py-3.5 text-foreground font-sans">
+                          <span className="flex items-center gap-1.5 justify-start">
+                            <Cpu className="w-3.5 h-3.5 text-muted-foreground/75" />
                             {model.cpu}
                           </span>
                         </TableCell>
-                        <TableCell className="px-5 py-3.5 text-foreground font-mono">
+                        <TableCell className="px-5 py-3.5 text-foreground font-sans">
                           {model.ram}
                         </TableCell>
                         <TableCell className="px-5 py-3.5 font-bold text-foreground">
                           ${costVal.toFixed(2)}
                         </TableCell>
-                        <TableCell className="px-5 py-3.5 text-muted-foreground">
+                        <TableCell className="px-5 py-3.5 text-muted-foreground text-left">
                           {model.providerSharePercent}% Provider / {100 - model.providerSharePercent}% Platform
                         </TableCell>
                         <TableCell className="px-5 py-3.5 text-right font-sans">
@@ -118,9 +118,9 @@ export default function ActiveDeploymentsTab({
                             variant="ghost"
                             size="sm"
                             onClick={() => onEditPricing(model)}
-                            className="h-7 text-[10px] font-bold text-primary hover:bg-primary/10 gap-1 cursor-pointer font-mono"
+                            className="h-7 text-[10px] font-bold text-primary hover:bg-primary/10 gap-1 cursor-pointer font-sans rounded-lg hover-lift active-shrink border border-primary/20 bg-primary/5 px-2.5"
                           >
-                            <Edit2 className="w-3 h-3" /> Adjust Pricing
+                            <Edit2 className="w-3.5 h-3.5" /> Adjust Pricing
                           </Button>
                         </TableCell>
                       </TableRow>

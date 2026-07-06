@@ -82,7 +82,7 @@ export default async function PublicLayout({
               <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-1">Resources</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <a href="/CLAUDE.md" className="hover:text-primary transition-colors">Platform Docs</a>
+                  <Link href="/docs" className="hover:text-primary transition-colors">Platform Docs</Link>
                 </li>
                 <li>
                   <span className="hover:text-primary cursor-pointer transition-colors">Qantara SDK (Python)</span>

@@ -81,9 +81,6 @@ function tierFeatures(tier: ProviderTierDefinition): string[] {
   ];
 }
 
-/**
- * Provider-facing tier management panel for viewing and upgrading account plans.
- */
 export function ProviderPlansPanel() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -181,7 +178,7 @@ export function ProviderPlansPanel() {
         clearCheckoutParams();
       })
       .catch(() => {
-        // toast.promise already renders the error state for the provider.
+        // Handled by toast promise
       });
   }, [checkoutSessionId, checkoutStatus, loadProviderPlans, router]);
 
@@ -212,12 +209,12 @@ export function ProviderPlansPanel() {
 
   if (loading) {
     return (
-      <Card className="border border-border bg-card rounded-xl overflow-hidden">
+      <Card className="border border-border bg-card rounded-xl overflow-hidden shadow-xs">
         <CardContent className="p-5">
           <div className="h-4 w-40 bg-muted animate-pulse rounded" />
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
             {[0, 1, 2].map((item) => (
-              <div key={item} className="h-40 bg-muted/60 animate-pulse rounded-xl" />
+              <div key={item} className="h-48 bg-muted/60 animate-pulse rounded-xl" />
             ))}
           </div>
         </CardContent>
@@ -230,33 +227,39 @@ export function ProviderPlansPanel() {
   const currentTier = data.account.tier;
 
   return (
-    <Card className="border border-emerald-500/20 bg-card rounded-xl overflow-hidden shadow-sm text-left">
-      <CardContent className="p-0">
-        <div className="p-5 border-b border-border/60 bg-linear-to-r from-emerald-500/10 via-primary/5 to-transparent flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+    <Card className="border border-border/80 bg-card/60 backdrop-blur-md rounded-xl overflow-hidden shadow-xs text-left font-sans relative premium-card p-0">
+      <div className="glow-spot" />
+      <div className="glow-spot-secondary" />
+
+      <CardContent className="p-0 relative z-10">
+        
+        {/* Panel Header Banner */}
+        <div className="p-5 border-b border-border/60 bg-gradient-to-r from-emerald-500/10 via-primary/5 to-transparent flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 select-none">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
               <Crown className="w-3.5 h-3.5" />
-              Provider Plans
+              Provider Subscription Management
             </div>
-            <h2 className="mt-1 text-base font-extrabold text-foreground tracking-tight">
-              Current plan: {currentTier.displayName}
+            <h2 className="text-base font-extrabold text-foreground tracking-tight">
+              Current Workspace Tier: <span className="text-primary font-black">{currentTier.displayName}</span>
             </h2>
-            <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+            <p className="text-[11px] text-muted-foreground leading-relaxed max-w-xl">
               {isConfirmingCheckout
-                ? "Confirming your payment and refreshing your current plan..."
-                : "Upgrade your provider account to unlock higher publishing limits, better revenue share, and priority marketplace tools."}
+                ? "Checking payment session and updating credentials..."
+                : "Upgrade your publisher capabilities to upload custom container weights, unlock higher request volume limits, and configure customized price lists."}
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-            <div className="inline-flex rounded-lg border border-border bg-background p-1 shadow-sm">
+          <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
+            {/* Billing Cycle Selector */}
+            <div className="inline-flex rounded-lg border border-border bg-background p-0.5 shadow-sm select-none">
               {(["MONTHLY", "ANNUAL"] as BillingCycle[]).map((cycle) => (
                 <button
                   key={cycle}
                   type="button"
                   onClick={() => setBillingCycle(cycle)}
                   className={cn(
-                    "px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                    "px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer hover-lift active-shrink",
                     billingCycle === cycle
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -269,13 +272,14 @@ export function ProviderPlansPanel() {
             <input
               value={offerCode}
               onChange={(event) => setOfferCode(event.target.value)}
-              placeholder="Offer code"
-              className="h-9 w-full sm:w-36 rounded-lg border border-border bg-background px-3 text-xs font-mono outline-none focus:border-primary"
+              placeholder="Promo offer code"
+              className="h-8.5 w-full sm:w-36 rounded-lg border border-border bg-background px-3 text-[11px] font-mono outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all form-input"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-3 p-4">
+        {/* Plan Cards Grid */}
+        <div className="flex flex-wrap gap-5 p-5 justify-center">
           {data.tiers.map((tier) => {
             const isCurrent = currentTier.id === tier.id;
             const monthly = toNumber(tier.monthlyPriceEgp);
@@ -284,103 +288,118 @@ export function ProviderPlansPanel() {
             const isCheckoutLoading = checkoutTierId === tier.id;
             const cannotCheckout = price <= 0 && !isCurrent;
 
+            // Gradient colors based on current status vs regular options
+            const cardAccentGlow = isCurrent
+              ? "from-emerald-400 to-teal-500"
+              : "from-primary/60 to-indigo-500/60";
+
             return (
               <div
                 key={tier.id}
                 className={cn(
-                  "rounded-xl border bg-background p-4 flex flex-col min-h-[330px] transition-all",
+                  "relative rounded-xl border bg-card/75 backdrop-blur-md overflow-hidden flex flex-col min-h-[360px] w-full sm:w-[280px] md:w-[300px] flex-grow sm:flex-grow-0 transition-all duration-300 select-none shadow-xs hover-lift",
                   isCurrent
-                    ? "border-emerald-500/45 shadow-sm ring-2 ring-emerald-500/10"
-                    : "border-border hover:border-primary/35 hover:-translate-y-0.5 hover:shadow-md"
+                    ? "border-emerald-500/40 ring-2 ring-emerald-500/10 shadow-sm"
+                    : "border-border hover:border-primary/30 hover:shadow-sm"
                 )}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                      {tier.code}
-                    </p>
-                    <h3 className="mt-1 text-sm font-extrabold text-foreground">
-                      {tier.displayName}
-                    </h3>
-                  </div>
-                  {isCurrent ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Active
-                    </span>
-                  ) : (
-                    <Sparkles className="w-4 h-4 text-primary" />
-                  )}
-                </div>
+                {/* Visual top line */}
+                <div className={cn("h-1 w-full bg-gradient-to-r", cardAccentGlow)} />
 
-                <div className="mt-4">
-                  <div className="text-2xl font-extrabold text-foreground tracking-tight">
-                    {price > 0 ? `${price.toLocaleString()} EGP` : "Custom"}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    {price > 0 ? `per ${billingCycle.toLowerCase()} cycle` : "contact admin for activation"}
-                  </p>
-                </div>
-
-                <div className="mt-4 space-y-2 flex-1">
-                  {tierFeatures(tier).map((feature) => (
-                    <div key={feature} className="flex items-start gap-2 text-[10.5px] text-muted-foreground leading-relaxed">
-                      <ShieldCheck className="mt-0.5 w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>{feature}</span>
+                <div className="p-5 flex flex-col flex-1">
+                  {/* Header Row */}
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div className="text-left">
+                      <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80 font-mono">
+                        {tier.code}
+                      </p>
+                      <h3 className="mt-0.5 text-xs font-bold text-foreground">
+                        {tier.displayName}
+                      </h3>
                     </div>
-                  ))}
-                </div>
+                    {isCurrent ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 shrink-0">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Active
+                      </span>
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-primary/60 shrink-0" />
+                    )}
+                  </div>
 
-                <Button
-                  type="button"
-                  disabled={isCurrent || cannotCheckout || checkoutTierId !== null}
-                  onClick={() => handleCheckout(tier)}
-                  className={cn(
-                    "mt-4 h-9 rounded-lg text-xs font-bold",
-                    isCurrent
-                      ? "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15"
-                      : "bg-primary text-primary-foreground"
-                  )}
-                >
-                  {isCheckoutLoading ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                      Redirecting
-                    </>
-                  ) : isCurrent ? (
-                    "Current plan"
-                  ) : cannotCheckout ? (
-                    "Contact admin"
-                  ) : (
-                    <>
-                      <Zap className="w-3.5 h-3.5 mr-1.5" />
-                      {monthly > toNumber(currentTier.monthlyPriceEgp) ? "Upgrade" : "Change plan"}
-                    </>
-                  )}
-                </Button>
+                  {/* Pricing Row */}
+                  <div className="mb-4 text-left border-b border-border/40 pb-4">
+                    <div className="text-xl font-black text-foreground tracking-tight font-mono">
+                      {price > 0 ? `${price.toLocaleString()} EGP` : "Custom"}
+                    </div>
+                    <p className="text-[9.5px] text-muted-foreground mt-0.5 font-medium">
+                      {price > 0 ? `per ${billingCycle.toLowerCase()} cycle` : "Request contract activation"}
+                    </p>
+                  </div>
+
+                  {/* Features List */}
+                  <div className="space-y-2 flex-1 text-left">
+                    {tierFeatures(tier).map((feature) => (
+                      <div key={feature} className="flex items-start gap-2.5 text-[10.5px] text-muted-foreground leading-relaxed">
+                        <ShieldCheck className="mt-0.5 w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="font-medium text-[11px]">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Action Button */}
+                  <Button
+                    type="button"
+                    disabled={isCurrent || cannotCheckout || checkoutTierId !== null}
+                    onClick={() => handleCheckout(tier)}
+                    variant={isCurrent ? "outline" : "default"}
+                    className={cn(
+                      "mt-5 h-9 w-full text-xs font-bold transition-all duration-150 select-none cursor-pointer hover-lift active-shrink rounded-lg",
+                      isCurrent && "border-emerald-500/20 bg-emerald-500/10 text-emerald-650 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-not-allowed hover:text-emerald-650"
+                    )}
+                  >
+                    {isCheckoutLoading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        Redirecting...
+                      </>
+                    ) : isCurrent ? (
+                      "Active Tier Plan"
+                    ) : cannotCheckout ? (
+                      "Contact Admin"
+                    ) : (
+                      <span className="flex items-center justify-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 shrink-0" />
+                        {monthly > toNumber(currentTier.monthlyPriceEgp) ? "Upgrade Plan" : "Downgrade Plan"}
+                      </span>
+                    )}
+                  </Button>
+                </div>
               </div>
             );
           })}
         </div>
 
-        <div className="px-5 py-4 border-t border-border/60 bg-secondary/15 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Account status</p>
-            <p className="mt-1 font-bold text-foreground">{data.account.status}</p>
+        {/* Usage Limits footer */}
+        <div className="px-5 py-4.5 border-t border-border/60 bg-secondary/15 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs select-none">
+          <div className="text-left">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground font-mono">Account status</p>
+            <p className="mt-1 font-bold text-foreground capitalize">{data.account.status.toLowerCase()}</p>
           </div>
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Model usage</p>
+          <div className="text-left">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground font-mono">Model usage</p>
             <p className="mt-1 font-bold text-foreground">
               {data.utilization.totalModels.used} / {formatLimit(data.utilization.totalModels.limit)}
             </p>
           </div>
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Public listings</p>
+          <div className="text-left">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground font-mono">Public listings</p>
             <p className="mt-1 font-bold text-foreground">
               {data.utilization.publicModels.used} / {formatLimit(data.utilization.publicModels.limit)}
             </p>
           </div>
         </div>
+
       </CardContent>
     </Card>
   );

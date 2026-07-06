@@ -1,6 +1,14 @@
 import { smartFetch } from "@/lib/utils/smart-fetch";
 import { LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES } from "@/lib/utils/upload-thresholds";
-import { Model, ModelVersion, ModelLog, ModelVersionReviewEvent, ModelVersionTestCase } from "@/types";
+import {
+  Model,
+  ModelVersion,
+  ModelLog,
+  ModelVersionReviewEvent,
+  ModelVersionTestCase,
+  ProviderInsights,
+  ModelIntegrationSpec,
+} from "@/types";
 
 /**
  * Fetches all registered machine learning models from the backend.
@@ -39,11 +47,18 @@ export async function createModel(
   isPublic: boolean = false,
   type?: string,
   framework?: string,
-  taskType?: string
+  taskType?: string,
 ): Promise<Model> {
   return smartFetch<Model>("/models", {
     method: "POST",
-    body: JSON.stringify({ name, description, isPublic, type, framework, taskType }),
+    body: JSON.stringify({
+      name,
+      description,
+      isPublic,
+      type,
+      framework,
+      taskType,
+    }),
   });
 }
 
@@ -71,6 +86,14 @@ export async function getPublicModelById(id: string): Promise<Model> {
   });
 }
 
+export async function getModelIntegrationSpec(
+  id: string,
+): Promise<ModelIntegrationSpec> {
+  return smartFetch<ModelIntegrationSpec>(`/models/${id}/integration-spec`, {
+    cache: "no-store",
+  });
+}
+
 /**
  * Submits a new version's artifacts (weights and scripts) for build queueing.
  *
@@ -78,7 +101,10 @@ export async function getPublicModelById(id: string): Promise<Model> {
  * @param formData - Envelope carrying the file binary streams and version strings.
  * @returns A promise resolving to the created ModelVersion instance.
  */
-export async function uploadModelVersion(id: string, formData: FormData): Promise<ModelVersion> {
+export async function uploadModelVersion(
+  id: string,
+  formData: FormData,
+): Promise<ModelVersion> {
   return smartFetch<ModelVersion>(`/models/${id}/versions`, {
     method: "POST",
     body: formData,
@@ -92,6 +118,34 @@ export interface VersionArtifactPreview {
     url: string | null;
     previewable: boolean;
   }>;
+}
+
+export interface InitiateVersionUploadResponse {
+  versionNumber: number;
+  model: {
+    objectKey: string;
+    uploadId: string;
+    chunkSize: number;
+    urls: Array<{ partNumber: number; url: string }>;
+  };
+  scaler?: { objectKey: string; url: string };
+  preprocess?: { objectKey: string; url: string };
+  postprocess?: { objectKey: string; url: string };
+}
+
+export interface CompleteVersionUploadPayload {
+  examplePayload?: string;
+  expectedResult?: string;
+  classLabels?: string;
+  triggerBuild?: string;
+  model: {
+    objectKey: string;
+    uploadId: string;
+    parts: Array<{ partNumber: number; etag: string }>;
+  };
+  scaler?: { objectKey: string };
+  preprocess?: { objectKey: string };
+  postprocess?: { objectKey: string };
 }
 
 export interface OrganizationModelAnalytics {
@@ -118,12 +172,13 @@ export interface OrganizationModelAnalytics {
     reviewedBy: string | null;
     createdAt: string;
   }>;
+  earningsHistory?: Array<{ name: string; Earnings: number }>;
 }
 
 export async function reviewModelVersion(
   versionId: string,
   decision: "approve" | "decline",
-  comment?: string
+  comment?: string,
 ): Promise<ModelVersion> {
   return smartFetch<ModelVersion>(`/models/versions/${versionId}/review`, {
     method: "POST",
@@ -133,36 +188,61 @@ export async function reviewModelVersion(
 
 export async function saveModelVersionTestCase(
   versionId: string,
-  body: { name: string; payload: string; expectedResult?: string; notes?: string }
+  body: {
+    name: string;
+    payload: string;
+    expectedResult?: string;
+    notes?: string;
+  },
 ): Promise<ModelVersionTestCase> {
-  return smartFetch<ModelVersionTestCase>(`/models/versions/${versionId}/test-cases`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return smartFetch<ModelVersionTestCase>(
+    `/models/versions/${versionId}/test-cases`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+  );
 }
 
-export async function getModelVersionTestCases(versionId: string): Promise<ModelVersionTestCase[]> {
-  return smartFetch<ModelVersionTestCase[]>(`/models/versions/${versionId}/test-cases`, {
-    cache: "no-store",
-  });
+export async function getModelVersionTestCases(
+  versionId: string,
+): Promise<ModelVersionTestCase[]> {
+  return smartFetch<ModelVersionTestCase[]>(
+    `/models/versions/${versionId}/test-cases`,
+    {
+      cache: "no-store",
+    },
+  );
 }
 
-export async function getModelVersionArtifacts(versionId: string): Promise<VersionArtifactPreview> {
-  return smartFetch<VersionArtifactPreview>(`/models/versions/${versionId}/artifacts`, {
-    cache: "no-store",
-  });
+export async function getModelVersionArtifacts(
+  versionId: string,
+): Promise<VersionArtifactPreview> {
+  return smartFetch<VersionArtifactPreview>(
+    `/models/versions/${versionId}/artifacts`,
+    {
+      cache: "no-store",
+    },
+  );
 }
 
-export async function getModelHistory(modelId: string): Promise<ModelVersionReviewEvent[]> {
+export async function getModelHistory(
+  modelId: string,
+): Promise<ModelVersionReviewEvent[]> {
   return smartFetch<ModelVersionReviewEvent[]>(`/models/${modelId}/history`, {
     cache: "no-store",
   });
 }
 
-export async function getOrganizationModelAnalytics(orgId: string): Promise<OrganizationModelAnalytics> {
-  return smartFetch<OrganizationModelAnalytics>(`/models/organizations/${orgId}/analytics`, {
-    cache: "no-store",
-  });
+export async function getOrganizationModelAnalytics(
+  orgId: string,
+): Promise<OrganizationModelAnalytics> {
+  return smartFetch<OrganizationModelAnalytics>(
+    `/models/organizations/${orgId}/analytics`,
+    {
+      cache: "no-store",
+    },
+  );
 }
 
 /**
@@ -175,9 +255,11 @@ export async function getOrganizationModelAnalytics(orgId: string): Promise<Orga
 export async function runPrediction(
   id: string,
   parsedPayload: unknown,
-  versionNumber?: number
+  versionNumber?: number,
 ): Promise<Record<string, unknown>> {
-  const url = versionNumber ? `/models/${id}/v${versionNumber}/predict` : `/models/${id}/predict`;
+  const url = versionNumber
+    ? `/models/${id}/v${versionNumber}/predict`
+    : `/models/${id}/predict`;
   return smartFetch<Record<string, unknown>>(url, {
     method: "POST",
     body: JSON.stringify(parsedPayload),
@@ -203,7 +285,7 @@ export async function updateCacheSettings(
     cacheEnabled?: boolean;
     cacheTtlSeconds?: number;
     cacheHitDiscountPercent?: number;
-  }
+  },
 ): Promise<Model> {
   return smartFetch<Model>(`/models/${id}/cache-settings`, {
     method: "PATCH",
@@ -233,7 +315,7 @@ export async function getCacheStats(id: string): Promise<CacheStats> {
  */
 export async function updateNetworkSettings(
   id: string,
-  allowEgress: boolean
+  allowEgress: boolean,
 ): Promise<Model> {
   return smartFetch<Model>(`/models/${id}/network-settings`, {
     method: "PATCH",
@@ -250,7 +332,7 @@ export async function updateNetworkSettings(
  */
 export async function updateVisibilitySettings(
   id: string,
-  isPublic: boolean
+  isPublic: boolean,
 ): Promise<Model> {
   return smartFetch<Model>(`/models/${id}/visibility-settings`, {
     method: "PATCH",
@@ -276,7 +358,9 @@ export async function deleteModel(id: string): Promise<{ success: boolean }> {
  * @param versionId - The model version UUID.
  * @returns A promise resolving to a success boolean indicator object.
  */
-export async function deleteModelVersion(versionId: string): Promise<{ success: boolean }> {
+export async function deleteModelVersion(
+  versionId: string,
+): Promise<{ success: boolean }> {
   return smartFetch<{ success: boolean }>(`/models/versions/${versionId}`, {
     method: "DELETE",
   });
@@ -302,6 +386,23 @@ export async function getProviderLogs(): Promise<ModelLog[]> {
   return smartFetch<ModelLog[]>("/models/logs/provider", {
     cache: "no-store",
   });
+}
+
+/**
+ * Fetches aggregated provider analytics for the dashboard decision-support view.
+ *
+ * @param days - Lookback window in days.
+ * @returns Provider performance insights and earnings breakdowns.
+ */
+export async function getProviderInsights(
+  days: number = 30,
+): Promise<ProviderInsights> {
+  return smartFetch<ProviderInsights>(
+    `/models/logs/provider/insights?days=${days}`,
+    {
+      cache: "no-store",
+    },
+  );
 }
 
 export interface DetectedSchema {
@@ -339,30 +440,48 @@ export interface PostprocessSource {
 export async function detectSchema(
   file: File,
   modelType?: string,
-  postprocess?: PostprocessSource
+  postprocess?: PostprocessSource,
 ): Promise<DetectedSchema> {
-  if (file.name.toLowerCase().endsWith('.gguf') || modelType === 'LLM_GGUF') {
+  if (file.name.toLowerCase().endsWith(".gguf") || modelType === "LLM_GGUF") {
     return {
-      framework: 'gguf',
-      task: 'llm_gguf',
+      framework: "gguf",
+      task: "llm_gguf",
       confidence: 1.0,
       inputs: [],
       outputs: [],
       warnings: [],
-      example_payload: JSON.stringify({
-        messages: [{ role: "user", content: "Hello, how are you?" }],
-        temperature: 0.7,
-        max_tokens: 128,
-        stream: false
-      }, null, 2),
-      expected_result: JSON.stringify({
-        choices: [{ message: { role: "assistant", content: "Hello! I'm an AI assistant. How can I help you today?" } }]
-      }, null, 2)
+      example_payload: JSON.stringify(
+        {
+          messages: [{ role: "user", content: "Hello, how are you?" }],
+          temperature: 0.7,
+          max_tokens: 128,
+          stream: false,
+        },
+        null,
+        2,
+      ),
+      expected_result: JSON.stringify(
+        {
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content:
+                  "Hello! I'm an AI assistant. How can I help you today?",
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      ),
     };
   }
 
   if (file.size > LARGE_MODEL_SCHEMA_DETECTION_THRESHOLD_BYTES) {
-    throw new Error("This file is too large for instant schema detection. It will be automatically detected in the background during compilation.");
+    throw new Error(
+      "This file is too large for instant schema detection. It will be automatically detected in the background during compilation.",
+    );
   }
 
   const formData = new FormData();
@@ -423,16 +542,21 @@ export async function confirmSchemaDetection(
   const body: Record<string, string> = {};
   if (examplePayload !== undefined) body.examplePayload = examplePayload;
   if (expectedResult !== undefined) body.expectedResult = expectedResult;
-  return smartFetch<ModelVersion>(`/models/versions/${versionId}/confirm-schema`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return smartFetch<ModelVersion>(
+    `/models/versions/${versionId}/confirm-schema`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 /**
  * Deprecates a model version, terminating any container running for it.
  */
-export async function deprecateModelVersion(versionId: string): Promise<ModelVersion> {
+export async function deprecateModelVersion(
+  versionId: string,
+): Promise<ModelVersion> {
   return smartFetch<ModelVersion>(`/models/versions/${versionId}/deprecate`, {
     method: "POST",
   });
@@ -441,36 +565,50 @@ export async function deprecateModelVersion(versionId: string): Promise<ModelVer
 /**
  * Undeprecates a model version, returning it to ready status.
  */
-export async function undeprecateModelVersion(versionId: string): Promise<ModelVersion> {
+export async function undeprecateModelVersion(
+  versionId: string,
+): Promise<ModelVersion> {
   return smartFetch<ModelVersion>(`/models/versions/${versionId}/undeprecate`, {
     method: "POST",
   });
 }
 
-export async function initiateVersionUpload(modelId: string, data: {
-  modelFilename: string;
-  modelSize: number;
-  scalerFilename?: string;
-  preprocessFilename?: string;
-  postprocessFilename?: string;
-}): Promise<any> {
-  return smartFetch<any>(`/models/${modelId}/versions/upload-initiate`, {
-    method: "POST",
-    body: JSON.stringify(data),
-    headers: {
-      "Content-Type": "application/json",
+export async function initiateVersionUpload(
+  modelId: string,
+  data: {
+    modelFilename: string;
+    modelSize: number;
+    scalerFilename?: string;
+    preprocessFilename?: string;
+    postprocessFilename?: string;
+  },
+): Promise<InitiateVersionUploadResponse> {
+  return smartFetch<InitiateVersionUploadResponse>(
+    `/models/${modelId}/versions/upload-initiate`,
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
 }
 
-export async function completeVersionUpload(modelId: string, data: any): Promise<ModelVersion> {
-  return smartFetch<ModelVersion>(`/models/${modelId}/versions/upload-complete`, {
-    method: "POST",
-    body: JSON.stringify(data),
-    headers: {
-      "Content-Type": "application/json",
+export async function completeVersionUpload(
+  modelId: string,
+  data: CompleteVersionUploadPayload,
+): Promise<ModelVersion> {
+  return smartFetch<ModelVersion>(
+    `/models/${modelId}/versions/upload-complete`,
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
 }
 
 /**
@@ -486,13 +624,16 @@ export async function completeVersionUpload(modelId: string, data: any): Promise
 export async function abortVersionUpload(
   modelId: string,
   objectKey: string,
-  uploadId: string
+  uploadId: string,
 ): Promise<{ success: boolean }> {
-  return smartFetch<{ success: boolean }>(`/models/${modelId}/versions/upload-abort`, {
-    method: "DELETE",
-    body: JSON.stringify({ objectKey, uploadId }),
-    headers: {
-      "Content-Type": "application/json",
+  return smartFetch<{ success: boolean }>(
+    `/models/${modelId}/versions/upload-abort`,
+    {
+      method: "DELETE",
+      body: JSON.stringify({ objectKey, uploadId }),
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
 }

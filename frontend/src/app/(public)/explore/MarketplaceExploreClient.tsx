@@ -347,18 +347,14 @@ export default function MarketplaceExploreClient() {
   };
 
   const toggleFramework = (value: string) => {
-    const next = selectedFrameworks.includes(value)
-      ? selectedFrameworks.filter((f) => f !== value)
-      : [...selectedFrameworks, value];
+    const next = selectedFrameworks.includes(value) ? [] : [value];
     setSelectedFrameworks(next);
     setCurrentPage(1);
     triggerImmediateSearch(searchQuery, selectedTypes, next, selectedTasks, 1);
   };
 
   const toggleTask = (value: string) => {
-    const next = selectedTasks.includes(value)
-      ? selectedTasks.filter((t) => t !== value)
-      : [...selectedTasks, value];
+    const next = selectedTasks.includes(value) ? [] : [value];
     setSelectedTasks(next);
     setCurrentPage(1);
     triggerImmediateSearch(searchQuery, selectedTypes, selectedFrameworks, next, 1);

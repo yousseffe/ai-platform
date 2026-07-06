@@ -50,14 +50,15 @@ export function StatsOverview({ totalModels, activeDeploymentsCount }: StatsOver
       </Card>
 
       {/* Latency Average */}
-      <Card className="bg-card border border-border p-0 shadow-sm">
+      <Card className="bg-card border border-border p-0 shadow-sm border-l-4 border-l-primary hover:border-primary/30 transition-all duration-300 rounded-xl">
         <CardContent className="p-6">
           <div className="flex justify-between items-start mb-2">
-            <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 font-mono">Latency Average</p>
-              <CardTitle className="text-3xl font-extrabold text-foreground border-none p-0 h-auto font-mono">42ms</CardTitle>
+            <div className="text-left">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Latency Average</p>
+              <CardTitle className="text-2xl font-extrabold text-foreground border-none p-0 h-auto tracking-tight">42.4ms</CardTitle>
             </div>
-            <span className="text-[9px] text-muted-foreground font-mono bg-muted border border-border px-2 py-0.5 rounded uppercase tracking-wider select-none mt-0.5">
+            <span className="text-[9px] text-muted-foreground font-mono bg-muted border border-border px-2 py-0.5 rounded-md uppercase tracking-wider select-none flex items-center gap-1.5 font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               p95 latency
             </span>
           </div>
@@ -65,7 +66,7 @@ export function StatsOverview({ totalModels, activeDeploymentsCount }: StatsOver
             {[40, 30, 45, 25, 50, 35, 60, 40, 30, 45, 50, 35, 42].map((h, i) => (
               <div
                 key={i}
-                className="flex-1 bg-primary/20 hover:bg-primary rounded-t-sm transition-all duration-200 cursor-pointer"
+                className="flex-1 bg-linear-to-t from-primary/10 to-primary/40 hover:from-primary/30 hover:to-primary/90 rounded-t-xs transition-all duration-200 cursor-pointer"
                 style={{ height: `${h}%` }}
                 title={`p95 latency: ${h + 10}ms`}
               ></div>

@@ -39,7 +39,7 @@ export function AdminTrendBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold ${colorClass}`}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold whitespace-nowrap ${colorClass}`}
     >
       {icon}
       {label}

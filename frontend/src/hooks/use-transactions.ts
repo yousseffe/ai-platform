@@ -24,16 +24,6 @@ export function useTransactions(limit = 10, enabled = true) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  // Render-time state reset to synchronize page parameter on context switches
-  const [prevWorkspaceId, setPrevWorkspaceId] = useState<string | undefined>(activeWorkspace?.id);
-  const [prevViewMode, setPrevViewMode] = useState(viewMode);
-
-  if (activeWorkspace?.id !== prevWorkspaceId || viewMode !== prevViewMode) {
-    setPrevWorkspaceId(activeWorkspace?.id);
-    setPrevViewMode(viewMode);
-    setPage(1);
-  }
-
   /**
    * Refetch trigger exposing manual cache updates for page controls.
    */
@@ -61,9 +51,11 @@ export function useTransactions(limit = 10, enabled = true) {
 
   useEffect(() => {
     if (!activeWorkspace || !enabled) {
-      setTransactions([]);
-      setTotal(0);
-      setLoading(false);
+      Promise.resolve().then(() => {
+        setTransactions([]);
+        setTotal(0);
+        setLoading(false);
+      });
       return;
     }
 
@@ -99,9 +91,13 @@ export function useTransactions(limit = 10, enabled = true) {
     };
   }, [activeWorkspace, enabled, viewMode, page, limit, search, txType, status, startDate, endDate]);
 
+  useEffect(() => {
+    Promise.resolve().then(() => setPage(1));
+  }, [activeWorkspace?.id, viewMode]);
+
   // Reset page to 1 when filters change
   useEffect(() => {
-    setPage(1);
+    Promise.resolve().then(() => setPage(1));
   }, [search, txType, status, startDate, endDate]);
 
   return {

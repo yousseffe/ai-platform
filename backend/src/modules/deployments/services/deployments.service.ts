@@ -41,10 +41,19 @@ export class DeploymentsService implements OnModuleInit {
           jobId: 'check-idle-deployments',
         },
       );
+      this.logger.log('Scheduling repeatable check-resource-caps job...');
+      await this.deployQueue.add(
+        'check-resource-caps',
+        {},
+        {
+          repeat: { pattern: '*/1 * * * *' },
+          jobId: 'check-resource-caps',
+        },
+      );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(
-        `Failed to register check-idle-deployments: ${message}`,
+        `Failed to register repeatable deploy-queue jobs: ${message}`,
       );
     }
   }

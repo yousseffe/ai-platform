@@ -151,3 +151,28 @@ export async function getCreditsPerEgp(): Promise<number> {
   const res = await smartFetch<{ credits_per_egp: number }>("/wallets/config/credits-per-egp");
   return res.credits_per_egp;
 }
+
+export interface WalletAnalytics {
+  dailyTransactions: { date: string; credits: number; debits: number }[];
+  apiKeysUsage: {
+    id: string;
+    name: string;
+    keyPrefix: string;
+    modelName: string;
+    maxDailySpendCredits: number | null;
+    todaySpend: number;
+    maxRequestsPerMinute: number | null;
+  }[];
+}
+
+export async function getWalletAnalytics(
+  workspaceId: string,
+  walletType: WalletType
+): Promise<WalletAnalytics> {
+  return smartFetch<WalletAnalytics>(`/wallets/analytics?type=${walletType}`, {
+    headers: {
+      "X-Workspace-Id": workspaceId,
+    },
+    cache: "no-store",
+  });
+}
