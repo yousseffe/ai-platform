@@ -8,9 +8,6 @@ import {
 import { ModelVersion } from './model-version.entity';
 import { User } from '../../users/entities/user.entity';
 
-/**
- * Saved reviewer test case for an organization model version.
- */
 @Entity('model_version_test_cases')
 export class ModelVersionTestCase {
   @PrimaryGeneratedColumn('uuid')

@@ -7,10 +7,6 @@ import { ModelVersion } from '../../modules/models/entities/model-version.entity
 import { Deployment } from '../../modules/deployments/entities/deployment.entity';
 import { BaseImageWarmerService } from '../docker/base-image-warmer.service';
 
-/**
- * Module responsible for registering and handling background job processors
- * for build artifacts compilation and container deployment pipelines.
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([ModelVersion, Deployment]),

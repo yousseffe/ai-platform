@@ -1,12 +1,5 @@
-import { ClientRequestMeta } from '../../modules/models/interfaces/inference.interface';
+import { ClientRequestMeta } from '../../modules/inference/interfaces/inference.interface';
 
-/**
- * Safely extracts client network metadata from a raw Express request for
- * fraud/abuse analysis. Reads only headers/ip — never request bodies.
- *
- * @param req - The raw request object.
- * @returns The extracted {@link ClientRequestMeta}.
- */
 export function extractClientMeta(
   req: Record<string, unknown>,
 ): ClientRequestMeta {

@@ -9,14 +9,11 @@ import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import { Project } from '../entities/project.entity';
 import { OrgApiKey } from '../entities/org-api-key.entity';
-import { ModelLog } from '../../models/entities/model-log.entity';
 import { Model } from '../../models/entities/model.entity';
+import { ModelLog } from '../../models/entities/model-log.entity';
+import { InferenceStatus } from '../../inference';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
 
-/**
- * Service managing project workspaces and API key lifecycle within organizations.
- * API keys are hashed server-side — the raw value is returned once and never stored.
- */
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -30,17 +27,6 @@ export class ProjectsService {
     private readonly modelRepository: Repository<Model>,
   ) {}
 
-  // ─── Projects ────────────────────────────────────────────────────────────
-
-  /**
-   * Creates a new project under the given organization.
-   *
-   * @param orgId - UUID of the parent organization.
-   * @param name - Display name of the project.
-   * @param description - Optional description.
-   * @returns The newly created Project entity.
-   * @throws {BadRequestException} If name is missing.
-   */
   async createProject(
     orgId: string,
     name: string,
@@ -58,12 +44,6 @@ export class ProjectsService {
     return this.projectRepository.save(project);
   }
 
-  /**
-   * Lists all active projects for an organization.
-   *
-   * @param orgId - UUID of the organization.
-   * @returns Array of active Project entities.
-   */
   async listProjects(orgId: string): Promise<Project[]> {
     return this.projectRepository.find({
       where: { orgId, isActive: true },
@@ -71,14 +51,6 @@ export class ProjectsService {
     });
   }
 
-  /**
-   * Retrieves a single project, verifying it belongs to the given org.
-   *
-   * @param orgId - UUID of the organization.
-   * @param projectId - UUID of the project.
-   * @returns The Project entity.
-   * @throws {NotFoundException} If not found.
-   */
   async getProject(orgId: string, projectId: string): Promise<Project> {
     const project = await this.projectRepository.findOne({
       where: { id: projectId, orgId, isActive: true },
@@ -87,14 +59,6 @@ export class ProjectsService {
     return project;
   }
 
-  /**
-   * Soft-deletes a project and revokes all its associated API keys.
-   *
-   * @param orgId - UUID of the organization.
-   * @param projectId - UUID of the project to delete.
-   * @returns Confirmation message.
-   * @throws {NotFoundException} If project not found.
-   */
   async deleteProject(
     orgId: string,
     projectId: string,
@@ -108,19 +72,6 @@ export class ProjectsService {
     return { message: 'Project deleted successfully' };
   }
 
-  // ─── API Keys ─────────────────────────────────────────────────────────────
-
-  /**
-   * Generates a new API key for a project.
-   * The raw key is returned ONCE — only the SHA-256 hash and masked prefix are stored.
-   *
-   * @param orgId - UUID of the organization.
-   * @param projectId - UUID of the project.
-   * @param label - Human-readable label for this key.
-   * @returns The OrgApiKey entity plus the one-time rawKey string.
-   * @throws {NotFoundException} If the project does not exist.
-   * @throws {BadRequestException} If label is missing.
-   */
   async createApiKey(
     orgId: string,
     projectId: string,
@@ -172,15 +123,6 @@ export class ProjectsService {
     return { ...saved, rawKey };
   }
 
-  /**
-   * Lists all active API keys for a specific project.
-   * keyHash is never returned — only the masked prefix is exposed.
-   *
-   * @param orgId - UUID of the organization.
-   * @param projectId - UUID of the project.
-   * @returns Array of OrgApiKey entities.
-   * @throws {NotFoundException} If the project does not exist.
-   */
   async listApiKeys(orgId: string, projectId: string): Promise<OrgApiKey[]> {
     await this.getProject(orgId, projectId);
     return this.apiKeyRepository.find({
@@ -190,16 +132,6 @@ export class ProjectsService {
     });
   }
 
-  /**
-   * Revokes an API key by setting isActive to false.
-   *
-   * @param orgId - UUID of the organization.
-   * @param projectId - UUID of the project.
-   * @param keyId - UUID of the API key.
-   * @returns Confirmation message.
-   * @throws {NotFoundException} If key not found.
-   * @throws {ForbiddenException} If key already revoked.
-   */
   async revokeApiKey(
     orgId: string,
     projectId: string,
@@ -215,15 +147,6 @@ export class ProjectsService {
     return { message: 'API key revoked successfully' };
   }
 
-  /**
-   * Updates the rate limit and daily spend budget quota for a project API key.
-   *
-   * @param orgId - UUID of the organization.
-   * @param projectId - UUID of the project.
-   * @param keyId - UUID of the API key.
-   * @param updates - Partial quota fields.
-   * @throws {NotFoundException} If key not found.
-   */
   async updateApiKeyQuota(
     orgId: string,
     projectId: string,
@@ -248,14 +171,6 @@ export class ProjectsService {
     return this.apiKeyRepository.save(key);
   }
 
-  /**
-   * Resolves an organization UUID from a raw API key string.
-   * Used by ApiKeyGuard to authenticate prediction API requests.
-   * Updates lastUsedAt on successful resolution.
-   *
-   * @param rawKey - The full raw API key from the Authorization header.
-   * @returns The resolved OrgApiKey entity including orgId, or null.
-   */
   async resolveOrgFromApiKey(rawKey: string): Promise<OrgApiKey | null> {
     if (!rawKey?.startsWith('sk_live_')) return null;
 
@@ -266,7 +181,6 @@ export class ProjectsService {
 
     if (!apiKey) return null;
 
-    // Fire-and-forget last used update
     this.apiKeyRepository
       .update(apiKey.id, { lastUsedAt: new Date() })
       .catch(() => undefined);
@@ -274,9 +188,6 @@ export class ProjectsService {
     return apiKey;
   }
 
-  /**
-   * Builds API key usage analytics for a project.
-   */
   async getProjectApiKeyUsage(
     orgId: string,
     projectId: string,
@@ -375,16 +286,17 @@ export class ProjectsService {
       const cost = Number(log.creditsCharged ?? 0);
       creditsCharged += cost;
 
-      if (log.status === 'SUCCESS') successfulRequests += 1;
-      if (log.status === 'FAILED') failedRequests += 1;
+      if (log.status === InferenceStatus.SUCCESS) successfulRequests += 1;
+      if (log.status === InferenceStatus.FAILED) failedRequests += 1;
 
       const keyId = log.orgApiKey?.id;
       if (keyId && apiKeyStats.has(keyId)) {
         const stat = apiKeyStats.get(keyId)!;
         stat.requests += 1;
         stat.creditsCharged += cost;
-        if (log.status === 'SUCCESS') stat.successfulRequests += 1;
-        if (log.status === 'FAILED') stat.failedRequests += 1;
+        if (log.status === InferenceStatus.SUCCESS)
+          stat.successfulRequests += 1;
+        if (log.status === InferenceStatus.FAILED) stat.failedRequests += 1;
         if (!stat.lastUsedAt || log.createdAt > stat.lastUsedAt) {
           stat.lastUsedAt = log.createdAt;
         }
@@ -405,8 +317,9 @@ export class ProjectsService {
           totalLatencyMs: 0,
         };
         current.requests += 1;
-        if (log.status === 'SUCCESS') current.successfulRequests += 1;
-        if (log.status === 'FAILED') current.failedRequests += 1;
+        if (log.status === InferenceStatus.SUCCESS)
+          current.successfulRequests += 1;
+        if (log.status === InferenceStatus.FAILED) current.failedRequests += 1;
         current.creditsCharged += cost;
         current.totalLatencyMs += Number(log.responseTimeMs ?? 0);
         modelStats.set(log.model.id, current);

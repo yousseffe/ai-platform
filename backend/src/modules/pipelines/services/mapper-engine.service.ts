@@ -1,24 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { MapperSpec, MapperContext } from '../interfaces/mapper-spec.interface';
 
-/**
- * Safely interprets a declarative {@link MapperSpec} against a
- * {@link MapperContext} to produce one edge's output payload. Rules are
- * data, never code — there is no `eval` and no user-supplied script ever
- * runs here. Rule paths are namespaced (`input.*`, `previous.*`,
- * `steps.<order>.*`) so a mapper can combine the pipeline's original input
- * and any earlier step's output, not just the immediately-previous one.
- */
 @Injectable()
 export class MapperEngineService {
-  /**
-   * Applies a mapper spec against a context, producing the mapped payload.
-   * A null/empty spec passes `context.previous` through unchanged.
-   *
-   * @param spec - The declarative mapping rules, or null/empty for pass-through.
-   * @param context - The pipeline input, previous step output, and prior step outputs.
-   * @returns The mapped payload to send across this edge.
-   */
   apply(
     spec: MapperSpec | null | undefined,
     context: MapperContext,
@@ -61,7 +45,6 @@ export class MapperEngineService {
     return output;
   }
 
-  /** Reads a dotted/bracketed path (e.g. `a.b[0].c`) from an object. */
   private getPath(obj: unknown, path: string): unknown {
     let current: unknown = obj;
     for (const segment of this.parsePath(path)) {
@@ -73,7 +56,6 @@ export class MapperEngineService {
     return current;
   }
 
-  /** Writes a value at a dotted/bracketed path, creating intermediate objects/arrays as needed. */
   private setPath(
     obj: Record<string, unknown>,
     path: string,
@@ -115,7 +97,6 @@ export class MapperEngineService {
     }
   }
 
-  /** Renders `{{dotted.path}}` tokens in a template string against the source payload. */
   private renderTemplate(template: string, source: unknown): string {
     return template.replace(
       /\{\{\s*([\w.[\]]+)\s*\}\}/g,
@@ -125,7 +106,6 @@ export class MapperEngineService {
     );
   }
 
-  /** Converts a value to a display string without ever emitting `[object Object]`. */
   private stringify(value: unknown): string {
     if (value === undefined || value === null) {
       return '';

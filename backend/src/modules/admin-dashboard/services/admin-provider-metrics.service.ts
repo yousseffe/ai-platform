@@ -3,12 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { Organization } from '../../organizations/entities/organization.entity';
-import { ModelLog } from '../../models/entities/model-log.entity';
 import { Model } from '../../models/entities/model.entity';
-import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
-import { ProviderOfferRedemption } from '../../provider-accounts/entities/provider-offer-redemption.entity';
-import { BillingCycle } from '../../provider-accounts/enums/billing-cycle.enum';
-import { ProviderAccountStatus } from '../../provider-accounts/enums/provider-account-status.enum';
+import { ModelLog } from '../../models/entities/model-log.entity';
+import {
+  BillingCycle,
+  ProviderAccount,
+  ProviderAccountStatus,
+  ProviderOfferRedemption,
+} from '../../provider-accounts';
 import { User } from '../../users/entities/user.entity';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { Wallet } from '../../wallets/entities/wallet.entity';
@@ -19,9 +21,6 @@ import {
 } from '../types/admin-dashboard.types';
 import { addBillingCycle } from '../utils/admin-period.util';
 
-/**
- * Batch-loads provider-adjacent data used by admin provider list/detail queries.
- */
 @Injectable()
 export class AdminProviderMetricsService {
   constructor(
@@ -41,12 +40,6 @@ export class AdminProviderMetricsService {
     private readonly redemptionRepository: Repository<ProviderOfferRedemption>,
   ) {}
 
-  /**
-   * Resolves batch owner summaries for provider accounts.
-   *
-   * @param accounts - Provider accounts to resolve.
-   * @returns Owner summaries keyed by provider account id.
-   */
   async getOwnerSummaryMap(
     accounts: ProviderAccount[],
   ): Promise<Map<string, AdminProviderOwnerSummary>> {
@@ -96,12 +89,6 @@ export class AdminProviderMetricsService {
     );
   }
 
-  /**
-   * Loads provider-owned models in batch keyed by provider account id.
-   *
-   * @param accounts - Target provider accounts.
-   * @returns Model collections keyed by provider account id.
-   */
   async getModelMap(
     accounts: ProviderAccount[],
   ): Promise<Map<string, Model[]>> {
@@ -144,12 +131,6 @@ export class AdminProviderMetricsService {
     return modelMap;
   }
 
-  /**
-   * Loads per-model request counts and latest usage timestamps.
-   *
-   * @param modelIds - Target model UUIDs.
-   * @returns Request metrics keyed by model id.
-   */
   async getModelLogMetricsMap(
     modelIds: string[],
   ): Promise<
@@ -184,12 +165,6 @@ export class AdminProviderMetricsService {
     );
   }
 
-  /**
-   * Loads provider wallet balances keyed by provider account id.
-   *
-   * @param accounts - Target provider accounts.
-   * @returns Balance map keyed by provider account id.
-   */
   async getWalletBalanceMap(
     accounts: ProviderAccount[],
   ): Promise<Map<string, number>> {
@@ -212,12 +187,6 @@ export class AdminProviderMetricsService {
     );
   }
 
-  /**
-   * Loads subscription/payment snapshots keyed by provider account id.
-   *
-   * @param accounts - Target provider accounts.
-   * @returns Snapshot map keyed by provider account id.
-   */
   async getSubscriptionMap(
     accounts: ProviderAccount[],
   ): Promise<
@@ -278,7 +247,9 @@ export class AdminProviderMetricsService {
           account.lastSubscriptionPaymentAt ?? latestPayment?.createdAt ?? null;
         const nextRenewalDate =
           account.subscriptionExpiresAt ??
-          (lastPaymentDate ? addBillingCycle(lastPaymentDate, billingCycle) : null);
+          (lastPaymentDate
+            ? addBillingCycle(lastPaymentDate, billingCycle)
+            : null);
         const isExpired =
           nextRenewalDate !== null && nextRenewalDate.getTime() <= Date.now();
 

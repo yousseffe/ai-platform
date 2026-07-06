@@ -7,7 +7,6 @@ import { PipelineStep } from '../entities/pipeline-step.entity';
 import { PipelineRunStatus } from '../enums/pipeline-run-status.enum';
 import { PipelineStepRunStatus } from '../enums/pipeline-step-run-status.enum';
 
-/** Persists {@link PipelineRun} and {@link PipelineStepRun} state transitions. */
 @Injectable()
 export class PipelineRunPersistenceService {
   constructor(
@@ -17,7 +16,6 @@ export class PipelineRunPersistenceService {
     private readonly stepRunRepository: Repository<PipelineStepRun>,
   ) {}
 
-  /** Records the outcome of one step's execution within a run. */
   async recordStepRun(
     run: PipelineRun,
     step: PipelineStep,
@@ -43,13 +41,11 @@ export class PipelineRunPersistenceService {
     );
   }
 
-  /** Marks a run as started, transitioning it to RUNNING. */
   async markRunning(run: PipelineRun): Promise<void> {
     run.status = PipelineRunStatus.RUNNING;
     await this.runRepository.save(run);
   }
 
-  /** Finalizes a run with its terminal status, output, and totals. */
   async finishRun(
     run: PipelineRun,
     status: PipelineRunStatus,

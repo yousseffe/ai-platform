@@ -9,8 +9,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../../auth/guards/admin.guard';
+import { AdminGuard } from '../../../shared/guards/admin.guard';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import {
   ChangeProviderStatusDto,
   ChangeProviderTierDto,
@@ -27,9 +27,6 @@ import { ProviderOffersService } from '../services/provider-offers.service';
 import { ProviderTierService } from '../services/provider-tier.service';
 import { ProviderUtilizationService } from '../services/provider-utilization.service';
 
-/**
- * Admin controller for provider account, tier, offer, and utilization management.
- */
 @Controller('admin/provider')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class ProviderAccountsAdminController {
@@ -40,17 +37,11 @@ export class ProviderAccountsAdminController {
     private readonly utilizationService: ProviderUtilizationService,
   ) {}
 
-  /**
-   * Lists all provider tiers.
-   */
   @Get('tiers')
   async listTiers(): Promise<ProviderTierDefinition[]> {
     return this.tierService.listTiers();
   }
 
-  /**
-   * Creates a provider tier.
-   */
   @Post('tiers')
   async createTier(
     @Body() body: UpsertProviderTierDto,
@@ -58,9 +49,6 @@ export class ProviderAccountsAdminController {
     return this.tierService.createTier(body);
   }
 
-  /**
-   * Updates a provider tier.
-   */
   @Patch('tiers/:id')
   async updateTier(
     @Param('id') id: string,
@@ -69,9 +57,6 @@ export class ProviderAccountsAdminController {
     return this.tierService.updateTier(id, body);
   }
 
-  /**
-   * Deletes unused tiers or deactivates tiers that are assigned.
-   */
   @Delete('tiers/:id')
   async deleteTier(
     @Param('id') id: string,
@@ -79,17 +64,11 @@ export class ProviderAccountsAdminController {
     return this.tierService.deleteOrDeactivateTier(id);
   }
 
-  /**
-   * Lists all provider accounts.
-   */
   @Get('accounts')
   async listAccounts(): Promise<ProviderAccount[]> {
     return this.accountsService.listProviderAccounts();
   }
 
-  /**
-   * Creates or updates a provider account.
-   */
   @Post('accounts')
   async upsertAccount(
     @Body() body: UpsertProviderAccountDto,
@@ -98,13 +77,12 @@ export class ProviderAccountsAdminController {
     return this.accountsService.upsertProviderAccount(body, req.user.id);
   }
 
-  /**
-   * Retrieves a provider account with utilization metrics.
-   */
   @Get('accounts/:id')
   async getAccount(@Param('id') id: string): Promise<{
     account: ProviderAccount;
-    utilization: Awaited<ReturnType<ProviderUtilizationService['getUtilization']>>;
+    utilization: Awaited<
+      ReturnType<ProviderUtilizationService['getUtilization']>
+    >;
   }> {
     const account = await this.accountsService.getProviderAccount(id);
     return {
@@ -113,9 +91,6 @@ export class ProviderAccountsAdminController {
     };
   }
 
-  /**
-   * Changes an account tier.
-   */
   @Patch('accounts/:id/tier')
   async changeTier(
     @Param('id') id: string,
@@ -125,9 +100,6 @@ export class ProviderAccountsAdminController {
     return this.accountsService.changeTier(id, body, req.user.id);
   }
 
-  /**
-   * Changes provider lifecycle status.
-   */
   @Patch('accounts/:id/status')
   async changeStatus(
     @Param('id') id: string,
@@ -136,9 +108,6 @@ export class ProviderAccountsAdminController {
     return this.accountsService.changeStatus(id, body);
   }
 
-  /**
-   * Updates provider account custom overrides.
-   */
   @Patch('accounts/:id/overrides')
   async updateOverrides(
     @Param('id') id: string,
@@ -147,17 +116,11 @@ export class ProviderAccountsAdminController {
     return this.accountsService.updateOverrides(id, body);
   }
 
-  /**
-   * Lists provider offers.
-   */
   @Get('offers')
   async listOffers(): Promise<ProviderOffer[]> {
     return this.offersService.listOffers();
   }
 
-  /**
-   * Creates a provider offer.
-   */
   @Post('offers')
   async createOffer(
     @Body() body: UpsertProviderOfferDto,
@@ -166,9 +129,6 @@ export class ProviderAccountsAdminController {
     return this.offersService.createOffer(body, req.user.id);
   }
 
-  /**
-   * Updates a provider offer.
-   */
   @Patch('offers/:id')
   async updateOffer(
     @Param('id') id: string,
@@ -177,9 +137,6 @@ export class ProviderAccountsAdminController {
     return this.offersService.updateOffer(id, body);
   }
 
-  /**
-   * Toggles a provider offer active state.
-   */
   @Patch('offers/:id/active')
   async setOfferActive(
     @Param('id') id: string,

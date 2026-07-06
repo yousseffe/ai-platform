@@ -11,12 +11,8 @@ import { getDockerOptions } from '../../../shared/docker/docker.util';
 import { Deployment } from '../entities/deployment.entity';
 import { DeploymentStatus } from '../enums/deployment-status.enum';
 import { DeploymentsRepository } from '../repositories/deployments.repository';
-import { ModelVersionsRepository } from '../../models/repositories/model-versions.repository';
+import { ModelVersionsRepository } from '../../models';
 
-/**
- * Service managing deployments of model versions. Handles spawning and stopping
- * container instances, and tracking active deployment endpoints.
- */
 @Injectable()
 export class DeploymentsService implements OnModuleInit {
   private readonly docker: Docker;
@@ -58,13 +54,6 @@ export class DeploymentsService implements OnModuleInit {
     }
   }
 
-  /**
-   * Retrieves the endpoint URL of the active running deployment for a given model.
-   *
-   * @param modelId - The UUID of the model.
-   * @returns A promise resolving to the deployment endpoint URL.
-   * @throws {NotFoundException} If no active running deployment is found.
-   */
   async getActiveDeploymentUrl(modelId: string): Promise<string> {
     const deployment = await this.deploymentsRepository.findOne({
       where: {
@@ -86,14 +75,6 @@ export class DeploymentsService implements OnModuleInit {
     return deployment.url;
   }
 
-  /**
-   * Retrieves the endpoint URL of the active running deployment for a given model and version.
-   *
-   * @param modelId - The UUID of the model.
-   * @param versionNumber - The version number to query.
-   * @returns A promise resolving to the deployment endpoint URL.
-   * @throws {NotFoundException} If no active running deployment is found.
-   */
   async getActiveDeploymentUrlByVersion(
     modelId: string,
     versionNumber: number,
@@ -124,23 +105,6 @@ export class DeploymentsService implements OnModuleInit {
     return deployment.url;
   }
 
-  /**
-   * Triggers a new deployment for a specific model version.
-   *
-   * Creates a deployment record in STARTING state and schedules container creation
-   * in the deployment queue. Does not stop any other version's already-RUNNING
-   * deployment for the same model — deploying a second version alongside an
-   * existing one is how canary/traffic-split rollouts are started; pass a low
-   * `trafficWeight` to send it only a fraction of unpinned prediction traffic.
-   *
-   * @param versionId - The UUID of the model version.
-   * @param trafficWeight - Share (0-100) of unpinned traffic this deployment
-   *   should receive once running, when co-existing with other RUNNING
-   *   deployments for the same model. Defaults to 100 (full traffic, or the
-   *   only deployment for its model).
-   * @returns A promise resolving to the created Deployment entity.
-   * @throws {NotFoundException} If the model version does not exist.
-   */
   async deployVersion(
     versionId: string,
     trafficWeight = 100,
@@ -169,13 +133,6 @@ export class DeploymentsService implements OnModuleInit {
     return savedDeployment;
   }
 
-  /**
-   * Updates the traffic-split weight of an existing deployment.
-   *
-   * @param deploymentId - The UUID of the deployment to update.
-   * @param trafficWeight - New weight (0-100).
-   * @throws {NotFoundException} If the deployment does not exist.
-   */
   async updateTrafficWeight(
     deploymentId: string,
     trafficWeight: number,
@@ -190,16 +147,6 @@ export class DeploymentsService implements OnModuleInit {
     return this.deploymentsRepository.save(deployment);
   }
 
-  /**
-   * Promotes a deployment to receive 100% of its model's unpinned traffic,
-   * stopping every other RUNNING deployment for the same model. Used both to
-   * promote a canary to full rollout and to roll back to a previous version
-   * (by promoting that version's still-RUNNING deployment).
-   *
-   * @param deploymentId - The UUID of the deployment to promote.
-   * @returns A promise resolving to the promoted Deployment entity.
-   * @throws {NotFoundException} If the deployment does not exist.
-   */
   async promoteDeployment(deploymentId: string): Promise<Deployment> {
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },
@@ -225,12 +172,6 @@ export class DeploymentsService implements OnModuleInit {
     return this.deploymentsRepository.save(deployment);
   }
 
-  /**
-   * Fetches deployment metadata by ID.
-   *
-   * @param deploymentId - The UUID of the deployment.
-   * @returns A promise resolving to the Deployment entity or null if not found.
-   */
   async getDeployment(deploymentId: string): Promise<Deployment | null> {
     return this.deploymentsRepository.findOne({
       where: { id: deploymentId },
@@ -238,12 +179,6 @@ export class DeploymentsService implements OnModuleInit {
     });
   }
 
-  /**
-   * Updates deployment attributes directly.
-   *
-   * @param deploymentId - The UUID of the deployment to update.
-   * @param updateData - The partial deployment data.
-   */
   async updateDeployment(
     deploymentId: string,
     updateData: Partial<Deployment>,
@@ -251,14 +186,6 @@ export class DeploymentsService implements OnModuleInit {
     await this.deploymentsRepository.update(deploymentId, updateData);
   }
 
-  /**
-   * Stops the running container for a deployment and removes it from the host.
-   * Marks the deployment status as STOPPED.
-   *
-   * @param deploymentId - The UUID of the deployment to terminate.
-   * @returns A promise indicating success.
-   * @throws {NotFoundException} If the deployment record cannot be found.
-   */
   async stopDeployment(deploymentId: string): Promise<{ success: boolean }> {
     const deployment = await this.deploymentsRepository.findOne({
       where: { id: deploymentId },

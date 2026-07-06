@@ -1,7 +1,3 @@
-/**
- * Trust/review lifecycle for a model version's example payload and expected
- * result (its sample request/response schema).
- */
 export enum SchemaDetectionStatus {
   MANUAL = 'manual',
   PENDING = 'pending',

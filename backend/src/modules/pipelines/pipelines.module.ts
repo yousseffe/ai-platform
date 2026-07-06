@@ -23,12 +23,6 @@ import { PipelineRunsController } from './controllers/pipeline-runs.controller';
 import { ModelsModule } from '../models/models.module';
 import { AuthModule } from '../auth/auth.module';
 
-/**
- * Module implementing the pipeline (model-chaining) feature: chains
- * deployed models together, mapping each step's output into the next step's
- * input, and proxying every call through the shared `InferenceClient` so
- * pipeline steps are billed/logged identically to direct predictions.
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([

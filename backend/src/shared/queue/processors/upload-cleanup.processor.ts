@@ -5,12 +5,6 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { MinioService } from '../../minio/minio.service';
 
-/**
- * BullMQ processor that periodically sweeps MinIO for orphaned incomplete
- * multipart upload sessions (left behind by cancelled/failed browser uploads)
- * and aborts any older than `UPLOAD_ORPHAN_CLEANUP_HOURS` (default 24), so
- * their partial storage does not leak indefinitely.
- */
 @Processor('upload-cleanup-queue', {
   concurrency: 1,
 })
@@ -25,11 +19,6 @@ export class UploadCleanupProcessor extends WorkerHost implements OnModuleInit {
     super();
   }
 
-  /**
-   * Registers the daily repeatable cleanup job on module startup, replacing
-   * any previously scheduled repeatable job with the same name so config
-   * changes (e.g. cron schedule) take effect on redeploy.
-   */
   async onModuleInit(): Promise<void> {
     try {
       const repeatableJobs = await this.uploadCleanupQueue.getRepeatableJobs();
@@ -41,24 +30,19 @@ export class UploadCleanupProcessor extends WorkerHost implements OnModuleInit {
       await this.uploadCleanupQueue.add(
         'sweep-orphaned-uploads',
         {},
-        { repeat: { pattern: '0 3 * * *' } }, // Daily at 03:00
+        { repeat: { pattern: '0 3 * * *' } },
       );
       this.logger.log(
         'Registered daily orphaned multipart upload cleanup job.',
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Failed to register upload cleanup repeatable job: ${message}`);
+      this.logger.warn(
+        `Failed to register upload cleanup repeatable job: ${message}`,
+      );
     }
   }
 
-  /**
-   * Processes a single cleanup sweep: lists all incomplete multipart uploads
-   * and aborts any whose initiation timestamp is older than the configured
-   * orphan threshold.
-   *
-   * @param job - The BullMQ job instance (no payload expected).
-   */
   async process(job: Job): Promise<{ aborted: number; inspected: number }> {
     const thresholdHours = parseInt(
       process.env.UPLOAD_ORPHAN_CLEANUP_HOURS || '24',
@@ -67,7 +51,8 @@ export class UploadCleanupProcessor extends WorkerHost implements OnModuleInit {
     const thresholdMs = thresholdHours * 60 * 60 * 1000;
     const now = Date.now();
 
-    const incompleteUploads = await this.minioService.listIncompleteUploadsWithAge();
+    const incompleteUploads =
+      await this.minioService.listIncompleteUploadsWithAge();
     let abortedCount = 0;
 
     for (const upload of incompleteUploads) {

@@ -9,7 +9,6 @@ import {
 } from 'class-validator';
 import { PipelinePinPolicy } from '../enums/pipeline-pin-policy.enum';
 
-/** Data Transfer Object for editing an existing pipeline step. */
 export class UpdateStepDto {
   @IsInt()
   @Min(0)
@@ -24,7 +23,6 @@ export class UpdateStepDto {
   @IsOptional()
   label?: string;
 
-  /** Disambiguates this step from its stage siblings when parallel. */
   @IsString()
   @IsOptional()
   @MaxLength(64)

@@ -7,18 +7,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PipelineStep } from '../entities/pipeline-step.entity';
 import { PipelinePinPolicy } from '../enums/pipeline-pin-policy.enum';
-import { ModelVersionsRepository } from '../../models/repositories/model-versions.repository';
+import { ModelVersionsRepository, VersionStatus } from '../../models';
 import { ModelVersion } from '../../models/entities/model-version.entity';
-import { VersionStatus } from '../../models/enums/version-status.enum';
 import { CreateStepDto } from '../dto/create-step.dto';
 import { UpdateStepDto } from '../dto/update-step.dto';
 import { PipelinesService } from './pipelines.service';
 
-/**
- * Manages the steps belonging to a pipeline. Any structural change demotes
- * the parent pipeline back to `DRAFT`, forcing re-validation before it can
- * be run again.
- */
 @Injectable()
 export class PipelineStepsService {
   constructor(
@@ -28,12 +22,6 @@ export class PipelineStepsService {
     private readonly pipelinesService: PipelinesService,
   ) {}
 
-  /**
-   * Adds a step to a pipeline, binding it to an existing READY model version.
-   *
-   * @throws {NotFoundException} If the referenced model version doesn't exist.
-   * @throws {BadRequestException} If the model version isn't READY.
-   */
   async addStep(
     pipelineId: string,
     actorId: string,
@@ -60,11 +48,6 @@ export class PipelineStepsService {
     return saved;
   }
 
-  /**
-   * Edits an existing step.
-   *
-   * @throws {NotFoundException} If the step doesn't belong to the pipeline.
-   */
   async updateStep(
     pipelineId: string,
     stepId: string,
@@ -94,7 +77,6 @@ export class PipelineStepsService {
     return saved;
   }
 
-  /** Removes a step from a pipeline (its edges cascade-delete with it). */
   async removeStep(
     pipelineId: string,
     stepId: string,

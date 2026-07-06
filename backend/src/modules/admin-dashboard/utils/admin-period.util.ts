@@ -4,26 +4,16 @@ import {
   AdminMetricTrend,
 } from '../types/admin-dashboard.types';
 
-/**
- * Standard date period ranges used in admin KPI comparisons.
- */
 export interface AdminPeriodRange {
-  /** Start of the current comparison window. */
   currentStart: Date;
-  /** End of the current comparison window. */
+
   currentEnd: Date;
-  /** Start of the immediately previous window. */
+
   previousStart: Date;
-  /** End of the immediately previous window. */
+
   previousEnd: Date;
 }
 
-/**
- * Builds a month-based comparison range anchored on the current time.
- *
- * @param now - Current timestamp.
- * @returns Date boundaries for current and previous months.
- */
 export function createMonthlyPeriod(now: Date): AdminPeriodRange {
   const currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const currentEnd = now;
@@ -33,12 +23,6 @@ export function createMonthlyPeriod(now: Date): AdminPeriodRange {
   return { currentStart, currentEnd, previousStart, previousEnd };
 }
 
-/**
- * Creates a comparable KPI card from current and previous metric values.
- *
- * @param params - Card values and formatting metadata.
- * @returns Fully computed KPI card.
- */
 export function createMetricCard(params: {
   key: string;
   label: string;

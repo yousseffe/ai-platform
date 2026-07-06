@@ -3,16 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
+import { TransactionStatus, TransactionType } from '../../wallets';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { Wallet } from '../../wallets/entities/wallet.entity';
-import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
-import { TransactionType } from '../../wallets/enums/transaction-type.enum';
 
 const SYSTEM_OWNER_ID = '00000000-0000-0000-0000-000000000000';
 
-/**
- * Central wallet ledger writer for platform revenue movements.
- */
 @Injectable()
 export class WalletLedgerService {
   constructor(
@@ -22,14 +18,6 @@ export class WalletLedgerService {
     private readonly transactionRepository: Repository<Transaction>,
   ) {}
 
-  /**
-   * Credits the system/admin revenue wallet in EGP.
-   *
-   * @param amountEgp - Amount to credit.
-   * @param reference - Ledger transaction reference.
-   * @param stripeEventId - Optional Stripe idempotency reference.
-   * @returns Updated system wallet.
-   */
   async creditSystemRevenue(
     amountEgp: number,
     reference: string,
@@ -45,15 +33,6 @@ export class WalletLedgerService {
     );
   }
 
-  /**
-   * Credits the system wallet inside an existing database transaction.
-   *
-   * @param manager - Active entity manager.
-   * @param amountEgp - Amount to credit.
-   * @param reference - Ledger reference.
-   * @param stripeEventId - Optional Stripe idempotency reference.
-   * @returns Updated system wallet.
-   */
   async creditSystemRevenueWithManager(
     manager: EntityManager,
     amountEgp: number,

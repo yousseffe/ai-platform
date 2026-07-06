@@ -8,12 +8,11 @@ import {
   AdminProviderOverridesDto,
 } from '../dto/provider-management.dto';
 import { AdminAuditLogService } from './admin-audit-log.service';
-import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
-import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
+import {
+  ProviderAccount,
+  ProviderAccountsService,
+} from '../../provider-accounts';
 
-/**
- * Handles audited provider admin actions for the new dashboard APIs.
- */
 @Injectable()
 export class AdminProviderManagementService {
   constructor(
@@ -23,9 +22,6 @@ export class AdminProviderManagementService {
     private readonly auditLogService: AdminAuditLogService,
   ) {}
 
-  /**
-   * Changes provider lifecycle status and records an audit event.
-   */
   async changeStatus(
     providerAccountId: string,
     body: AdminChangeProviderStatusDto,
@@ -48,9 +44,6 @@ export class AdminProviderManagementService {
     return updated;
   }
 
-  /**
-   * Changes provider tier and records an audit event.
-   */
   async changeTier(
     providerAccountId: string,
     body: AdminChangeProviderTierDto,
@@ -74,9 +67,6 @@ export class AdminProviderManagementService {
     return updated;
   }
 
-  /**
-   * Updates provider overrides and records an audit event.
-   */
   async updateOverrides(
     providerAccountId: string,
     body: AdminProviderOverridesDto,
@@ -99,9 +89,6 @@ export class AdminProviderManagementService {
     return updated;
   }
 
-  /**
-   * Appends an internal admin note and records an audit event.
-   */
   async appendNote(
     providerAccountId: string,
     body: AdminProviderNoteDto,
@@ -126,9 +113,6 @@ export class AdminProviderManagementService {
     return updated;
   }
 
-  /**
-   * Retrieves a provider account with its assigned tier.
-   */
   private async getAccount(
     providerAccountId: string,
   ): Promise<ProviderAccount> {
@@ -142,9 +126,6 @@ export class AdminProviderManagementService {
     return account;
   }
 
-  /**
-   * Extracts the override subset relevant to admin audits.
-   */
   private extractOverrides(account: ProviderAccount): Record<string, unknown> {
     return {
       customCommissionPercent: account.customCommissionPercent,

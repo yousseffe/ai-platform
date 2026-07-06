@@ -7,17 +7,19 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Model } from '../entities/model.entity';
+import {
+  InferenceClient,
+  InferenceStatus,
+  PredictionActor,
+} from '../../inference';
 import { ModelLog } from '../entities/model-log.entity';
+import { OrgType, OrganizationsService } from '../../organizations';
+import { DeploymentStatus } from '../../deployments';
 import { ModelComparisonSession } from '../entities/model-comparison-session.entity';
 import { ModelComparisonResult } from '../entities/model-comparison-result.entity';
-import { InferenceClient } from './inference-client.service';
-import { OrganizationsService } from '../../organizations/services/organizations.service';
-import { OrgType } from '../../organizations/enums/org-type.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { extractClientMeta } from '../../../shared/utils/client-meta.util';
-import { PredictionActor } from '../interfaces/inference.interface';
 import { ModelType } from '../enums/model-type.enum';
-import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import {
   ComparableModelResponseDto,
   ComparisonHistoryItemResponseDto,
@@ -407,7 +409,7 @@ export class ModelComparisonsService {
       const tokens = this.extractTokens(payload, result.output);
       const outputText = this.normalizeOutputText(result.output);
       const qualityScore = this.computeQualityScore({
-        success: result.status === 'SUCCESS',
+        success: result.status === InferenceStatus.SUCCESS,
         latencyMs: result.responseTimeMs,
         outputText,
       });
@@ -439,7 +441,7 @@ export class ModelComparisonsService {
         qualityScore,
         valueScore,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : 'Comparison request failed';
 
@@ -460,7 +462,7 @@ export class ModelComparisonsService {
         inputTokens: this.estimatePromptTokens(payload),
         outputTokens: 0,
         totalTokens: this.estimatePromptTokens(payload),
-        status: 'FAILED',
+        status: InferenceStatus.FAILED,
         statusCode: 500,
         errorMessage: message.slice(0, 1000),
         qualityScore: 0,
@@ -477,8 +479,8 @@ export class ModelComparisonsService {
         return rightValue - leftValue;
       }
 
-      const leftSuccess = left.status === 'SUCCESS' ? 1 : 0;
-      const rightSuccess = right.status === 'SUCCESS' ? 1 : 0;
+      const leftSuccess = left.status === InferenceStatus.SUCCESS ? 1 : 0;
+      const rightSuccess = right.status === InferenceStatus.SUCCESS ? 1 : 0;
       if (rightSuccess !== leftSuccess) {
         return rightSuccess - leftSuccess;
       }
@@ -495,7 +497,9 @@ export class ModelComparisonsService {
   private buildSummaryInsights(
     results: ModelComparisonResult[],
   ): ComparisonSummaryInsightsDto {
-    const successful = results.filter((result) => result.status === 'SUCCESS');
+    const successful = results.filter(
+      (result) => result.status === InferenceStatus.SUCCESS,
+    );
     const ranked = [...results].sort(
       (left, right) => (left.resultRank ?? 999) - (right.resultRank ?? 999),
     );
@@ -522,8 +526,8 @@ export class ModelComparisonsService {
     );
 
     const lowestError = [...results].sort((left, right) => {
-      const leftPenalty = left.status === 'SUCCESS' ? 0 : 1;
-      const rightPenalty = right.status === 'SUCCESS' ? 0 : 1;
+      const leftPenalty = left.status === InferenceStatus.SUCCESS ? 0 : 1;
+      const rightPenalty = right.status === InferenceStatus.SUCCESS ? 0 : 1;
       if (leftPenalty !== rightPenalty) {
         return leftPenalty - rightPenalty;
       }

@@ -5,23 +5,19 @@ import { OrgMember } from './entities/org-member.entity';
 import { Project } from './entities/project.entity';
 import { OrgApiKey } from './entities/org-api-key.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
+import { UsersModule } from '../users/users.module';
 import { ModelLog } from '../models/entities/model-log.entity';
+import { WalletsModule } from '../wallets/wallets.module';
+import { ProviderAccountsModule } from '../provider-accounts/provider-accounts.module';
+import { AuthModule } from '../auth/auth.module';
 import { OrganizationsService } from './services/organizations.service';
 import { ProjectsService } from './services/projects.service';
 import { OrganizationsController } from './controllers/organizations.controller';
 import { ProjectsController } from './controllers/projects.controller';
-import { UsersModule } from '../users/users.module';
-import { WalletsModule } from '../wallets/wallets.module';
 import { StripeModule } from '../../shared/stripe/stripe.module';
 import { MinioModule } from '../../shared/minio/minio.module';
-import { ProviderAccountsModule } from '../provider-accounts/provider-accounts.module';
-import { AuthModule } from '../auth/auth.module';
 import { TenantIsolationController } from './controllers/tenant-isolation.controller';
 
-/**
- * Module responsible for workspace organizations, membership tracking,
- * project management, and API key lifecycle.
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([

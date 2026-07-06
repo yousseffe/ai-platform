@@ -7,18 +7,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import { Model } from '../../models/entities/model.entity';
 import { ModelLog } from '../../models/entities/model-log.entity';
+import { DeploymentStatus } from '../../deployments';
 import { Deployment } from '../../deployments/entities/deployment.entity';
-import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 
-/** Per-minute traffic bucket derived from ModelLog. */
 export interface MinuteBucket {
   minute: string;
   count: number;
   errors: number;
 }
 
-/** Windowed request statistics for a model, derived from ModelLog (reliable
- * even when Prometheus has no samples). Consumed by the MCP correlation tool. */
 export interface RequestStats {
   modelId: string;
   windowMinutes: number;
@@ -31,7 +28,6 @@ export interface RequestStats {
   perMinute: MinuteBucket[];
 }
 
-/** Compact, scoped deployment summary. */
 export interface DeploymentSummary {
   deploymentId: string;
   modelId: string;
@@ -41,11 +37,6 @@ export interface DeploymentSummary {
   createdAt: Date;
 }
 
-/**
- * Provides scoped, raw observability data (request statistics, deployment
- * inventory) for the MCP server to correlate and summarize. Deterministic and
- * read-only; it performs no inference and returns no secrets.
- */
 @Injectable()
 export class AnalyticsQueryService {
   constructor(
@@ -57,18 +48,6 @@ export class AnalyticsQueryService {
     private readonly deploymentsRepository: Repository<Deployment>,
   ) {}
 
-  /**
-   * Computes windowed request statistics for a model the actor owns, or for any
-   * model when the actor is an administrator.
-   *
-   * @param modelId - Target model UUID.
-   * @param actorId - Authenticated user id.
-   * @param windowMinutes - Look-back window in minutes (clamped 1..1440).
-   * @param isAdmin - When true, bypasses the ownership check.
-   * @returns The {@link RequestStats}.
-   * @throws {NotFoundException} If the model does not exist.
-   * @throws {ForbiddenException} If the actor does not own the model and is not an admin.
-   */
   async requestStats(
     modelId: string,
     actorId: string,
@@ -134,15 +113,6 @@ export class AnalyticsQueryService {
     };
   }
 
-  /**
-   * Lists deployments for the models the actor owns, or every deployment on the
-   * platform when the actor is an administrator.
-   *
-   * @param actorId - Authenticated user id.
-   * @param onlyRunning - When true, restrict to RUNNING deployments.
-   * @param isAdmin - When true, bypasses the ownership filter.
-   * @returns Scoped (or platform-wide) deployment summaries.
-   */
   async listDeployments(
     actorId: string,
     onlyRunning: boolean,
@@ -170,13 +140,6 @@ export class AnalyticsQueryService {
   }
 }
 
-/**
- * Computes the q-th percentile of a numeric array (nearest-rank).
- *
- * @param values - Numeric samples.
- * @param q - Quantile in [0, 1].
- * @returns The percentile value, or 0 for an empty input.
- */
 function percentile(values: number[], q: number): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);

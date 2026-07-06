@@ -11,9 +11,6 @@ import { WalletController } from './controllers/wallet.controller';
 import { StripeModule } from '../../shared/stripe/stripe.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 
-/**
- * Module responsible for ledger balance initializations and credit/revenue logic.
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([

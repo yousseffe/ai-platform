@@ -3,11 +3,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../users/entities/user.entity';
 import { Model } from '../models/entities/model.entity';
 import { ModelVersion } from '../models/entities/model-version.entity';
+import { Transaction } from '../wallets/entities/transaction.entity';
 import { WalletsModule } from '../wallets/wallets.module';
 import { AuthModule } from '../auth/auth.module';
-import { StripeModule } from '../../shared/stripe/stripe.module';
 import { BillingModule } from '../billing/billing.module';
-import { Transaction } from '../wallets/entities/transaction.entity';
+import { StripeModule } from '../../shared/stripe/stripe.module';
 import { ProviderAccountsAdminController } from './controllers/provider-accounts.admin.controller';
 import { ProviderAccountsController } from './controllers/provider-accounts.controller';
 import { ProviderSubscriptionWebhookController } from './controllers/provider-subscription-webhook.controller';
@@ -22,9 +22,6 @@ import { ProviderSubscriptionBillingService } from './services/provider-subscrip
 import { ProviderTierService } from './services/provider-tier.service';
 import { ProviderUtilizationService } from './services/provider-utilization.service';
 
-/**
- * Module owning provider accounts, tiers, offers, limits, and subscription checkout.
- */
 @Module({
   imports: [
     TypeOrmModule.forFeature([

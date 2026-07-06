@@ -1,6 +1,3 @@
-/**
- * Classification of a detected risk/abuse pattern on a registered model.
- */
 export enum ThreatClass {
   SPAM = 'SPAM',
   ABUSE = 'ABUSE',

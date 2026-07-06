@@ -18,15 +18,59 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, MoreThanOrEqual } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { ApiKeyOrJwtGuard } from '../auth/guards/api-key-or-jwt.guard';
-import { AdminGuard } from '../auth/guards/admin.guard';
+import { ApiKeyOrJwtGuard } from '../../shared/guards/api-key-or-jwt.guard';
+import { AdminGuard } from '../../shared/guards/admin.guard';
+import { DeploymentStatus } from '../deployments';
 import { Deployment } from '../deployments/entities/deployment.entity';
-import { Alert } from './entities/alert.entity';
 import { Model } from '../models/entities/model.entity';
-import { DeploymentStatus } from '../deployments/enums/deployment-status.enum';
 import { ModelLog } from '../models/entities/model-log.entity';
+import { Alert } from './entities/alert.entity';
 import * as Docker from 'dockerode';
 import { getDockerOptions } from '../../shared/docker/docker.util';
+
+interface LogEntry {
+  timestamp: string;
+  line: string;
+  stream?: string;
+}
+
+interface SpanEntry {
+  traceId: string;
+  spanId?: string;
+  service: string;
+  name: string;
+  timestampNs: number;
+  durationMs: number;
+  offsetMs: number;
+  status: string;
+  attributes: Record<string, unknown>;
+}
+
+interface PrometheusResponse {
+  status: string;
+  data: {
+    resultType: string;
+    result: Array<{
+      metric: Record<string, string>;
+      value: [number, string];
+    }>;
+  };
+}
+
+interface LokiResponse {
+  status: string;
+  data: {
+    resultType: string;
+    result: Array<{
+      stream: {
+        container_id?: string;
+        job?: string;
+        [key: string]: string | undefined;
+      };
+      values: Array<[string, string]>;
+    }>;
+  };
+}
 
 @Controller('analytics')
 export class AnalyticsController {
@@ -53,7 +97,7 @@ export class AnalyticsController {
   @UseGuards(ApiKeyOrJwtGuard)
   async getModelMetrics(
     @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: any,
+    @Req() req: { user: { id: string; isAdmin?: boolean } },
   ) {
     const userId = req.user.id;
     const model = await this.modelsRepository.findOne({
@@ -65,7 +109,6 @@ export class AnalyticsController {
       throw new NotFoundException('Model not found');
     }
 
-    // Check model ownership
     if (model.user?.id !== userId && !req.user.isAdmin) {
       throw new ForbiddenException('You do not own this model');
     }
@@ -94,7 +137,6 @@ export class AnalyticsController {
     const containerId = deployment.containerId;
     const shortContainerId = containerId.substring(0, 12);
 
-    // 1. CPU & RAM Query (cAdvisor via Prometheus)
     try {
       const cpuQuery = `sum(rate(container_cpu_usage_seconds_total{id=~".*${shortContainerId}.*"}[1m])) * 100`;
       const cpuRes = await this.queryPrometheus(cpuQuery);
@@ -104,11 +146,12 @@ export class AnalyticsController {
       const ramRes = await this.queryPrometheus(ramQuery);
       const ramBytes = parseFloat(ramRes?.data?.result?.[0]?.value?.[1] || '0');
       ramMb = parseFloat((ramBytes / 1024 / 1024).toFixed(2));
-    } catch (err) {
-      this.logger.warn(`cAdvisor Prometheus query failed: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.warn(
+        `cAdvisor Prometheus query failed: ${(err as Error).message}`,
+      );
     }
 
-    // Fallback to Dockerode for CPU/RAM if values are 0 (e.g. on Windows)
     if (cpuPercent === 0 && ramMb === 0 && containerId) {
       try {
         const container = this.docker.getContainer(containerId);
@@ -131,12 +174,13 @@ export class AnalyticsController {
         this.logger.log(
           `Dockerode stats fallback used for container ${shortContainerId}: CPU=${cpuPercent}%, RAM=${ramMb}MB`,
         );
-      } catch (err) {
-        this.logger.warn(`Dockerode stats fallback failed: ${err.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(
+          `Dockerode stats fallback failed: ${(err as Error).message}`,
+        );
       }
     }
 
-    // 2. Latency & Requests (Prometheus via OTel)
     let latencyP50 = 0;
     let latencyP95 = 0;
     let requestRate = 0;
@@ -159,11 +203,12 @@ export class AnalyticsController {
       latencyP95 = parseFloat(p95Res?.data?.result?.[0]?.value?.[1] || '0');
       requestRate = parseFloat(rateRes?.data?.result?.[0]?.value?.[1] || '0');
       errorRate = parseFloat(errRes?.data?.result?.[0]?.value?.[1] || '0');
-    } catch (err) {
-      this.logger.warn(`OTel Prometheus query failed: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.warn(
+        `OTel Prometheus query failed: ${(err as Error).message}`,
+      );
     }
 
-    // Fallback to PostgreSQL ModelLog records if request metrics are empty
     if (requestRate === 0) {
       try {
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
@@ -190,8 +235,10 @@ export class AnalyticsController {
             `PostgreSQL logs fallback used for model ${id}: Requests=${recentLogs.length}, P50=${latencyP50}ms`,
           );
         }
-      } catch (err) {
-        this.logger.warn(`PostgreSQL logs fallback failed: ${err.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(
+          `PostgreSQL logs fallback failed: ${(err as Error).message}`,
+        );
       }
     }
 
@@ -209,7 +256,7 @@ export class AnalyticsController {
   async getModelLogs(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('limit') limit = '100',
-    @Req() req: any,
+    @Req() req: { user: { id: string; isAdmin?: boolean } },
   ) {
     const userId = req.user.id;
     const model = await this.modelsRepository.findOne({
@@ -240,8 +287,9 @@ export class AnalyticsController {
       const url = `${this.lokiUrl}/loki/api/v1/query_range?query=${encodeURIComponent(query)}&limit=${limit}`;
       const response = await firstValueFrom(this.httpService.get(url));
 
-      const logs: any[] = [];
-      const streams = response.data?.data?.result || [];
+      const logs: LogEntry[] = [];
+      const data = response.data as unknown as LokiResponse;
+      const streams = data?.data?.result || [];
       for (const stream of streams) {
         for (const val of stream.values || []) {
           logs.push({
@@ -251,15 +299,14 @@ export class AnalyticsController {
         }
       }
 
-      // Sort logs by timestamp ascending
       logs.sort(
         (a, b) =>
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
       );
       return { logs };
-    } catch (err) {
-      this.logger.error(`Error querying Loki logs: ${err.message}`);
-      return { logs: [], error: err.message };
+    } catch (err: unknown) {
+      this.logger.error(`Error querying Loki logs: ${(err as Error).message}`);
+      return { logs: [], error: (err as Error).message };
     }
   }
 
@@ -268,7 +315,7 @@ export class AnalyticsController {
   async getModelRequestHistory(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('limit') limit = '50',
-    @Req() req: any,
+    @Req() req: { user: { id: string; isAdmin?: boolean } },
   ) {
     const userId = req.user.id;
     const model = await this.modelsRepository.findOne({
@@ -313,13 +360,12 @@ export class AnalyticsController {
   @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
   async getAdminMetrics() {
     try {
-      // 1. Host CPU
       const hostCpuQuery = `100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100)`;
-      // 2. Host RAM
+
       const hostRamQuery = `(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100`;
-      // 3. Host Disk
+
       const hostDiskQuery = `(node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100`;
-      // 4. Container count
+
       const containerCountQuery = `count(container_last_seen{name=~".+"})`;
 
       const [cpuRes, ramRes, diskRes, containerRes] = await Promise.all([
@@ -339,7 +385,6 @@ export class AnalyticsController {
         10,
       );
 
-      // Query database for deployment stats
       const totalDeployments = await this.deploymentsRepository.count();
       const runningDeployments = await this.deploymentsRepository.count({
         where: { status: DeploymentStatus.RUNNING },
@@ -353,8 +398,10 @@ export class AnalyticsController {
         totalDeployments,
         runningDeployments,
       };
-    } catch (err) {
-      this.logger.error(`Error querying Admin metrics: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(
+        `Error querying Admin metrics: ${(err as Error).message}`,
+      );
       return {
         hostCpu: 0,
         hostRam: 0,
@@ -362,7 +409,7 @@ export class AnalyticsController {
         activeContainers: 0,
         totalDeployments: 0,
         runningDeployments: 0,
-        error: err.message,
+        error: (err as Error).message,
       };
     }
   }
@@ -398,7 +445,7 @@ export class AnalyticsController {
         logqls.push(`{service_name=~".+"}`);
       }
 
-      const logs: any[] = [];
+      const logs: LogEntry[] = [];
 
       for (let logql of logqls) {
         if (level) {
@@ -412,19 +459,21 @@ export class AnalyticsController {
         const url = `${this.lokiUrl}/loki/api/v1/query_range?query=${encodeURIComponent(logql)}&limit=${limit}`;
         try {
           const response = await firstValueFrom(this.httpService.get(url));
-          const streams = response.data?.data?.result || [];
+          const data = response.data as unknown as LokiResponse;
+          const streams = data?.data?.result || [];
           for (const stream of streams) {
             for (const val of stream.values || []) {
               logs.push({
                 timestamp: new Date(parseInt(val[0]) / 1000000).toISOString(),
                 line: val[1],
-                stream: stream.stream,
+                stream:
+                  stream.stream.container_id || stream.stream.job || 'unknown',
               });
             }
           }
-        } catch (queryErr) {
+        } catch (queryErr: unknown) {
           this.logger.warn(
-            `Failed to query Loki with LogQL "${logql}": ${queryErr.message}`,
+            `Failed to query Loki with LogQL "${logql}": ${(queryErr as Error).message}`,
           );
         }
       }
@@ -435,9 +484,11 @@ export class AnalyticsController {
       );
       const finalLogs = logs.slice(0, parseInt(limit, 10));
       return { logs: finalLogs };
-    } catch (err) {
-      this.logger.error(`Error querying Admin Loki logs: ${err.message}`);
-      return { logs: [], error: err.message };
+    } catch (err: unknown) {
+      this.logger.error(
+        `Error querying Admin Loki logs: ${(err as Error).message}`,
+      );
+      return { logs: [], error: (err as Error).message };
     }
   }
 
@@ -445,7 +496,7 @@ export class AnalyticsController {
   @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
   async getAdminTrace(@Param('traceId') traceId: string) {
     try {
-      const spans: any[] = [];
+      const spans: SpanEntry[] = [];
 
       // The OTel Winston transport injects `trace_id` (W3C field name).
       // The OTel Collector may use `traceid`. Try both JSON strategies plus
@@ -484,20 +535,18 @@ export class AnalyticsController {
 
         try {
           const response = await firstValueFrom(this.httpService.get(url));
-          const streams = response.data?.data?.result || [];
+          const data = response.data as unknown as LokiResponse;
+          const streams = data?.data?.result || [];
 
           for (const stream of streams) {
             const service: string =
-              stream.stream?.container_name ||
-              stream.stream?.service_name ||
-              stream.stream?.job ||
-              'unknown';
+              stream.stream?.container_id || stream.stream?.job || 'unknown';
 
             for (const val of stream.values || []) {
               const timestampNs = parseInt(val[0]);
-              const line = val[1] as string;
+              const line = val[1];
 
-              let span: any;
+              let span: SpanEntry;
               try {
                 const parsed = JSON.parse(line);
 
@@ -509,7 +558,6 @@ export class AnalyticsController {
                   parsed.attributes?.trace_id ||
                   parsed.attributes?.traceid;
 
-                // Only include logs that actually belong to this trace
                 if (logTraceId && logTraceId !== traceId) continue;
 
                 const spanId =
@@ -562,7 +610,6 @@ export class AnalyticsController {
                   attributes: parsed.attributes || {},
                 };
               } catch {
-                // Plain-text — include if the raw line contains the traceId
                 if (!line.includes(traceId)) continue;
                 span = {
                   traceId,
@@ -578,7 +625,6 @@ export class AnalyticsController {
                 };
               }
 
-              // Deduplicate: skip if we already have a span with the same timestamp + service
               const isDupe = spans.some(
                 (s) =>
                   s.timestampNs === span.timestampNs &&
@@ -588,23 +634,20 @@ export class AnalyticsController {
             }
           }
 
-          // Stop after first strategy that actually returned results
           if (spans.length > 0) break;
-        } catch (lokiErr) {
+        } catch (lokiErr: unknown) {
           this.logger.warn(
-            `Loki trace strategy "${strategy.label}" failed: ${lokiErr.message}`,
+            `Loki trace strategy "${strategy.label}" failed: ${(lokiErr as Error).message}`,
           );
         }
       }
 
-      // Sort chronologically
       spans.sort((a, b) => a.timestampNs - b.timestampNs);
 
-      // Compute relative offsets from the first span
       if (spans.length > 0) {
         const firstTs = spans[0].timestampNs;
         const lastTs = spans[spans.length - 1].timestampNs;
-        const totalNs = lastTs - firstTs || 1_000_000; // at least 1ms
+        const totalNs = lastTs - firstTs || 1_000_000;
 
         for (const span of spans) {
           span.offsetMs = Math.round((span.timestampNs - firstTs) / 1_000_000);
@@ -622,9 +665,11 @@ export class AnalyticsController {
         `Trace ${traceId}: resolved ${spans.length} span(s) from Loki`,
       );
       return { traceId, spans };
-    } catch (err) {
-      this.logger.error(`Error querying trace ${traceId}: ${err.message}`);
-      return { traceId, spans: [], error: err.message };
+    } catch (err: unknown) {
+      this.logger.error(
+        `Error querying trace ${traceId}: ${(err as Error).message}`,
+      );
+      return { traceId, spans: [], error: (err as Error).message };
     }
   }
 
@@ -638,7 +683,18 @@ export class AnalyticsController {
 
   @Post('alerts/webhook')
   @HttpCode(HttpStatus.OK)
-  async handleAlertmanagerWebhook(@Body() payload: any) {
+  async handleAlertmanagerWebhook(
+    @Body()
+    payload: {
+      alerts?: Array<{
+        labels?: Record<string, string>;
+        annotations?: Record<string, string>;
+        status?: string;
+        startsAt?: string;
+        endsAt?: string;
+      }>;
+    },
+  ) {
     this.logger.log(
       `Received alerts webhook from Alertmanager: ${JSON.stringify(payload)}`,
     );
@@ -684,15 +740,17 @@ export class AnalyticsController {
         this.logger.log(
           `Successfully saved/updated alert: ${alertName} (${status})`,
         );
-      } catch (err) {
-        this.logger.error(`Failed to save alert item: ${err.message}`);
+      } catch (err: unknown) {
+        this.logger.error(
+          `Failed to save alert item: ${(err as Error).message}`,
+        );
       }
     }
 
     return { status: 'success' };
   }
 
-  private async queryPrometheus(query: string): Promise<any> {
+  private async queryPrometheus(query: string): Promise<PrometheusResponse> {
     const url = `${this.prometheusUrl}/api/v1/query?query=${encodeURIComponent(query)}`;
     const response = await firstValueFrom(this.httpService.get(url));
     return response.data;

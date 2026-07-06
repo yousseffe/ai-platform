@@ -1,11 +1,5 @@
-/**
- * Limit value where null means unlimited.
- */
 export type NullableLimit = number | null;
 
-/**
- * Effective provider limits after applying custom overrides over tier defaults.
- */
 export interface EffectiveProviderLimits {
   maxModels: NullableLimit;
   maxPublicModels: NullableLimit;
@@ -26,18 +20,12 @@ export interface EffectiveProviderLimits {
   allowAdvancedAnalytics: boolean;
 }
 
-/**
- * Used/limit/remaining triplet displayed in admin and provider dashboards.
- */
 export interface LimitUtilization {
   used: number;
   limit: NullableLimit;
   remaining: NullableLimit;
 }
 
-/**
- * Provider model usage grouped by supported limit dimensions.
- */
 export interface ProviderUtilization {
   totalModels: LimitUtilization;
   publicModels: LimitUtilization;

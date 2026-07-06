@@ -1,11 +1,3 @@
-/**
- * Generates a highly professional HTML template for organization switcher access OTP.
- *
- * @param email - The user's email address.
- * @param orgName - The name of the organization being switched to.
- * @param otpCode - The 6-digit access verification code.
- * @returns A string containing the formatted HTML email body.
- */
 export function getWorkspaceAccessTemplate(
   email: string,
   orgName: string,

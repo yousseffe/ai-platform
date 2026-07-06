@@ -2,16 +2,18 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, MoreThanOrEqual, Repository } from 'typeorm';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
+import { OrgStatus } from '../../organizations';
 import { Organization } from '../../organizations/entities/organization.entity';
-import { OrgStatus } from '../../organizations/enums/org-status.enum';
+import { VersionReviewStatus } from '../../models';
 import { Model } from '../../models/entities/model.entity';
 import { ModelVersion } from '../../models/entities/model-version.entity';
-import { VersionReviewStatus } from '../../models/enums/version-review-status.enum';
-import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
-import { ProviderAccountStatus } from '../../provider-accounts/enums/provider-account-status.enum';
+import {
+  ProviderAccount,
+  ProviderAccountStatus,
+} from '../../provider-accounts';
 import { User } from '../../users/entities/user.entity';
+import { TransactionStatus } from '../../wallets';
 import { Transaction } from '../../wallets/entities/transaction.entity';
-import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
 import {
   AdminDashboardOverview,
   AdminTopProvider,
@@ -21,9 +23,6 @@ import {
   createMonthlyPeriod,
 } from '../utils/admin-period.util';
 
-/**
- * Aggregates business KPIs for the professional admin dashboard overview.
- */
 @Injectable()
 export class AdminKpiService {
   constructor(
@@ -41,11 +40,6 @@ export class AdminKpiService {
     private readonly transactionRepository: Repository<Transaction>,
   ) {}
 
-  /**
-   * Builds the overview payload for the new admin dashboard.
-   *
-   * @returns Dashboard KPIs and top providers.
-   */
   async getOverview(): Promise<AdminDashboardOverview> {
     const now = new Date();
     const period = createMonthlyPeriod(now);
@@ -64,9 +58,6 @@ export class AdminKpiService {
     };
   }
 
-  /**
-   * Creates the user-related KPI cards.
-   */
   private async buildUserCards(currentStart: Date) {
     const totalUsers = await this.userRepository.count();
     const newUsersThisMonth = await this.userRepository.count({
@@ -114,9 +105,6 @@ export class AdminKpiService {
     ];
   }
 
-  /**
-   * Creates organization KPI cards.
-   */
   private async buildOrganizationCards(currentStart: Date) {
     const totalOrgs = await this.organizationRepository.count();
     const newOrganizationsThisMonth = await this.organizationRepository.count({
@@ -150,9 +138,6 @@ export class AdminKpiService {
     ];
   }
 
-  /**
-   * Creates provider KPI cards.
-   */
   private async buildProviderCards(currentStart: Date) {
     const accounts = await this.providerAccountRepository.find({
       relations: ['tier'],
@@ -209,9 +194,6 @@ export class AdminKpiService {
     ];
   }
 
-  /**
-   * Creates model KPI cards.
-   */
   private async buildModelCards(currentStart: Date) {
     const totalModels = await this.modelRepository.count();
     const newModelsThisMonth = await this.modelRepository.count({
@@ -253,9 +235,6 @@ export class AdminKpiService {
     ];
   }
 
-  /**
-   * Creates revenue and transaction KPI cards.
-   */
   private async buildRevenueCards(
     period: ReturnType<typeof createMonthlyPeriod>,
   ) {
@@ -382,9 +361,6 @@ export class AdminKpiService {
     ];
   }
 
-  /**
-   * Returns top providers ranked by model earnings.
-   */
   private async getTopProviders(): Promise<AdminTopProvider[]> {
     const accounts = await this.providerAccountRepository.find({
       relations: ['tier'],
@@ -420,9 +396,6 @@ export class AdminKpiService {
       .slice(0, 5);
   }
 
-  /**
-   * Sums transactions whose references start with the given prefix.
-   */
   private sumByReference(transactions: Transaction[], prefix: string): number {
     return transactions
       .filter(

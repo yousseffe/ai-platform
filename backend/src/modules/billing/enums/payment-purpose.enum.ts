@@ -1,6 +1,3 @@
-/**
- * Explicit business reason for a payment or ledger movement.
- */
 export enum PaymentPurpose {
   PROVIDER_TIER_SUBSCRIPTION = 'PROVIDER_TIER_SUBSCRIPTION',
   PROVIDER_TIER_UPGRADE = 'PROVIDER_TIER_UPGRADE',

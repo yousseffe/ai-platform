@@ -1,21 +1,13 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
-import { AdminGuard } from '../../auth/guards/admin.guard';
 import { ApiKey } from '../../auth/entities/api-key.entity';
-import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
 import { McpToken } from '../../auth/entities/mcp-token.entity';
+import { ApiKeyOrJwtGuard } from '../../../shared/guards/api-key-or-jwt.guard';
+import { AdminGuard } from '../../../shared/guards/admin.guard';
+import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
 import { AuditLog } from '../../users/entities/audit-log.entity';
 
-/**
- * Read-only platform access/security audit surface consumed by the
- * `admin_list_api_keys`, `admin_list_mcp_tokens`, and `admin_get_audit_log`
- * MCP tools. None of this data is visible anywhere else today — not even on
- * the dashboard — even though the `AuditLog` table is actively written by
- * `AuthService`, `UsersService`, and `OrganizationsService`. Never exposes
- * raw secret material, only masked prefixes and metadata.
- */
 @Controller('admin-mcp')
 @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
 export class AccessAuditMcpController {
@@ -30,12 +22,6 @@ export class AccessAuditMcpController {
     private readonly auditLogRepository: Repository<AuditLog>,
   ) {}
 
-  /**
-   * Lists every personal and organization API key on the platform (masked
-   * prefixes only, never the raw secret).
-   *
-   * @returns Platform-wide API key inventory.
-   */
   @Get('api-keys')
   async listApiKeys() {
     const [personalKeys, orgKeys] = await Promise.all([
@@ -67,11 +53,6 @@ export class AccessAuditMcpController {
     };
   }
 
-  /**
-   * Lists every MCP access token issued on the platform, across all users.
-   *
-   * @returns Platform-wide MCP token inventory.
-   */
   @Get('mcp-tokens')
   async listMcpTokens() {
     const tokens = await this.mcpTokenRepository.find({
@@ -92,15 +73,6 @@ export class AccessAuditMcpController {
     }));
   }
 
-  /**
-   * Filterable platform audit log — the only read surface for the `AuditLog`
-   * table, which today has no controller anywhere in the codebase.
-   *
-   * @param userId - Optional filter to a single actor.
-   * @param action - Optional filter to a single action category.
-   * @param limit - Max records to return (default 100, max 500).
-   * @returns Matching audit log entries, newest first.
-   */
   @Get('audit-log')
   async getAuditLog(
     @Query('userId') userId?: string,

@@ -16,18 +16,14 @@ import {
   Logger,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { WorkspaceInterceptor } from '../../auth/guards/workspace.interceptor';
+import { WorkspaceInterceptor } from '../../../shared/interceptors/workspace.interceptor';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { WalletsService } from '../services/wallets.service';
 import { StripeService } from '../../../shared/stripe/stripe.service';
 import { Request } from 'express';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 
-/**
- * Controller exposing endpoints for wallet balances, mock fund additions,
- * Stripe checkout session generation, and Stripe webhook consumption.
- */
 @Controller('wallets')
 export class WalletsController {
   private readonly logger = new Logger(WalletsController.name);
@@ -37,13 +33,6 @@ export class WalletsController {
     private readonly stripeService: StripeService,
   ) {}
 
-  /**
-   * Retrieves the wallet balance for the current active workspace.
-   *
-   * @param req - Request envelope carrying resolved workspace parameters.
-   * @param type - Query parameter specifying CONSUMER or PROVIDER wallet lookups.
-   * @returns An object containing the decimal balance.
-   */
   @Get('balance')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(WorkspaceInterceptor)
@@ -75,13 +64,6 @@ export class WalletsController {
     return { balance };
   }
 
-  /**
-   * Retrieves all wallet ledgers associated with a specific organization.
-   *
-   * @param orgId - Organization UUID.
-   * @param req - Authenticated request containing the user details.
-   * @returns Array of organization wallet records.
-   */
   @Get('org/:orgId')
   @UseGuards(JwtAuthGuard)
   async getOrganizationWallets(
@@ -91,13 +73,6 @@ export class WalletsController {
     return this.walletsService.getOrganizationWallets(orgId, req.user.id);
   }
 
-  /**
-   * Mock endpoint allowing users to top up credits in their active workspace.
-   *
-   * @param req - Request envelope carrying resolved workspace parameters.
-   * @param body - Post parameters containing the decimal value to append.
-   * @returns The updated wallet.
-   */
   @Post('add-funds')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(WorkspaceInterceptor)
@@ -129,13 +104,6 @@ export class WalletsController {
     );
   }
 
-  /**
-   * Generates a Stripe Checkout Session redirect URL for credit deposit.
-   *
-   * @param req - Request envelope carrying resolved workspace parameters.
-   * @param body - Body containing deposit amount in USD.
-   * @returns REDIRECT Stripe Checkout URL.
-   */
   @Post('checkout-session')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(WorkspaceInterceptor)
@@ -168,13 +136,6 @@ export class WalletsController {
     return { url: session.url };
   }
 
-  /**
-   * Stripe Webhook endpoint. Processes payment confirmation notifications asynchronously.
-   *
-   * @param signature - Signature value from Stripe-Signature header.
-   * @param req - Express raw body request wrapper containing untouched payload buffer.
-   * @returns Status receipt confirming receipt of webhook event.
-   */
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(
@@ -226,13 +187,6 @@ export class WalletsController {
     return { received: true };
   }
 
-  /**
-   * Withdraws funds from the active workspace's wallet.
-   *
-   * @param req - Request envelope carrying resolved workspace details.
-   * @param body - Post parameters containing the amount to withdraw.
-   * @returns The updated wallet balance config.
-   */
   @Post('withdraw')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(WorkspaceInterceptor)
@@ -262,15 +216,6 @@ export class WalletsController {
     );
   }
 
-  /**
-   * Retrieves the transaction history for the active workspace's wallet.
-   *
-   * @param req - Request envelope carrying resolved workspace details.
-   * @param type - Query parameter specifying CONSUMER or PROVIDER wallet lookups.
-   * @param page - Query page index selector.
-   * @param limit - Count of items per page.
-   * @returns Paginated transactions list.
-   */
   @Get('transactions')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(WorkspaceInterceptor)
@@ -345,11 +290,6 @@ export class WalletsController {
     );
   }
 
-  /**
-   * Retrieves the current system configuration parameter for credits per EGP.
-   *
-   * @returns An object containing the credits per EGP multiplier.
-   */
   @Get('config/credits-per-egp')
   @UseGuards(JwtAuthGuard)
   async getCreditsPerEgp() {

@@ -10,9 +10,6 @@ import { ProviderTierDefinition } from '../entities/provider-tier-definition.ent
 import { ProviderAccount } from '../entities/provider-account.entity';
 import { UpsertProviderTierDto } from '../dto/provider-tier.dto';
 
-/**
- * Manages admin-configurable provider tier definitions and default seed tiers.
- */
 @Injectable()
 export class ProviderTierService implements OnModuleInit {
   constructor(
@@ -22,29 +19,14 @@ export class ProviderTierService implements OnModuleInit {
     private readonly providerAccountRepository: Repository<ProviderAccount>,
   ) {}
 
-  /**
-   * Ensures default provider tiers exist when the application boots.
-   */
   async onModuleInit(): Promise<void> {
     await this.seedDefaultTiers();
   }
 
-  /**
-   * Lists all provider tiers in admin order.
-   *
-   * @returns Provider tier definitions.
-   */
   async listTiers(): Promise<ProviderTierDefinition[]> {
     return this.tierRepository.find({ order: { sortOrder: 'ASC' } });
   }
 
-  /**
-   * Retrieves a tier by UUID.
-   *
-   * @param tierId - Tier UUID.
-   * @returns Provider tier definition.
-   * @throws {NotFoundException} If the tier does not exist.
-   */
   async getTier(tierId: string): Promise<ProviderTierDefinition> {
     const tier = await this.tierRepository.findOneBy({ id: tierId });
     if (!tier) {
@@ -53,11 +35,6 @@ export class ProviderTierService implements OnModuleInit {
     return tier;
   }
 
-  /**
-   * Resolves the active FREE tier used for default provider provisioning.
-   *
-   * @returns The FREE tier definition.
-   */
   async getDefaultTier(): Promise<ProviderTierDefinition> {
     let tier = await this.tierRepository.findOne({ where: { code: 'FREE' } });
     if (!tier) {
@@ -70,13 +47,9 @@ export class ProviderTierService implements OnModuleInit {
     return tier;
   }
 
-  /**
-   * Creates a new provider tier definition.
-   *
-   * @param dto - Tier creation payload.
-   * @returns Created tier.
-   */
-  async createTier(dto: UpsertProviderTierDto): Promise<ProviderTierDefinition> {
+  async createTier(
+    dto: UpsertProviderTierDto,
+  ): Promise<ProviderTierDefinition> {
     this.assertRevenueSplit(dto);
     const existing = await this.tierRepository.findOne({
       where: { code: dto.code.toUpperCase() },
@@ -88,13 +61,6 @@ export class ProviderTierService implements OnModuleInit {
     return this.tierRepository.save(tier);
   }
 
-  /**
-   * Updates an existing provider tier definition.
-   *
-   * @param tierId - Target tier UUID.
-   * @param dto - Tier update payload.
-   * @returns Updated tier.
-   */
   async updateTier(
     tierId: string,
     dto: UpsertProviderTierDto,
@@ -105,12 +71,6 @@ export class ProviderTierService implements OnModuleInit {
     return this.tierRepository.save(tier);
   }
 
-  /**
-   * Deletes an unused tier or deactivates one that is assigned to providers.
-   *
-   * @param tierId - Target tier UUID.
-   * @returns Deletion/deactivation receipt.
-   */
   async deleteOrDeactivateTier(
     tierId: string,
   ): Promise<{ deleted: boolean; tier?: ProviderTierDefinition }> {
@@ -127,9 +87,6 @@ export class ProviderTierService implements OnModuleInit {
     return { deleted: false, tier: saved };
   }
 
-  /**
-   * Seeds the default tier catalog without relying on hardcoded business logic.
-   */
   private async seedDefaultTiers(): Promise<void> {
     const defaults: Array<Partial<ProviderTierDefinition>> = [
       {
@@ -234,12 +191,6 @@ export class ProviderTierService implements OnModuleInit {
     }
   }
 
-  /**
-   * Normalizes tier input before persistence.
-   *
-   * @param dto - Raw admin DTO.
-   * @returns Persistence-safe partial entity.
-   */
   private normalizeTierDto(
     dto: UpsertProviderTierDto,
   ): Partial<ProviderTierDefinition> {
@@ -261,9 +212,6 @@ export class ProviderTierService implements OnModuleInit {
     };
   }
 
-  /**
-   * Ensures tier payout percentages describe a full revenue split.
-   */
   private assertRevenueSplit(dto: UpsertProviderTierDto): void {
     if (dto.platformCommissionPercent + dto.providerSharePercent !== 100) {
       throw new BadRequestException(

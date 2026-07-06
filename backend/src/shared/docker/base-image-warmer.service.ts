@@ -4,51 +4,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { getDockerOptions } from './docker.util';
 
-/**
- * Describes one of the platform's four base Docker images used by
- * `BuildProcessor` when generating per-model-version Dockerfiles.
- */
 interface BaseImageSpec {
-  /** The local Docker image tag, e.g. `ai-platform-pytorch-base:latest`. */
   tag: string;
-  /** Absolute path to the Dockerfile used to build this image locally. */
+
   dockerfilePath: string;
-  /** The build context directory to pass to `docker build`. */
+
   contextDir: string;
 }
 
-/**
- * B7: Pre-warms the platform's four base Docker images (pytorch, tensorflow,
- * sklearn, diffusion) on backend startup, so the very first model build of a
- * cold Docker host doesn't pay the full multi-GB pip-install cost inline
- * mid-build (which previously fell back silently to vanilla
- * `python:3.11-slim` if the base image wasn't present).
- *
- * Investigation of this repo found `build-base-images.sh`/`.bat` at the repo
- * root, which build all four images locally via `docker build` from
- * `docker/base-images/*.Dockerfile` — there is no CI workflow or registry
- * push step for these images. Because of that, this warmer defaults to the
- * same local-build behavior. If `BASE_IMAGE_REGISTRY` is set, it prefers
- * pulling pre-built images from that registry instead (faster, and doesn't
- * require pip/network access to package indexes on every host).
- *
- * Both paths run in the background (fire-and-forget, logged) so backend
- * startup itself is never blocked waiting for a multi-minute image build.
- */
 @Injectable()
 export class BaseImageWarmerService implements OnModuleInit {
   private readonly docker: Docker;
   private readonly logger = new Logger(BaseImageWarmerService.name);
 
-  /**
-   * Directory containing the four base-image Dockerfiles. When running
-   * inside the backend's own Docker container, `docker-compose.yml` bind-
-   * mounts the repo-root `docker/base-images` directory to
-   * `/usr/src/docker/base-images` (the repo root itself isn't otherwise
-   * available inside the container — only `./backend` is). When running
-   * directly on the host (e.g. `npm run dev`), the repo-root `docker/`
-   * directory is one level up from `process.cwd()` (`backend/`).
-   */
   private readonly baseImagesDir = fs.existsSync('/.dockerenv')
     ? '/usr/src/docker/base-images'
     : path.resolve(process.cwd(), '..', 'docker', 'base-images');
@@ -86,10 +54,6 @@ export class BaseImageWarmerService implements OnModuleInit {
     this.docker = new Docker(getDockerOptions());
   }
 
-  /**
-   * Kicks off warming of all four base images in the background. Does not
-   * await completion — NestJS module bootstrap continues immediately.
-   */
   onModuleInit(): void {
     this.warmAll().catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
@@ -97,11 +61,6 @@ export class BaseImageWarmerService implements OnModuleInit {
     });
   }
 
-  /**
-   * Checks and warms each base image sequentially in the background.
-   * Sequential (not parallel) to avoid saturating the host with four
-   * simultaneous multi-GB pip installs / pulls on cold start.
-   */
   private async warmAll(): Promise<void> {
     this.logger.log('Starting base image warm-up check...');
     for (const image of this.images) {
@@ -109,9 +68,7 @@ export class BaseImageWarmerService implements OnModuleInit {
         await this.docker.getImage(image.tag).inspect();
         this.logger.log(`Base image ${image.tag} already present. Skipping.`);
         continue;
-      } catch {
-        // Not present locally — fall through to pull or build.
-      }
+      } catch {}
 
       const registry = process.env.BASE_IMAGE_REGISTRY;
       if (registry) {
@@ -123,10 +80,6 @@ export class BaseImageWarmerService implements OnModuleInit {
     this.logger.log('Base image warm-up check complete.');
   }
 
-  /**
-   * Pulls a pre-built base image from the configured registry and re-tags it
-   * to the local tag `BuildProcessor` expects.
-   */
   private async pullFromRegistry(
     image: BaseImageSpec,
     registry: string,
@@ -164,10 +117,6 @@ export class BaseImageWarmerService implements OnModuleInit {
     }
   }
 
-  /**
-   * Builds a base image locally from its Dockerfile, mirroring
-   * `build-base-images.sh`/`.bat` at the repo root.
-   */
   private async buildLocally(image: BaseImageSpec): Promise<void> {
     if (!fs.existsSync(image.dockerfilePath)) {
       this.logger.warn(

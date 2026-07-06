@@ -8,8 +8,8 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { WorkspaceInterceptor } from '../../auth/guards/workspace.interceptor';
+import { WorkspaceInterceptor } from '../../../shared/interceptors/workspace.interceptor';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { PipelineRunsService } from '../services/pipeline-runs.service';
 import { PipelineRun } from '../entities/pipeline-run.entity';
@@ -20,16 +20,11 @@ interface RunRequestContext {
   workspaceType: OwnerType;
 }
 
-/**
- * Controller exposing endpoints to trigger pipeline runs and inspect their
- * status — the pipeline equivalent of the model `/predict` endpoint.
- */
 @Controller('pipelines')
 @UseGuards(JwtAuthGuard)
 export class PipelineRunsController {
   constructor(private readonly runsService: PipelineRunsService) {}
 
-  /** Triggers a background run of a `VALIDATED` pipeline. */
   @Post(':id/run')
   @UseInterceptors(WorkspaceInterceptor)
   async triggerRun(
@@ -46,7 +41,6 @@ export class PipelineRunsController {
     );
   }
 
-  /** Lists recent runs for a pipeline, newest first. */
   @Get(':id/runs')
   async listRuns(
     @Param('id') id: string,
@@ -55,7 +49,6 @@ export class PipelineRunsController {
     return this.runsService.listRuns(id, req.user.id);
   }
 
-  /** Fetches a single run's status, output, and per-step results. */
   @Get('runs/:runId')
   async getRun(
     @Param('runId') runId: string,

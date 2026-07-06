@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, FindOptionsWhere, Repository } from 'typeorm';
+import { ModelType } from '../../models';
 import { Model } from '../../models/entities/model.entity';
-import { ModelType } from '../../models/enums/model-type.enum';
-import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
-import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
-import { ProviderUtilizationService } from '../../provider-accounts/services/provider-utilization.service';
+import {
+  ProviderAccount,
+  ProviderAccountsService,
+  ProviderUtilizationService,
+} from '../../provider-accounts';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { ListProvidersQueryDto } from '../dto/list-providers-query.dto';
 import { AdminAuditLogService } from './admin-audit-log.service';
@@ -16,9 +18,6 @@ import {
   AdminProvidersListResponse,
 } from '../types/admin-dashboard.types';
 
-/**
- * Query layer for provider-focused admin tables and details pages.
- */
 @Injectable()
 export class AdminProviderQueryService {
   constructor(
@@ -32,12 +31,6 @@ export class AdminProviderQueryService {
     private readonly providerAccountsService: ProviderAccountsService,
   ) {}
 
-  /**
-   * Returns the admin providers list with server-side filtering and pagination.
-   *
-   * @param query - Provider list filters.
-   * @returns Paginated provider rows.
-   */
   async listProviders(
     query: ListProvidersQueryDto,
   ): Promise<AdminProvidersListResponse> {
@@ -114,7 +107,8 @@ export class AdminProviderQueryService {
       await this.providerMetricsService.getModelLogMetricsMap(
         models.map((model) => model.id),
       );
-    const recentTransactions = await this.listRecentTransactions(normalizedAccount);
+    const recentTransactions =
+      await this.listRecentTransactions(normalizedAccount);
 
     return {
       id: account.id,
@@ -138,11 +132,12 @@ export class AdminProviderQueryService {
       ),
       lastActiveAt: this.resolveLastActiveAt(models, logMetricsMap),
       createdAt: account.createdAt.toISOString(),
-      utilization:
-        (await this.providerUtilizationService.getUtilization(normalizedAccount)) as unknown as Record<
-          string,
-          { used: number; limit: number | null; remaining: number | null }
-        >,
+      utilization: (await this.providerUtilizationService.getUtilization(
+        normalizedAccount,
+      )) as unknown as Record<
+        string,
+        { used: number; limit: number | null; remaining: number | null }
+      >,
       models: models.map((model) => ({
         id: model.id,
         name: model.name,
@@ -264,9 +259,6 @@ export class AdminProviderQueryService {
     return Number(((earnings * (100 - share)) / share).toFixed(2));
   }
 
-  /**
-   * Lists recent provider-related transactions including subscription payments.
-   */
   private async listRecentTransactions(account: ProviderAccount) {
     const subscriptionReference = `Provider tier subscription payment: ${account.id}`;
     const transactions = await this.transactionRepository.find({
@@ -286,9 +278,6 @@ export class AdminProviderQueryService {
     }));
   }
 
-  /**
-   * Chooses the latest activity timestamp across all models.
-   */
   private resolveLastActiveAt(
     models: Model[],
     logMetricsMap: Map<

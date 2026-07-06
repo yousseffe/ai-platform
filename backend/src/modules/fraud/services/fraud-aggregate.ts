@@ -1,7 +1,6 @@
 import { ModelLog } from '../../models/entities/model-log.entity';
 import { TrafficFeatures } from '../fraud-rules';
 
-/** Returns the maximum count among grouped non-null keys. */
 function maxGroupCount(keys: (string | null)[]): number {
   const counts = new Map<string, number>();
   for (const key of keys) {
@@ -13,15 +12,6 @@ function maxGroupCount(keys: (string | null)[]): number {
   return max;
 }
 
-/**
- * Aggregates a window of ModelLog rows into deterministic traffic features for
- * the fraud rule engine. Pure: no I/O, no inference.
- *
- * @param modelId - The model the logs belong to.
- * @param logs - ModelLog rows within the window.
- * @param windowMinutes - The window length in minutes.
- * @returns The computed {@link TrafficFeatures}.
- */
 export function aggregateFeatures(
   modelId: string,
   logs: ModelLog[],

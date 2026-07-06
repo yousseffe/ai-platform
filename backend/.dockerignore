@@ -9,9 +9,6 @@ yarn-debug.log*
 yarn-error.log*
 .prettierrc
 eslint.config.mjs
-nest-cli.json
-tsconfig.build.json
-tsconfig.json
 README.md
 AGENTS.md
 CLAUDE.md

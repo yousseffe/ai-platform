@@ -1,12 +1,3 @@
-/**
- * Generates a professional organization invitation email template.
- *
- * @param inviteeName - Display name of the invited user.
- * @param orgName - Target organization name.
- * @param role - Role granted inside the organization.
- * @param inviterName - Display name of the inviter.
- * @returns A string containing the formatted HTML email body.
- */
 export function getOrganizationInvitationTemplate(
   inviteeName: string,
   orgName: string,

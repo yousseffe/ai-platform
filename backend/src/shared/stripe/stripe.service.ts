@@ -4,18 +4,11 @@ import { OwnerType } from '../enums/owner-type.enum';
 
 export type StripeWebhookKind = 'payments' | 'wallets';
 
-/**
- * Service governing Stripe API integrations (checkout sessions and webhook validation).
- */
 @Injectable()
 export class StripeService {
   private stripe: InstanceType<typeof Stripe> | null = null;
 
-  /**
-   * Lazily initializes and returns the Stripe SDK instance.
-   * Prevents app startup crashes when keys are not defined in .env.
-   */
-  private getStripe(): InstanceType<typeof Stripe> {
+  public getStripe(): InstanceType<typeof Stripe> {
     if (this.stripe) {
       return this.stripe;
     }
@@ -27,21 +20,11 @@ export class StripeService {
       );
     }
 
-    this.stripe = new Stripe(secretKey, {
-      // Allow Stripe to fallback to your account's default API version
-    });
+    this.stripe = new Stripe(secretKey, {});
 
     return this.stripe;
   }
 
-  /**
-   * Generates a Stripe Checkout Session for a credit top-up purchase.
-   *
-   * @param amount - The wallet credit count to purchase (in EGP).
-   * @param workspaceId - The target workspace UUID to credit.
-   * @param workspaceType - The workspace type: USER or ORG.
-   * @returns A promise resolving to the created Stripe Session object as a record.
-   */
   async createCheckoutSession(
     amount: number,
     workspaceId: string,
@@ -91,14 +74,6 @@ export class StripeService {
     return session as unknown as Record<string, unknown>;
   }
 
-  /**
-   * Generates a Stripe Checkout Session for organization creation fee payment.
-   *
-   * @param amount - The organization creation fee amount (in EGP).
-   * @param pendingId - The pending organization reference UUID.
-   * @param ownerUserId - The owner user UUID.
-   * @returns A promise resolving to the created Stripe Session object as a record.
-   */
   async createOrgCheckoutSession(
     amount: number,
     pendingId: string,
@@ -138,12 +113,6 @@ export class StripeService {
     return session as unknown as Record<string, unknown>;
   }
 
-  /**
-   * Generates a Stripe Checkout Session for provider tier subscription payments.
-   *
-   * @param params - Provider subscription checkout parameters.
-   * @returns A promise resolving to the created Stripe Session object.
-   */
   async createProviderTierCheckoutSession(params: {
     providerAccountId: string;
     tierId: string;
@@ -190,12 +159,6 @@ export class StripeService {
     return session as unknown as Record<string, unknown>;
   }
 
-  /**
-   * Retrieves a Stripe Checkout Session by ID for post-redirect confirmation.
-   *
-   * @param sessionId - Stripe Checkout Session ID.
-   * @returns Stripe Checkout Session record.
-   */
   async retrieveCheckoutSession(
     sessionId: string,
   ): Promise<Record<string, unknown>> {
@@ -204,15 +167,6 @@ export class StripeService {
     return session as unknown as Record<string, unknown>;
   }
 
-  /**
-   * Verifies the cryptographic signature of a Stripe webhook event.
-   *
-   * @param rawBody - The unparsed raw body Buffer.
-   * @param signature - The stripe-signature header value.
-   * @param webhookKind - The Stripe webhook endpoint kind used to resolve the correct secret.
-   * @returns The parsed and verified Stripe Event as a record.
-   * @throws {Error} If validation fails or webhook signature is invalid.
-   */
   constructEvent(
     rawBody: Buffer,
     signature: string,
@@ -228,17 +182,14 @@ export class StripeService {
     return event as unknown as Record<string, unknown>;
   }
 
-  /**
-   * Resolves the Stripe webhook secret for a specific endpoint kind.
-   *
-   * @param webhookKind - The configured webhook endpoint group.
-   * @returns The matching webhook signing secret.
-   * @throws {Error} If the required secret is missing.
-   */
   private getWebhookSecret(webhookKind: StripeWebhookKind): string {
     const secretMap: Record<StripeWebhookKind, string | undefined> = {
-      payments: process.env.STRIPE_PAYMENTS_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET,
-      wallets: process.env.STRIPE_WALLETS_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET,
+      payments:
+        process.env.STRIPE_PAYMENTS_WEBHOOK_SECRET ||
+        process.env.STRIPE_WEBHOOK_SECRET,
+      wallets:
+        process.env.STRIPE_WALLETS_WEBHOOK_SECRET ||
+        process.env.STRIPE_WEBHOOK_SECRET,
     };
 
     const webhookSecret = secretMap[webhookKind];

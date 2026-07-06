@@ -14,21 +14,17 @@ import { Request } from 'express';
 import { StripeService } from '../../../shared/stripe/stripe.service';
 import { ProviderSubscriptionBillingService } from '../services/provider-subscription-billing.service';
 
-/**
- * Stripe webhook endpoint for provider tier subscription payment confirmation.
- */
 @Controller('provider-accounts')
 export class ProviderSubscriptionWebhookController {
-  private readonly logger = new Logger(ProviderSubscriptionWebhookController.name);
+  private readonly logger = new Logger(
+    ProviderSubscriptionWebhookController.name,
+  );
 
   constructor(
     private readonly stripeService: StripeService,
     private readonly subscriptionBillingService: ProviderSubscriptionBillingService,
   ) {}
 
-  /**
-   * Processes Stripe checkout completion events for provider subscriptions.
-   */
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(
@@ -48,7 +44,9 @@ export class ProviderSubscriptionWebhookController {
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new BadRequestException(`Webhook signature validation failed: ${message}`);
+      throw new BadRequestException(
+        `Webhook signature validation failed: ${message}`,
+      );
     }
 
     try {
@@ -61,9 +59,6 @@ export class ProviderSubscriptionWebhookController {
     }
   }
 
-  /**
-   * Routes supported Stripe events to subscription activation.
-   */
   private async processEvent(event: Record<string, unknown>): Promise<void> {
     if (event.type !== 'checkout.session.completed') {
       return;

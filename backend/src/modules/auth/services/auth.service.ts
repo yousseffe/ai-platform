@@ -9,19 +9,19 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { UsersService } from '../../users/services/users.service';
+import { UsersService } from '../../users';
+import { AuditLog } from '../../users/entities/audit-log.entity';
+import { User } from '../../users/entities/user.entity';
+import { WalletsService } from '../../wallets';
+import { Wallet } from '../../wallets/entities/wallet.entity';
+import { OrganizationsService } from '../../organizations';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { User } from '../../users/entities/user.entity';
-import { AuditLog } from '../../users/entities/audit-log.entity';
 import { VerificationCode } from '../entities/verification-code.entity';
 import { ApiKey } from '../entities/api-key.entity';
-import { Wallet } from '../../wallets/entities/wallet.entity';
 import { TokenResponse, JwtPayload } from '../interfaces/auth.interface';
 import { RedisService } from '../../../shared/redis/redis.service';
-import { WalletsService } from '../../wallets/services/wallets.service';
-import { OrganizationsService } from '../../organizations/services/organizations.service';
 import { UserStatus } from '../../../shared/enums/user-status.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
@@ -29,10 +29,6 @@ import { getRsaKeys } from '../utils/keys';
 import { MailService } from '../../../shared/mail/mail.service';
 import { ApiKeyType } from '../enums/api-key-type.enum';
 
-/**
- * Service governing password encryption, credential matching, verification OTP issuance,
- * session profiles loading, and JWT token declarations.
- */
 @Injectable()
 export class AuthService {
   constructor(
@@ -51,16 +47,6 @@ export class AuthService {
     private readonly mailService: MailService,
   ) {}
 
-  /**
-   * Registers a new platform user account.
-   * Atomically creates a 0-credit CONSUMER Wallet and writes verification OTP within a transaction.
-   *
-   * @param email - The user email.
-   * @param fullName - The user display full name.
-   * @param password - The raw user password.
-   * @returns A promise resolving to a registration message and user metadata.
-   * @throws {ConflictException} If the email address is already registered.
-   */
   async register(
     email: string,
     fullName: string,
@@ -100,7 +86,7 @@ export class AuthService {
       await queryRunner.manager.save(Wallet, wallet);
 
       const codeStr = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
       const verificationCode = queryRunner.manager.create(VerificationCode, {
         userId: savedUser.id,
         code: codeStr,
@@ -112,7 +98,6 @@ export class AuthService {
 
       await queryRunner.commitTransaction();
 
-      // Trigger verification email asynchronously
       this.mailService
         .sendOtpVerification(email, fullName, codeStr)
         .catch((err: unknown) => {
@@ -128,7 +113,7 @@ export class AuthService {
           status: UserStatus.PENDING_VERIFICATION,
         },
       };
-    } catch (error) {
+    } catch (error: unknown) {
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
@@ -136,14 +121,6 @@ export class AuthService {
     }
   }
 
-  /**
-   * Asserts OTP matches the database entry, checks lockout limits, then flags the user as ACTIVE.
-   *
-   * @param emailOrUserId - User email address or UUID.
-   * @param codeOrOtp - 6-digit input token.
-   * @returns Indicator of success.
-   * @throws {UnauthorizedException | NotFoundException | HttpException} Based on OTP validity.
-   */
   async verifyOtp(
     emailOrUserId: string,
     codeOrOtp: string,
@@ -218,13 +195,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Resends the verification OTP code to the user, enforcing rate limit rules.
-   *
-   * @param email - User email address.
-   * @returns Success payload.
-   * @throws {BadRequestException | HttpException} If rate limited or verified.
-   */
   async resendVerification(
     email: string,
   ): Promise<{ success: boolean; message: string }> {
@@ -253,7 +223,7 @@ export class AuthService {
     );
 
     const codeStr = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     const verificationCode = this.verificationCodeRepository.create({
       userId: user.id,
       code: codeStr,
@@ -271,7 +241,6 @@ export class AuthService {
       ttl > 0 ? ttl : 3600,
     );
 
-    // Trigger verification email asynchronously
     this.mailService
       .sendOtpVerification(email, user.fullName, codeStr)
       .catch((err: unknown) => {
@@ -285,15 +254,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Verifies user email and password credentials for sign-in processing.
-   * Restricts login to active verified accounts.
-   *
-   * @param email - The input user email.
-   * @param password - The input raw password.
-   * @returns A promise resolving to the User object.
-   * @throws {UnauthorizedException | HttpException} If credentials are wrong or status is restricted.
-   */
   async validateUser(email: string, password: string): Promise<User> {
     const user = await this.usersService.findOneByEmail(email);
     if (!user) {
@@ -322,12 +282,6 @@ export class AuthService {
     return user;
   }
 
-  /**
-   * Generates a pair of signed access and refresh tokens for a user using RS256.
-   *
-   * @param user - The authenticated user record.
-   * @returns An object containing signed access and refresh tokens.
-   */
   async login(user: User): Promise<TokenResponse> {
     const roles = ['consumer'];
     if (user.providerMode) {
@@ -412,7 +366,7 @@ export class AuthService {
         const tokenIatMs = payload.iat * 1000;
         if (tokenIatMs < user.lastLoginAt.getTime()) {
           const timeSinceLastLoginMs = Date.now() - user.lastLoginAt.getTime();
-          const gracePeriodMs = 15 * 1000; // 15 seconds grace period for concurrent requests
+          const gracePeriodMs = 15 * 1000;
           if (
             timeSinceLastLoginMs < 0 ||
             timeSinceLastLoginMs > gracePeriodMs
@@ -428,12 +382,6 @@ export class AuthService {
     }
   }
 
-  /**
-   * Revokes all active tokens for the user by updating their last login timestamp.
-   *
-   * @param userId - Target user UUID.
-   * @returns Successful logout notification.
-   */
   async logout(userId: string): Promise<{ success: boolean }> {
     const user = await this.usersService.usersRepository.findOneBy({
       id: userId,
@@ -441,19 +389,12 @@ export class AuthService {
     if (!user) {
       throw new NotFoundException('User profile not found');
     }
-    // Set lastLoginAt to 15 seconds in the future to instantly revoke all active tokens,
-    // bypassing the 15-second concurrency grace period.
+
     user.lastLoginAt = new Date(Date.now() + 15 * 1000);
     await this.usersService.usersRepository.save(user);
     return { success: true };
   }
 
-  /**
-   * Compiles user metadata, wallet balances, and accessible workspaces.
-   *
-   * @param userId - Target user UUID.
-   * @returns Active session profile payload.
-   */
   async getProfile(userId: string) {
     const user = await this.usersService.usersRepository.findOneBy({
       id: userId,
@@ -503,16 +444,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Modifies password checking current password first.
-   *
-   * @param userId - Requesting user UUID.
-   * @param currentPass - Present password.
-   * @param newPass - Target new password.
-   * @param ipAddress - Request IP.
-   * @param userAgent - Request User-Agent.
-   * @returns Status code confirm.
-   */
   async changePassword(
     userId: string,
     currentPass: string,
@@ -547,15 +478,6 @@ export class AuthService {
     return { success: true };
   }
 
-  /**
-   * Updates profile data.
-   *
-   * @param userId - Target user UUID.
-   * @param fullName - New display name.
-   * @param ipAddress - Request IP.
-   * @param userAgent - Request User-Agent.
-   * @returns User context.
-   */
   async updateProfile(
     userId: string,
     fullName?: string,

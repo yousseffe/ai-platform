@@ -1,10 +1,3 @@
-/**
- * Deterministic prompt-injection / jailbreak pattern detector.
- *
- * Run at request time over the serialized input so the platform captures the
- * signal (a matched category) without persisting the raw payload. No model, no
- * inference — a fixed, auditable pattern library.
- */
 interface InjectionPattern {
   category: string;
   regex: RegExp;
@@ -40,12 +33,6 @@ const PATTERNS: InjectionPattern[] = [
   },
 ];
 
-/**
- * Scans text for known prompt-injection / jailbreak patterns.
- *
- * @param text - The serialized request input.
- * @returns The first matched category, or `null` if none match.
- */
 export function detectInjection(text: string): string | null {
   if (!text) return null;
   const sample = text.length > 20_000 ? text.slice(0, 20_000) : text;

@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { StripeService } from '../../../shared/stripe/stripe.service';
 import { WalletsService } from '../services/wallets.service';
 import { RedisService } from '../../../shared/redis/redis.service';
@@ -30,9 +30,6 @@ const PACKAGES: Record<string, { credits: number; price: number }> = {
   pkg_team: { credits: 2000, price: 160.0 },
 };
 
-/**
- * Controller handling payments, checkouts, and Stripe webhooks.
- */
 @Controller('payments')
 export class PaymentsController {
   private readonly logger = new Logger(PaymentsController.name);
@@ -45,15 +42,6 @@ export class PaymentsController {
     private readonly walletRepository: Repository<Wallet>,
   ) {}
 
-  /**
-   * Generates a Stripe Checkout Session redirect URL for credit package purchases.
-   * Enforces that checkout is only allowed for the personal consumer wallet.
-   *
-   * @param req - Request containing user details.
-   * @param body - Body containing package_id.
-   * @param idempotencyKey - X-Idempotency-Key header value.
-   * @returns Redirect Stripe Checkout URL.
-   */
   @Post('checkout')
   @UseGuards(JwtAuthGuard)
   async createCheckout(
@@ -70,7 +58,6 @@ export class PaymentsController {
       throw new NotFoundException('Credit package not found');
     }
 
-    // Resolve user's personal CONSUMER wallet
     const personalWallet = await this.walletRepository.findOne({
       where: {
         ownerId: req.user.id,
@@ -83,7 +70,6 @@ export class PaymentsController {
       throw new InternalServerErrorException('User wallet not initialized');
     }
 
-    // Idempotency: check if checkout session has already been generated
     if (idempotencyKey) {
       const cacheKey = `checkout:session:${idempotencyKey}`;
       const cachedUrl = await this.redisService.get(cacheKey);
@@ -92,8 +78,7 @@ export class PaymentsController {
       }
     }
 
-    // Call Stripe checkout session creation
-    const stripeInstance = (this.stripeService as any).getStripe();
+    const stripeInstance = this.stripeService.getStripe();
     const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/settings?status=success`;
     const cancelUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/settings?status=cancelled`;
 
@@ -125,20 +110,12 @@ export class PaymentsController {
 
     if (idempotencyKey && session.url) {
       const cacheKey = `checkout:session:${idempotencyKey}`;
-      await this.redisService.set(cacheKey, session.url, 3600); // cache for 1 hour
+      await this.redisService.set(cacheKey, session.url, 3600);
     }
 
     return { url: session.url };
   }
 
-  /**
-   * Stripe Webhook consumption endpoint.
-   * Processes payment status events asynchronously with HMAC signature validation.
-   *
-   * @param signature - Signature from Stripe-Signature header.
-   * @param req - Express raw body request wrapper.
-   * @returns Confirmation indicator.
-   */
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(

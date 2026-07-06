@@ -3,21 +3,6 @@ import { Pipeline } from '../entities/pipeline.entity';
 import { PipelineEdge } from '../entities/pipeline-edge.entity';
 import { PipelineType } from '../enums/pipeline-type.enum';
 
-/**
- * Enforces that a pipeline's declared `type` preset actually matches its
- * structure before it can be validated/run. `CONTEXT_AUGMENTED` and
- * `SEQUENTIAL_CHAIN`/`PARALLEL` are otherwise just labels — this is the only
- * place `type` has any effect.
- *
- * - `SEQUENTIAL_CHAIN` rejects any stage with more than one step.
- * - `PARALLEL` requires at least one stage with more than one step.
- * - `CONTEXT_AUGMENTED` requires at least one mapper rule that reads a
- *   `steps.<N>` path skipping the stage immediately before its edge's target
- *   — i.e. genuinely reaching back past the adjacent step, not just using
- *   `steps.<N>` as a spelled-out synonym for `previous`.
- *
- * @throws {BadRequestException} If the pipeline's structure doesn't match its declared type.
- */
 export function assertTypeMatchesStructure(
   pipeline: Pipeline,
   edges: PipelineEdge[],
@@ -48,11 +33,6 @@ export function assertTypeMatchesStructure(
   }
 }
 
-/**
- * True if any rule in this edge's mapper reads a `steps.<N>` path where `N`
- * is more than one stage before the edge's target — i.e. it skips the stage
- * immediately before it rather than just addressing the adjacent step.
- */
 function referencesNonAdjacentStep(edge: PipelineEdge): boolean {
   const targetOrder = edge.toStep?.order ?? Number.POSITIVE_INFINITY;
   for (const rule of edge.spec?.rules ?? []) {

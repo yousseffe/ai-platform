@@ -7,15 +7,8 @@ import { PipelineRunStatus } from '../enums/pipeline-run-status.enum';
 import { PipelineStepLoopService } from './pipeline-step-loop.service';
 import { PipelineRunPersistenceService } from './pipeline-run-persistence.service';
 import { buildPipelineRunActor } from './pipeline-run-actor.util';
-import { ClientRequestMeta } from '../../models/interfaces/inference.interface';
+import { ClientRequestMeta } from '../../inference';
 
-/**
- * Executes a {@link PipelineRun}: loads the pipeline's steps and edges,
- * delegates the stage-by-stage walk to {@link PipelineStepLoopService}, then
- * resolves the pipeline's final output — merging every edge that targets the
- * pipeline's external output the same way a fan-in join step would — and
- * finalizes the run record.
- */
 @Injectable()
 export class PipelineRunnerService {
   private readonly logger = new Logger(PipelineRunnerService.name);
@@ -29,12 +22,6 @@ export class PipelineRunnerService {
     private readonly persistence: PipelineRunPersistenceService,
   ) {}
 
-  /**
-   * Runs a pipeline end to end and persists the result on the given
-   * {@link PipelineRun} row. Never throws — failures are recorded on the run.
-   *
-   * @param runId - The UUID of the pending {@link PipelineRun} to execute.
-   */
   async runPipeline(runId: string): Promise<void> {
     const run = await this.runRepository.findOne({
       where: { id: runId },

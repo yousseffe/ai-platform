@@ -5,10 +5,6 @@ import { getOtpVerificationTemplate } from './templates/otp-verification.templat
 import { getWorkspaceAccessTemplate } from './templates/workspace-access.template';
 import { getOrganizationInvitationTemplate } from './templates/org-invitation.template';
 
-/**
- * Service managing SMTP mailer configurations, connection transport setups,
- * and HTML email deliveries for user alerts and security verification challenges.
- */
 @Injectable()
 export class MailService implements OnModuleInit {
   private readonly logger = new Logger(MailService.name);
@@ -19,10 +15,6 @@ export class MailService implements OnModuleInit {
     return nodemailer.getTestMessageUrl(info);
   }
 
-  /**
-   * Initializes the SMTP transporter connection on module lifecycle setup.
-   * Falls back to a mock Ethereal testing account if SMTP configs are missing.
-   */
   async onModuleInit() {
     const host = process.env.SMTP_HOST;
     const port = parseInt(process.env.SMTP_PORT || '587', 10);
@@ -68,14 +60,6 @@ export class MailService implements OnModuleInit {
     }
   }
 
-  /**
-   * Delivers an OTP verification email to the user.
-   *
-   * @param email - Target receiver email.
-   * @param fullName - Full name of the user.
-   * @param otpCode - The 6-digit verification code.
-   * @returns A promise resolving to a success confirmation boolean.
-   */
   async sendOtpVerification(
     email: string,
     fullName: string,
@@ -123,14 +107,6 @@ export class MailService implements OnModuleInit {
     }
   }
 
-  /**
-   * Sends a plain-text security/fraud alert notification to a model owner.
-   *
-   * @param email - Recipient email.
-   * @param subject - Email subject line.
-   * @param body - Plain-text alert body.
-   * @returns A promise resolving to a success confirmation boolean.
-   */
   async sendSecurityAlert(
     email: string,
     subject: string,
@@ -168,14 +144,6 @@ export class MailService implements OnModuleInit {
     }
   }
 
-  /**
-   * Delivers a workspace access verification email to the user.
-   *
-   * @param email - Target receiver email.
-   * @param orgName - The organization workspace name.
-   * @param otpCode - The 6-digit access verification code.
-   * @returns A promise resolving to a success confirmation boolean.
-   */
   async sendWorkspaceAccessOtp(
     email: string,
     orgName: string,
@@ -223,16 +191,6 @@ export class MailService implements OnModuleInit {
     }
   }
 
-  /**
-   * Delivers a professional organization invitation email to the invited collaborator.
-   *
-   * @param email - Target receiver email.
-   * @param inviteeName - Display name of the invited user.
-   * @param orgName - The organization name.
-   * @param role - Role granted inside the organization.
-   * @param inviterName - Display name of the inviter.
-   * @returns A promise resolving to a success confirmation boolean.
-   */
   async sendOrganizationInvitation(
     email: string,
     inviteeName: string,

@@ -14,13 +14,6 @@ interface JwtIdentityPayload {
   email: string;
 }
 
-/**
- * Resolves any platform credential (organization key, personal/trial model key,
- * MCP access token, or RS256 JWT) to a scoped identity, without requiring a model-id route param.
- *
- * Used by the `whoami` endpoint so the MCP server can validate a caller's key
- * once and scope every subsequent tool call. Returns no secret material.
- */
 @Injectable()
 export class ApiIdentityService {
   constructor(
@@ -33,13 +26,6 @@ export class ApiIdentityService {
     private readonly mcpTokenRepository: Repository<McpToken>,
   ) {}
 
-  /**
-   * Parses an `Authorization` header and resolves the caller's identity.
-   *
-   * @param authHeader - Raw `Authorization` header value (`Bearer <token>`).
-   * @returns The resolved, scoped identity for the credential.
-   * @throws {UnauthorizedException} If the header is missing or the credential is invalid/expired/revoked.
-   */
   async resolve(authHeader: string | undefined): Promise<ApiIdentity> {
     if (!authHeader) {
       throw new UnauthorizedException('Missing Authorization header');
@@ -65,9 +51,6 @@ export class ApiIdentityService {
     return this.resolveJwt(token);
   }
 
-  /**
-   * Resolves an organization API key (`sk_live_*`) via its SHA-256 hash.
-   */
   private async resolveOrgKey(token: string): Promise<ApiIdentity> {
     const keyHash = crypto.createHash('sha256').update(token).digest('hex');
     const orgApiKey = await this.orgApiKeyRepository.findOne({
@@ -95,11 +78,6 @@ export class ApiIdentityService {
     };
   }
 
-  /**
-   * Resolves a personal/trial model-scoped key (`ml_sk_live_*` / `ml_sk_trial_*`).
-   * Validates activation and expiry but, unlike the prediction guard, does not
-   * require the bound model to match a route param.
-   */
   private async resolvePersonalKey(token: string): Promise<ApiIdentity> {
     const apiKeyEntity = await this.apiKeyRepository.findOne({
       where: { key: token, isActive: true },
@@ -128,9 +106,6 @@ export class ApiIdentityService {
     };
   }
 
-  /**
-   * Resolves a standard RS256 platform JWT.
-   */
   private async resolveJwt(token: string): Promise<ApiIdentity> {
     try {
       const keys = getRsaKeys();
@@ -156,9 +131,6 @@ export class ApiIdentityService {
     }
   }
 
-  /**
-   * Resolves a standard MCP Access Token (`mcp_*`) via its SHA-256 hash.
-   */
   private async resolveMcpToken(token: string): Promise<ApiIdentity> {
     const keyHash = crypto.createHash('sha256').update(token).digest('hex');
     const mcpToken = await this.mcpTokenRepository.findOne({

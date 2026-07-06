@@ -8,16 +8,20 @@ import { getDockerOptions } from '../../../shared/docker/docker.util';
 import { MinioService } from '../../../shared/minio/minio.service';
 import { User } from '../../users/entities/user.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
-import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
+import { ProviderAccount } from '../../provider-accounts';
 import { Model } from '../../models/entities/model.entity';
 import { ModelLog } from '../../models/entities/model-log.entity';
+import { DeploymentStatus } from '../../deployments';
 import { Deployment } from '../../deployments/entities/deployment.entity';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import { Alert } from '../../analytics/entities/alert.entity';
+import { InferenceStatus } from '../../inference';
 import { AdminProviderMetricsService } from './admin-provider-metrics.service';
-import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 
-export const DEFAULT_CAPS: Record<string, { cpuPercent: number; ramMb: number }> = {
+export const DEFAULT_CAPS: Record<
+  string,
+  { cpuPercent: number; ramMb: number }
+> = {
   TABULAR: { cpuPercent: 30, ramMb: 512 },
   NLP: { cpuPercent: 60, ramMb: 1024 },
   VISION: { cpuPercent: 70, ramMb: 1024 },
@@ -55,9 +59,6 @@ export class AdminInsightsService {
     this.docker = new Docker(getDockerOptions());
   }
 
-  /**
-   * Compiles high-detail analytical data across infrastructure, user growth, subscriptions, and AI recommendations.
-   */
   async getInsights() {
     const now = new Date();
 
@@ -87,17 +88,17 @@ export class AdminInsightsService {
       }),
     ]);
 
-    // 1. User Growth Calculations
     const userGrowthTrend = this.calculateUserGrowth(users);
 
-    // 2. Subscription & Plans Analytics
-    const subscriptionAnalytics = await this.compileSubscriptionInsights(providers);
+    const subscriptionAnalytics =
+      await this.compileSubscriptionInsights(providers);
 
-    // 3. Infrastructure & Container Telemetry
     const containerStatsList = await this.getContainerStats(activeDeps);
 
-    // 4. Model Analytics & pricing recommendations
-    const pricingRecommendations = await this.generatePricingRecommendations(models, containerStatsList);
+    const pricingRecommendations = await this.generatePricingRecommendations(
+      models,
+      containerStatsList,
+    );
 
     return {
       generatedAt: now.toISOString(),
@@ -115,15 +116,14 @@ export class AdminInsightsService {
     };
   }
 
-  /**
-   * Compiles details of active subscription plans and provider list.
-   */
   private async compileSubscriptionInsights(providers: ProviderAccount[]) {
-    const ownerSummaryMap = await this.metricsService.getOwnerSummaryMap(providers);
-    const subscriptionMap = await this.metricsService.getSubscriptionMap(providers);
+    const ownerSummaryMap =
+      await this.metricsService.getOwnerSummaryMap(providers);
+    const subscriptionMap =
+      await this.metricsService.getSubscriptionMap(providers);
 
     const planStats: Record<string, number> = {};
-    const subscribersList: any[] = [];
+    const subscribersList: Record<string, unknown>[] = [];
 
     for (const provider of providers) {
       const ownerMeta = ownerSummaryMap.get(provider.id);
@@ -132,14 +132,18 @@ export class AdminInsightsService {
 
       planStats[tierName] = (planStats[tierName] || 0) + 1;
 
-      const price = provider.subscriptionBillingCycle === 'ANNUAL'
-        ? Number(provider.tier?.annualPriceEgp || 0)
-        : Number(provider.tier?.monthlyPriceEgp || 0);
+      const price =
+        provider.subscriptionBillingCycle === 'ANNUAL'
+          ? Number(provider.tier?.annualPriceEgp || 0)
+          : Number(provider.tier?.monthlyPriceEgp || 0);
 
       let daysRemaining: number | null = null;
       if (provider.subscriptionExpiresAt) {
         const expiresTime = new Date(provider.subscriptionExpiresAt).getTime();
-        daysRemaining = Math.max(0, Math.ceil((expiresTime - Date.now()) / (1000 * 60 * 60 * 24)));
+        daysRemaining = Math.max(
+          0,
+          Math.ceil((expiresTime - Date.now()) / (1000 * 60 * 60 * 24)),
+        );
       }
 
       subscribersList.push({
@@ -158,11 +162,16 @@ export class AdminInsightsService {
     }
 
     return {
-      planBreakdown: Object.entries(planStats).map(([name, count]) => ({ name, value: count })),
+      planBreakdown: Object.entries(planStats).map(([name, count]) => ({
+        name,
+        value: count,
+      })),
       subscribers: subscribersList.sort((a, b) => {
-        if (a.daysRemaining === null) return 1;
-        if (b.daysRemaining === null) return -1;
-        return a.daysRemaining - b.daysRemaining;
+        const da = a.daysRemaining as number | null;
+        const db = b.daysRemaining as number | null;
+        if (da === null) return 1;
+        if (db === null) return -1;
+        return da - db;
       }),
     };
   }
@@ -196,7 +205,7 @@ export class AdminInsightsService {
    * Collects CPU and Memory stats from running containers or Postgres fallback logs.
    */
   private async getContainerStats(activeDeps: Deployment[]) {
-    const statsList: any[] = [];
+    const statsList: Record<string, unknown>[] = [];
 
     for (const dep of activeDeps) {
       let cpuPercent = 0.0;
@@ -216,7 +225,9 @@ export class AdminInsightsService {
           const numCpus = stats.cpu_stats.online_cpus || 1;
 
           if (systemDelta > 0 && cpuDelta > 0) {
-            cpuPercent = parseFloat(((cpuDelta / systemDelta) * numCpus * 100).toFixed(1));
+            cpuPercent = parseFloat(
+              ((cpuDelta / systemDelta) * numCpus * 100).toFixed(1),
+            );
           }
           const usageBytes = stats.memory_stats.usage || 0;
           ramMb = parseFloat((usageBytes / (1024 * 1024)).toFixed(1));
@@ -262,14 +273,20 @@ export class AdminInsightsService {
   /**
    * Generates smart pricing recommendations based on model requests and caps violations.
    */
-  private async generatePricingRecommendations(models: Model[], containerStats: any[]) {
-    const recommendations: any[] = [];
+  private async generatePricingRecommendations(
+    models: Model[],
+    containerStats: Record<string, unknown>[],
+  ) {
+    const recommendations: Record<string, unknown>[] = [];
 
     for (const model of models) {
       const successfulRequests = await this.modelLogRepository.count({
-        where: { model: { id: model.id }, status: 'SUCCESS' },
+        where: { model: { id: model.id }, status: InferenceStatus.SUCCESS },
       });
-      const costVal = typeof model.costPerRequest === 'string' ? parseFloat(model.costPerRequest) : model.costPerRequest;
+      const costVal =
+        typeof model.costPerRequest === 'string'
+          ? parseFloat(model.costPerRequest)
+          : model.costPerRequest;
 
       // Suggest price increase for highly used, low-priced models
       if (successfulRequests > 100 && costVal < 0.1) {
@@ -279,18 +296,29 @@ export class AdminInsightsService {
           currentPrice: costVal,
           currentTier: model.tier,
           reason: `Highly popular: Served ${successfulRequests} successful predictions. Price is too low.`,
-          suggestedPrice: costVal === 0 ? 0.05 : parseFloat((costVal * 1.5).toFixed(2)),
+          suggestedPrice:
+            costVal === 0 ? 0.05 : parseFloat((costVal * 1.5).toFixed(2)),
           suggestedTier: model.tier,
           actionType: 'PRICE_UPGRADE',
         });
       }
 
       // Recommend tier upgrade if model container is currently active and pushing caps limits
-      const stats = containerStats.find(s => s.modelId === model.id);
+      const stats = containerStats.find((s) => s.modelId === model.id);
       if (stats) {
-        const caps = DEFAULT_CAPS[stats.modelType.toUpperCase()] || { cpuPercent: 80, ramMb: 1024 };
-        if (stats.cpu > caps.cpuPercent * 0.9 || stats.ram > caps.ramMb * 0.9) {
-          const nextTierMap: Record<string, string> = { SMALL: 'MEDIUM', MEDIUM: 'LARGE', LARGE: 'LARGE' };
+        const statsModelType = stats.modelType as string;
+        const statsCpu = stats.cpu as number;
+        const statsRam = stats.ram as number;
+        const caps = DEFAULT_CAPS[statsModelType.toUpperCase()] || {
+          cpuPercent: 80,
+          ramMb: 1024,
+        };
+        if (statsCpu > caps.cpuPercent * 0.9 || statsRam > caps.ramMb * 0.9) {
+          const nextTierMap: Record<string, string> = {
+            SMALL: 'MEDIUM',
+            MEDIUM: 'LARGE',
+            LARGE: 'LARGE',
+          };
           const nextTier = nextTierMap[model.tier.toUpperCase()] || 'LARGE';
           if (nextTier !== model.tier) {
             recommendations.push({
@@ -326,8 +354,20 @@ export class AdminInsightsService {
       };
     } catch {
       return {
-        buildQueue: { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0 },
-        deployQueue: { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0 },
+        buildQueue: {
+          waiting: 0,
+          active: 0,
+          completed: 0,
+          failed: 0,
+          delayed: 0,
+        },
+        deployQueue: {
+          waiting: 0,
+          active: 0,
+          completed: 0,
+          failed: 0,
+          delayed: 0,
+        },
       };
     }
   }
@@ -337,14 +377,20 @@ export class AdminInsightsService {
    */
   async modelTypeCaps() {
     const configs = await this.systemConfigRepository.find();
-    const configMap = new Map(configs.map(c => [c.key, c.value]));
+    const configMap = new Map(configs.map((c) => [c.key, c.value]));
 
     const caps: Record<string, { cpuPercent: number; ramMb: number }> = {};
     for (const key of Object.keys(DEFAULT_CAPS)) {
       const lower = key.toLowerCase();
       caps[key] = {
-        cpuPercent: parseFloat(configMap.get(`cap_cpu_${lower}`) || DEFAULT_CAPS[key].cpuPercent.toString()),
-        ramMb: parseFloat(configMap.get(`cap_ram_${lower}`) || DEFAULT_CAPS[key].ramMb.toString()),
+        cpuPercent: parseFloat(
+          configMap.get(`cap_cpu_${lower}`) ||
+            DEFAULT_CAPS[key].cpuPercent.toString(),
+        ),
+        ramMb: parseFloat(
+          configMap.get(`cap_ram_${lower}`) ||
+            DEFAULT_CAPS[key].ramMb.toString(),
+        ),
       };
     }
     return caps;
@@ -353,7 +399,9 @@ export class AdminInsightsService {
   /**
    * Updates CPU & Memory caps for model types.
    */
-  async updateCaps(body: Record<string, { cpuPercent: number; ramMb: number }>) {
+  async updateCaps(
+    body: Record<string, { cpuPercent: number; ramMb: number }>,
+  ) {
     for (const [modelType, capVal] of Object.entries(body)) {
       const lowerType = modelType.toLowerCase();
       const cpuKey = `cap_cpu_${lowerType}`;
@@ -380,7 +428,11 @@ export class AdminInsightsService {
   /**
    * Upgrades a model's tier and pricing details manually or via recommendations.
    */
-  async upgradeModel(id: string, suggestedPrice?: number, suggestedTier?: string) {
+  async upgradeModel(
+    id: string,
+    suggestedPrice?: number,
+    suggestedTier?: string,
+  ) {
     const model = await this.modelRepository.findOneBy({ id });
     if (!model) throw new Error('Model not found');
 
@@ -394,9 +446,11 @@ export class AdminInsightsService {
 
     await this.modelRepository.save(model);
 
-    // Stop active running deployments so they restart with the upgraded tier limits
     const deployments = await this.deploymentsRepository.find({
-      where: { modelVersion: { model: { id } }, status: DeploymentStatus.RUNNING },
+      where: {
+        modelVersion: { model: { id } },
+        status: DeploymentStatus.RUNNING,
+      },
     });
 
     for (const d of deployments) {
@@ -405,9 +459,7 @@ export class AdminInsightsService {
           const container = this.docker.getContainer(d.containerId);
           await container.stop();
           await container.remove();
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
       await this.deploymentsRepository.update(d.id, {
         status: DeploymentStatus.STOPPED,

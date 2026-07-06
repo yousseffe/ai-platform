@@ -21,32 +21,30 @@ import {
   MoreThanOrEqual,
   LessThanOrEqual,
   ILike,
+  FindOptionsWhere,
 } from 'typeorm';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../../auth/guards/admin.guard';
+import { ApiKeyType } from '../../auth';
+import { ApiKey } from '../../auth/entities/api-key.entity';
+import { AdminGuard } from '../../../shared/guards/admin.guard';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { Model } from '../../models/entities/model.entity';
 import { ModelLog } from '../../models/entities/model-log.entity';
-import { ApiKey } from '../../auth/entities/api-key.entity';
-import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
-import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
+import { DeploymentStatus } from '../../deployments';
+import { TransactionStatus, TransactionType } from '../../wallets';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
-import { Wallet } from '../../wallets/entities/wallet.entity';
 import { Transaction } from '../../wallets/entities/transaction.entity';
-import { User } from '../entities/user.entity';
+import { Wallet } from '../../wallets/entities/wallet.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
+import {
+  ProviderAccountStatus,
+  ProviderAccountsService,
+} from '../../provider-accounts';
+import { User } from '../entities/user.entity';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
-import { TransactionType } from '../../wallets/enums/transaction-type.enum';
-import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
-import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
-import { ProviderAccountStatus } from '../../provider-accounts/enums/provider-account-status.enum';
 import * as Docker from 'dockerode';
 import { getDockerOptions } from '../../../shared/docker/docker.util';
 
-/**
- * Controller exposing endpoints for system administration, container resource utilization,
- * model pricing adjustments, and transaction ledger details.
- */
 @Controller('admin')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminController {
@@ -68,10 +66,6 @@ export class AdminController {
     this.docker = new Docker(getDockerOptions());
   }
 
-  /**
-   * Attaches wallet metadata so admin clients can format ledger amounts using
-   * the real wallet currency instead of guessing from the transaction text.
-   */
   private async enrichTransactions(transactions: Transaction[]): Promise<
     Array<
       Transaction & {
@@ -112,11 +106,6 @@ export class AdminController {
     });
   }
 
-  /**
-   * Retrieves all registered platform models with deployment stats and container metrics.
-   *
-   * @returns Detailed models registry list.
-   */
   @Get('models')
   async getModels() {
     const models = await this.modelRepository.find({
@@ -173,9 +162,10 @@ export class AdminController {
             }
             const usageBytes = stats.memory_stats.usage || 0;
             ram = (usageBytes / (1024 * 1024)).toFixed(0) + ' MB';
-          } catch (err: any) {
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
             this.logger.error(
-              `Failed to collect Docker container stats: ${err.message}`,
+              `Failed to collect Docker container stats: ${message}`,
             );
             cpu = '0.0%';
             ram = '0 MB';
@@ -205,13 +195,6 @@ export class AdminController {
     return result;
   }
 
-  /**
-   * Updates the pricing configuration for a specific model.
-   *
-   * @param id - Model ID.
-   * @param body - Target values (costPerRequest, providerSharePercent).
-   * @returns Updated configurations.
-   */
   @Patch('models/:id/pricing')
   async updateModelPricing(
     @Param('id') id: string,
@@ -248,11 +231,6 @@ export class AdminController {
     return model;
   }
 
-  /**
-   * Retrieves the current system organization creation fee.
-   *
-   * @returns The fee configuration.
-   */
   @Get('config/org-creation-fee')
   async getOrgCreationFee() {
     const config = await this.systemConfigRepository.findOne({
@@ -261,12 +239,6 @@ export class AdminController {
     return { fee: config ? parseFloat(config.value) : 50.0 };
   }
 
-  /**
-   * Updates the global organization creation fee settings.
-   *
-   * @param body - The new fee amount.
-   * @returns Status confirmation.
-   */
   @Patch('config/org-creation-fee')
   async updateOrgCreationFee(@Body() body: { fee: number }) {
     if (body.fee === undefined || body.fee < 0) {
@@ -290,12 +262,6 @@ export class AdminController {
     return { success: true, fee: body.fee };
   }
 
-  /**
-   * Retrieves global default pricing for each model type and trial usage configuration.
-   * LLM_GGUF models use token-based billing (separate input/output prices per 1M tokens).
-   *
-   * @returns Current defaults configuration dictionary.
-   */
   @Get('config/pricing-defaults')
   async getPricingDefaults() {
     const configs = await this.systemConfigRepository.find();
@@ -307,33 +273,26 @@ export class AdminController {
       configMap.has(key) ? parseInt(configMap.get(key)!, 10) : fallback;
 
     return {
-      // Per-prediction / per-image rates
       price_tabular: float('price_tabular', 0.00005),
       price_nlp: float('price_nlp', 0.2),
       price_vision: float('price_vision', 0.01),
       price_diffusion: float('price_diffusion', 0.04),
-      // LLM token-based rates (credits per 1M tokens)
+
       price_llm_gguf_input: float('price_llm_gguf_input', 2.0),
       price_llm_gguf_output: float('price_llm_gguf_output', 8.0),
-      // Revenue split & economy settings
+
       default_provider_share_percent: int('default_provider_share_percent', 80),
       playground_trial_limit: int('playground_trial_limit', 50),
       credits_per_egp: configMap.has('credits_per_egp')
         ? int('credits_per_egp', 10)
         : int('credits_per_usd', 10),
-      // Commission tier schedule (platform cut %)
+
       commission_tier_free: int('commission_tier_free', 20),
       commission_tier_professional: int('commission_tier_professional', 15),
       commission_tier_enterprise: int('commission_tier_enterprise', 10),
     };
   }
 
-  /**
-   * Updates global default pricing parameters and playground constraints.
-   *
-   * @param body - Key-value pair configuration overrides.
-   * @returns Receipt confirming successful config update.
-   */
   @Patch('config/pricing-defaults')
   async updatePricingDefaults(
     @Body()
@@ -374,11 +333,6 @@ export class AdminController {
     return { success: true };
   }
 
-  /**
-   * Compiles total users, total models, total organizations, and global financial stats.
-   *
-   * @returns Stats metrics and transaction ledger overview.
-   */
   @Get('stats')
   async getStats() {
     const totalUsers = await this.userRepository.count();
@@ -392,7 +346,9 @@ export class AdminController {
       },
     });
     const platformBalance = platformWallet
-      ? parseFloat(platformWallet.balance as any) || 0.0
+      ? typeof platformWallet.balance === 'number'
+        ? platformWallet.balance
+        : parseFloat(platformWallet.balance) || 0.0
       : 0.0;
     const platformCurrency = platformWallet?.currency || 'EGP';
 
@@ -415,35 +371,22 @@ export class AdminController {
     };
   }
 
-  /**
-   * Retrieves a paginated and filterable list of transactions across either all users
-   * or scoped exclusively to the platform's revenue wallets.
-   *
-   * @param page - Target page index selector (default 1).
-   * @param limit - Count of items per page (default 20).
-   * @param scope - Isolation filter ('ALL' for all system logs, 'SYSTEM_REVENUE' for platform cut/commission).
-   * @param type - Optional transaction type (CREDIT, DEBIT).
-   * @param startDate - Optional date range start.
-   * @param endDate - Optional date range end.
-   * @param search - Optional query search for references or transaction IDs.
-   * @returns Paginated list of ledger transaction records.
-   */
   @Get('transactions')
   async getTransactions(
-    @Query('page') page = 1,
-    @Query('limit') limit = 20,
+    @Query('page') page: number | string = 1,
+    @Query('limit') limit: number | string = 20,
     @Query('scope') scope: 'ALL' | 'SYSTEM_REVENUE' = 'ALL',
     @Query('type') type?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('search') search?: string,
   ) {
-    const pageNum = parseInt(page as any) || 1;
-    const limitNum = parseInt(limit as any) || 20;
+    const pageNum = typeof page === 'number' ? page : parseInt(page, 10) || 1;
+    const limitNum =
+      typeof limit === 'number' ? limit : parseInt(limit, 10) || 20;
 
-    const where: any = {};
+    const where: FindOptionsWhere<Transaction> = {};
 
-    // Scope filtering
     if (scope === 'SYSTEM_REVENUE') {
       const platformWallets = await this.walletRepository.find({
         where: { ownerId: '00000000-0000-0000-0000-000000000000' },
@@ -452,7 +395,6 @@ export class AdminController {
       if (platformWalletIds.length > 0) {
         where.walletId = In(platformWalletIds);
       } else {
-        // No platform wallets exist, return empty data
         return {
           success: true,
           data: [],
@@ -463,12 +405,14 @@ export class AdminController {
       }
     }
 
-    // Type filter (CREDIT/DEBIT)
-    if (type && type !== 'ALL') {
-      where.type = type;
+    if (
+      type &&
+      type !== 'ALL' &&
+      Object.values(TransactionType).includes(type as TransactionType)
+    ) {
+      where.type = type as TransactionType;
     }
 
-    // Date range filter
     if (startDate || endDate) {
       if (startDate && endDate) {
         const start = new Date(startDate);
@@ -484,7 +428,6 @@ export class AdminController {
       }
     }
 
-    // Search term filtering on reference
     if (search) {
       where.reference = ILike(`%${search}%`);
     }
@@ -508,11 +451,6 @@ export class AdminController {
     };
   }
 
-  /**
-   * Retrieves all registered platform users with their roles and wallet balances.
-   *
-   * @returns Detailed user list.
-   */
   @Get('users')
   async getUsers() {
     const users = await this.userRepository.find({
@@ -553,12 +491,10 @@ export class AdminController {
         },
       });
 
-      // Fetch user's active API keys
       const apiKeyEntity = await this.dataSource.getRepository(ApiKey).findOne({
         where: { user: { id: user.id }, type: ApiKeyType.LIVE, isActive: true },
       });
 
-      // Fetch user's models
       const userModels = await this.dataSource.getRepository(Model).find({
         where: { user: { id: user.id } },
         order: { createdAt: 'DESC' },
@@ -572,10 +508,10 @@ export class AdminController {
         providerMode: user.providerMode,
         createdAt: user.createdAt,
         consumerBalance: consumerWallet
-          ? parseFloat(consumerWallet.balance as any) || 0.0
+          ? parseFloat(String(consumerWallet.balance)) || 0.0
           : 0.0,
         providerBalance: providerWallet
-          ? parseFloat(providerWallet.balance as any) || 0.0
+          ? parseFloat(String(providerWallet.balance)) || 0.0
           : 0.0,
         apiKey: apiKeyEntity
           ? apiKeyEntity.key.length > 15
@@ -598,14 +534,6 @@ export class AdminController {
     return result;
   }
 
-  /**
-   * Retrieves full profile details, wallet balances, API credentials history, and
-   * hosted models catalog for a specific registered user.
-   *
-   * @param id - User UUID.
-   * @returns Detailed user registry configurations.
-   * @throws {NotFoundException} If the user profile does not exist.
-   */
   @Get('users/:id')
   async getUserDetails(@Param('id') id: string) {
     const user = await this.userRepository.findOneBy({ id });
@@ -719,12 +647,6 @@ export class AdminController {
     };
   }
 
-  /**
-   * Toggles the admin status of a user.
-   *
-   * @param id - User UUID.
-   * @returns Receipt confirming update.
-   */
   @Patch('users/:id/toggle-admin')
   async toggleAdmin(@Param('id') id: string) {
     const user = await this.userRepository.findOneBy({ id });
@@ -736,12 +658,6 @@ export class AdminController {
     return { success: true, isAdmin: user.isAdmin };
   }
 
-  /**
-   * Toggles the provider mode status of a user.
-   *
-   * @param id - User UUID.
-   * @returns Receipt confirming update.
-   */
   @Patch('users/:id/toggle-provider')
   async toggleProvider(@Param('id') id: string) {
     const user = await this.userRepository.findOneBy({ id });
@@ -766,12 +682,6 @@ export class AdminController {
     return { success: true, providerMode: user.providerMode };
   }
 
-  /**
-   * Purges a user profile and their wallets.
-   *
-   * @param id - User UUID.
-   * @returns Success receipt.
-   */
   @Delete('users/:id')
   async deleteUser(@Param('id') id: string) {
     const user = await this.userRepository.findOneBy({ id });
@@ -785,13 +695,6 @@ export class AdminController {
     return { success: true };
   }
 
-  /**
-   * Manually adjusts (credits/debits) consumer or provider balances for a user.
-   *
-   * @param id - User UUID.
-   * @param body - Parameters detailing walletType, adjustType (CREDIT/DEBIT), and amount.
-   * @returns The updated wallet record.
-   */
   @Post('users/:id/adjust-wallet')
   async adjustWallet(
     @Param('id') id: string,
@@ -851,7 +754,6 @@ export class AdminController {
 
     const savedWallet = await this.walletRepository.save(wallet);
 
-    // Save transaction record
     const transaction = this.dataSource.getRepository(Transaction).create({
       walletId: wallet.id,
       type,

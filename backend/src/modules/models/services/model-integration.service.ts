@@ -16,10 +16,6 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-/**
- * A consumer-facing description of how to call a deployed model's prediction API.
- * Contains only the *format* of authentication — never a live key.
- */
 export interface ModelIntegrationSpec {
   model: {
     id: string;
@@ -57,11 +53,11 @@ export interface ModelIntegrationSpec {
   pricing: {
     billingUnit: BillingUnit;
     currency: 'CREDITS';
-    /** Credits per 1M input tokens — present only for LLM_GGUF models. */
+
     inputCreditsPerMToken?: number;
-    /** Credits per 1M output tokens — present only for LLM_GGUF models. */
+
     outputCreditsPerMToken?: number;
-    /** Credits per request/prediction — present for non-LLM models. */
+
     creditsPerRequest?: number;
     note: string;
   };
@@ -85,12 +81,6 @@ export interface OpenApiDocument {
   security: Array<Record<string, string[]>>;
 }
 
-/**
- * Assembles a deterministic, consumer-facing integration spec for a model from
- * existing registry data. The MCP server exposes this so external agents can wire
- * a platform model into a user's project; this service neither generates code nor
- * returns secrets.
- */
 @Injectable()
 export class ModelIntegrationService {
   constructor(
@@ -99,14 +89,6 @@ export class ModelIntegrationService {
     private readonly systemConfigRepository: Repository<SystemConfig>,
   ) {}
 
-  /**
-   * Builds the {@link ModelIntegrationSpec} for a model the actor may access.
-   *
-   * @param modelId - Target model UUID.
-   * @param actorId - The authenticated actor (for access control), if any.
-   * @returns The assembled integration spec.
-   * @throws {NotFoundException} If the model has no built/ready version to call.
-   */
   async getIntegrationSpec(
     modelId: string,
     actorId?: string,
@@ -173,10 +155,6 @@ export class ModelIntegrationService {
     return spec.openapi;
   }
 
-  /**
-   * Selects the highest-numbered READY version that carries an integration
-   * sample, falling back to the highest READY version overall.
-   */
   private pickReferenceVersion(versions: ModelVersion[]): ModelVersion | null {
     const ready = versions
       .filter((v) => v.status === VersionStatus.READY)
@@ -185,10 +163,6 @@ export class ModelIntegrationService {
     return withSample ?? ready[0] ?? null;
   }
 
-  /**
-   * Parses a stored JSON sample string into structured form, preserving the raw
-   * text when it is not valid JSON.
-   */
   private parseSample(raw: string | null): {
     contentType: 'application/json';
     example: JsonValue;
@@ -377,9 +351,6 @@ export class ModelIntegrationService {
     return { prediction: 'model_output' };
   }
 
-  /**
-   * Returns deterministic, model-style-specific integration guidance notes.
-   */
   private buildNotes(isLlm: boolean): string[] {
     const notes = [
       'Send requests with header "Content-Type: application/json".',
@@ -396,11 +367,6 @@ export class ModelIntegrationService {
     return notes;
   }
 
-  /**
-   * Builds the pricing descriptor for the integration spec. LLM_GGUF models use
-   * token-based pricing (separate input/output rates); all other types use a flat
-   * per-request or per-prediction rate.
-   */
   private async buildPricingSpec(model: {
     type: ModelType;
     costPerRequest: number;
@@ -443,9 +409,6 @@ export class ModelIntegrationService {
     };
   }
 
-  /**
-   * Retrieves the system-default price for a given model type from system_configs.
-   */
   private async getDefaultPrice(modelType: string): Promise<number> {
     const key = 'price_' + modelType.toLowerCase();
     const config = await this.systemConfigRepository.findOne({

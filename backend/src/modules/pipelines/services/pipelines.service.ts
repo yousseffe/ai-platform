@@ -21,11 +21,6 @@ const DETAIL_RELATIONS = [
   'user',
 ];
 
-/**
- * CRUD and lifecycle management for {@link Pipeline} definitions. Editing a
- * pipeline's steps/edges always demotes it back to `DRAFT` so it must be
- * re-validated before it can be run again.
- */
 @Injectable()
 export class PipelinesService {
   constructor(
@@ -35,12 +30,6 @@ export class PipelinesService {
     private readonly edgeRepository: Repository<PipelineEdge>,
   ) {}
 
-  /**
-   * Creates a new, empty pipeline in `DRAFT` status.
-   *
-   * @param userId - The owning user's UUID.
-   * @param dto - The pipeline's name/description.
-   */
   async createPipeline(
     userId: string,
     dto: CreatePipelineDto,
@@ -56,7 +45,6 @@ export class PipelinesService {
     return this.pipelineRepository.save(pipeline);
   }
 
-  /** Lists all pipelines owned by a user. */
   async listPipelines(userId: string): Promise<Pipeline[]> {
     return this.pipelineRepository.find({
       where: { user: { id: userId } },
@@ -65,13 +53,6 @@ export class PipelinesService {
     });
   }
 
-  /**
-   * Fetches a single pipeline with its steps and model versions, enforcing
-   * ownership.
-   *
-   * @throws {NotFoundException} If the pipeline does not exist.
-   * @throws {ForbiddenException} If the actor does not own the pipeline.
-   */
   async getPipeline(pipelineId: string, actorId: string): Promise<Pipeline> {
     const pipeline = await this.pipelineRepository.findOne({
       where: { id: pipelineId },
@@ -86,12 +67,6 @@ export class PipelinesService {
     return pipeline;
   }
 
-  /**
-   * Lists every publicly-listed, runnable pipeline for the marketplace
-   * catalog — no authentication required. Only `VALIDATED` pipelines are
-   * shown, mirroring the models marketplace's intent of only surfacing
-   * things a visitor could actually try.
-   */
   async getPublicPipelines(): Promise<Pipeline[]> {
     return this.pipelineRepository.find({
       where: { isPublic: true, status: PipelineStatus.VALIDATED },
@@ -100,12 +75,6 @@ export class PipelinesService {
     });
   }
 
-  /**
-   * Fetches a single publicly-listed pipeline by ID — no authentication
-   * required.
-   *
-   * @throws {NotFoundException} If the pipeline doesn't exist or isn't public.
-   */
   async getPublicPipeline(pipelineId: string): Promise<Pipeline> {
     const pipeline = await this.pipelineRepository.findOne({
       where: { id: pipelineId, isPublic: true },
@@ -117,7 +86,6 @@ export class PipelinesService {
     return pipeline;
   }
 
-  /** Updates a pipeline's name/description. Does not affect its status. */
   async updatePipeline(
     pipelineId: string,
     actorId: string,
@@ -131,20 +99,11 @@ export class PipelinesService {
     return this.pipelineRepository.save(pipeline);
   }
 
-  /** Deletes a pipeline and all its steps/edges/runs (cascades at the DB level). */
   async deletePipeline(pipelineId: string, actorId: string): Promise<void> {
     const pipeline = await this.getPipeline(pipelineId, actorId);
     await this.pipelineRepository.remove(pipeline);
   }
 
-  /**
-   * Validates a pipeline's structure (every step bound to a READY model
-   * version, parallel stages unambiguously roled, and its shape matching its
-   * declared `type`) and marks it `VALIDATED` so it can be run. Bumps `version`.
-   *
-   * @throws {BadRequestException} If the pipeline has no steps, an unbound
-   * step, ambiguous parallel roles, or a structure that doesn't match its type.
-   */
   async validatePipeline(
     pipelineId: string,
     actorId: string,
@@ -170,14 +129,6 @@ export class PipelinesService {
     return this.pipelineRepository.save(pipeline);
   }
 
-  /**
-   * Every stage (steps sharing an `order`) with more than one step is a
-   * parallel branch point — each of its steps needs a distinct, non-null
-   * `role` so mapper rules and join steps can address `steps.<order>.<role>`
-   * unambiguously.
-   *
-   * @throws {BadRequestException} If a multi-step stage has a missing or duplicate role.
-   */
   private assertStageRolesAreUnambiguous(steps: Pipeline['steps']): void {
     const byOrder = new Map<number, Pipeline['steps']>();
     for (const step of steps) {
@@ -203,7 +154,6 @@ export class PipelinesService {
     }
   }
 
-  /** Demotes a pipeline back to `DRAFT`. Called whenever its steps/edges change. */
   async demoteToDraft(pipelineId: string): Promise<void> {
     await this.pipelineRepository.update(
       { id: pipelineId },

@@ -16,16 +16,13 @@ import { extname, join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { ModelsService } from '../services/models.service';
 import { ConfirmSchemaDto } from '../dto/confirm-schema.dto';
 import { ModelVersion } from '../entities/model-version.entity';
 
 const execPromise = promisify(exec);
 
-/**
- * Interface representing a NestJS request authenticated with a JWT payload.
- */
 interface RequestWithUser {
   user: {
     id: string;
@@ -34,30 +31,12 @@ interface RequestWithUser {
   };
 }
 
-/**
- * Controller exposing endpoints for model schema detection and verification.
- */
 @Controller('models')
 export class SchemaController {
   private readonly logger = new Logger(SchemaController.name);
 
   constructor(private readonly modelsService: ModelsService) {}
 
-  /**
-   * Accepts a model file (and, optionally, a postprocessing script), writes
-   * them temporarily, executes detect_schema.py to inspect the model
-   * features/task, and returns the auto-generated JSON schema and sample
-   * templates. When a postprocessing script is provided — as an uploaded
-   * file or inline code — its `postprocess(prediction)` function is applied
-   * to the synthetic expected-result sample, matching the same script
-   * serve.py runs at inference time, so the returned `expected_result`
-   * reflects what callers actually receive rather than the raw model output.
-   *
-   * @param files - The uploaded `model` and optional `postprocess` files.
-   * @param body - Form fields: `modelType`, `originalFilename`, and optional inline `postprocessCode`.
-   * @returns A promise resolving to the schema detection result object.
-   * @throws {BadRequestException} If no model file is provided or if schema generation execution fails.
-   */
   @UseGuards(JwtAuthGuard)
   @Post('detect-schema')
   @UseInterceptors(
@@ -67,7 +46,7 @@ export class SchemaController {
         { name: 'postprocess', maxCount: 1 },
       ],
       {
-        limits: { fileSize: 15 * 1024 * 1024 * 1024 }, // 15GB limit for schema detection
+        limits: { fileSize: 15 * 1024 * 1024 * 1024 },
         storage: diskStorage({
           destination: (req, file, cb) => {
             const dir = './uploads';
@@ -116,8 +95,6 @@ export class SchemaController {
       'detect_schema.py',
     );
 
-    // Resolve the postprocessing script to a temp file path, if any was
-    // supplied — either as an uploaded file or inline code.
     let postprocessPath = files?.postprocess?.[0]?.path;
     let inlinePostprocessPath: string | undefined;
     if (!postprocessPath && body?.postprocessCode?.trim()) {
@@ -131,7 +108,6 @@ export class SchemaController {
     }
 
     try {
-      // Execute the python schema generator
       let command = `python "${scriptPath}" "${tempFilePath}"`;
       if (body?.originalFilename) {
         command += ` --filename "${body.originalFilename}"`;
@@ -148,7 +124,6 @@ export class SchemaController {
         this.logger.warn(`Python stderr output: ${stderr}`);
       }
 
-      // Parse the JSON result
       const parsed = JSON.parse(stdout) as unknown;
       const result = parsed as Record<string, unknown>;
 
@@ -166,7 +141,6 @@ export class SchemaController {
       this.logger.error(`Schema detection failed: ${message}`);
       throw new BadRequestException(`Schema detection failed: ${message}`);
     } finally {
-      // Ensure the temporary files are deleted
       for (const path of [
         tempFilePath,
         files?.postprocess?.[0]?.path,
@@ -190,13 +164,6 @@ export class SchemaController {
     }
   }
 
-  /**
-   * Finalizes the schema configuration and dispatches the build process for a model version.
-   *
-   * @param versionId - The UUID of the model version to build.
-   * @param body - JSON request body containing examplePayload and expectedResult strings.
-   * @returns A promise resolving to the updated ModelVersion.
-   */
   @UseGuards(JwtAuthGuard)
   @Post('versions/:versionId/build')
   async startBuild(
@@ -217,15 +184,6 @@ export class SchemaController {
     return version as unknown as Record<string, unknown>;
   }
 
-  /**
-   * Lets the provider review an auto-detected (or pending) schema and mark it
-   * confirmed, optionally overwriting the example payload/expected result.
-   *
-   * @param versionId - The UUID of the model version to confirm.
-   * @param body - Optional replacement schema values.
-   * @param req - The authenticated request, used to derive the acting user.
-   * @returns A promise resolving to the updated ModelVersion.
-   */
   @UseGuards(JwtAuthGuard)
   @Post('versions/:versionId/confirm-schema')
   async confirmSchema(

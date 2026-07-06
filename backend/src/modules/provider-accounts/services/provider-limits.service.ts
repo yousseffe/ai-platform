@@ -1,15 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
-import { ModelType } from '../../models/enums/model-type.enum';
+import { ModelType } from '../../models';
 import { ProviderAccount } from '../entities/provider-account.entity';
 import { ProviderAccountStatus } from '../enums/provider-account-status.enum';
 import { assertWithinLimit } from '../utils/limit.util';
 import { ProviderAccountsService } from './provider-accounts.service';
 import { ProviderUtilizationService } from './provider-utilization.service';
 
-/**
- * Reusable provider account, tier, and upload limit guards.
- */
 @Injectable()
 export class ProviderLimitsService {
   constructor(
@@ -17,15 +14,6 @@ export class ProviderLimitsService {
     private readonly utilizationService: ProviderUtilizationService,
   ) {}
 
-  /**
-   * Verifies a provider can create a model of a requested type and visibility.
-   *
-   * @param ownerType - USER or ORG publishing owner.
-   * @param ownerId - Publishing owner UUID.
-   * @param modelType - Requested model type.
-   * @param isPublic - Whether the model should be public.
-   * @returns Active provider account.
-   */
   async assertCanCreateModel(
     ownerType: OwnerType,
     ownerId: string,
@@ -60,14 +48,6 @@ export class ProviderLimitsService {
     return account;
   }
 
-  /**
-   * Verifies a provider can upload another version for a model.
-   *
-   * @param ownerType - USER or ORG publishing owner.
-   * @param ownerId - Publishing owner UUID.
-   * @param modelId - Target model UUID.
-   * @returns Active provider account.
-   */
   async assertCanCreateModelVersion(
     ownerType: OwnerType,
     ownerId: string,
@@ -87,13 +67,6 @@ export class ProviderLimitsService {
     return account;
   }
 
-  /**
-   * Fetches and validates active provider account state.
-   *
-   * @param ownerType - Provider owner type.
-   * @param ownerId - Provider owner UUID.
-   * @returns Active provider account.
-   */
   private async getActiveProviderAccount(
     ownerType: OwnerType,
     ownerId: string,
@@ -111,9 +84,6 @@ export class ProviderLimitsService {
     return account;
   }
 
-  /**
-   * Checks the per-model-type limit for the requested model type.
-   */
   private assertTypeLimit(
     modelType: ModelType,
     utilization: Awaited<

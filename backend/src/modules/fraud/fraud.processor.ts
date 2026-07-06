@@ -3,10 +3,6 @@ import { OnModuleInit, Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { FraudService } from './services/fraud.service';
 
-/**
- * BullMQ processor that runs the deterministic fraud scan on a fixed schedule.
- * Registers a repeatable job on init (mirrors the deployments idle-check job).
- */
 @Processor('fraud-queue')
 export class FraudProcessor extends WorkerHost implements OnModuleInit {
   private readonly logger = new Logger(FraudProcessor.name);
@@ -18,9 +14,6 @@ export class FraudProcessor extends WorkerHost implements OnModuleInit {
     super();
   }
 
-  /**
-   * Schedules the repeatable `scan-fraud` job (every 2 minutes).
-   */
   async onModuleInit(): Promise<void> {
     try {
       await this.fraudQueue.add(
@@ -32,7 +25,7 @@ export class FraudProcessor extends WorkerHost implements OnModuleInit {
         },
       );
       this.logger.log('Scheduled repeatable scan-fraud job (every 2m).');
-    } catch (err) {
+    } catch (err: unknown) {
       this.logger.error(
         `Failed to schedule scan-fraud: ${
           err instanceof Error ? err.message : String(err)
@@ -41,11 +34,6 @@ export class FraudProcessor extends WorkerHost implements OnModuleInit {
     }
   }
 
-  /**
-   * Executes a scheduled fraud scan.
-   *
-   * @param job - The BullMQ job.
-   */
   async process(job: Job): Promise<void> {
     if (job.name !== 'scan-fraud') return;
     const recorded = await this.fraudService.scanAll();

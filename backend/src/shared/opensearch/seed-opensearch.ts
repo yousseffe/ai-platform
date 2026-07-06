@@ -1,14 +1,3 @@
-/**
- * One-time seed script to bulk-index all existing public models from Postgres into OpenSearch.
- *
- * Usage:
- *   npx ts-node -r tsconfig-paths/register src/shared/opensearch/seed-opensearch.ts
- *
- * This script connects to the database via TypeORM, loads all public models with their
- * relations, and pushes them into the OpenSearch index using the ModelsSearchService.
- * Run this once after initial OpenSearch setup, or whenever the index needs to be rebuilt.
- */
-
 import 'reflect-metadata';
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -23,6 +12,7 @@ import { ModelReview } from '../../modules/models/entities/model-review.entity';
 import { User } from '../../modules/users/entities/user.entity';
 import { AuditLog } from '../../modules/users/entities/audit-log.entity';
 import { Deployment } from '../../modules/deployments/entities/deployment.entity';
+import { DeploymentStatus } from '../../modules/deployments/enums/deployment-status.enum';
 import { Wallet } from '../../modules/wallets/entities/wallet.entity';
 import { Transaction } from '../../modules/wallets/entities/transaction.entity';
 import { ProcessedWebhook } from '../../modules/wallets/entities/processed-webhook.entity';
@@ -34,7 +24,6 @@ const OPENSEARCH_INDEX = process.env.OPENSEARCH_INDEX || 'mlhub-models';
 const OPENSEARCH_URL = process.env.OPENSEARCH_URL || 'http://localhost:9200';
 
 async function seed(): Promise<void> {
-  // --- Connect to Postgres ---
   const dataSource = new DataSource({
     type: 'postgres',
     host: process.env.DB_HOST || 'localhost',
@@ -64,7 +53,6 @@ async function seed(): Promise<void> {
   await dataSource.initialize();
   console.log('✓ Connected to Postgres');
 
-  // --- Connect to OpenSearch ---
   const client = new Client({
     node: OPENSEARCH_URL,
     auth: {
@@ -74,7 +62,6 @@ async function seed(): Promise<void> {
     ssl: { rejectUnauthorized: false },
   });
 
-  // --- Delete and recreate the index ---
   try {
     await client.indices.delete({ index: OPENSEARCH_INDEX });
     console.log(`✓ Deleted existing index: ${OPENSEARCH_INDEX}`);
@@ -123,7 +110,6 @@ async function seed(): Promise<void> {
   });
   console.log(`✓ Created index: ${OPENSEARCH_INDEX}`);
 
-  // --- Load all public models from Postgres ---
   const modelRepository = dataSource.getRepository(Model);
   const models = await modelRepository.find({
     where: { isPublic: true },
@@ -138,11 +124,10 @@ async function seed(): Promise<void> {
     return;
   }
 
-  // --- Build bulk body ---
   const bulkBody = models.flatMap((model) => {
     const hasLiveDeployment =
       model.versions?.some((v) =>
-        v.deployments?.some((d) => d.status === 'running'),
+        v.deployments?.some((d) => d.status === DeploymentStatus.RUNNING),
       ) ?? false;
 
     const doc = {

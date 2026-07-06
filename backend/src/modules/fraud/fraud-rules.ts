@@ -1,6 +1,5 @@
 import { ThreatClass } from './enums/threat-class.enum';
 
-/** Aggregated, deterministic traffic features for one model over a window. */
 export interface TrafficFeatures {
   modelId: string;
   windowMinutes: number;
@@ -18,13 +17,11 @@ export interface TrafficFeatures {
   reviewCount?: number;
 }
 
-/** Per-model EWMA baseline used for spike comparison. */
 export interface Baseline {
   ewmaRequestRatePerMin: number;
   ewmaErrorRate: number;
 }
 
-/** A single rule that fired during assessment. */
 export interface FiredRule {
   rule: string;
   threatClass: ThreatClass;
@@ -32,7 +29,6 @@ export interface FiredRule {
   detail: string;
 }
 
-/** The deterministic risk assessment result for a model window. */
 export interface RiskAssessment {
   riskScore: number;
   threatClass: ThreatClass | null;
@@ -57,14 +53,6 @@ const RECOMMENDATIONS: Record<ThreatClass, string> = {
     'Elevated error/abuse signals or severe negative user feedback on the API — review caller behavior and model reviews.',
 };
 
-/**
- * Assesses traffic features against deterministic rules + a statistical spike
- * test (vs EWMA baseline). No model, no inference.
- *
- * @param f - Aggregated traffic features.
- * @param b - The model's current EWMA baseline.
- * @returns A {@link RiskAssessment}.
- */
 export function assessTraffic(f: TrafficFeatures, b: Baseline): RiskAssessment {
   const fired: FiredRule[] = [];
 

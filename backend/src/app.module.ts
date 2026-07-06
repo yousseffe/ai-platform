@@ -27,11 +27,12 @@ import { Project } from './modules/organizations/entities/project.entity';
 import { OrgApiKey } from './modules/organizations/entities/org-api-key.entity';
 import { VerificationCode } from './modules/auth/entities/verification-code.entity';
 import { ApiKey } from './modules/auth/entities/api-key.entity';
-import { ModelLog } from './modules/models/entities/model-log.entity';
+import { ModelLog } from './modules/inference/entities/model-log.entity';
 import { SystemConfig } from './modules/wallets/entities/system-config.entity';
 import { ModelReview } from './modules/models/entities/model-review.entity';
 import { ModelComparisonSession } from './modules/models/entities/model-comparison-session.entity';
 import { ModelComparisonResult } from './modules/models/entities/model-comparison-result.entity';
+import { InferenceModule } from './modules/inference/inference.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { OpenSearchModule } from './shared/opensearch/opensearch.module';
@@ -61,10 +62,6 @@ import { FirewallModule } from './modules/firewall/firewall.module';
 import { FirewallPolicy } from './modules/firewall/entities/firewall-policy.entity';
 import { TenantScopeModule } from './shared/security/tenant-scope.module';
 
-/**
- * Root application module configuring TypeORM database connectivity, Redis-backed
- * queues, global Multer options, and domain feature modules.
- */
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -111,7 +108,7 @@ import { TenantScopeModule } from './shared/security/tenant-scope.module';
         ProviderOfferRedemption,
         FirewallPolicy,
       ],
-      synchronize: true, // For MVP only
+      synchronize: true,
       logging: ['query', 'error', 'schema', 'warn'],
     }),
     BullModule.forRoot({
@@ -126,6 +123,7 @@ import { TenantScopeModule } from './shared/security/tenant-scope.module';
     UsersModule,
     AuthModule,
     ModelsModule,
+    InferenceModule,
     DeploymentsModule,
     QueueModule,
     MinioModule,

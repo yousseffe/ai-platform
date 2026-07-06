@@ -13,6 +13,7 @@ import {
   MoreThanOrEqual,
   LessThanOrEqual,
   ILike,
+  FindOptionsWhere,
 } from 'typeorm';
 import { Wallet } from '../entities/wallet.entity';
 import { Transaction } from '../entities/transaction.entity';
@@ -23,14 +24,33 @@ import { TransactionStatus } from '../enums/transaction-status.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { RedisService } from '../../../shared/redis/redis.service';
-import { OrganizationsService } from '../../organizations/services/organizations.service';
-import { OrgType } from '../../organizations/enums/org-type.enum';
-import { OrgRole } from '../../../shared/enums/org-role.enum';
+import { OrgType, OrganizationsService } from '../../organizations';
 import { ApiKey } from '../../auth/entities/api-key.entity';
+import { OrgRole } from '../../../shared/enums/org-role.enum';
 
-/**
- * Service governing ledger balance operations, wallet initializations, additions, and deductions.
- */
+interface StripeWebhookMetadata {
+  type?: string;
+  pendingId?: string;
+  ownerUserId?: string;
+  walletId?: string;
+  credits?: string;
+  workspaceId?: string;
+  workspaceType?: string;
+  amount?: string;
+}
+
+interface StripeWebhookEvent {
+  id?: string;
+  type?: string;
+  data?: {
+    object?: {
+      id?: string;
+      payment_intent?: string;
+      metadata?: StripeWebhookMetadata;
+    };
+  };
+}
+
 @Injectable()
 export class WalletsService {
   constructor(
@@ -47,15 +67,6 @@ export class WalletsService {
     private readonly orgsService: OrganizationsService,
   ) {}
 
-  /**
-   * Initializes a wallet ledger for a user or organization.
-   *
-   * @param ownerId - UUID of the owner.
-   * @param ownerType - USER or ORG.
-   * @param walletType - CONSUMER or PROVIDER.
-   * @param initialBalance - Default credit value.
-   * @returns Fully created Wallet entity.
-   */
   async createWallet(
     ownerId: string,
     ownerType: OwnerType,
@@ -81,14 +92,6 @@ export class WalletsService {
     return this.walletRepository.save(wallet);
   }
 
-  /**
-   * Retrieves a wallet balance.
-   *
-   * @param ownerId - UUID of the owner.
-   * @param ownerType - USER or ORG.
-   * @param walletType - CONSUMER or PROVIDER.
-   * @returns The balance value.
-   */
   async getBalance(
     ownerId: string,
     ownerType: OwnerType,
@@ -102,20 +105,11 @@ export class WalletsService {
       return 0.0;
     }
 
-    // Convert decimal database string to float
     return typeof wallet.balance === 'string'
       ? parseFloat(wallet.balance)
       : wallet.balance;
   }
 
-  /**
-   * Retrieves all wallets belonging to an organization after validating membership.
-   *
-   * @param orgId - Organization UUID.
-   * @param userId - Requesting user UUID.
-   * @returns Array of organization wallet records.
-   * @throws {ForbiddenException} If the requester is not an organization member.
-   */
   async getOrganizationWallets(
     orgId: string,
     userId: string,
@@ -133,14 +127,6 @@ export class WalletsService {
     });
   }
 
-  /**
-   * Enforces that organization billing data is visible only to workspace owners.
-   * Personal wallets keep their existing authenticated-user behavior.
-   *
-   * @param ownerId - Workspace owner UUID.
-   * @param ownerType - USER or ORG workspace type.
-   * @param userId - Authenticated user UUID.
-   */
   async assertBillingAccess(
     ownerId: string,
     ownerType: OwnerType,
@@ -162,15 +148,6 @@ export class WalletsService {
     }
   }
 
-  /**
-   * Appends funds to a wallet.
-   *
-   * @param ownerId - UUID of the owner.
-   * @param ownerType - USER or ORG.
-   * @param walletType - CONSUMER or PROVIDER.
-   * @param amount - Funds value to add.
-   * @returns Updated Wallet.
-   */
   async addFunds(
     ownerId: string,
     ownerType: OwnerType,
@@ -191,20 +168,18 @@ export class WalletsService {
       wallet = await this.createWallet(ownerId, ownerType, walletType, 0);
     }
 
-    // Idempotency: verify if this Stripe event was already processed
     if (stripeEventId) {
       const existingTx = await this.transactionRepository.findOneBy({
         stripeEventId,
       });
       if (existingTx) {
-        return wallet; // Skip duplicate processing
+        return wallet;
       }
     }
 
     let finalAmount = amount;
     let finalReference = reference;
     if (walletType === WalletType.CONSUMER) {
-      // Input is EGP amount, convert to credits
       let config = await this.systemConfigRepository.findOne({
         where: { key: 'credits_per_egp' },
       });
@@ -225,7 +200,6 @@ export class WalletsService {
     wallet.balance = currentBalance + finalAmount;
     const savedWallet = await this.walletRepository.save(wallet);
 
-    // Save completed transaction record
     const transaction = this.transactionRepository.create({
       walletId: wallet.id,
       type: TransactionType.CREDIT,
@@ -239,15 +213,6 @@ export class WalletsService {
     return savedWallet;
   }
 
-  /**
-   * Deducts funds from a wallet.
-   *
-   * @param ownerId - UUID of the owner.
-   * @param ownerType - USER or ORG.
-   * @param walletType - CONSUMER or PROVIDER.
-   * @param amount - Funds value to subtract.
-   * @returns Updated Wallet.
-   */
   async deductFunds(
     ownerId: string,
     ownerType: OwnerType,
@@ -278,14 +243,6 @@ export class WalletsService {
     return this.walletRepository.save(wallet);
   }
 
-  /**
-   * Withdraws funds from the wallet and registers a DEBIT transaction.
-   *
-   * @param ownerId - Owner user/org UUID.
-   * @param ownerType - USER or ORG.
-   * @param amount - Capital amount to cash out.
-   * @returns Updated Wallet configuration.
-   */
   async withdrawFunds(
     ownerId: string,
     ownerType: OwnerType,
@@ -335,16 +292,6 @@ export class WalletsService {
     return savedWallet;
   }
 
-  /**
-   * Retrieves a paginated history list of transactions associated with a workspace wallet.
-   *
-   * @param ownerId - UUID of the owner (User or Organization).
-   * @param ownerType - USER or ORG.
-   * @param walletType - CONSUMER or PROVIDER.
-   * @param page - Current page index (1-based).
-   * @param limit - Count of items per page.
-   * @returns Paginated list of ledger transaction records.
-   */
   async getTransactions(
     ownerId: string,
     ownerType: OwnerType,
@@ -384,12 +331,20 @@ export class WalletsService {
     const limitNum =
       typeof limit === 'string' ? parseInt(limit, 10) : Number(limit) || 20;
 
-    const where: any = { walletId: wallet.id };
-    if (filters?.type) {
-      where.type = filters.type;
+    const where: FindOptionsWhere<Transaction> = { walletId: wallet.id };
+    if (
+      filters?.type &&
+      Object.values(TransactionType).includes(filters.type as TransactionType)
+    ) {
+      where.type = filters.type as TransactionType;
     }
-    if (filters?.status) {
-      where.status = filters.status;
+    if (
+      filters?.status &&
+      Object.values(TransactionStatus).includes(
+        filters.status as TransactionStatus,
+      )
+    ) {
+      where.status = filters.status as TransactionStatus;
     }
     if (filters?.startDate || filters?.endDate) {
       if (filters.startDate && filters.endDate) {
@@ -427,20 +382,12 @@ export class WalletsService {
     };
   }
 
-  /**
-   * Processes a verified Stripe Webhook event.
-   * Handles both top-up and package purchases, and updates balances/transactions transactionally.
-   *
-   * @param event - The verified Stripe event payload.
-   * @returns A promise resolving to a boolean indicating if processing was performed.
-   */
-  async processStripeWebhook(event: Record<string, any>): Promise<boolean> {
+  async processStripeWebhook(event: StripeWebhookEvent): Promise<boolean> {
     const stripeEventId = event.id;
     if (!stripeEventId) {
       return false;
     }
 
-    // 1. Idempotency Check: check if event was already processed
     const alreadyProcessed = await this.processedWebhookRepository.findOneBy({
       stripeEventId,
     });
@@ -455,7 +402,7 @@ export class WalletsService {
       'payment_intent.payment_failed',
     ];
 
-    if (!acceptedEvents.includes(event.type)) {
+    if (!event.type || !acceptedEvents.includes(event.type)) {
       return false;
     }
 
@@ -464,14 +411,11 @@ export class WalletsService {
       return false;
     }
 
-    const metadata = sessionOrIntent.metadata as
-      | Record<string, any>
-      | undefined;
+    const metadata = sessionOrIntent.metadata;
     if (!metadata) {
       return false;
     }
 
-    // Handle Organization Creation Checkout Session
     if (metadata.type === 'org_creation') {
       const pendingId = metadata.pendingId;
       const ownerUserId = metadata.ownerUserId;
@@ -498,7 +442,6 @@ export class WalletsService {
         collaborators?: Array<{ email: string; role: OrgRole }>;
       };
 
-      // Call createOrganization on OrganizationsService
       const organization = await this.orgsService.createOrganization(
         orgData.name,
         orgData.slug,
@@ -507,11 +450,10 @@ export class WalletsService {
         orgData.type || OrgType.CONSUMER,
         orgData.description,
         orgData.avatarUrl,
-        true, // isPaidViaStripe = true
+        true,
         stripeEventId,
       );
 
-      // Clean up cached key
       await this.redisService.del(cacheKey);
       await this.redisService.set(
         `completed_org:${pendingId}`,
@@ -539,7 +481,6 @@ export class WalletsService {
     }
     const creditsPerEgp = config ? parseInt(config.value, 10) || 10 : 10;
 
-    // 2. Handle Payment Intent Failures
     if (event.type === 'payment_intent.payment_failed') {
       let walletId = '';
       let credits = 0;
@@ -582,7 +523,6 @@ export class WalletsService {
       return false;
     }
 
-    // 3. Process Successful Payments
     let ownerId = '';
     let ownerType: OwnerType = OwnerType.USER;
     let walletType: WalletType = WalletType.CONSUMER;
@@ -590,7 +530,6 @@ export class WalletsService {
     let reference = '';
     let paymentId = '';
 
-    // Handle package purchase checkout (Format B)
     if (metadata.walletId && metadata.credits) {
       const walletId = metadata.walletId;
       credits = parseFloat(metadata.credits);
@@ -606,22 +545,19 @@ export class WalletsService {
       ownerId = wallet.ownerId;
       ownerType = wallet.ownerType;
       walletType = WalletType.CONSUMER;
-    }
-    // Handle custom top-up checkout (Format A)
-    else if (
+    } else if (
       metadata.workspaceId &&
       metadata.workspaceType &&
       metadata.amount
     ) {
       ownerId = metadata.workspaceId;
       ownerType = metadata.workspaceType as OwnerType;
-      walletType = WalletType.CONSUMER; // Top-ups are deposited to consumer wallet
+      walletType = WalletType.CONSUMER;
       const egpAmount = parseFloat(metadata.amount);
       credits = egpAmount * creditsPerEgp;
       paymentId = String(sessionOrIntent.payment_intent || sessionOrIntent.id);
       reference = `Stripe checkout deposit: ${paymentId} (${credits} credits purchased at ${creditsPerEgp} credits/EGP)`;
     } else {
-      // Unknown metadata format or missing crucial fields
       return false;
     }
 
@@ -639,14 +575,12 @@ export class WalletsService {
       }
     }
 
-    // Run database transaction to commit balance credit, transaction log, and processed webhook idempotency lock
     const queryRunner =
       this.walletRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // Resolve or create wallet
       let wallet = await queryRunner.manager.findOne(Wallet, {
         where: { ownerId, ownerType, walletType },
       });
@@ -661,7 +595,6 @@ export class WalletsService {
         wallet = await queryRunner.manager.save(Wallet, wallet);
       }
 
-      // 1. Insert ProcessedWebhook first (guarantees db transaction uniqueness)
       const processed = queryRunner.manager.create(ProcessedWebhook, {
         stripeEventId,
         walletId: wallet.id,
@@ -676,7 +609,6 @@ export class WalletsService {
         await queryRunner.manager.save(ProcessedWebhook, processedPayment);
       }
 
-      // 2. Perform atomic increment balance update
       const currentBalance =
         typeof wallet.balance === 'string'
           ? parseFloat(wallet.balance)
@@ -684,7 +616,6 @@ export class WalletsService {
       wallet.balance = currentBalance + credits;
       await queryRunner.manager.save(Wallet, wallet);
 
-      // 3. Save completed transaction record
       const transaction = queryRunner.manager.create(Transaction, {
         walletId: wallet.id,
         type: TransactionType.CREDIT,
@@ -697,7 +628,7 @@ export class WalletsService {
 
       await queryRunner.commitTransaction();
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
@@ -705,11 +636,6 @@ export class WalletsService {
     }
   }
 
-  /**
-   * Retrieves the conversion rate of credits per one EGP from system config database.
-   *
-   * @returns A promise resolving to the credits per EGP multiplier.
-   */
   async getCreditsPerEgp(): Promise<number> {
     let config = await this.systemConfigRepository.findOne({
       where: { key: 'credits_per_egp' },
@@ -746,22 +672,26 @@ export class WalletsService {
       return { dailyTransactions: [], apiKeysUsage: [] };
     }
 
-    // 1. Fetch daily transaction summaries for the last 30 days
-    const rows: { date: string; type: TransactionType; total: string }[] = await this.transactionRepository
-      .createQueryBuilder('tx')
-      .select("DATE_TRUNC('day', tx.created_at)::text", 'date')
-      .addSelect('tx.type', 'type')
-      .addSelect('SUM(tx.amount)', 'total')
-      .where('tx.wallet_id = :walletId', { walletId: wallet.id })
-      .andWhere('tx.status = :status', { status: TransactionStatus.COMPLETED })
-      .andWhere("tx.created_at >= NOW() - INTERVAL '30 days'")
-      .groupBy("DATE_TRUNC('day', tx.created_at)")
-      .addGroupBy('tx.type')
-      .orderBy("DATE_TRUNC('day', tx.created_at)", 'ASC')
-      .getRawMany();
+    const rows: { date: string; type: TransactionType; total: string }[] =
+      await this.transactionRepository
+        .createQueryBuilder('tx')
+        .select("DATE_TRUNC('day', tx.created_at)::text", 'date')
+        .addSelect('tx.type', 'type')
+        .addSelect('SUM(tx.amount)', 'total')
+        .where('tx.wallet_id = :walletId', { walletId: wallet.id })
+        .andWhere('tx.status = :status', {
+          status: TransactionStatus.COMPLETED,
+        })
+        .andWhere("tx.created_at >= NOW() - INTERVAL '30 days'")
+        .groupBy("DATE_TRUNC('day', tx.created_at)")
+        .addGroupBy('tx.type')
+        .orderBy("DATE_TRUNC('day', tx.created_at)", 'ASC')
+        .getRawMany();
 
-    // Pivot by date
-    const dailyMap = new Map<string, { date: string; credits: number; debits: number }>();
+    const dailyMap = new Map<
+      string,
+      { date: string; credits: number; debits: number }
+    >();
     for (let i = 29; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -771,7 +701,11 @@ export class WalletsService {
 
     for (const row of rows) {
       const dateStr = row.date.split(' ')[0];
-      const entry = dailyMap.get(dateStr) || { date: dateStr, credits: 0, debits: 0 };
+      const entry = dailyMap.get(dateStr) || {
+        date: dateStr,
+        credits: 0,
+        debits: 0,
+      };
       const amount = parseFloat(row.total);
       if (row.type === TransactionType.CREDIT) {
         entry.credits = amount;
@@ -781,15 +715,27 @@ export class WalletsService {
       dailyMap.set(dateStr, entry);
     }
 
-    const dailyTransactions = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+    const dailyTransactions = Array.from(dailyMap.values()).sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
 
-    // 2. Fetch active API keys for this owner to check caps and today's spend
-    const apiKeysUsage: any[] = [];
+    interface ApiKeyUsageInfo {
+      id: string;
+      name: string;
+      keyPrefix: string;
+      modelName: string;
+      maxDailySpendCredits: number | null;
+      todaySpend: number;
+      maxRequestsPerMinute: number | null;
+    }
+    const apiKeysUsage: ApiKeyUsageInfo[] = [];
     if (ownerType === OwnerType.USER) {
-      const apiKeys = await this.walletRepository.manager.getRepository(ApiKey).find({
-        where: { user: { id: ownerId }, isActive: true },
-        relations: ['model'],
-      });
+      const apiKeys = await this.walletRepository.manager
+        .getRepository(ApiKey)
+        .find({
+          where: { user: { id: ownerId }, isActive: true },
+          relations: ['model'],
+        });
 
       const today = new Date().toISOString().slice(0, 10);
       for (const key of apiKeys) {
@@ -802,7 +748,9 @@ export class WalletsService {
           name: key.name,
           keyPrefix: key.key.slice(0, 12) + '...',
           modelName: key.model?.name || 'All Models',
-          maxDailySpendCredits: key.maxDailySpendCredits ? parseFloat(key.maxDailySpendCredits as any) : null,
+          maxDailySpendCredits: key.maxDailySpendCredits
+            ? parseFloat(String(key.maxDailySpendCredits))
+            : null,
           todaySpend,
           maxRequestsPerMinute: key.maxRequestsPerMinute,
         });

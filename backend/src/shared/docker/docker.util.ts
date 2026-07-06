@@ -2,13 +2,6 @@ import * as Docker from 'dockerode';
 import * as fs from 'fs';
 import * as path from 'path';
 
-/**
- * Resolves the Docker configuration options by dynamically checking for the environment.
- * Prioritizes DOCKER_HOST environment variables, falls back to standard socket files,
- * and automatically detects macOS Colima socket paths if Docker Desktop isn't running.
- *
- * @returns Docker options configured with the correct socket path or connection settings.
- */
 export function getDockerOptions(): Docker.DockerOptions {
   if (process.env.DOCKER_HOST) {
     return {};

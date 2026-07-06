@@ -1,4 +1,3 @@
-/** Execution status of a single step within a {@link PipelineRun}. */
 export enum PipelineStepRunStatus {
   PENDING = 'pending',
   RUNNING = 'running',

@@ -12,24 +12,20 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { OrgRoleGuard, RequireOrgRole } from '../../auth/guards/org-role.guard';
-import { OrgRole } from '../../../shared/enums/org-role.enum';
+import { RequireOrgRole } from '../../../shared/guards/org-role.guard';
+import { OrgRoleGuard } from '../../../shared/guards/org-role.guard';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { Model } from '../../models/entities/model.entity';
+import { AuditLog } from '../../users/entities/audit-log.entity';
+import { OrgRole } from '../../../shared/enums/org-role.enum';
 import { FirewallService } from '../services/firewall.service';
 import { FirewallScopeType } from '../enums/firewall-scope-type.enum';
 import { UpdateFirewallPolicyDto } from '../dto/update-firewall-policy.dto';
-import { AuditLog } from '../../users/entities/audit-log.entity';
 
 interface RequestWithUser {
   user: { id: string; isAdmin?: boolean };
 }
 
-/**
- * Owner/organization-facing CRUD for firewall security policies (IP
- * allow/deny lists, prompt-injection blocking, and fraud-engine auto-block
- * threshold), plus read/clear access to any currently active auto-block.
- */
 @Controller('firewall')
 export class FirewallController {
   constructor(
@@ -59,7 +55,6 @@ export class FirewallController {
     return model;
   }
 
-  /** Retrieves the firewall policy for a model (or defaults if unset). */
   @UseGuards(JwtAuthGuard)
   @Get('models/:modelId')
   async getModelPolicy(
@@ -70,7 +65,6 @@ export class FirewallController {
     return this.firewallService.getPolicy(FirewallScopeType.MODEL, modelId);
   }
 
-  /** Creates or updates the firewall policy for a model. */
   @UseGuards(JwtAuthGuard)
   @Put('models/:modelId')
   async updateModelPolicy(
@@ -86,7 +80,6 @@ export class FirewallController {
     );
   }
 
-  /** Returns whether a model is currently auto-blocked, and why. */
   @UseGuards(JwtAuthGuard)
   @Get('models/:modelId/status')
   async getModelStatus(
@@ -101,7 +94,6 @@ export class FirewallController {
     return { blocked: reason !== null, reason };
   }
 
-  /** Manually lifts an active auto-block on a model. */
   @UseGuards(JwtAuthGuard)
   @Post('models/:modelId/unblock')
   async unblockModel(
@@ -113,7 +105,6 @@ export class FirewallController {
     return { success: true };
   }
 
-  /** Retrieves the firewall policy for an organization (or defaults if unset). */
   @UseGuards(JwtAuthGuard, OrgRoleGuard)
   @RequireOrgRole(OrgRole.OWNER, OrgRole.MAINTAINER)
   @Get('orgs/:orgId')
@@ -121,7 +112,6 @@ export class FirewallController {
     return this.firewallService.getPolicy(FirewallScopeType.ORG, orgId);
   }
 
-  /** Creates or updates the firewall policy for an organization. */
   @UseGuards(JwtAuthGuard, OrgRoleGuard)
   @RequireOrgRole(OrgRole.OWNER, OrgRole.MAINTAINER)
   @Put('orgs/:orgId')
@@ -136,7 +126,6 @@ export class FirewallController {
     );
   }
 
-  /** Retrieves recent firewall audit logs for a model. */
   @UseGuards(JwtAuthGuard)
   @Get('models/:modelId/logs')
   async getModelFirewallLogs(
@@ -144,8 +133,7 @@ export class FirewallController {
     @Request() req: RequestWithUser,
   ) {
     await this.assertModelAccess(modelId, req);
-    
-    // Fetch logs relating to firewall blocks/violations for this model
+
     return this.modelRepository.manager
       .createQueryBuilder(AuditLog, 'log')
       .where("log.action LIKE 'firewall.%'")

@@ -9,10 +9,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
-import { AdminGuard } from '../../auth/guards/admin.guard';
+import { ApiKeyOrJwtGuard } from '../../../shared/guards/api-key-or-jwt.guard';
+import { AdminGuard } from '../../../shared/guards/admin.guard';
+import { DeploymentStatus } from '../../deployments';
 import { Deployment } from '../../deployments/entities/deployment.entity';
-import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 
 const DEPLOYMENT_RELATIONS = [
   'modelVersion',
@@ -20,12 +20,6 @@ const DEPLOYMENT_RELATIONS = [
   'modelVersion.model.user',
 ];
 
-/**
- * Read-only, platform-wide deployment inventory consumed by the
- * `admin_list_deployments` and `admin_get_deployment` MCP tools. Unlike
- * `observability_list_deployments` (which is scoped to the caller's own
- * models), this always returns every deployment on the platform.
- */
 @Controller('admin-mcp')
 @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
 export class DeploymentsAdminMcpController {
@@ -34,12 +28,6 @@ export class DeploymentsAdminMcpController {
     private readonly deploymentsRepository: Repository<Deployment>,
   ) {}
 
-  /**
-   * Lists every deployment on the platform, optionally restricted to running ones.
-   *
-   * @param running - When `'true'`, restrict to RUNNING deployments.
-   * @returns Platform-wide deployment summaries.
-   */
   @Get('deployments')
   async listDeployments(@Query('running') running?: string) {
     const deployments = await this.deploymentsRepository.find({
@@ -51,13 +39,6 @@ export class DeploymentsAdminMcpController {
     return deployments.map((d) => this.summarize(d));
   }
 
-  /**
-   * Retrieves a single deployment's detail.
-   *
-   * @param id - Deployment UUID.
-   * @returns The deployment summary.
-   * @throws {NotFoundException} If no deployment matches the given id.
-   */
   @Get('deployments/:id')
   async getDeployment(@Param('id', ParseUUIDPipe) id: string) {
     const deployment = await this.deploymentsRepository.findOne({
@@ -68,12 +49,6 @@ export class DeploymentsAdminMcpController {
     return this.summarize(deployment);
   }
 
-  /**
-   * Projects a deployment entity into a compact, model/owner-aware summary.
-   *
-   * @param deployment - The deployment entity to summarize.
-   * @returns The deployment summary.
-   */
   private summarize(deployment: Deployment) {
     const model = deployment.modelVersion?.model;
     return {

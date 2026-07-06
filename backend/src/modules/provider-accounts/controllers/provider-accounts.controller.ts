@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import {
   ProviderSubscriptionCheckoutDto,
@@ -13,9 +13,6 @@ import { ProviderSubscriptionBillingService } from '../services/provider-subscri
 import { ProviderTierService } from '../services/provider-tier.service';
 import { ProviderUtilizationService } from '../services/provider-utilization.service';
 
-/**
- * Authenticated provider-facing endpoints for tier subscription checkout.
- */
 @Controller('provider-accounts')
 @UseGuards(JwtAuthGuard)
 export class ProviderAccountsController {
@@ -26,13 +23,8 @@ export class ProviderAccountsController {
     private readonly utilizationService: ProviderUtilizationService,
   ) {}
 
-  /**
-   * Returns the caller's provider account, active tier catalog, and utilization.
-   */
   @Get('me')
-  async getMyProviderAccount(
-    @Req() req: { user: { id: string } },
-  ): Promise<{
+  async getMyProviderAccount(@Req() req: { user: { id: string } }): Promise<{
     account: ProviderAccount;
     tiers: ProviderTierDefinition[];
     utilization: ProviderUtilization;
@@ -53,9 +45,6 @@ export class ProviderAccountsController {
     };
   }
 
-  /**
-   * Creates a provider tier subscription checkout session.
-   */
   @Post('subscription-checkout')
   async createSubscriptionCheckout(
     @Body() body: ProviderSubscriptionCheckoutDto,
@@ -77,9 +66,6 @@ export class ProviderAccountsController {
     });
   }
 
-  /**
-   * Confirms a provider subscription checkout after Stripe redirects back.
-   */
   @Post('confirm-checkout')
   async confirmSubscriptionCheckout(
     @Body() body: ProviderSubscriptionConfirmDto,
@@ -97,9 +83,6 @@ export class ProviderAccountsController {
     return { success: true };
   }
 
-  /**
-   * Lists the caller's confirmed provider subscription payments.
-   */
   @Get('subscription-payments')
   async listMySubscriptionPayments(
     @Req() req: { user: { id: string } },
@@ -114,9 +97,10 @@ export class ProviderAccountsController {
       req.user.id,
       req.user.id,
     );
-    const result = await this.subscriptionBillingService.listSubscriptionPayments(
-      account.id,
-    );
+    const result =
+      await this.subscriptionBillingService.listSubscriptionPayments(
+        account.id,
+      );
 
     return {
       ...result,

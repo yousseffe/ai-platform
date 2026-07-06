@@ -1,6 +1,14 @@
-import { Controller, Get, Patch, Post, Body, Param, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../../auth/guards/admin.guard';
+import {
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
+import { AdminGuard } from '../../../shared/guards/admin.guard';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { AdminInsightsService } from '../services/admin-insights.service';
 
 @Controller('admin/dashboard')
@@ -25,6 +33,10 @@ export class AdminInsightsController {
     @Param('id') id: string,
     @Body() body: { suggestedPrice?: number; suggestedTier?: string },
   ) {
-    return this.insightsService.upgradeModel(id, body.suggestedPrice, body.suggestedTier);
+    return this.insightsService.upgradeModel(
+      id,
+      body.suggestedPrice,
+      body.suggestedTier,
+    );
   }
 }

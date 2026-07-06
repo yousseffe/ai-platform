@@ -1,6 +1,3 @@
-/**
- * Immutable audit actions attached to organization model/version review workflows.
- */
 export enum VersionReviewAction {
   MODEL_CREATED = 'MODEL_CREATED',
   VERSION_SUBMITTED = 'VERSION_SUBMITTED',

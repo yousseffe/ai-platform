@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { StripeService } from '../../../shared/stripe/stripe.service';
-import { WalletLedgerService } from '../../billing/services/wallet-ledger.service';
+import { WalletLedgerService } from '../../billing';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { ProviderSubscriptionCheckoutDto } from '../dto/provider-offer.dto';
 import { ProviderTierDefinition } from '../entities/provider-tier-definition.entity';
@@ -11,9 +11,6 @@ import { ProviderAccountsService } from './provider-accounts.service';
 import { ProviderOffersService } from './provider-offers.service';
 import { ProviderTierService } from './provider-tier.service';
 
-/**
- * Coordinates provider tier checkout pricing and subscription activation.
- */
 @Injectable()
 export class ProviderSubscriptionBillingService {
   constructor(
@@ -26,12 +23,6 @@ export class ProviderSubscriptionBillingService {
     private readonly walletLedgerService: WalletLedgerService,
   ) {}
 
-  /**
-   * Creates a Stripe checkout session for a provider tier subscription.
-   *
-   * @param dto - Checkout request payload.
-   * @returns Stripe checkout URL/session payload plus calculated pricing.
-   */
   async createCheckoutSession(dto: ProviderSubscriptionCheckoutDto): Promise<{
     session: Record<string, unknown>;
     originalAmountEgp: number;
@@ -39,14 +30,18 @@ export class ProviderSubscriptionBillingService {
     finalAmountEgp: number;
   }> {
     if (!dto.providerAccountId) {
-      throw new BadRequestException('Provider account is required for checkout');
+      throw new BadRequestException(
+        'Provider account is required for checkout',
+      );
     }
     const account = await this.providerAccountsService.getProviderAccount(
       dto.providerAccountId,
     );
     const tier = await this.tierService.getTier(dto.tierId);
     if (!tier.isActive) {
-      throw new BadRequestException('Cannot subscribe to an inactive provider tier');
+      throw new BadRequestException(
+        'Cannot subscribe to an inactive provider tier',
+      );
     }
 
     const originalAmount = this.resolveTierPrice(tier, dto.billingCycle);
@@ -72,12 +67,6 @@ export class ProviderSubscriptionBillingService {
     return { session, ...pricing };
   }
 
-  /**
-   * Lists confirmed subscription payments for a provider account.
-   *
-   * @param providerAccountId - Provider account UUID.
-   * @returns Payment ledger entries associated with provider tier subscriptions.
-   */
   async listSubscriptionPayments(providerAccountId: string): Promise<{
     data: Transaction[];
     total: number;
@@ -111,19 +100,15 @@ export class ProviderSubscriptionBillingService {
     };
   }
 
-  /**
-   * Applies a confirmed provider subscription payment.
-   *
-   * @param metadata - Stripe metadata payload.
-   * @param paymentReference - Stripe event/session/payment reference.
-   */
   async activateSubscriptionFromMetadata(
     metadata: Record<string, unknown>,
     paymentReference: string,
   ): Promise<void> {
     const providerAccountId = String(metadata.providerAccountId ?? '');
     const tierId = String(metadata.tierId ?? '');
-    const billingCycle = String(metadata.billingCycle ?? BillingCycle.MONTHLY) as BillingCycle;
+    const billingCycle = String(
+      metadata.billingCycle ?? BillingCycle.MONTHLY,
+    ) as BillingCycle;
     const offerId = String(metadata.offerId ?? '');
     const discountAmountEgp = Number(metadata.discountAmountEgp ?? 0);
     const amountEgp = Number(metadata.amountEgp ?? 0);
@@ -167,13 +152,6 @@ export class ProviderSubscriptionBillingService {
     }
   }
 
-  /**
-   * Confirms a Checkout Session after Stripe redirects the provider back.
-   * This makes local/dev flows work even before asynchronous webhooks arrive.
-   *
-   * @param sessionId - Stripe Checkout Session ID.
-   * @param expectedProviderAccountId - Provider account owned by the caller.
-   */
   async confirmCheckoutSession(
     sessionId: string,
     expectedProviderAccountId: string,
@@ -181,25 +159,24 @@ export class ProviderSubscriptionBillingService {
     const session = await this.stripeService.retrieveCheckoutSession(sessionId);
     const metadata = session.metadata as Record<string, unknown> | undefined;
     if (!metadata || metadata.type !== 'provider_tier_subscription') {
-      throw new BadRequestException('Checkout session is not a provider subscription');
+      throw new BadRequestException(
+        'Checkout session is not a provider subscription',
+      );
     }
     if (metadata.providerAccountId !== expectedProviderAccountId) {
-      throw new BadRequestException('Checkout session does not belong to this provider');
+      throw new BadRequestException(
+        'Checkout session does not belong to this provider',
+      );
     }
     if (session.payment_status !== 'paid') {
-      throw new BadRequestException('Checkout session payment is not completed');
+      throw new BadRequestException(
+        'Checkout session payment is not completed',
+      );
     }
 
     await this.activateSubscriptionFromMetadata(metadata, String(session.id));
   }
 
-  /**
-   * Resolves a tier price for the selected billing cycle.
-   *
-   * @param tier - Target tier.
-   * @param billingCycle - Selected cycle.
-   * @returns Price in EGP.
-   */
   private resolveTierPrice(
     tier: ProviderTierDefinition,
     billingCycle: BillingCycle,
@@ -210,20 +187,18 @@ export class ProviderSubscriptionBillingService {
     if (billingCycle === BillingCycle.MONTHLY) {
       return Number(tier.monthlyPriceEgp);
     }
-    throw new BadRequestException('Provider subscription must be monthly or annual');
+    throw new BadRequestException(
+      'Provider subscription must be monthly or annual',
+    );
   }
 
-  /**
-   * Builds the stable ledger reference used for subscription payment lookups.
-   */
   private getSubscriptionPaymentReference(providerAccountId: string): string {
     return `Provider tier subscription payment: ${providerAccountId}`;
   }
 
-  /**
-   * Builds provider-facing subscription state from the stored account period.
-   */
-  private buildSubscriptionSnapshot(account: Awaited<ReturnType<ProviderAccountsService['getProviderAccount']>>): {
+  private buildSubscriptionSnapshot(
+    account: Awaited<ReturnType<ProviderAccountsService['getProviderAccount']>>,
+  ): {
     billingCycle: BillingCycle | null;
     startedAt: string | null;
     expiresAt: string | null;
@@ -245,7 +220,8 @@ export class ProviderSubscriptionBillingService {
       startedAt: account.subscriptionStartedAt?.toISOString() ?? null,
       expiresAt: expiresAt?.toISOString() ?? null,
       lastPaymentAt: account.lastSubscriptionPaymentAt?.toISOString() ?? null,
-      status: isPaidTier && !isExpired ? 'ACTIVE' : isExpired ? 'EXPIRED' : 'FREE',
+      status:
+        isPaidTier && !isExpired ? 'ACTIVE' : isExpired ? 'EXPIRED' : 'FREE',
       daysRemaining,
     };
   }

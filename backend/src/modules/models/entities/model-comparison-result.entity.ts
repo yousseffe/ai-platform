@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { Model } from './model.entity';
 import { ModelComparisonSession } from './model-comparison-session.entity';
+import { InferenceStatus } from '../../inference';
 
 @Entity('model_comparison_results')
 export class ModelComparisonResult {
@@ -82,8 +83,12 @@ export class ModelComparisonResult {
   @Column({ name: 'total_tokens', type: 'integer', nullable: true })
   totalTokens: number | null;
 
-  @Column({ type: 'varchar', length: 24, default: 'FAILED' })
-  status: string;
+  @Column({
+    type: 'varchar',
+    enum: InferenceStatus,
+    default: InferenceStatus.FAILED,
+  })
+  status: InferenceStatus;
 
   @Column({ name: 'status_code', type: 'integer', nullable: true })
   statusCode: number | null;

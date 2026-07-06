@@ -8,23 +8,17 @@ import {
   MoreThanOrEqual,
   Repository,
 } from 'typeorm';
-import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
-import { AdminGuard } from '../../auth/guards/admin.guard';
+import { ApiKeyOrJwtGuard } from '../../../shared/guards/api-key-or-jwt.guard';
+import { AdminGuard } from '../../../shared/guards/admin.guard';
 import { User } from '../../users/entities/user.entity';
 import { Model } from '../../models/entities/model.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
-import { Wallet } from '../../wallets/entities/wallet.entity';
 import { Transaction } from '../../wallets/entities/transaction.entity';
+import { Wallet } from '../../wallets/entities/wallet.entity';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 
 const PLATFORM_OWNER_ID = '00000000-0000-0000-0000-000000000000';
 
-/**
- * Read-only platform KPI and ledger surface consumed by the `admin_get_platform_stats`
- * and `admin_list_transactions` MCP tools. Mirrors `AdminController.getStats()`/
- * `getTransactions()` but is guarded for API-key/MCP-token access instead of
- * JWT-only, so it never grants those tokens write access to the mutating endpoint.
- */
 @Controller('admin-mcp')
 @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
 export class PlatformStatsMcpController {
@@ -41,11 +35,6 @@ export class PlatformStatsMcpController {
     private readonly transactionRepository: Repository<Transaction>,
   ) {}
 
-  /**
-   * Platform-wide KPI snapshot: user/model/org counts and platform revenue balance.
-   *
-   * @returns Aggregate platform statistics.
-   */
   @Get('stats')
   async getStats(): Promise<{
     totalUsers: number;
@@ -73,18 +62,6 @@ export class PlatformStatsMcpController {
     };
   }
 
-  /**
-   * Paginated, filterable platform transaction ledger.
-   *
-   * @param page - Page number (default 1).
-   * @param limit - Page size (default 20, max 100).
-   * @param scope - `'SYSTEM_REVENUE'` restricts results to the platform's own wallets.
-   * @param type - Optional CREDIT/DEBIT filter.
-   * @param startDate - Optional ISO date range start.
-   * @param endDate - Optional ISO date range end.
-   * @param search - Optional reference search term.
-   * @returns Paginated transaction records.
-   */
   @Get('transactions')
   async getTransactions(
     @Query('page') page = '1',

@@ -15,7 +15,6 @@ import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { PipelinesService } from './pipelines.service';
 import { RunPipelineJobPayload } from '../interfaces/queue-payload.interface';
 
-/** Triggers and reports on {@link PipelineRun} execution. */
 @Injectable()
 export class PipelineRunsService {
   constructor(
@@ -26,12 +25,6 @@ export class PipelineRunsService {
     private readonly pipelinesService: PipelinesService,
   ) {}
 
-  /**
-   * Creates a pending run for a `VALIDATED` pipeline and enqueues it for
-   * background execution.
-   *
-   * @throws {BadRequestException} If the pipeline isn't `VALIDATED`.
-   */
   async triggerRun(
     pipelineId: string,
     actorId: string,
@@ -65,10 +58,6 @@ export class PipelineRunsService {
     return run;
   }
 
-  /**
-   * Fetches a run's current status/output, enforcing ownership via its
-   * parent pipeline.
-   */
   async getRun(runId: string, actorId: string): Promise<PipelineRun> {
     const run = await this.runRepository.findOne({
       where: { id: runId },
@@ -83,7 +72,6 @@ export class PipelineRunsService {
     return run;
   }
 
-  /** Lists recent runs for a pipeline, newest first. */
   async listRuns(pipelineId: string, actorId: string): Promise<PipelineRun[]> {
     await this.pipelinesService.getPipeline(pipelineId, actorId);
     return this.runRepository.find({

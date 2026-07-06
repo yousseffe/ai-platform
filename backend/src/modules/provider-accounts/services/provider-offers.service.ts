@@ -17,9 +17,6 @@ import { ProviderEligibility } from '../enums/provider-eligibility.enum';
 import { OfferPricingResult } from '../interfaces/offer-pricing.interface';
 import { calculateOfferPricing } from '../utils/offer-pricing.util';
 
-/**
- * Manages provider subscription offers, validation, pricing, and redemptions.
- */
 @Injectable()
 export class ProviderOffersService {
   constructor(
@@ -31,11 +28,6 @@ export class ProviderOffersService {
     private readonly tierRepository: Repository<ProviderTierDefinition>,
   ) {}
 
-  /**
-   * Lists all admin-created offers.
-   *
-   * @returns Offer collection.
-   */
   async listOffers(): Promise<ProviderOffer[]> {
     return this.offerRepository.find({
       relations: ['tiers'],
@@ -43,23 +35,10 @@ export class ProviderOffersService {
     });
   }
 
-  /**
-   * Retrieves an offer by UUID for internal billing workflows.
-   *
-   * @param offerId - Offer UUID.
-   * @returns Provider offer.
-   */
   async getOfferById(offerId: string): Promise<ProviderOffer> {
     return this.getOffer(offerId);
   }
 
-  /**
-   * Creates a provider offer.
-   *
-   * @param dto - Offer creation payload.
-   * @param createdBy - Admin user UUID.
-   * @returns Created offer.
-   */
   async createOffer(
     dto: UpsertProviderOfferDto,
     createdBy: string,
@@ -72,13 +51,6 @@ export class ProviderOffersService {
     return this.offerRepository.save(offer);
   }
 
-  /**
-   * Updates an existing provider offer.
-   *
-   * @param offerId - Offer UUID.
-   * @param dto - Offer update payload.
-   * @returns Updated offer.
-   */
   async updateOffer(
     offerId: string,
     dto: UpsertProviderOfferDto,
@@ -89,13 +61,6 @@ export class ProviderOffersService {
     return this.offerRepository.save(offer);
   }
 
-  /**
-   * Toggles offer availability.
-   *
-   * @param offerId - Offer UUID.
-   * @param isActive - Target active state.
-   * @returns Updated offer.
-   */
   async setOfferActive(
     offerId: string,
     isActive: boolean,
@@ -105,15 +70,6 @@ export class ProviderOffersService {
     return this.offerRepository.save(offer);
   }
 
-  /**
-   * Finds and validates an offer code for checkout.
-   *
-   * @param code - Offer code.
-   * @param account - Provider account.
-   * @param tier - Target tier.
-   * @param billingCycle - Selected billing cycle.
-   * @returns Valid offer.
-   */
   async validateOfferCode(
     code: string,
     account: ProviderAccount,
@@ -131,13 +87,6 @@ export class ProviderOffersService {
     return offer;
   }
 
-  /**
-   * Applies a validated offer to an amount.
-   *
-   * @param originalAmountEgp - Original amount.
-   * @param offer - Validated offer.
-   * @returns Pricing result.
-   */
   calculateDiscount(
     originalAmountEgp: number,
     offer: ProviderOffer | null,
@@ -156,9 +105,6 @@ export class ProviderOffersService {
     );
   }
 
-  /**
-   * Logs a completed offer redemption.
-   */
   async recordRedemption(params: {
     offer: ProviderOffer;
     providerAccount: ProviderAccount;
@@ -189,9 +135,6 @@ export class ProviderOffersService {
     return this.redemptionRepository.save(redemption);
   }
 
-  /**
-   * Retrieves an offer with tier relations.
-   */
   private async getOffer(offerId: string): Promise<ProviderOffer> {
     const offer = await this.offerRepository.findOne({
       where: { id: offerId },
@@ -203,9 +146,6 @@ export class ProviderOffersService {
     return offer;
   }
 
-  /**
-   * Validates offer business rules for a provider checkout.
-   */
   private async assertOfferCanApply(
     offer: ProviderOffer,
     account: ProviderAccount,
@@ -216,11 +156,18 @@ export class ProviderOffersService {
     if (!offer.isActive || offer.startDate > now || offer.endDate < now) {
       throw new BadRequestException('Offer is not active for the current date');
     }
-    if (offer.billingCycle !== BillingCycle.BOTH && offer.billingCycle !== billingCycle) {
-      throw new BadRequestException('Offer does not apply to this billing cycle');
+    if (
+      offer.billingCycle !== BillingCycle.BOTH &&
+      offer.billingCycle !== billingCycle
+    ) {
+      throw new BadRequestException(
+        'Offer does not apply to this billing cycle',
+      );
     }
     if (offer.appliesTo === OfferAppliesTo.SPECIFIC_TIERS) {
-      const appliesToTier = offer.tiers.some((candidate) => candidate.id === tier.id);
+      const appliesToTier = offer.tiers.some(
+        (candidate) => candidate.id === tier.id,
+      );
       if (!appliesToTier) {
         throw new BadRequestException('Offer does not apply to this tier');
       }
@@ -229,9 +176,6 @@ export class ProviderOffersService {
     await this.assertRedemptionLimits(offer, account);
   }
 
-  /**
-   * Validates new/existing provider eligibility rules.
-   */
   private assertProviderEligibility(
     offer: ProviderOffer,
     account: ProviderAccount,
@@ -251,9 +195,6 @@ export class ProviderOffersService {
     }
   }
 
-  /**
-   * Validates global and per-provider redemption counts.
-   */
   private async assertRedemptionLimits(
     offer: ProviderOffer,
     account: ProviderAccount,
@@ -279,9 +220,6 @@ export class ProviderOffersService {
     }
   }
 
-  /**
-   * Resolves tier relations for an offer payload.
-   */
   private async resolveOfferTiers(
     dto: UpsertProviderOfferDto,
   ): Promise<ProviderTierDefinition[]> {
@@ -292,16 +230,15 @@ export class ProviderOffersService {
     if (tierIds.length === 0) {
       throw new BadRequestException('Specific tier offers require tierIds');
     }
-    const tiers = await this.tierRepository.find({ where: { id: In(tierIds) } });
+    const tiers = await this.tierRepository.find({
+      where: { id: In(tierIds) },
+    });
     if (tiers.length !== tierIds.length) {
       throw new BadRequestException('One or more offer tiers were not found');
     }
     return tiers;
   }
 
-  /**
-   * Normalizes offer DTO into entity fields.
-   */
   private mapDto(dto: UpsertProviderOfferDto): Partial<ProviderOffer> {
     return {
       title: dto.title.trim(),

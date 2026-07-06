@@ -10,9 +10,9 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Deployment } from '../deployments/entities/deployment.entity';
+import { getRsaKeys } from '../auth';
 import * as Docker from 'dockerode';
 import { getDockerOptions } from '../../shared/docker/docker.util';
-import { getRsaKeys } from '../auth/utils/keys';
 import { Writable } from 'stream';
 import { Logger } from '@nestjs/common';
 
@@ -66,14 +66,14 @@ export class LogStreamGateway
       client.data.user = {
         id: payload.sub,
         email: payload.email,
-        isAdmin: payload.isAdmin || false, // Check if isAdmin payload exists
+        isAdmin: payload.isAdmin || false,
       };
       this.logger.log(
         `Authenticated client ${client.id} as User ID: ${client.data.user.id}`,
       );
-    } catch (err) {
+    } catch (err: unknown) {
       this.logger.warn(
-        `Authentication failed for client ${client.id}: ${err.message}`,
+        `Authentication failed for client ${client.id}: ${(err as Error).message}`,
       );
       client.disconnect();
     }
@@ -89,8 +89,10 @@ export class LogStreamGateway
       try {
         client.data.logStream.destroy();
         this.logger.log(`Cleaned up log stream for client ${client.id}`);
-      } catch (err) {
-        this.logger.error(`Error destroying log stream: ${err.message}`);
+      } catch (err: unknown) {
+        this.logger.error(
+          `Error destroying log stream: ${(err as Error).message}`,
+        );
       }
       client.data.logStream = null;
     }
@@ -143,12 +145,11 @@ export class LogStreamGateway
 
       const container = this.docker.getContainer(deployment.containerId);
 
-      // Verify container exists
       try {
         await container.inspect();
-      } catch (err) {
+      } catch (err: unknown) {
         client.emit('error', {
-          message: `Container not found on Docker host: ${err.message}`,
+          message: `Container not found on Docker host: ${(err as Error).message}`,
         });
         return;
       }
@@ -193,12 +194,16 @@ export class LogStreamGateway
       });
 
       logStream.on('error', (err) => {
-        client.emit('error', { message: `Stream error: ${err.message}` });
+        client.emit('error', {
+          message: `Stream error: ${(err as Error).message}`,
+        });
       });
-    } catch (err) {
-      this.logger.error(`Error initializing log stream: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(
+        `Error initializing log stream: ${(err as Error).message}`,
+      );
       client.emit('error', {
-        message: `Internal server error: ${err.message}`,
+        message: `Internal server error: ${(err as Error).message}`,
       });
     }
   }

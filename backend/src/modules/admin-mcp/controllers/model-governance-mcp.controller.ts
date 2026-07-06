@@ -7,18 +7,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
-import { AdminGuard } from '../../auth/guards/admin.guard';
+import { ApiKeyOrJwtGuard } from '../../../shared/guards/api-key-or-jwt.guard';
+import { AdminGuard } from '../../../shared/guards/admin.guard';
+import { ModelReview } from '../../models/entities/model-review.entity';
 import { ModelVersion } from '../../models/entities/model-version.entity';
 import { ModelVersionReviewEvent } from '../../models/entities/model-version-review-event.entity';
-import { ModelReview } from '../../models/entities/model-review.entity';
 
-/**
- * Read-only model governance surface consumed by the `admin_get_model_versions`
- * and `admin_get_model_reviews` MCP tools. Surfaces the version/review-approval
- * history and individual consumer reviews that the dashboard only ever shows
- * as an aggregate rating — there is no existing admin endpoint for either today.
- */
 @Controller('admin-mcp')
 @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
 export class ModelGovernanceMcpController {
@@ -31,13 +25,6 @@ export class ModelGovernanceMcpController {
     private readonly modelReviewRepository: Repository<ModelReview>,
   ) {}
 
-  /**
-   * Lists a model's version history alongside its governance review events
-   * (submissions, approvals, declines, build events).
-   *
-   * @param id - Model UUID.
-   * @returns Version history and review event timeline.
-   */
   @Get('models/:id/versions')
   async getModelVersions(@Param('id', ParseUUIDPipe) id: string) {
     const [versions, events] = await Promise.all([
@@ -79,13 +66,6 @@ export class ModelGovernanceMcpController {
     };
   }
 
-  /**
-   * Lists the individual consumer review records for a model (not just the
-   * aggregate rating already shown elsewhere).
-   *
-   * @param id - Model UUID.
-   * @returns Individual review records.
-   */
   @Get('models/:id/reviews')
   async getModelReviews(@Param('id', ParseUUIDPipe) id: string) {
     const reviews = await this.modelReviewRepository.find({

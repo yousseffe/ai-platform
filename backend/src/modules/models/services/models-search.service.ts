@@ -1,91 +1,26 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { OpenSearchService } from '../../../shared/opensearch/opensearch.service';
 import { Model } from '../entities/model.entity';
-
-/** Shape of a single model document stored in OpenSearch. */
-interface ModelDocument {
-  id: string;
-  name: string;
-  description: string;
-  type: string;
-  taskType: string;
-  framework: string;
-  isPublic: boolean;
-  marketplaceVerified: boolean;
-  organizationName: string | null;
-  publisherEmail: string;
-  versionCount: number;
-  hasLiveDeployment: boolean;
-  createdAt: string;
-  averageRating: number;
-  reviewCount: number;
-}
-
-/** Facet bucket returned by OpenSearch aggregations. */
-interface FacetBucket {
-  key: string;
-  doc_count: number;
-}
-
-/** Aggregation node in an OpenSearch response. */
-interface AggregationResult {
-  buckets: FacetBucket[];
-}
-
-/** Typed structure of the OpenSearch search response body. */
-interface OpenSearchHitsWrapper {
-  total: { value: number };
-  hits: Array<{ _source: ModelDocument }>;
-}
-
-/** Public search result shape returned to controllers. */
-export interface SearchResult {
-  hits: ModelDocument[];
-  total: number;
-  page: number;
-  limit: number;
-  facets: {
-    types: FacetBucket[];
-    frameworks: FacetBucket[];
-    taskTypes: FacetBucket[];
-  };
-}
-
-/** Parameters accepted by the search method. */
-export interface SearchParams {
-  q?: string;
-  type?: string;
-  framework?: string;
-  taskType?: string;
-  page?: number;
-  limit?: number;
-}
+import {
+  ModelDocument,
+  AggregationResult,
+  OpenSearchHitsWrapper,
+  SearchResult,
+  SearchParams,
+} from '../interfaces/search.interface';
 
 const INDEX_NAME = process.env.OPENSEARCH_INDEX || 'mlhub-models';
 
-/**
- * Domain service encapsulating all OpenSearch operations for the models catalog.
- * Manages index creation, document indexing/deletion, and smart full-text search
- * with fuzzy matching, field boosting, and faceted aggregation.
- */
 @Injectable()
 export class ModelsSearchService implements OnModuleInit {
   private readonly logger = new Logger(ModelsSearchService.name);
 
   constructor(private readonly openSearchService: OpenSearchService) {}
 
-  /**
-   * Ensures the OpenSearch index with its mapping exists on module startup.
-   * Called automatically by NestJS lifecycle hooks.
-   */
   async onModuleInit(): Promise<void> {
     await this.ensureIndexExists();
   }
 
-  /**
-   * Creates the mlhub-models index with optimized field mappings if it does not exist.
-   * Uses a custom analyzer for improved tokenization and search accuracy.
-   */
   private async ensureIndexExists(): Promise<void> {
     try {
       const exists = await this.openSearchService.indexExists(INDEX_NAME);
@@ -135,12 +70,6 @@ export class ModelsSearchService implements OnModuleInit {
     }
   }
 
-  /**
-   * Converts a Model entity into a flat document and upserts it into OpenSearch.
-   * Should be called after model creation or metadata updates.
-   *
-   * @param model - The full Model entity with relations loaded.
-   */
   async indexModel(model: Model): Promise<void> {
     try {
       await this.ensureIndexExists();
@@ -156,21 +85,10 @@ export class ModelsSearchService implements OnModuleInit {
     }
   }
 
-  /**
-   * Removes a model document from the OpenSearch index.
-   * Should be called when a model is deleted from the database.
-   *
-   * @param modelId - The UUID of the model to remove from the index.
-   */
   async deleteFromIndex(modelId: string): Promise<void> {
     await this.openSearchService.delete(INDEX_NAME, modelId);
   }
 
-  /**
-   * Bulk-indexes multiple models at once (used by the seed script).
-   *
-   * @param models - Array of Model entities to index.
-   */
   async bulkIndex(models: Model[]): Promise<void> {
     await this.ensureIndexExists();
     const documents = models.map((model) => ({
@@ -181,20 +99,11 @@ export class ModelsSearchService implements OnModuleInit {
     this.logger.log(`Bulk indexed ${models.length} models into ${INDEX_NAME}`);
   }
 
-  /**
-   * Executes a smart full-text search query against the OpenSearch index.
-   * Supports fuzzy matching, multi-field boosting, exact enum filters,
-   * and returns aggregated facet counts for sidebar filtering.
-   *
-   * @param params - The search parameters including query, filters, and pagination.
-   * @returns A promise resolving to the ranked search results with facets.
-   */
   async search(params: SearchParams): Promise<SearchResult> {
     const { q, type, framework, taskType, page = 1, limit = 20 } = params;
 
     const from = (page - 1) * limit;
 
-    // Build the must clause — only added when a query string is provided
     const mustClauses: Record<string, unknown>[] = [];
     if (q && q.trim()) {
       mustClauses.push({
@@ -215,7 +124,6 @@ export class ModelsSearchService implements OnModuleInit {
       });
     }
 
-    // Exact enum filters applied via filter context (no scoring cost)
     const filterClauses: Record<string, unknown>[] = [
       { term: { isPublic: true } },
     ];
@@ -230,7 +138,7 @@ export class ModelsSearchService implements OnModuleInit {
           filter: filterClauses,
         },
       },
-      // Faceted aggregations — always computed on the unfiltered enum axes
+
       aggs: {
         by_type: {
           terms: { field: 'type', size: 10 },
@@ -244,7 +152,7 @@ export class ModelsSearchService implements OnModuleInit {
       },
       from,
       size: limit,
-      // Boost recently added models slightly when relevance scores are tied
+
       sort: q ? ['_score', { createdAt: 'desc' }] : [{ createdAt: 'desc' }],
     };
 
@@ -254,7 +162,7 @@ export class ModelsSearchService implements OnModuleInit {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`OpenSearch query failed: ${message}`);
-      // Gracefully degrade — return empty results
+
       return {
         hits: [],
         total: 0,
@@ -265,12 +173,6 @@ export class ModelsSearchService implements OnModuleInit {
     }
   }
 
-  /**
-   * Converts a Model entity into a flat OpenSearch document object.
-   *
-   * @param model - The Model entity with optional relations.
-   * @returns A flat ModelDocument ready for indexing.
-   */
   private buildDocument(model: Model): ModelDocument {
     const hasLiveDeployment =
       model.versions?.some((v) =>
@@ -296,14 +198,6 @@ export class ModelsSearchService implements OnModuleInit {
     };
   }
 
-  /**
-   * Parses the raw OpenSearch response into the typed SearchResult shape.
-   *
-   * @param raw - The raw OpenSearch response body.
-   * @param page - The current page number.
-   * @param limit - The page size.
-   * @returns A typed SearchResult object.
-   */
   private parseSearchResponse(
     raw: Record<string, unknown>,
     page: number,

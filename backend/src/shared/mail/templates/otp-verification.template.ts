@@ -1,10 +1,3 @@
-/**
- * Generates a highly professional HTML template for user account verification OTP.
- *
- * @param fullName - The full name of the registering user.
- * @param otpCode - The 6-digit verification code.
- * @returns A string containing the formatted HTML email body.
- */
 export function getOtpVerificationTemplate(
   fullName: string,
   otpCode: string,

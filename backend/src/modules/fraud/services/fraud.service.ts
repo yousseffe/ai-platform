@@ -6,26 +6,20 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
-import { ModelLog } from '../../models/entities/model-log.entity';
 import { Model } from '../../models/entities/model.entity';
+import { ModelLog } from '../../models/entities/model-log.entity';
 import { Alert } from '../../analytics/entities/alert.entity';
+import { FirewallService } from '../../firewall';
 import { MailService } from '../../../shared/mail/mail.service';
 import { RiskBaseline } from '../entities/risk-baseline.entity';
 import { RiskEvent } from '../entities/risk-event.entity';
 import { assessTraffic, TrafficFeatures } from '../fraud-rules';
 import { aggregateFeatures } from './fraud-aggregate';
-import { FirewallService } from '../../firewall/services/firewall.service';
 
 const WINDOW_MINUTES = 5;
 const EWMA_ALPHA = 0.3;
 const PERSIST_THRESHOLD = 50;
 
-/**
- * Deterministic fraud/abuse detection engine. Aggregates ModelLog traffic into
- * features, maintains EWMA baselines, applies rules + statistical anomaly tests,
- * and persists findings + alerts. No LLM, no inference, read-only enforcement
- * (it reports and notifies; it never blocks traffic).
- */
 @Injectable()
 export class FraudService {
   private readonly logger = new Logger(FraudService.name);
@@ -43,12 +37,6 @@ export class FraudService {
     private readonly firewallService: FirewallService,
   ) {}
 
-  /**
-   * Scans all models with recent activity, updates baselines, and records any
-   * risk findings. Invoked on a schedule by the fraud processor.
-   *
-   * @returns The number of risk events recorded.
-   */
   async scanAll(): Promise<number> {
     const since = new Date(Date.now() - WINDOW_MINUTES * 60 * 1000);
     const logs = await this.modelLogRepository.find({
@@ -70,7 +58,7 @@ export class FraudService {
       try {
         const handled = await this.assessModel(modelId, modelLogs);
         if (handled) recorded += 1;
-      } catch (err) {
+      } catch (err: unknown) {
         this.logger.warn(
           `Fraud scan failed for model ${modelId}: ${
             err instanceof Error ? err.message : String(err)
@@ -81,12 +69,6 @@ export class FraudService {
     return recorded;
   }
 
-  /**
-   * Assesses a single model's window of logs, updating its baseline and
-   * persisting a finding when the risk threshold is met.
-   *
-   * @returns True if a new risk event was persisted.
-   */
   private async assessModel(
     modelId: string,
     modelLogs: ModelLog[],
@@ -117,8 +99,6 @@ export class FraudService {
       return false;
     }
 
-    // Deduplicate ongoing conditions: skip if an identical-class finding was
-    // recorded within the current window.
     const recentSince = new Date(Date.now() - WINDOW_MINUTES * 60 * 1000);
     const duplicate = await this.riskEventRepository.findOne({
       where: {
@@ -149,13 +129,12 @@ export class FraudService {
     return true;
   }
 
-  /** Applies the EWMA update to a model's baseline, creating it if absent. */
   private async updateBaseline(
     baseline: RiskBaseline | null,
     modelId: string,
     f: TrafficFeatures,
   ): Promise<void> {
-    const avgLatency = 0; // latency baseline reserved for future use
+    const avgLatency = 0;
     const ewma = (prev: number, cur: number): number =>
       EWMA_ALPHA * cur + (1 - EWMA_ALPHA) * prev;
 
@@ -178,7 +157,6 @@ export class FraudService {
     await this.baselineRepository.save(baseline);
   }
 
-  /** Persists a RiskEvent and a corresponding in-app Alert. */
   private async persistFinding(
     modelId: string,
     ownerId: string | null,
@@ -217,7 +195,6 @@ export class FraudService {
     );
   }
 
-  /** Best-effort owner notification email. */
   private async notify(
     ownerEmail: string | null,
     modelId: string,
@@ -243,12 +220,6 @@ export class FraudService {
     );
   }
 
-  /**
-   * Returns recent risk events across ALL models — admin-only, no ownership check.
-   *
-   * @param limit - Maximum number of events to return (default 50).
-   * @returns Array of recent risk events with modelId and threat metadata.
-   */
   async getAdminRiskEvents(limit = 50): Promise<unknown[]> {
     return this.riskEventRepository.find({
       order: { createdAt: 'DESC' },
@@ -256,13 +227,6 @@ export class FraudService {
     });
   }
 
-  /**
-   * Returns a risk report for any model — admin-only, bypasses ownership check.
-   *
-   * @param modelId - Target model UUID.
-   * @returns The risk report with model name and owner email included.
-   * @throws {NotFoundException} If the model does not exist.
-   */
   async getAdminRiskReport(modelId: string): Promise<unknown> {
     const model = await this.modelLogRepository.manager
       .getRepository(Model)
@@ -292,16 +256,6 @@ export class FraudService {
     };
   }
 
-  /**
-   * Returns a risk report for a model the actor owns: recent findings and the
-   * current baseline.
-   *
-   * @param modelId - Target model UUID.
-   * @param actorId - Authenticated user id (ownership enforced).
-   * @returns The risk report.
-   * @throws {NotFoundException} If the model does not exist.
-   * @throws {ForbiddenException} If the actor does not own the model.
-   */
   async getRiskReport(modelId: string, actorId: string): Promise<unknown> {
     const model = await this.modelLogRepository.manager
       .getRepository(Model)

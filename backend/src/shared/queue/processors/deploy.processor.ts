@@ -18,14 +18,11 @@ import { Logger } from '@nestjs/common';
 import { DeployJobPayload } from '../interfaces/queue.interface';
 import { getDockerOptions } from '../../docker/docker.util';
 import { RedisService } from '../../redis/redis.service';
+import { buildDockerContainerOptions } from '../utils/deploy-processor.utils';
 
-/**
- * BullMQ processor responsible for scheduling and launching containerized
- * model versions as running server instances inside isolated Docker containers.
- */
 @Processor('deploy-queue', {
   concurrency: parseInt(process.env.DEPLOY_QUEUE_CONCURRENCY || '3', 10),
-  lockDuration: 300000, // 5 minutes lock duration to prevent stall if pulling base image (e.g. llama.cpp)
+  lockDuration: 300000,
   stalledInterval: 300000,
 })
 export class DeployProcessor extends WorkerHost {
@@ -44,13 +41,6 @@ export class DeployProcessor extends WorkerHost {
     this.docker = new Docker(getDockerOptions());
   }
 
-  /**
-   * Processes a background deployment job. Spins up a new Docker container
-   * using the target version image, maps a dynamic host port, and records endpoints.
-   *
-   * @param job - The background job payload carrying the target deployment ID.
-   * @returns A promise that resolves when the container starts running.
-   */
   async process(job: Job<any, void, string>): Promise<void> {
     if (job.name === 'check-idle-deployments') {
       await this.checkIdleDeployments();
@@ -94,7 +84,6 @@ export class DeployProcessor extends WorkerHost {
         ? 'ghcr.io/ggml-org/llama.cpp:server'
         : `model-version-${deployment.modelVersion.id}`;
 
-      // Find next available port starting from 8000
       const activeDeployments = await this.deploymentsRepository.find({
         where: { status: DeploymentStatus.RUNNING },
       });
@@ -102,7 +91,6 @@ export class DeployProcessor extends WorkerHost {
         activeDeployments.map((d) => d.port).filter((p) => p != null),
       );
 
-      // Query Docker daemon for any containers already mapping host ports
       try {
         const containers = await this.docker.listContainers({ all: true });
         for (const container of containers) {
@@ -114,7 +102,7 @@ export class DeployProcessor extends WorkerHost {
             }
           }
         }
-      } catch (dockerErr) {
+      } catch (dockerErr: unknown) {
         this.logger.warn(
           `Could not list docker containers for port check: ${dockerErr}`,
         );
@@ -158,7 +146,6 @@ export class DeployProcessor extends WorkerHost {
         ownerApiKey = apiKeyEntity?.key || '';
       }
 
-      // Ensure the isolated sandbox network 'ai-platform_models' exists
       const networks = await this.docker.listNetworks();
       const hasNetwork = networks.some((n) => n.Name === 'ai-platform_models');
       if (!hasNetwork) {
@@ -169,12 +156,6 @@ export class DeployProcessor extends WorkerHost {
         });
       }
 
-      // Ensure the no-egress network exists for models that haven't opted
-      // into outbound internet access. `Internal: true` means Docker never
-      // attaches a default route out of this network — containers on it can
-      // still reach each other (and the otel-collector, which is dual-homed
-      // onto this network in docker-compose.yml) but cannot reach the
-      // internet or the host's other networks.
       const hasIsolatedNetwork = networks.some(
         (n) => n.Name === 'ai-platform_models_isolated',
       );
@@ -187,20 +168,12 @@ export class DeployProcessor extends WorkerHost {
         });
       }
 
-      // Memory-based eviction check
       const TIER_RAM_MAP: Record<string, number> = {
-        SMALL: 512, // 512 MB
-        MEDIUM: 1024, // 1 GB
-        LARGE: 2048, // 2 GB
+        SMALL: 512,
+        MEDIUM: 1024,
+        LARGE: 2048,
       };
 
-      // Diffusion pipelines (UNet + VAE + text encoder + safety checker,
-      // loaded at fp32 on CPU) need well over 512MB even for a "tiny"
-      // model — the billing tier alone (which defaults new models to SMALL)
-      // isn't a reliable proxy for actual memory footprint for this model
-      // type. Enforce a floor so these don't get OOM-killed (exit 137)
-      // regardless of tier. Applied consistently everywhere TIER_RAM_MAP
-      // is used below so eviction accounting stays accurate.
       const DIFFUSION_MIN_RAM_MB = 2048;
       const getRamMb = (model: { tier?: string; type?: ModelType }): number => {
         const tier = model.tier?.toUpperCase() || 'SMALL';
@@ -216,13 +189,12 @@ export class DeployProcessor extends WorkerHost {
       const MAX_SYSTEM_RAM_MB = parseInt(
         process.env.MAX_SYSTEM_RAM_MB || '3072',
         10,
-      ); // Default: 3 GB (3072 MB)
+      );
 
       this.logger.log(
         `Checking memory limits for deploying ${deploymentId} (Tier: ${newModelTier}, footprint: ${newModelRamMb}MB)`,
       );
 
-      // Calculate total RAM used by currently running containers
       const runningDeployments = await this.deploymentsRepository.find({
         where: { status: DeploymentStatus.RUNNING },
         relations: ['modelVersion', 'modelVersion.model'],
@@ -241,7 +213,6 @@ export class DeployProcessor extends WorkerHost {
           `Memory threshold exceeded (${currentSystemRamMb + newModelRamMb}MB > ${MAX_SYSTEM_RAM_MB}MB). Starting eviction...`,
         );
 
-        // Fetch last active times from Redis for all running deployments
         const runningWithActiveTimes = await Promise.all(
           runningDeployments.map(async (dep) => {
             const lastActiveStr = await this.redisService.get(
@@ -254,7 +225,6 @@ export class DeployProcessor extends WorkerHost {
           }),
         );
 
-        // Sort by last active time ascending (oldest/least recently active first)
         runningWithActiveTimes.sort(
           (a, b) => a.lastActiveTime - b.lastActiveTime,
         );
@@ -280,11 +250,10 @@ export class DeployProcessor extends WorkerHost {
         }
       }
 
-      // Ensure the GGUF base image exists locally by checking and pulling it if needed
       if (isLlm) {
         try {
           await this.docker.getImage(imageName).inspect();
-        } catch (e) {
+        } catch (e: unknown) {
           this.logger.log(
             `Base image ${imageName} not found locally. Pulling from registry...`,
           );
@@ -308,45 +277,8 @@ export class DeployProcessor extends WorkerHost {
         ? 'ai-platform_models'
         : 'ai-platform_models_isolated';
 
-      const hostConfig: Docker.HostConfig = {
-        PortBindings: {
-          [containerPort]: [{ HostPort: nextPort.toString() }],
-        },
-        NetworkMode: networkMode,
-      };
-
-      // Container sandboxing: model containers execute untrusted,
-      // user-uploaded preprocess/postprocess scripts and model weights, so
-      // they get the same hardening as an untrusted-code sandbox regardless
-      // of framework. Kept behind an env kill-switch in case a specific
-      // framework's runtime needs a capability or writable path this doesn't
-      // anticipate — flip MODEL_SANDBOX_HARDENING_ENABLED=false to fall back
-      // to the previous unrestricted container config without a code change.
-      if (process.env.MODEL_SANDBOX_HARDENING_ENABLED !== 'false') {
-        hostConfig.CapDrop = ['ALL'];
-        hostConfig.SecurityOpt = ['no-new-privileges'];
-        hostConfig.PidsLimit = 256;
-        hostConfig.ReadonlyRootfs = true;
-        hostConfig.Tmpfs = {
-          '/tmp': 'size=128m',
-          '/root/.cache': 'size=256m',
-          '/root/.config': 'size=16m',
-        };
-      }
-
+      let hasRelocatedWeights = false;
       if (!isLlm) {
-        hostConfig.Memory = newModelRamMb * 1024 * 1024;
-
-        // C1: mount the shared model-weights volume read-only at /weights
-        // when build.processor.ts successfully relocated this version's
-        // weights out of the Docker image (see build.processor.ts's
-        // `weightsRelocated` flag). We detect this on disk rather than via a
-        // DB column, mirroring the existing GGUF convention of using the
-        // filesystem as the source of truth for weight location. If the
-        // version's weights were never relocated (e.g. an older build, or
-        // the relocation step failed and fell back to COPY-based image), no
-        // bind is added and the image's own COPY'd weights are used as
-        // before — this keeps both old and new images deployable.
         const weightsStorageEnv = process.env.WEIGHTS_STORAGE_PATH;
         const weightsStorageRoot = weightsStorageEnv
           ? path.resolve(weightsStorageEnv)
@@ -355,60 +287,32 @@ export class DeployProcessor extends WorkerHost {
           weightsStorageRoot,
           deployment.modelVersion.id,
         );
-        // Check for actual content, not just directory presence — build.processor.ts
-        // may leave an empty per-version directory behind if relocation failed
-        // partway through, which must not be mistaken for a successful relocation.
-        const hasRelocatedWeights =
+        hasRelocatedWeights =
           fs.existsSync(versionWeightsDir) &&
           fs.readdirSync(versionWeightsDir).length > 0;
-        if (hasRelocatedWeights) {
-          hostConfig.Binds = [`ai-platform_model_weights:/weights:ro`];
-        }
-      } else {
-        // Mount the GGUF named volume directly for native WSL2 I/O speeds
-        hostConfig.Binds = [`ai-platform_llm_models:/models:ro`];
       }
 
-      const containerOptions: any = {
-        name: containerName,
-        Image: imageName,
-        ExposedPorts: {
-          [containerPort]: {},
-        },
-        Env: [
-          `API_KEY=${ownerApiKey}`,
-          `MODEL_ID=${deployment.modelVersion.model.id}`,
-          `VERSION_ID=${deployment.modelVersion.id}`,
-          `USER_ID=${ownerId}`,
-          `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318`,
-          `OTEL_SERVICE_NAME=model-${deployment.modelVersion.model.name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}`,
-        ],
-        HostConfig: hostConfig,
-      };
+      const containerOptions = buildDockerContainerOptions({
+        deployment,
+        containerName,
+        imageName,
+        hostPort: nextPort,
+        containerPort,
+        newModelRamMb,
+        ownerApiKey,
+        ownerId: ownerId || '',
+        isLlm,
+        hasRelocatedWeights,
+      }) as Docker.ContainerCreateOptions;
 
-      if (isLlm) {
-        containerOptions.Entrypoint = [
-          '/app/llama-server',
-          '-m',
-          `/models/${deployment.modelVersion.id}.gguf`,
-          '--port',
-          '8080',
-          '--host',
-          '0.0.0.0',
-          '-np',
-          '2',
-          '-c',
-          '4096',
-        ];
+      if (containerOptions.HostConfig) {
+        containerOptions.HostConfig.NetworkMode = networkMode;
       }
 
       const container = await this.docker.createContainer(containerOptions);
 
       await container.start();
 
-      // Since the backend might be running directly on the host (like during dev),
-      // we check if we are running in a docker container to resolve URLs correctly.
-      // If running on host, communicate via hostPort on localhost.
       const isDocker = fs.existsSync('/.dockerenv');
       const url = isDocker
         ? `http://${containerName}:${urlPort}`
@@ -435,7 +339,6 @@ export class DeployProcessor extends WorkerHost {
         deployment.modelVersion.model.type,
       );
 
-      // Schedule the first health check attempt in 2 seconds
       await this.deployQueue.add(
         'verify-deployment-health',
         { deploymentId, attempt: 1 },
@@ -465,7 +368,7 @@ export class DeployProcessor extends WorkerHost {
       const IDLE_TIMEOUT_MS = parseInt(
         process.env.IDLE_TIMEOUT_MS || '300000',
         10,
-      ); // Default: 5 minutes (300000 ms)
+      );
       const now = Date.now();
 
       for (const deployment of runningDeployments) {
@@ -504,7 +407,6 @@ export class DeployProcessor extends WorkerHost {
       try {
         const container = this.docker.getContainer(deployment.containerId);
 
-        // Remove Prometheus target before stopping container
         const containerName = this.getContainerName(deployment);
         await this.removePrometheusTarget(containerName);
 
@@ -537,16 +439,6 @@ export class DeployProcessor extends WorkerHost {
     });
   }
 
-  /**
-   * B4: Computes an increasing health-check re-poll delay so early attempts
-   * (while the container is most likely to become healthy soon) poll
-   * frequently, while later attempts back off to reduce unnecessary load on
-   * the backend/Docker daemon during long framework-import waits (e.g.
-   * PyTorch/TensorFlow/diffusion cold starts).
-   *
-   * @param attempt - The 1-indexed attempt number that is about to be scheduled.
-   * @returns The delay, in milliseconds, before the next health-check attempt.
-   */
   private getHealthCheckBackoffMs(attempt: number): number {
     if (attempt <= 5) return 2000;
     if (attempt <= 15) return 3000;
@@ -570,7 +462,6 @@ export class DeployProcessor extends WorkerHost {
       return;
     }
 
-    // If it's already running or stopped/failed, we don't need to do anything
     if (deployment.status !== DeploymentStatus.STARTING) {
       this.logger.log(
         `verifyDeploymentHealth: Deployment ${deploymentId} is in status ${deployment.status}. Skipping.`,
@@ -618,13 +509,10 @@ export class DeployProcessor extends WorkerHost {
 
       let isHealthy = false;
       if (isLlm) {
-        // llama-server returns 200 when ready, and 503 when still loading
         if (response.status === 200) {
           isHealthy = true;
         }
       } else {
-        // For non-LLM, uvicorn binds only when loaded. So 200, 404, or 405 are all valid responses
-        // showing the server is up and listening!
         if (response.status < 500) {
           isHealthy = true;
         }
@@ -638,7 +526,6 @@ export class DeployProcessor extends WorkerHost {
           status: DeploymentStatus.RUNNING,
         });
 
-        // Set last-active time in Redis to start idle tracking
         await this.redisService.set(
           `model:last-active:${deploymentId}`,
           Date.now().toString(),
@@ -652,8 +539,7 @@ export class DeployProcessor extends WorkerHost {
       );
     }
 
-    // If health check failed/loading, decide to retry or fail
-    const maxAttempts = isLlm ? 60 : 15; // 60 attempts for LLM (5 mins), 15 for others (75s)
+    const maxAttempts = isLlm ? 60 : 15;
     if (attempt >= maxAttempts) {
       this.logger.error(
         `Deployment ${deploymentId} failed to become healthy after ${attempt} attempts. Marking as FAILED.`,
@@ -668,8 +554,6 @@ export class DeployProcessor extends WorkerHost {
           : 'Model container failed to start responding within 75 seconds.',
       });
     } else {
-      // Re-queue health check with an increasing backoff delay (B4):
-      // denser early on, sparser for long-running framework-import waits.
       const nextAttempt = attempt + 1;
       await this.deployQueue.add(
         'verify-deployment-health',
@@ -705,12 +589,11 @@ export class DeployProcessor extends WorkerHost {
       const content = fs.readFileSync(filePath, 'utf8');
       const targets = JSON.parse(content || '[]');
 
-      // Remove existing target for this container name if any
       const filtered = targets.filter(
-        (t: any) => t.labels?.container_name !== containerName,
+        (t: { labels?: { container_name?: string } }) =>
+          t.labels?.container_name !== containerName,
       );
 
-      // Add new target
       filtered.push({
         targets: [`${containerName}:${port}`],
         labels: {
@@ -726,9 +609,9 @@ export class DeployProcessor extends WorkerHost {
       this.logger.log(
         `Added Prometheus scrape target for container: ${containerName}`,
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.logger.error(
-        `Failed to update Prometheus targets.json (add): ${err.message}`,
+        `Failed to update Prometheus targets.json (add): ${(err as Error).message}`,
       );
     }
   }
@@ -741,16 +624,17 @@ export class DeployProcessor extends WorkerHost {
       const targets = JSON.parse(content || '[]');
 
       const filtered = targets.filter(
-        (t: any) => t.labels?.container_name !== containerName,
+        (t: { labels?: { container_name?: string } }) =>
+          t.labels?.container_name !== containerName,
       );
 
       fs.writeFileSync(filePath, JSON.stringify(filtered, null, 2), 'utf8');
       this.logger.log(
         `Removed Prometheus scrape target for container: ${containerName}`,
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.logger.error(
-        `Failed to update Prometheus targets.json (remove): ${err.message}`,
+        `Failed to update Prometheus targets.json (remove): ${(err as Error).message}`,
       );
     }
   }
@@ -770,7 +654,10 @@ export class DeployProcessor extends WorkerHost {
       const configs = await this.dataSource.getRepository(SystemConfig).find();
       const configMap = new Map(configs.map((c) => [c.key, c.value]));
 
-      const DEFAULT_CAPS_LOCAL: Record<string, { cpuPercent: number; ramMb: number }> = {
+      const DEFAULT_CAPS_LOCAL: Record<
+        string,
+        { cpuPercent: number; ramMb: number }
+      > = {
         TABULAR: { cpuPercent: 30, ramMb: 512 },
         NLP: { cpuPercent: 60, ramMb: 1024 },
         VISION: { cpuPercent: 70, ramMb: 1024 },
@@ -823,9 +710,7 @@ export class DeployProcessor extends WorkerHost {
           const usageBytes = stats.memory_stats.usage || 0;
           ramMb = parseFloat((usageBytes / (1024 * 1024)).toFixed(1));
           statsCollected = true;
-        } catch (err) {
-          // ignore
-        }
+        } catch (err: unknown) {}
 
         if (!statsCollected) continue;
 
@@ -835,7 +720,8 @@ export class DeployProcessor extends WorkerHost {
         if (isCpuViolated || isRamViolated) {
           const redisKey = `model:violation-count:${model.id}`;
           const currentCountStr = await this.redisService.get(redisKey);
-          const nextCount = (currentCountStr ? parseInt(currentCountStr, 10) : 0) + 1;
+          const nextCount =
+            (currentCountStr ? parseInt(currentCountStr, 10) : 0) + 1;
           await this.redisService.set(redisKey, nextCount.toString());
 
           this.logger.warn(
@@ -847,7 +733,6 @@ export class DeployProcessor extends WorkerHost {
               `Resource cap exceeded for model ${model.name} for 3 consecutive intervals. Upgrading tier & pricing...`,
             );
 
-            // 1. Upgrade Tier & Price
             const currentTier = model.tier?.toUpperCase() || 'SMALL';
             const nextTierMap: Record<string, string> = {
               SMALL: 'MEDIUM',
@@ -855,15 +740,18 @@ export class DeployProcessor extends WorkerHost {
               LARGE: 'LARGE',
             };
             const nextTier = nextTierMap[currentTier] || 'LARGE';
-            const costVal = typeof model.costPerRequest === 'string' ? parseFloat(model.costPerRequest) : model.costPerRequest;
-            const newPrice = costVal === 0 ? 0.05 : parseFloat((costVal * 1.5).toFixed(2));
+            const costVal =
+              typeof model.costPerRequest === 'string'
+                ? parseFloat(model.costPerRequest)
+                : model.costPerRequest;
+            const newPrice =
+              costVal === 0 ? 0.05 : parseFloat((costVal * 1.5).toFixed(2));
 
             model.tier = nextTier;
             model.costPerRequest = newPrice;
             model.hasCustomPricing = true;
             await this.dataSource.getRepository(Model).save(model);
 
-            // 2. Log Alert
             const alert = new Alert();
             alert.alertName = 'ModelResourceCapViolation';
             alert.severity = 'critical';
@@ -871,10 +759,13 @@ export class DeployProcessor extends WorkerHost {
             alert.summary = `Model '${model.name}' exceeded limits: CPU=${cpuPercent}% (Cap=${capCpu}%), RAM=${ramMb}MB (Cap=${capRam}MB). Tier automatically upgraded to ${nextTier} and price adjusted to $${newPrice}.`;
             alert.startsAt = new Date();
             alert.endsAt = new Date();
-            alert.labels = { modelId: model.id, modelType: model.type, action: 'AUTO_UPGRADE' };
+            alert.labels = {
+              modelId: model.id,
+              modelType: model.type,
+              action: 'AUTO_UPGRADE',
+            };
             await this.dataSource.getRepository(Alert).save(alert);
 
-            // 3. Send Email Notification
             const ownerEmail = model.user?.email || 'admin@mlhub.com';
             const subject = `[MLHub Auto-Upgrade] Resource Cap Exceeded for Model: ${model.name}`;
             const body = `Hello MLHub User,
@@ -894,15 +785,20 @@ Best regards,
 MLHub Operations Team`;
 
             await this.mailService.sendSecurityAlert(ownerEmail, subject, body);
-            await this.mailService.sendSecurityAlert('admin@mlhub.com', subject, body);
+            await this.mailService.sendSecurityAlert(
+              'admin@mlhub.com',
+              subject,
+              body,
+            );
 
-            // 4. Restart/Stop Container so it boots with upgraded tier limits
             try {
               const container = this.docker.getContainer(dep.containerId);
               await container.stop();
               await container.remove();
-            } catch (err: any) {
-              this.logger.warn(`Failed to remove container during auto-upgrade: ${err.message}`);
+            } catch (err: unknown) {
+              this.logger.warn(
+                `Failed to remove container during auto-upgrade: ${(err as Error).message}`,
+              );
             }
 
             await this.deploymentsRepository.update(dep.id, {
@@ -917,12 +813,14 @@ MLHub Operations Team`;
           await this.redisService.set(`model:violation-count:${model.id}`, '0');
         }
       }
-    } catch (err: any) {
-      this.logger.error(`Error executing checkResourceCaps check: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(
+        `Error executing checkResourceCaps check: ${(err as Error).message}`,
+      );
     }
   }
 
-  private getContainerName(deployment: any): string {
+  private getContainerName(deployment: Deployment): string {
     const userEmail =
       deployment.modelVersion?.model?.user?.email || 'unknown@unknown.com';
     const emailPrefix = userEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');

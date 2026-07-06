@@ -4,9 +4,6 @@ import { Repository } from 'typeorm';
 import { AuditLog } from '../../users/entities/audit-log.entity';
 import { AdminAuditEventSummary } from '../types/admin-dashboard.types';
 
-/**
- * Writes and reads admin audit events using the shared audit log store.
- */
 @Injectable()
 export class AdminAuditLogService {
   constructor(
@@ -14,12 +11,6 @@ export class AdminAuditLogService {
     private readonly auditLogRepository: Repository<AuditLog>,
   ) {}
 
-  /**
-   * Stores a structured admin audit event.
-   *
-   * @param params - Audit event payload.
-   * @returns Persisted audit log entry.
-   */
   async logAdminAction(params: {
     actorAdminId: string;
     action: string;
@@ -44,14 +35,6 @@ export class AdminAuditLogService {
     );
   }
 
-  /**
-   * Lists recent audit entries for a specific entity.
-   *
-   * @param entityType - Entity category.
-   * @param entityId - Entity UUID.
-   * @param limit - Maximum number of rows.
-   * @returns Recent audit event projections.
-   */
   async listEntityAuditEvents(
     entityType: string,
     entityId: string,

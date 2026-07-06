@@ -3,10 +3,7 @@ import { ProviderTierDefinition } from '../entities/provider-tier-definition.ent
 import { ProviderUtilizationService } from './provider-utilization.service';
 
 describe('ProviderUtilizationService', () => {
-  const service = new ProviderUtilizationService(
-    {} as never,
-    {} as never,
-  );
+  const service = new ProviderUtilizationService({} as never, {} as never);
 
   it('applies provider limit overrides over tier defaults', () => {
     const tier = {

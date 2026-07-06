@@ -5,7 +5,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiIdentityService } from '../../auth/services/api-identity.service';
+import { ApiIdentityService } from '../../auth';
 import { Request } from 'express';
 import {
   ModelIntegrationService,
@@ -13,11 +13,6 @@ import {
   OpenApiDocument,
 } from '../services/model-integration.service';
 
-/**
- * Exposes a consumer-facing integration spec for a model: how to call its
- * prediction API (endpoint, auth header format, request/response samples,
- * pricing). Consumed by the MCP server's `integration_get_model_spec` tool.
- */
 @Controller('models')
 export class IntegrationController {
   constructor(
@@ -25,13 +20,6 @@ export class IntegrationController {
     private readonly apiIdentityService: ApiIdentityService,
   ) {}
 
-  /**
-   * Returns the {@link ModelIntegrationSpec} for a model the caller may access.
-   *
-   * @param id - Model UUID.
-   * @param req - Request containing the Authorization header.
-   * @returns The integration spec.
-   */
   @Get(':id/integration-spec')
   async getIntegrationSpec(
     @Param('id') id: string,
@@ -42,9 +30,6 @@ export class IntegrationController {
     return this.modelIntegrationService.getIntegrationSpec(id, actorId);
   }
 
-  /**
-   * Returns a standards-compliant OpenAPI document for this model's predict API.
-   */
   @Get(':id/openapi.json')
   async getOpenApiDocument(
     @Param('id') id: string,
@@ -63,7 +48,6 @@ export class IntegrationController {
       try {
         const identity = await this.apiIdentityService.resolve(authHeader);
 
-        // If it's an MCP token, verify it carries the 'models:read' scope
         if (identity.keyType === 'mcp') {
           if (!identity.mcpScopes?.includes('models:read')) {
             throw new UnauthorizedException(
@@ -73,12 +57,10 @@ export class IntegrationController {
         }
 
         actorId = identity.userId || identity.orgId || undefined;
-      } catch (err) {
-        // If credentials are invalid, we let it fall back to unauthenticated (actorId = undefined)
-        // unless it's a scope error which we want to surface.
+      } catch (err: unknown) {
         if (
           err instanceof UnauthorizedException &&
-          err.message.includes('scope')
+          (err as Error).message.includes('scope')
         ) {
           throw err;
         }

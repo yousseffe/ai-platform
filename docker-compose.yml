@@ -101,6 +101,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: dev
     ports:
       - "3000:3000"
     env_file:
@@ -127,7 +128,6 @@ services:
       - OPENSEARCH_URL=http://opensearch:9200
       - GGUF_STORAGE_PATH=/usr/src/app/uploads/gguf-models
       - WEIGHTS_STORAGE_PATH=/usr/src/app/uploads/model-weights
-      - DB_HOST=host.docker.internal
     volumes:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules

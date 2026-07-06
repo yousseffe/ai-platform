@@ -7,24 +7,19 @@ import { MapperEngineService } from './mapper-engine.service';
 import { PipelineStepExecutorService } from './pipeline-step-executor.service';
 import { PipelineRunPersistenceService } from './pipeline-run-persistence.service';
 import { MapperContext } from '../interfaces/mapper-spec.interface';
-import {
-  ClientRequestMeta,
-  PredictionActor,
-} from '../../models/interfaces/inference.interface';
+import { ClientRequestMeta, PredictionActor } from '../../inference';
 
-/** Result of walking a pipeline run's full stage-by-stage execution. */
 export interface RunStepsOutcome {
   success: boolean;
   anySucceeded: boolean;
-  /** Every completed stage's output, keyed by `order` — see {@link MapperContext.steps}. */
+
   stepOutputs: Record<string, Record<string, unknown>>;
-  /** The `order` of the last stage that ran (successfully or not), or -1 if none did. */
+
   lastStageOrder: number;
   totalCost: number;
   errorMessage: string | null;
 }
 
-/** One step's execution outcome within a stage, before it's folded into the run's aggregates. */
 interface StepOutcome {
   step: PipelineStep;
   success: boolean;
@@ -33,15 +28,6 @@ interface StepOutcome {
   errorMessage: string | null;
 }
 
-/**
- * Walks a pipeline run stage by stage — steps sharing an `order` run
- * concurrently as parallel branches of that stage. For each step, every
- * inbound edge targeting it is applied independently (each against its own
- * upstream step's output) and the results are shallow-merged, which is how a
- * fan-in "join" step combines multiple parallel branches, each with its own
- * from/to mapper. Execution halts before the next stage if any step in the
- * current one failed.
- */
 @Injectable()
 export class PipelineStepLoopService {
   constructor(
@@ -50,13 +36,6 @@ export class PipelineStepLoopService {
     private readonly persistence: PipelineRunPersistenceService,
   ) {}
 
-  /**
-   * @param steps - The pipeline's steps, already sorted by `order`.
-   * @param edges - All edges defined for the pipeline.
-   * @param run - The run these steps belong to, for persistence.
-   * @param actor - The caller identity for billing/logging.
-   * @param clientMeta - Synthetic client metadata for the internal calls.
-   */
   async run(
     steps: PipelineStep[],
     edges: PipelineEdge[],
@@ -120,17 +99,6 @@ export class PipelineStepLoopService {
     };
   }
 
-  /**
-   * Resolves one node's mapped input from every inbound edge targeting it
-   * and shallow-merges the results. `targetStepId` is null to resolve the
-   * pipeline's final output (edges with a null `toStep`). Falls back to the
-   * single immediately-prior stage's output (or the run's input, for the
-   * first stage) when nothing targets this node, preserving the original
-   * no-edge-needed pass-through behavior for purely sequential pipelines.
-   *
-   * Exposed so {@link PipelineRunnerService} can reuse the same merge logic
-   * for the pipeline's final output mapping.
-   */
   resolveMappedInput(
     targetStepId: string | null,
     targetOrder: number,
@@ -169,7 +137,6 @@ export class PipelineStepLoopService {
     return merged;
   }
 
-  /** Executes one step against its resolved mapped input and records the outcome. Never throws. */
   private async runOneStep(
     step: PipelineStep,
     allSteps: PipelineStep[],
@@ -239,7 +206,6 @@ export class PipelineStepLoopService {
     };
   }
 
-  /** Groups steps by `order` into ascending stages; steps within a stage run concurrently. */
   private groupIntoStages(steps: PipelineStep[]): PipelineStep[][] {
     const byOrder = new Map<number, PipelineStep[]>();
     for (const step of steps) {
@@ -252,11 +218,6 @@ export class PipelineStepLoopService {
       .map((order) => byOrder.get(order)!);
   }
 
-  /**
-   * Shapes one stage's combined output for `MapperContext.steps`: a
-   * single-step stage's output is stored flat; a multi-step (parallel)
-   * stage's output is nested one level deeper, keyed by each step's `role`.
-   */
   private buildStageOutput(
     stage: PipelineStep[],
     outcomes: StepOutcome[],
@@ -271,7 +232,6 @@ export class PipelineStepLoopService {
     return nested;
   }
 
-  /** Reads one step's output back out of a `MapperContext.steps`-shaped map, honoring the flat/nested-by-role duality. */
   private outputForStep(
     step: PipelineStep,
     allSteps: PipelineStep[],
@@ -287,13 +247,6 @@ export class PipelineStepLoopService {
     return (stageOutput[key] as Record<string, unknown>) ?? {};
   }
 
-  /**
-   * The implicit "previous" for a node with no inbound edge: the single
-   * immediately-prior stage's output, or the run's input for the first
-   * stage. Ambiguous (a parallel prior stage with no explicit edge) falls
-   * back to an empty object — mapper authors must address branches
-   * explicitly via edges in that case.
-   */
   private defaultPrevious(
     targetOrder: number,
     steps: PipelineStep[],

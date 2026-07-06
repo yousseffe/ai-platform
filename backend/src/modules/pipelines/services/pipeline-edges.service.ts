@@ -7,10 +7,6 @@ import { PipelineEdgeStatus } from '../enums/pipeline-edge-status.enum';
 import { UpsertEdgeDto } from '../dto/upsert-edge.dto';
 import { PipelinesService } from './pipelines.service';
 
-/**
- * Manages the mapper attached to each edge between (or into/out of) pipeline
- * steps. Replacing an edge's mapper demotes the parent pipeline to `DRAFT`.
- */
 @Injectable()
 export class PipelineEdgesService {
   constructor(
@@ -21,7 +17,6 @@ export class PipelineEdgesService {
     private readonly pipelinesService: PipelinesService,
   ) {}
 
-  /** Lists all edges defined for a pipeline. */
   async listEdges(
     pipelineId: string,
     actorId: string,
@@ -33,13 +28,6 @@ export class PipelineEdgesService {
     });
   }
 
-  /**
-   * Creates or replaces the edge between the given `fromStepId`/`toStepId`
-   * pair (one or both may be omitted to represent the pipeline's external
-   * input/output).
-   *
-   * @throws {NotFoundException} If a referenced step ID doesn't belong to the pipeline.
-   */
   async upsertEdge(
     pipelineId: string,
     actorId: string,
@@ -71,7 +59,6 @@ export class PipelineEdgesService {
     return saved;
   }
 
-  /** Deletes an edge by ID. */
   async removeEdge(
     pipelineId: string,
     edgeId: string,

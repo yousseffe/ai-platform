@@ -1,12 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { RedisService } from '../../../shared/redis/redis.service';
 
-/**
- * Enforces per-API-key rate limits and daily spend budgets using Redis
- * fixed-window counters. Shared by both personal (`ml_sk_*`) and
- * organization (`sk_live_*`) API key authentication paths in
- * {@link ApiKeyOrJwtGuard}.
- */
 @Injectable()
 export class KeyQuotaService {
   constructor(private readonly redisService: RedisService) {}

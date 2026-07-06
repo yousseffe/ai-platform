@@ -11,8 +11,8 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { WorkspaceInterceptor } from '../../auth/guards/workspace.interceptor';
+import { WorkspaceInterceptor } from '../../../shared/interceptors/workspace.interceptor';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { ModelComparisonsService } from '../services/model-comparisons.service';
 import {

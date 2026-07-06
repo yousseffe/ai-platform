@@ -9,8 +9,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AdminGuard } from '../../auth/guards/admin.guard';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { AdminGuard } from '../../../shared/guards/admin.guard';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { ListProvidersQueryDto } from '../dto/list-providers-query.dto';
 import {
   AdminChangeProviderStatusDto,
@@ -25,9 +25,6 @@ import {
   AdminProvidersListResponse,
 } from '../types/admin-dashboard.types';
 
-/**
- * Provider-focused admin controller for enterprise dashboard workflows.
- */
 @Controller('admin/providers')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminProvidersController {
@@ -36,9 +33,6 @@ export class AdminProvidersController {
     private readonly adminProviderManagementService: AdminProviderManagementService,
   ) {}
 
-  /**
-   * Returns the admin providers list with filtering and pagination.
-   */
   @Get()
   async listProviders(
     @Query() query: ListProvidersQueryDto,
@@ -46,9 +40,6 @@ export class AdminProvidersController {
     return this.adminProviderQueryService.listProviders(query);
   }
 
-  /**
-   * Returns the admin details payload for a single provider account.
-   */
   @Get(':id')
   async getProviderDetails(
     @Param('id') id: string,
@@ -56,9 +47,6 @@ export class AdminProvidersController {
     return this.adminProviderQueryService.getProviderDetails(id);
   }
 
-  /**
-   * Changes provider lifecycle status with a mandatory audit reason.
-   */
   @Patch(':id/status')
   async changeStatus(
     @Param('id') id: string,
@@ -72,9 +60,6 @@ export class AdminProvidersController {
     );
   }
 
-  /**
-   * Changes provider tier with a mandatory audit reason.
-   */
   @Patch(':id/tier')
   async changeTier(
     @Param('id') id: string,
@@ -88,9 +73,6 @@ export class AdminProvidersController {
     );
   }
 
-  /**
-   * Updates provider overrides with a mandatory audit reason.
-   */
   @Patch(':id/overrides')
   async updateOverrides(
     @Param('id') id: string,
@@ -104,9 +86,6 @@ export class AdminProvidersController {
     );
   }
 
-  /**
-   * Appends an internal provider note.
-   */
   @Post(':id/notes')
   async appendNote(
     @Param('id') id: string,

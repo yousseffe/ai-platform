@@ -1,17 +1,11 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
-import { AdminGuard } from '../../auth/guards/admin.guard';
+import { ApiKeyOrJwtGuard } from '../../../shared/guards/api-key-or-jwt.guard';
+import { AdminGuard } from '../../../shared/guards/admin.guard';
 import { Model } from '../../models/entities/model.entity';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 
-/**
- * Read-only platform model catalog and configuration surface consumed by the
- * `admin_list_models` and `admin_get_platform_config` MCP tools. Mirrors
- * `AdminController.getModels()`/`getPricingDefaults()`/`getOrgCreationFee()`
- * but is guarded for API-key/MCP-token access instead of JWT-only.
- */
 @Controller('admin-mcp')
 @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
 export class PlatformCatalogMcpController {
@@ -22,11 +16,6 @@ export class PlatformCatalogMcpController {
     private readonly systemConfigRepository: Repository<SystemConfig>,
   ) {}
 
-  /**
-   * Lists every model registered on the platform (catalog view, no live container stats).
-   *
-   * @returns Model catalog summary.
-   */
   @Get('models')
   async listModels() {
     const models = await this.modelRepository.find({
@@ -50,11 +39,6 @@ export class PlatformCatalogMcpController {
     }));
   }
 
-  /**
-   * Returns the platform's global pricing defaults and org creation fee.
-   *
-   * @returns Combined platform configuration.
-   */
   @Get('config')
   async getConfig() {
     const configs = await this.systemConfigRepository.find();

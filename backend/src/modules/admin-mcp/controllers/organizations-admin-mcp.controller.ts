@@ -8,22 +8,16 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ApiKeyOrJwtGuard } from '../../auth/guards/api-key-or-jwt.guard';
-import { AdminGuard } from '../../auth/guards/admin.guard';
-import { Organization } from '../../organizations/entities/organization.entity';
-import { OrgMember } from '../../organizations/entities/org-member.entity';
-import { Project } from '../../organizations/entities/project.entity';
+import { ApiKeyOrJwtGuard } from '../../../shared/guards/api-key-or-jwt.guard';
+import { AdminGuard } from '../../../shared/guards/admin.guard';
 import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
+import { OrgMember } from '../../organizations/entities/org-member.entity';
+import { Organization } from '../../organizations/entities/organization.entity';
+import { Project } from '../../organizations/entities/project.entity';
 import { Wallet } from '../../wallets/entities/wallet.entity';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 
-/**
- * Read-only, platform-wide organization directory consumed by the
- * `admin_list_organizations` and `admin_get_organization` MCP tools. There is
- * no existing platform-wide equivalent on the dashboard — `OrganizationsController`
- * only ever returns the caller's own organizations.
- */
 @Controller('admin-mcp')
 @UseGuards(ApiKeyOrJwtGuard, AdminGuard)
 export class OrganizationsAdminMcpController {
@@ -40,11 +34,6 @@ export class OrganizationsAdminMcpController {
     private readonly walletRepository: Repository<Wallet>,
   ) {}
 
-  /**
-   * Lists every organization on the platform with member/project counts.
-   *
-   * @returns Organization summaries.
-   */
   @Get('organizations')
   async listOrganizations() {
     const organizations = await this.organizationRepository.find({
@@ -71,13 +60,6 @@ export class OrganizationsAdminMcpController {
     );
   }
 
-  /**
-   * Retrieves a single organization's members, projects, API keys, and wallet balances.
-   *
-   * @param id - Organization UUID.
-   * @returns The organization detail.
-   * @throws {NotFoundException} If no organization matches the given id.
-   */
   @Get('organizations/:id')
   async getOrganization(@Param('id', ParseUUIDPipe) id: string) {
     const org = await this.organizationRepository.findOneBy({ id });

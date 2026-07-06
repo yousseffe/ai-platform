@@ -10,9 +10,6 @@ import { ModelVersion } from './model-version.entity';
 import { User } from '../../users/entities/user.entity';
 import { VersionReviewAction } from '../enums/version-review-action.enum';
 
-/**
- * Append-only history event for organization model governance.
- */
 @Entity('model_version_review_events')
 export class ModelVersionReviewEvent {
   @PrimaryGeneratedColumn('uuid')
