@@ -9,7 +9,7 @@ import { MoreThanOrEqual, Repository } from 'typeorm';
 import { Model } from '../../models/entities/model.entity';
 import { ModelLog } from '../../models/entities/model-log.entity';
 import { Alert } from '../../analytics/entities/alert.entity';
-import { FirewallService } from '../../firewall';
+import { FirewallService } from '../../firewall/services/firewall.service';
 import { MailService } from '../../../shared/mail/mail.service';
 import { RiskBaseline } from '../entities/risk-baseline.entity';
 import { RiskEvent } from '../entities/risk-event.entity';

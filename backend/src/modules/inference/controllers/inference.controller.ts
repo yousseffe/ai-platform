@@ -15,25 +15,27 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { ModelsService } from '../../models';
+import { ModelsService } from '../../models/services/models.service';
 import {
   ProviderInsightsResponse,
   ProviderInsightsService,
 } from '../services/provider-insights.service';
 import { Model } from '../../models/entities/model.entity';
-import { ApiKeyType } from '../../auth';
+import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
 import { ApiKey } from '../../auth/entities/api-key.entity';
 import { WorkspaceInterceptor } from '../../../shared/interceptors/workspace.interceptor';
 import { ApiKeyOrJwtGuard } from '../../../shared/guards/api-key-or-jwt.guard';
 import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { User } from '../../users/entities/user.entity';
-import { OrgStatus, OrgType } from '../../organizations';
+import { OrgStatus } from '../../organizations/enums/org-status.enum';
+import { OrgType } from '../../organizations/enums/org-type.enum';
 import { OrgApiKey } from '../../organizations/entities/org-api-key.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
 import { Project } from '../../organizations/entities/project.entity';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
-import { FirewallService } from '../../firewall';
+import { FirewallService } from '../../firewall/services/firewall.service';
 import { HttpService } from '@nestjs/axios';
+import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { Readable } from 'stream';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -400,6 +402,27 @@ export class InferenceController {
       .catch(() => undefined);
   }
 
+  private extractHttpErrorMessage(error: unknown): string {
+    if (error instanceof AxiosError && error.response?.data) {
+      const data = error.response.data;
+      if (typeof data === 'string') {
+        return data;
+      }
+      if (typeof data === 'object') {
+        const body = data as Record<string, unknown>;
+        const detail = body.detail ?? body.error ?? body.message;
+        if (typeof detail === 'string') {
+          return detail;
+        }
+        try {
+          return JSON.stringify(body);
+        } catch {}
+      }
+    }
+
+    return error instanceof Error ? error.message : String(error);
+  }
+
   private async streamPrediction(
     model: Model,
     url: string,
@@ -441,7 +464,7 @@ export class InferenceController {
       res.setHeader('Connection', 'keep-alive');
       response.data.pipe(res);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = this.extractHttpErrorMessage(err);
       await this.inferenceClient.recordOutcome({
         model,
         actor,

@@ -4,9 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { ModelType, VersionStatus } from '../../models';
+import { ModelType } from '../../models/enums/model-type.enum';
+import { VersionStatus } from '../../models/enums/version-status.enum';
 import { Model } from '../../models/entities/model.entity';
-import { DeploymentStatus, DeploymentsService } from '../../deployments';
+import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
+import { DeploymentsService } from '../../deployments/services/deployments.service';
 import { Deployment } from '../../deployments/entities/deployment.entity';
 
 @Injectable()

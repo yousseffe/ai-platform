@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import { Model } from '../../models/entities/model.entity';
 import { ModelLog } from '../../models/entities/model-log.entity';
-import { DeploymentStatus } from '../../deployments';
+import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import { Deployment } from '../../deployments/entities/deployment.entity';
 
 export interface MinuteBucket {

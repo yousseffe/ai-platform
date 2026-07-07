@@ -17,7 +17,7 @@ export function AlertsPanel() {
 
   if (error && alerts.length === 0) {
     return (
-      <div className="p-4 bg-red-950/20 border border-red-900/30 text-red-400 text-xs rounded-xl flex items-center gap-2">
+      <div className="p-4 bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:border-red-900/30 dark:text-red-400 text-xs rounded-xl flex items-center gap-2">
         <AlertOctagon className="w-5 h-5 shrink-0" />
         <span>Could not sync platform alert state: {error}</span>
       </div>

@@ -55,12 +55,12 @@ export class OpenSearchService implements OnModuleInit {
     id: string,
     body: Record<string, unknown>,
   ): Promise<void> {
-    await this.client.index({ index, id, body, refresh: 'wait_for' });
+    await this.client.index({ index, id, body, refresh: true });
   }
 
   async delete(index: string, id: string): Promise<void> {
     try {
-      await this.client.delete({ index, id, refresh: 'wait_for' });
+      await this.client.delete({ index, id, refresh: true });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
@@ -88,6 +88,6 @@ export class OpenSearchService implements OnModuleInit {
       doc.body,
     ]);
 
-    await this.client.bulk({ body, refresh: 'wait_for' });
+    await this.client.bulk({ body, refresh: true });
   }
 }

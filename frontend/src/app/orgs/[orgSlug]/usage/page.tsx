@@ -337,9 +337,13 @@ export default function OrgUsagePage() {
 
           <Tabs defaultValue="trends" className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <TabsList className="bg-secondary/40 border border-border/80 w-fit">
-                <TabsTrigger value="trends">Consumption Trends</TabsTrigger>
-                <TabsTrigger value="breakdown">Distribution Breakdown</TabsTrigger>
+              <TabsList className="flex w-fit border-b border-border bg-transparent p-0 rounded-none h-10 gap-6" variant="line">
+                <TabsTrigger value="trends" className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent">
+                  Consumption Trends
+                </TabsTrigger>
+                <TabsTrigger value="breakdown" className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent">
+                  Distribution Breakdown
+                </TabsTrigger>
               </TabsList>
 
               {/* Time Range Selector for trends */}

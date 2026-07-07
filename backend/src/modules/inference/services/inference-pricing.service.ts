@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Model } from '../../models/entities/model.entity';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
-import { ProviderAccountsService } from '../../provider-accounts';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
 import { InferencePricing } from '../interfaces/inference.interface';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 

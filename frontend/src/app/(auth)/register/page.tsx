@@ -132,7 +132,7 @@ export default function RegisterPage() {
       actionLabel="Sign in"
       actionHref="/login"
     >
-      <Card className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/40 shadow-sm backdrop-blur-md">
+      <Card className="overflow-hidden rounded-xl border border-border bg-card shadow-sm backdrop-blur-md">
         <CardContent className="p-5 sm:p-6">
           {error && (
             <div className="mb-4 rounded-lg border border-destructive/15 bg-destructive/5 px-4 py-2.5 text-[11px] font-medium text-destructive/90 animate-fade-in">

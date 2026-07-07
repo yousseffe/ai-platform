@@ -2,17 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, MoreThanOrEqual, Repository } from 'typeorm';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
-import { OrgStatus } from '../../organizations';
+import { OrgStatus } from '../../organizations/enums/org-status.enum';
 import { Organization } from '../../organizations/entities/organization.entity';
-import { VersionReviewStatus } from '../../models';
+import { VersionReviewStatus } from '../../models/enums/version-review-status.enum';
 import { Model } from '../../models/entities/model.entity';
 import { ModelVersion } from '../../models/entities/model-version.entity';
-import {
-  ProviderAccount,
-  ProviderAccountStatus,
-} from '../../provider-accounts';
+import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
+import { ProviderAccountStatus } from '../../provider-accounts/enums/provider-account-status.enum';
 import { User } from '../../users/entities/user.entity';
-import { TransactionStatus } from '../../wallets';
+import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import {
   AdminDashboardOverview,

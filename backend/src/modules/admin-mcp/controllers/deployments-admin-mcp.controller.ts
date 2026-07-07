@@ -11,7 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiKeyOrJwtGuard } from '../../../shared/guards/api-key-or-jwt.guard';
 import { AdminGuard } from '../../../shared/guards/admin.guard';
-import { DeploymentStatus } from '../../deployments';
+import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import { Deployment } from '../../deployments/entities/deployment.entity';
 
 const DEPLOYMENT_RELATIONS = [

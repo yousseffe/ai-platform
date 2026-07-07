@@ -3,7 +3,7 @@ import { getSession } from "next-auth/react";
 import { runPrediction } from "@/lib/actions/models.actions";
 import { smartFetch } from "@/lib/utils/smart-fetch";
 import { getPredictionHistory, savePredictionHistory, clearPredictionHistory } from "@/lib/utils/indexed-db";
-import { Model, ModelVersion, HistoryItem, DeploymentStatus, PredictionStatus, ModelType } from "@/types";
+import { Model, ModelVersion, HistoryItem, DeploymentStatus, PredictionStatus, ModelType, VersionStatus } from "@/types";
 
 /**
  * Parses an SSE (Server-Sent Events) stream from an OpenAI-compatible endpoint.
@@ -59,11 +59,19 @@ function parseSSEChunk(rawChunk: string, buffer: { pending: string }) {
 export function usePrediction(model: Model, selectedVersionNumber?: number) {
   // Find active version
   const versions = model.versions || [];
+  const sortedVersions = [...versions].sort(
+    (a: ModelVersion, b: ModelVersion) => b.versionNumber - a.versionNumber,
+  );
   const activeVersion = selectedVersionNumber
     ? versions.find((v: ModelVersion) => v.versionNumber === selectedVersionNumber)
-    : (versions.length
-      ? [...versions].sort((a: ModelVersion, b: ModelVersion) => b.versionNumber - a.versionNumber)[0]
-      : null);
+    : (
+      sortedVersions.find((v: ModelVersion) =>
+        v.deployments?.some((d) => d.status === DeploymentStatus.RUNNING)
+      ) ??
+      sortedVersions.find((v: ModelVersion) => v.status === VersionStatus.READY) ??
+      sortedVersions[0] ??
+      null
+    );
 
   // Retrieve active deployment specifically for activeVersion
   const activeDeployment = activeVersion

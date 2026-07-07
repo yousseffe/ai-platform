@@ -23,22 +23,21 @@ import {
   ILike,
   FindOptionsWhere,
 } from 'typeorm';
-import { ApiKeyType } from '../../auth';
+import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
 import { ApiKey } from '../../auth/entities/api-key.entity';
 import { AdminGuard } from '../../../shared/guards/admin.guard';
 import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { Model } from '../../models/entities/model.entity';
 import { ModelLog } from '../../models/entities/model-log.entity';
-import { DeploymentStatus } from '../../deployments';
-import { TransactionStatus, TransactionType } from '../../wallets';
+import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
+import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
+import { TransactionType } from '../../wallets/enums/transaction-type.enum';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { Wallet } from '../../wallets/entities/wallet.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
-import {
-  ProviderAccountStatus,
-  ProviderAccountsService,
-} from '../../provider-accounts';
+import { ProviderAccountStatus } from '../../provider-accounts/enums/provider-account-status.enum';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
 import { User } from '../entities/user.entity';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';

@@ -11,7 +11,7 @@ import { getDockerOptions } from '../../../shared/docker/docker.util';
 import { Deployment } from '../entities/deployment.entity';
 import { DeploymentStatus } from '../enums/deployment-status.enum';
 import { DeploymentsRepository } from '../repositories/deployments.repository';
-import { ModelVersionsRepository } from '../../models';
+import { ModelVersionsRepository } from '../../models/repositories/model-versions.repository';
 
 @Injectable()
 export class DeploymentsService implements OnModuleInit {

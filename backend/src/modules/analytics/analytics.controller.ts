@@ -20,7 +20,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { ApiKeyOrJwtGuard } from '../../shared/guards/api-key-or-jwt.guard';
 import { AdminGuard } from '../../shared/guards/admin.guard';
-import { DeploymentStatus } from '../deployments';
+import { DeploymentStatus } from '../deployments/enums/deployment-status.enum';
 import { Deployment } from '../deployments/entities/deployment.entity';
 import { Model } from '../models/entities/model.entity';
 import { ModelLog } from '../models/entities/model-log.entity';

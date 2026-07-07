@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
-import { ModelType } from '../../models';
+import { ModelType } from '../../models/enums/model-type.enum';
 import { Model } from '../../models/entities/model.entity';
 import { ModelVersion } from '../../models/entities/model-version.entity';
 import { ProviderAccount } from '../entities/provider-account.entity';

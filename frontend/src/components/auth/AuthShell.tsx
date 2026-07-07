@@ -24,7 +24,7 @@ export default function AuthShell({
     <div className="relative min-h-screen lg:h-screen lg:max-h-screen w-full flex flex-col lg:flex-row bg-background text-foreground transition-colors duration-300 overflow-y-auto lg:overflow-hidden select-none">
       
       {/* ================= LEFT SIDE: BRANDING VISUALS (on Desktop) ================= */}
-      <div className="relative hidden lg:flex lg:w-[46%] xl:w-[48%] lg:h-full lg:max-h-full bg-[#030712] text-slate-200 flex-col justify-between p-10 overflow-hidden border-r border-slate-900/60 select-none shrink-0">
+      <div className="relative hidden lg:flex lg:w-[46%] xl:w-[48%] lg:h-full lg:max-h-full bg-[#030712] dark:bg-background text-slate-200 flex-col justify-between p-10 overflow-hidden border-r border-slate-900/60 dark:border-border select-none shrink-0">
         {/* Glow Spheres */}
         <div className="absolute top-[-10rem] left-[-10rem] w-[35rem] h-[35rem] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute bottom-[-10rem] right-[-10rem] w-[30rem] h-[30rem] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
@@ -124,9 +124,9 @@ export default function AuthShell({
           </div>
 
           {/* IDE/Terminal mockup */}
-          <div className="w-full rounded-xl border border-slate-800 bg-slate-950/60 shadow-2xl backdrop-blur-md overflow-hidden text-left mb-6">
+          <div className="w-full rounded-xl border border-slate-800 dark:border-border bg-slate-950/60 dark:bg-card shadow-2xl backdrop-blur-md overflow-hidden text-left mb-6">
             {/* Header bar */}
-            <div className="flex items-center justify-between border-b border-slate-900 bg-slate-900/40 px-4 py-2">
+            <div className="flex items-center justify-between border-b border-slate-900 dark:border-border bg-slate-900/40 dark:bg-secondary px-4 py-2">
               <div className="flex items-center gap-1.5">
                 <div className="h-2 w-2 rounded-full bg-rose-500/80" />
                 <div className="h-2 w-2 rounded-full bg-amber-500/80" />
@@ -164,7 +164,7 @@ export default function AuthShell({
             </div>
 
             {/* Output Panel Header */}
-            <div className="flex border-t border-slate-900 bg-slate-950/80 px-4 py-1.5 border-b border-slate-900">
+            <div className="flex border-t border-slate-900 dark:border-border bg-slate-950/80 dark:bg-secondary px-4 py-1.5 border-b border-slate-900 dark:border-border">
               <span className="text-[9px] font-mono text-indigo-400 font-semibold tracking-wider uppercase flex items-center gap-1">
                 <Terminal className="h-3 w-3" /> System Logs
               </span>
@@ -238,6 +238,7 @@ export default function AuthShell({
               width={140}
               height={34}
               className="hidden object-contain dark:block"
+              style={{ height: "auto" }}
             />
             <Image
               src="/qantara-assets/light-full.svg"
@@ -245,6 +246,7 @@ export default function AuthShell({
               width={140}
               height={34}
               className="object-contain dark:hidden"
+              style={{ height: "auto" }}
             />
           </Link>
 

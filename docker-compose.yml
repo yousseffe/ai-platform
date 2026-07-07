@@ -189,7 +189,9 @@ services:
         exit 0;
       fi;
       apk add --no-cache wget &&
-      wget -q -O /models/model.gguf https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf &&
+      echo 'Downloading Qwen2.5-0.5B model (this may take a few minutes)...' &&
+      wget -O /models/model.gguf.tmp https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf &&
+      mv /models/model.gguf.tmp /models/model.gguf &&
       echo 'Download complete.'
       "
     restart: "no"

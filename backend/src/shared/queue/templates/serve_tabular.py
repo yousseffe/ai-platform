@@ -145,31 +145,48 @@ async def health():
 
 @app.post("/predict")
 async def predict(request: Request):
-    expected_api_key = os.getenv("API_KEY")
-    if expected_api_key:
-        auth_header = request.headers.get("Authorization")
-        api_key = None
-        if auth_header and auth_header.startswith("Bearer "):
-            api_key = auth_header.split(" ")[1]
-        else:
-            api_key = request.headers.get("x-api-key")
+    try:
+        expected_api_key = os.getenv("API_KEY")
+        if expected_api_key:
+            auth_header = request.headers.get("Authorization")
+            api_key = None
+            if auth_header and auth_header.startswith("Bearer "):
+                api_key = auth_header.split(" ")[1]
+            else:
+                api_key = request.headers.get("x-api-key")
 
-        if api_key != expected_api_key:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
+            if api_key != expected_api_key:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
 
-    _load_model()
-    if _model_load_error is not None:
-        return {"error": f"Model failed to load: {_model_load_error}"}
-    model = _model
+        _load_model()
+        if _model_load_error is not None:
+            return {"error": f"Model failed to load: {_model_load_error}"}
+        model = _model
 
-    data = await request.json()
+        data = await request.json()
 
-    # Preprocess
-    if preprocess_func:
-        data = preprocess_func(data)
-    elif scaler:
-        pass
+        # Backwards compatibility for older auto-detected samples:
+        # {"feature_0": 1, "feature_1": 2} -> {"features": [1, 2]}
+        if isinstance(data, dict) and "features" not in data:
+            feature_items = []
+            for key, value in data.items():
+                if isinstance(key, str) and key.startswith("feature_"):
+                    suffix = key.replace("feature_", "", 1)
+                    if suffix.isdigit():
+                        feature_items.append((int(suffix), value))
+            if feature_items and len(feature_items) == len(data):
+                data = {"features": [value for _, value in sorted(feature_items)]}
+
+        # Preprocess
+        if preprocess_func:
+            data = preprocess_func(data)
+        elif scaler:
+            pass
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
 
     # Format data for TABULAR inference.
     # Sklearn numeric models expect shape (1, n_features): [[v1, v2, ...]].

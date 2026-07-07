@@ -198,12 +198,18 @@ export class ProjectsController {
   async getApiKeyLogs(
     @Param('orgId') orgId: string,
     @Param('projectId') projectId: string,
-    @Query('limit') limit = '50',
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+    @Query('status') status?: string,
+    @Query('modelId') modelId?: string,
+    @Query('apiKeyId') apiKeyId?: string,
   ) {
-    return this.projectsService.listProjectApiKeyLogs(
-      orgId,
-      projectId,
-      parseInt(limit, 10) || 50,
-    );
+    return this.projectsService.listProjectApiKeyLogs(orgId, projectId, {
+      page: parseInt(page, 10) || 1,
+      limit: parseInt(limit, 10) || 10,
+      status,
+      modelId,
+      apiKeyId,
+    });
   }
 }

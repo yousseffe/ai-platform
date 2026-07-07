@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ModelType } from '../../models';
+import { ModelType } from '../../models/enums/model-type.enum';
 import { Model } from '../../models/entities/model.entity';
-import { ApiKeyType } from '../../auth';
+import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
 import { ApiKey } from '../../auth/entities/api-key.entity';
-import { WalletsService } from '../../wallets';
+import { WalletsService } from '../../wallets/services/wallets.service';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { RedisService } from '../../../shared/redis/redis.service';

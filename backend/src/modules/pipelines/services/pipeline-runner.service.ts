@@ -7,7 +7,7 @@ import { PipelineRunStatus } from '../enums/pipeline-run-status.enum';
 import { PipelineStepLoopService } from './pipeline-step-loop.service';
 import { PipelineRunPersistenceService } from './pipeline-run-persistence.service';
 import { buildPipelineRunActor } from './pipeline-run-actor.util';
-import { ClientRequestMeta } from '../../inference';
+import { ClientRequestMeta } from '../../inference/interfaces/inference.interface';
 
 @Injectable()
 export class PipelineRunnerService {

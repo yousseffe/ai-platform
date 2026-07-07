@@ -6,15 +6,17 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { UsersService } from '../../users';
+import { UsersService } from '../../users/services/users.service';
 import { AuditLog } from '../../users/entities/audit-log.entity';
 import { User } from '../../users/entities/user.entity';
-import { WalletsService } from '../../wallets';
+import { WalletsService } from '../../wallets/services/wallets.service';
 import { Wallet } from '../../wallets/entities/wallet.entity';
-import { OrganizationsService } from '../../organizations';
+import { OrganizationsService } from '../../organizations/services/organizations.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -32,10 +34,13 @@ import { ApiKeyType } from '../enums/api-key-type.enum';
 @Injectable()
 export class AuthService {
   constructor(
+    @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
+    @Inject(forwardRef(() => WalletsService))
     private readonly walletsService: WalletsService,
+    @Inject(forwardRef(() => OrganizationsService))
     private readonly orgsService: OrganizationsService,
     @InjectRepository(VerificationCode)
     private readonly verificationCodeRepository: Repository<VerificationCode>,

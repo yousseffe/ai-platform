@@ -9,7 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
-import { WalletsService } from '../../wallets';
+import { WalletsService } from '../../wallets/services/wallets.service';
 import {
   ChangeProviderStatusDto,
   ChangeProviderTierDto,

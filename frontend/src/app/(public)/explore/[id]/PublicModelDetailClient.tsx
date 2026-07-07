@@ -565,8 +565,8 @@ export default function PublicModelDetailClient({
                 {/* Cost/Credits badge */}
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
                   <Zap className="w-3 h-3 text-emerald-500" />
-                {model.costPerRequest && model.costPerRequest > 0
-                    ? `${model.costPerRequest.toFixed(2)} Credits / Run`
+                {model.costPerRequest && Number(model.costPerRequest) > 0
+                    ? `${Number(model.costPerRequest).toFixed(2)} Credits / Run`
                     : "Free Sandbox Run"}
                 </span>
                 {model.marketplaceVerified && (

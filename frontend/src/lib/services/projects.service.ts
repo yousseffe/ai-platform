@@ -335,8 +335,29 @@ export async function getProjectApiKeyUsage(
 export async function listProjectApiKeyLogs(
   orgId: string,
   projectId: string,
-): Promise<ProjectApiKeyLog[]> {
-  return smartFetch<ProjectApiKeyLog[]>(
-    `/organizations/${orgId}/projects/${projectId}/api-keys/logs`,
-  );
+  params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    modelId?: string;
+    apiKeyId?: string;
+  },
+): Promise<{ items: ProjectApiKeyLog[]; total: number }> {
+  const query = new URLSearchParams();
+  if (params?.page) query.append("page", String(params.page));
+  if (params?.limit) query.append("limit", String(params.limit));
+  if (params?.status) query.append("status", params.status);
+  if (params?.modelId) query.append("modelId", params.modelId);
+  if (params?.apiKeyId) query.append("apiKeyId", params.apiKeyId);
+
+  const queryString = query.toString();
+  const url = `/organizations/${orgId}/projects/${projectId}/api-keys/logs${
+    queryString ? `?${queryString}` : ""
+  }`;
+
+  const res = await smartFetch<any>(url);
+  if (Array.isArray(res)) {
+    return { items: res, total: res.length };
+  }
+  return res;
 }

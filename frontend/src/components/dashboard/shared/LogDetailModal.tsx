@@ -176,7 +176,7 @@ export default function LogDetailModal({
               <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Cost Deducted</span>
               <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-slate-700 dark:text-slate-300 font-mono">
                 <Coins className="w-3.5 h-3.5 text-amber-500" />
-                ${(log.model?.costPerRequest || 0.02).toFixed(2)}
+                ${Number(log.model?.costPerRequest || 0.02).toFixed(2)}
               </span>
             </div>
           </div>

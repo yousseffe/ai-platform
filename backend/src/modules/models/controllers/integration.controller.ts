@@ -5,7 +5,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiIdentityService } from '../../auth';
+import { ApiIdentityService } from '../../auth/services/api-identity.service';
 import { Request } from 'express';
 import {
   ModelIntegrationService,

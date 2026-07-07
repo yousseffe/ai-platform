@@ -12,6 +12,17 @@ import {
   ModelIntegrationSpec,
 } from "@/types";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+const INTEGRATION_SPEC_NOT_READY_MESSAGE =
+  "Model has no ready version with an integration sample yet";
+
+function isIntegrationSpecNotReady(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes(INTEGRATION_SPEC_NOT_READY_MESSAGE)
+  );
+}
 
 /**
  * Retrieves all registered ML models from the database.
@@ -117,6 +128,10 @@ export async function getModelIntegrationSpec(
   try {
     return await modelsService.getModelIntegrationSpec(id);
   } catch (error) {
+    if (isIntegrationSpecNotReady(error)) {
+      return null;
+    }
+
     console.error(`getModelIntegrationSpec error for ${id}:`, error);
     return null;
   }
@@ -192,12 +207,12 @@ export async function deleteModel(
     await modelsService.deleteModel(id);
     revalidatePath("/models");
     revalidatePath("/");
-    return { success: true };
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Failed to delete model";
     return { success: false, error: errorMessage };
   }
+  redirect("/models");
 }
 
 /**

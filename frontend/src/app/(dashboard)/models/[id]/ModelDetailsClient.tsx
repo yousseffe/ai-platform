@@ -57,6 +57,20 @@ interface ModelDetailsClientProps {
   integrationSpec?: ModelIntegrationSpec | null;
 }
 
+function pickDefaultVersion(versions: ModelVersion[]) {
+  const sorted = [...versions].sort((a, b) => b.versionNumber - a.versionNumber);
+  return (
+    sorted.find((version) =>
+      version.deployments?.some(
+        (deployment) => deployment.status === DeploymentStatus.RUNNING,
+      ),
+    ) ??
+    sorted.find((version) => version.status === VersionStatus.READY) ??
+    sorted[0] ??
+    null
+  );
+}
+
 /**
  * Client-side layout view for Model Details page in the console.
  * Orchestrates modal controls, deployment actions, version history logs,
@@ -118,10 +132,7 @@ export default function ModelDetailsClient({
   const [activeVersion, setActiveVersion] = useState<ModelVersion | null>(
     () => {
       const list = initialModel.versions || [];
-      if (list.length > 0) {
-        return [...list].sort((a, b) => b.versionNumber - a.versionNumber)[0];
-      }
-      return null;
+      return pickDefaultVersion(list);
     },
   );
 
@@ -328,45 +339,45 @@ export default function ModelDetailsClient({
 
       {/* Tabs Container */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="h-10! bg-secondary/60 border border-border p-1 rounded-xl mb-6 gap-1.5 select-none flex flex-row w-fit shadow-sm items-center">
+        <TabsList className="flex w-full border-b border-border bg-transparent p-0 rounded-none h-10 gap-6 mb-6 justify-start overflow-x-auto" variant="line">
           <TabsTrigger
             value="overview"
-            className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+            className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
           >
-            <Code className="w-3.5 h-3.5 mr-1.5" /> Overview
+            <Code className="w-3.5 h-3.5" /> Overview
           </TabsTrigger>
           <TabsTrigger
             value="versions"
-            className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+            className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
           >
-            <GitBranch className="w-3.5 h-3.5 mr-1.5" /> Version Registry
+            <GitBranch className="w-3.5 h-3.5" /> Version Registry
           </TabsTrigger>
           <TabsTrigger
             value="sandbox"
-            className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+            className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
           >
-            <PlayCircle className="w-3.5 h-3.5 mr-1.5" /> Playground
+            <PlayCircle className="w-3.5 h-3.5" /> Playground
           </TabsTrigger>
           <TabsTrigger
             value="docs"
-            className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+            className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
           >
-            <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Docs
+            <BookOpen className="w-3.5 h-3.5" /> Docs
           </TabsTrigger>
           {isOwner && (
             <TabsTrigger
               value="monitoring"
-              className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+              className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
             >
-              <Activity className="w-3.5 h-3.5 mr-1.5" /> Monitoring & Logs
+              <Activity className="w-3.5 h-3.5" /> Monitoring & Logs
             </TabsTrigger>
           )}
           {isOwner && (
             <TabsTrigger
               value="settings"
-              className="h-full cursor-pointer font-bold px-4 text-xs transition-all rounded-lg text-muted-foreground hover:text-foreground data-active:bg-primary data-active:text-primary-foreground dark:data-active:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:text-primary-foreground data-active:hover:text-primary-foreground data-[state=active]:hover:text-primary-foreground data-active:shadow-md data-[state=active]:shadow-md"
+              className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
             >
-              <Settings className="w-3.5 h-3.5 mr-1.5" /> Settings
+              <Settings className="w-3.5 h-3.5" /> Settings
             </TabsTrigger>
           )}
         </TabsList>

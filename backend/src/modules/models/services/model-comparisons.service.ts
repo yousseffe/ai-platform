@@ -2,19 +2,20 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Inject,
+  forwardRef,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Model } from '../entities/model.entity';
-import {
-  InferenceClient,
-  InferenceStatus,
-  PredictionActor,
-} from '../../inference';
+import { InferenceClient } from '../../inference/services/inference-client.service';
+import { InferenceStatus } from '../../inference/enums/inference-status.enum';
+import { PredictionActor } from '../../inference/interfaces/inference.interface';
 import { ModelLog } from '../entities/model-log.entity';
-import { OrgType, OrganizationsService } from '../../organizations';
-import { DeploymentStatus } from '../../deployments';
+import { OrgType } from '../../organizations/enums/org-type.enum';
+import { OrganizationsService } from '../../organizations/services/organizations.service';
+import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import { ModelComparisonSession } from '../entities/model-comparison-session.entity';
 import { ModelComparisonResult } from '../entities/model-comparison-result.entity';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
@@ -68,6 +69,7 @@ export class ModelComparisonsService {
     @InjectRepository(ModelComparisonResult)
     private readonly resultRepository: Repository<ModelComparisonResult>,
     private readonly inferenceClient: InferenceClient,
+    @Inject(forwardRef(() => OrganizationsService))
     private readonly organizationsService: OrganizationsService,
   ) {}
 
@@ -639,6 +641,15 @@ export class ModelComparisonsService {
     requestBody?: Record<string, unknown>,
     settings?: ComparisonSettingsInput,
   ) {
+    let parsedPrompt: Record<string, unknown> = {};
+    if (prompt.trim().startsWith('{') && prompt.trim().endsWith('}')) {
+      try {
+        parsedPrompt = JSON.parse(prompt);
+      } catch {
+        // Not valid JSON, fallback to treating as regular text
+      }
+    }
+
     const basePayload = {
       prompt,
       input: prompt,
@@ -656,6 +667,7 @@ export class ModelComparisonsService {
 
     return {
       ...basePayload,
+      ...parsedPrompt,
       ...(requestBody ?? {}),
     };
   }

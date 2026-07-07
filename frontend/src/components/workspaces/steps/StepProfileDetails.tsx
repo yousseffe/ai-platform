@@ -75,7 +75,7 @@ export default function StepProfileDetails({
               type="text"
               {...register("name")}
               onChange={onNameChange}
-              className={`pl-10 h-10 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200 ${
+              className={`pl-10 h-10 border-border focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200 ${
                 errors.name ? "border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/10" : ""
               }`}
               placeholder="Acme Analytics"
@@ -93,8 +93,8 @@ export default function StepProfileDetails({
           <Label htmlFor="slug" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
             URL Slug <span className="text-red-500 font-bold" title="Required">*</span>
           </Label>
-          <div className="flex rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-sm overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200">
-            <span className="px-3 py-2 border-r border-slate-200 bg-slate-100/80 select-none text-xs flex items-center font-semibold text-slate-500">
+          <div className="flex rounded-lg border border-border bg-muted/20 text-muted-foreground text-sm overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200">
+            <span className="px-3 py-2 border-r border-border bg-secondary select-none text-xs flex items-center font-semibold text-muted-foreground">
               qantara.com/
             </span>
             <input
@@ -102,7 +102,7 @@ export default function StepProfileDetails({
               type="text"
               {...register("slug")}
               onChange={onSlugChange}
-              className={`flex-1 px-3 py-2 bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-800 text-xs font-mono dark:text-slate-100 ${
+              className={`flex-1 px-3 py-2 bg-transparent border-0 focus:outline-none focus:ring-0 text-foreground text-xs font-mono dark:text-slate-100 ${
                 errors.slug ? "text-red-500" : ""
               }`}
               placeholder="acme-analytics"
@@ -134,7 +134,7 @@ export default function StepProfileDetails({
               id="description"
               rows={3}
               {...register("description")}
-              className={`flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-10 pt-2.5 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200 text-xs font-sans ${
+              className={`flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-10 pt-2.5 border-border focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200 text-xs font-sans ${
                 errors.description ? "border-red-500 focus-visible:border-red-500" : ""
               }`}
               placeholder="A brief workspace bio for collaborators..."
@@ -158,7 +158,7 @@ export default function StepProfileDetails({
               id="avatarUrl"
               type="text"
               {...register("avatarUrl")}
-              className={`pl-10 h-10 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200 ${
+              className={`pl-10 h-10 border-border focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200 ${
                 errors.avatarUrl ? "border-red-500" : ""
               }`}
               placeholder="https://company.com/logo.png"

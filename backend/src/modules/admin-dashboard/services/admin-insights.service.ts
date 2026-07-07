@@ -8,14 +8,14 @@ import { getDockerOptions } from '../../../shared/docker/docker.util';
 import { MinioService } from '../../../shared/minio/minio.service';
 import { User } from '../../users/entities/user.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
-import { ProviderAccount } from '../../provider-accounts';
+import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
 import { Model } from '../../models/entities/model.entity';
 import { ModelLog } from '../../models/entities/model-log.entity';
-import { DeploymentStatus } from '../../deployments';
+import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import { Deployment } from '../../deployments/entities/deployment.entity';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import { Alert } from '../../analytics/entities/alert.entity';
-import { InferenceStatus } from '../../inference';
+import { InferenceStatus } from '../../inference/enums/inference-status.enum';
 import { AdminProviderMetricsService } from './admin-provider-metrics.service';
 
 export const DEFAULT_CAPS: Record<

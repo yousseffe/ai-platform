@@ -29,12 +29,14 @@ import {
   Cpu,
   Zap,
   Gauge,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "react-hot-toast";
 import ApiKeyRow from "@/components/orgs/ApiKeyRow";
 import CreateApiKeyModal from "@/components/orgs/CreateApiKeyModal";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /**
  * Project detail page — shows project info and API keys table.
@@ -55,22 +57,53 @@ export default function ProjectDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [createKeyOpen, setCreateKeyOpen] = useState(false);
 
+  // Call Logs pagination and filter states
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsLimit] = useState(10);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [selectedModel, setSelectedModel] = useState<string>("ALL");
+  const [selectedApiKey, setSelectedApiKey] = useState<string>("ALL");
+  const [isLogsLoading, setIsLogsLoading] = useState(false);
+
+  const fetchLogs = useCallback(async () => {
+    if (!org || !projectId || !can(OrgAction.VIEW_PROJECT_USAGE)) return;
+    setIsLogsLoading(true);
+    try {
+      const statusParam = selectedStatus === "ALL" ? undefined : selectedStatus;
+      const modelParam = selectedModel === "ALL" ? undefined : selectedModel;
+      const apiKeyParam = selectedApiKey === "ALL" ? undefined : selectedApiKey;
+
+      const res = await listProjectApiKeyLogs(org.id, projectId, {
+        page: logsPage,
+        limit: logsLimit,
+        status: statusParam,
+        modelId: modelParam,
+        apiKeyId: apiKeyParam,
+      });
+      setLogs(res.items);
+      setLogsTotal(res.total);
+    } catch {
+      toast.error("Failed to load logs");
+    } finally {
+      setIsLogsLoading(false);
+    }
+  }, [org, projectId, can, logsPage, logsLimit, selectedStatus, selectedModel, selectedApiKey]);
+
   const fetchData = useCallback(async () => {
     if (!org || !projectId) return;
     setIsLoading(true);
     try {
       const canViewApiKeys = can(OrgAction.VIEW_API_KEYS);
       const canViewProjectUsage = can(OrgAction.VIEW_PROJECT_USAGE);
-      const [proj, keys, usageData, logData] = await Promise.all([
+      const [proj, keys, usageData] = await Promise.all([
         getProject(org.id, projectId),
         canViewApiKeys ? listApiKeys(org.id, projectId) : Promise.resolve([]),
         canViewProjectUsage ? getProjectApiKeyUsage(org.id, projectId) : Promise.resolve(null),
-        canViewProjectUsage ? listProjectApiKeyLogs(org.id, projectId) : Promise.resolve([]),
       ]);
       setProject(proj);
       setApiKeys(keys);
       setUsage(usageData);
-      setLogs(logData);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load project");
     } finally {
@@ -81,6 +114,10 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     Promise.resolve().then(fetchData);
   }, [fetchData]);
+
+  useEffect(() => {
+    void fetchLogs();
+  }, [fetchLogs]);
 
   const [revokeTargetId, setRevokeTargetId] = useState<string | null>(null);
 
@@ -186,296 +223,496 @@ export default function ProjectDetailPage() {
         ))}
       </section>}
 
-      {canViewProjectUsage && <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-lg border border-border bg-card p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Usage Intelligence</p>
-          <h2 className="mt-2 text-lg font-bold text-foreground">API key consumption</h2>
-          <div className="mt-5 overflow-hidden rounded-lg border border-border bg-background/60">
-            <table className="min-w-full text-left">
-              <thead>
-                <tr className="border-b border-border bg-secondary/40">
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Key</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Requests</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Credits</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Last Used</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(usage?.apiKeys ?? []).map((key) => (
-                  <tr key={key.id} className="border-b border-border/70 last:border-0">
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-semibold text-foreground">{key.label}</p>
-                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">{key.keyPrefix}</p>
-                    </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-foreground">{key.requests}</td>
-                    <td className="px-4 py-3 text-sm font-semibold text-foreground">{key.creditsCharged.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString() : "Never"}
-                    </td>
-                  </tr>
-                ))}
-                {!isLoading && (usage?.apiKeys.length ?? 0) === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No API key usage recorded yet.
-                    </td>
-                  </tr>
+      <Tabs defaultValue="overview" className="w-full space-y-5">
+        <TabsList className="flex w-full max-w-[600px] border-b border-border bg-transparent p-0 rounded-none h-10 gap-6" variant="line">
+          <TabsTrigger value="overview" className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent">
+            <Gauge className="w-4 h-4" />
+            <span>Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="keys" className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent">
+            <Key className="w-4 h-4" />
+            <span>Credentials</span>
+          </TabsTrigger>
+          <TabsTrigger value="economics" className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent">
+            <Coins className="w-4 h-4" />
+            <span>Model Economics</span>
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="flex items-center gap-1.5 cursor-pointer pb-2 pt-0 rounded-none bg-transparent">
+            <Activity className="w-4 h-4" />
+            <span>Call Logs</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4 outline-none">
+          {canViewProjectUsage && (
+            <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-lg border border-border bg-card p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Usage Intelligence</p>
+                <h2 className="mt-2 text-lg font-bold text-foreground">API key consumption</h2>
+                <div className="mt-5 overflow-hidden rounded-lg border border-border bg-background/60">
+                  <table className="min-w-full text-left">
+                    <thead>
+                      <tr className="border-b border-border bg-secondary/40">
+                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Key</th>
+                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Requests</th>
+                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Credits</th>
+                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Last Used</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(usage?.apiKeys ?? []).map((key) => (
+                        <tr key={key.id} className="border-b border-border/70 last:border-0">
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-semibold text-foreground">{key.label}</p>
+                            <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                              {can(OrgAction.MANAGE_API_KEYS) ? key.keyPrefix : "••••••••••••••••"}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-foreground">{key.requests}</td>
+                          <td className="px-4 py-3 text-sm font-semibold text-foreground">{key.creditsCharged.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">
+                            {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString() : "Never"}
+                          </td>
+                        </tr>
+                      ))}
+                      {!isLoading && (usage?.apiKeys.length ?? 0) === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                            No API key usage recorded yet.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Highlights</p>
+                <h2 className="mt-2 text-lg font-bold text-foreground">What is using credits</h2>
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-lg border border-border bg-background/70 p-4">
+                    <div className="flex items-center gap-2 text-primary">
+                      <Key className="w-4 h-4" strokeWidth={1.7} />
+                      <p className="text-xs font-bold uppercase tracking-[0.14em]">Top API Key</p>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-foreground">{topApiKey?.label ?? "No usage yet"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {topApiKey ? `${topApiKey.creditsCharged.toLocaleString()} credits across ${topApiKey.requests} calls` : "Run predictions with a project key to populate this."}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-background/70 p-4">
+                    <div className="flex items-center gap-2 text-primary">
+                      <BarChart3 className="w-4 h-4" strokeWidth={1.7} />
+                      <p className="text-xs font-bold uppercase tracking-[0.14em]">Top Model</p>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-foreground">{topModel?.name ?? "No model calls yet"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {topModel ? `${topModel.creditsCharged.toLocaleString()} credits across ${topModel.requests} calls` : "Model calls will appear here after successful predictions."}
+                    </p>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      {topModel ? `${topModel.framework} · ${topModel.type} · ${Number(topModel.costPerRequest ?? 0).toLocaleString()} credits per request` : "Per-model pricing appears once requests are logged."}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-background/70 p-4">
+                    <div className="flex items-center gap-2 text-primary">
+                      <Zap className="w-4 h-4" strokeWidth={1.7} />
+                      <p className="text-xs font-bold uppercase tracking-[0.14em]">Delivery Health</p>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-foreground">{successRate}% success rate</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {usage ? `${usage.totals.successfulRequests} successful and ${usage.totals.failedRequests} failed requests.` : "Health metrics will appear after traffic starts flowing."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+        </TabsContent>
+
+        <TabsContent value="keys" className="space-y-4 outline-none">
+          {canViewApiKeys && (
+            <section className="overflow-hidden rounded-lg border border-border bg-card">
+              <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Credentials</p>
+                  <h2 className="mt-1 text-lg font-bold text-foreground">API Keys</h2>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {apiKeys.length > 0 ? `${apiKeys.length} key${apiKeys.length !== 1 ? "s" : ""} in this project` : "No keys generated yet"}
+                </div>
+              </div>
+
+              <div className="p-5 sm:p-6">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" strokeWidth={1.5} />
+                  </div>
+                ) : apiKeys.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-background/70 px-6 py-16 text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-primary/10 text-primary">
+                      <Key className="w-7 h-7" strokeWidth={1.6} />
+                    </div>
+                    <h3 className="mt-5 text-lg font-bold text-foreground">No API keys yet</h3>
+                    <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                      {can(OrgAction.MANAGE_API_KEYS)
+                        ? "Generate a key when this project is ready to make authenticated prediction requests."
+                        : "No API keys have been created for this project."}
+                    </p>
+                    {can(OrgAction.MANAGE_API_KEYS) && (
+                      <Button size="sm" className="mt-5" onClick={() => setCreateKeyOpen(true)}>
+                        <Plus className="w-4 h-4" strokeWidth={2} />
+                        Generate First Key
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-lg border border-border bg-background/60">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-left">
+                        <thead>
+                          <tr className="border-b border-border bg-secondary/40">
+                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Label & Model</th>
+                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Key</th>
+                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Status</th>
+                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Consumption Limits</th>
+                            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Last Used</th>
+                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {apiKeys.map((key) => (
+                            <ApiKeyRow
+                              key={key.id}
+                              orgId={org.id}
+                              apiKey={key}
+                              onRevoke={setRevokeTargetId}
+                              onQuotaUpdated={(updated) =>
+                                setApiKeys((prev) => prev.map((k) => (k.id === updated.id ? updated : k)))
+                              }
+                              canRevoke={can(OrgAction.MANAGE_API_KEYS)}
+                              canManageQuota={can(OrgAction.MANAGE_API_KEYS)}
+                              canShowAndCopy={can(OrgAction.MANAGE_API_KEYS)}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Highlights</p>
-          <h2 className="mt-2 text-lg font-bold text-foreground">What is using credits</h2>
-          <div className="mt-4 space-y-3">
-            <div className="rounded-lg border border-border bg-background/70 p-4">
-              <div className="flex items-center gap-2 text-primary">
-                <Key className="w-4 h-4" strokeWidth={1.7} />
-                <p className="text-xs font-bold uppercase tracking-[0.14em]">Top API Key</p>
               </div>
-              <p className="mt-3 text-sm font-semibold text-foreground">{topApiKey?.label ?? "No usage yet"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {topApiKey ? `${topApiKey.creditsCharged.toLocaleString()} credits across ${topApiKey.requests} calls` : "Run predictions with a project key to populate this."}
-              </p>
-            </div>
-            <div className="rounded-lg border border-border bg-background/70 p-4">
-              <div className="flex items-center gap-2 text-primary">
-                <BarChart3 className="w-4 h-4" strokeWidth={1.7} />
-                <p className="text-xs font-bold uppercase tracking-[0.14em]">Top Model</p>
+            </section>
+          )}
+        </TabsContent>
+
+        <TabsContent value="economics" className="space-y-4 outline-none">
+          {canViewProjectUsage && (
+            <section className="overflow-hidden rounded-lg border border-border bg-card">
+              <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Model Economics</p>
+                  <h2 className="mt-1 text-lg font-bold text-foreground">Which models are consuming credits</h2>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {usage?.models.length ?? 0} model{(usage?.models.length ?? 0) !== 1 ? "s" : ""} with tracked usage
+                </div>
               </div>
-              <p className="mt-3 text-sm font-semibold text-foreground">{topModel?.name ?? "No model calls yet"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {topModel ? `${topModel.creditsCharged.toLocaleString()} credits across ${topModel.requests} calls` : "Model calls will appear here after successful predictions."}
-              </p>
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                {topModel ? `${topModel.framework} · ${topModel.type} · ${Number(topModel.costPerRequest ?? 0).toLocaleString()} credits per request` : "Per-model pricing appears once requests are logged."}
-              </p>
-            </div>
-            <div className="rounded-lg border border-border bg-background/70 p-4">
-              <div className="flex items-center gap-2 text-primary">
-                <Zap className="w-4 h-4" strokeWidth={1.7} />
-                <p className="text-xs font-bold uppercase tracking-[0.14em]">Delivery Health</p>
+              <div className="grid gap-4 border-b border-border px-5 py-5 lg:grid-cols-3 sm:px-6">
+                <div className="rounded-lg border border-border bg-background/60 p-4">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Cpu className="w-4 h-4" strokeWidth={1.7} />
+                    <p className="text-xs font-bold uppercase tracking-[0.14em]">Most Used Model</p>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-foreground">{topModel?.name ?? "No model calls yet"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {topModel ? `${topModel.requests} calls at ${Number(topModel.costPerRequest).toLocaleString()} credits each` : "Start sending project traffic to compare model demand."}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border bg-background/60 p-4">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Coins className="w-4 h-4" strokeWidth={1.7} />
+                    <p className="text-xs font-bold uppercase tracking-[0.14em]">Average Spend / Call</p>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-foreground">
+                    {usage?.totals.requests ? (usage.totals.creditsCharged / usage.totals.requests).toFixed(2) : "0.00"} credits
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Helps explain how quickly this project draws from your organization balance.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border bg-background/60 p-4">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Gauge className="w-4 h-4" strokeWidth={1.7} />
+                    <p className="text-xs font-bold uppercase tracking-[0.14em]">Average Latency</p>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-foreground">
+                    {usage?.models.length ? Math.round(usage.models.reduce((sum, model) => sum + model.averageLatencyMs, 0) / usage.models.length) : 0} ms
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Based on tracked model calls in this project workspace.
+                  </p>
+                </div>
               </div>
-              <p className="mt-3 text-sm font-semibold text-foreground">{successRate}% success rate</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {usage ? `${usage.totals.successfulRequests} successful and ${usage.totals.failedRequests} failed requests.` : "Health metrics will appear after traffic starts flowing."}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>}
-
-      {canViewProjectUsage && <section className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Model Economics</p>
-            <h2 className="mt-1 text-lg font-bold text-foreground">Which models are consuming credits</h2>
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {usage?.models.length ?? 0} model{(usage?.models.length ?? 0) !== 1 ? "s" : ""} with tracked usage
-          </div>
-        </div>
-        <div className="grid gap-4 border-b border-border px-5 py-5 lg:grid-cols-3 sm:px-6">
-          <div className="rounded-lg border border-border bg-background/60 p-4">
-            <div className="flex items-center gap-2 text-primary">
-              <Cpu className="w-4 h-4" strokeWidth={1.7} />
-              <p className="text-xs font-bold uppercase tracking-[0.14em]">Most Used Model</p>
-            </div>
-            <p className="mt-3 text-sm font-semibold text-foreground">{topModel?.name ?? "No model calls yet"}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {topModel ? `${topModel.requests} calls at ${Number(topModel.costPerRequest).toLocaleString()} credits each` : "Start sending project traffic to compare model demand."}
-            </p>
-          </div>
-          <div className="rounded-lg border border-border bg-background/60 p-4">
-            <div className="flex items-center gap-2 text-primary">
-              <Coins className="w-4 h-4" strokeWidth={1.7} />
-              <p className="text-xs font-bold uppercase tracking-[0.14em]">Average Spend / Call</p>
-            </div>
-            <p className="mt-3 text-sm font-semibold text-foreground">
-              {usage?.totals.requests ? (usage.totals.creditsCharged / usage.totals.requests).toFixed(2) : "0.00"} credits
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Helps explain how quickly this project draws from your organization balance.
-            </p>
-          </div>
-          <div className="rounded-lg border border-border bg-background/60 p-4">
-            <div className="flex items-center gap-2 text-primary">
-              <Gauge className="w-4 h-4" strokeWidth={1.7} />
-              <p className="text-xs font-bold uppercase tracking-[0.14em]">Average Latency</p>
-            </div>
-            <p className="mt-3 text-sm font-semibold text-foreground">
-              {usage?.models.length ? Math.round(usage.models.reduce((sum, model) => sum + model.averageLatencyMs, 0) / usage.models.length) : 0} ms
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Based on tracked model calls in this project workspace.
-            </p>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left">
-            <thead>
-              <tr className="border-b border-border bg-secondary/40">
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Model</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Pricing</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Requests</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Credits Used</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Success</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Avg Latency</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(usage?.models ?? []).map((model) => (
-                <tr key={model.id} className="border-b border-border/70 last:border-0">
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-semibold text-foreground">{model.name}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{model.framework} · {model.type}</p>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-foreground">{Number(model.costPerRequest ?? 0).toLocaleString()} credits / request</td>
-                  <td className="px-4 py-3 text-sm font-semibold text-foreground">{model.requests}</td>
-                  <td className="px-4 py-3 text-sm font-semibold text-foreground">{Number(model.creditsCharged ?? 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{model.successfulRequests} success / {model.failedRequests} failed</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{model.averageLatencyMs}ms</td>
-                </tr>
-              ))}
-              {!isLoading && (usage?.models.length ?? 0) === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    No model consumption data recorded yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>}
-
-      {canViewProjectUsage && <section className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Call Logs</p>
-            <h2 className="mt-1 text-lg font-bold text-foreground">Recent model calls</h2>
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {logs.length} recent call{logs.length !== 1 ? "s" : ""}
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left">
-            <thead>
-              <tr className="border-b border-border bg-secondary/40">
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Model</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">API Key</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Credits</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Latency</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Status</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => (
-                <tr key={log.id} className="border-b border-border/70 last:border-0">
-                  <td className="px-4 py-3 text-sm font-semibold text-foreground">{log.model?.name ?? "Unknown model"}</td>
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-semibold text-foreground">{log.apiKeyLabel ?? "Project key"}</p>
-                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">{log.apiKeyPrefix ?? log.apiKey ?? "Hidden"}</p>
-                  </td>
-                  <td className="px-4 py-3 text-sm font-semibold text-foreground">{Number(log.creditsCharged ?? 0).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{log.responseTimeMs}ms</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${
-                      log.status === "SUCCESS"
-                        ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
-                        : "border-destructive/20 bg-destructive/10 text-destructive"
-                    }`}>
-                      {log.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</td>
-                </tr>
-              ))}
-              {!isLoading && logs.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                    No model calls recorded for this project yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>}
-
-      {canViewApiKeys && <section className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Credentials</p>
-            <h2 className="mt-1 text-lg font-bold text-foreground">API Keys</h2>
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {apiKeys.length > 0 ? `${apiKeys.length} key${apiKeys.length !== 1 ? "s" : ""} in this project` : "No keys generated yet"}
-          </div>
-        </div>
-
-        <div className="p-5 sm:p-6">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" strokeWidth={1.5} />
-            </div>
-          ) : apiKeys.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-background/70 px-6 py-16 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-primary/10 text-primary">
-                <Key className="w-7 h-7" strokeWidth={1.6} />
-              </div>
-              <h3 className="mt-5 text-lg font-bold text-foreground">No API keys yet</h3>
-              <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-                {can(OrgAction.MANAGE_API_KEYS)
-                  ? "Generate a key when this project is ready to make authenticated prediction requests."
-                  : "No API keys have been created for this project."}
-              </p>
-              {can(OrgAction.MANAGE_API_KEYS) && (
-                <Button size="sm" className="mt-5" onClick={() => setCreateKeyOpen(true)}>
-                  <Plus className="w-4 h-4" strokeWidth={2} />
-                  Generate First Key
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-lg border border-border bg-background/60">
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left">
                   <thead>
                     <tr className="border-b border-border bg-secondary/40">
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Label & Model</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Key</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Status</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Consumption Limits</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Last Used</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Actions</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Model</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Pricing</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Requests</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Credits Used</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Success</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Avg Latency</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {apiKeys.map((key) => (
-                      <ApiKeyRow
-                        key={key.id}
-                        orgId={org.id}
-                        apiKey={key}
-                        onRevoke={setRevokeTargetId}
-                        onQuotaUpdated={(updated) =>
-                          setApiKeys((prev) => prev.map((k) => (k.id === updated.id ? updated : k)))
-                        }
-                        canRevoke={can(OrgAction.MANAGE_API_KEYS)}
-                        canManageQuota={can(OrgAction.MANAGE_API_KEYS)}
-                      />
+                    {(usage?.models ?? []).map((model) => (
+                      <tr key={model.id} className="border-b border-border/70 last:border-0">
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-semibold text-foreground">{model.name}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{model.framework} · {model.type}</p>
+                          <div className="mt-1 flex items-center gap-2 text-[10px] font-semibold text-primary select-none">
+                            <Link
+                              href={`/explore/${model.id}`}
+                              target="_blank"
+                              className="hover:underline flex items-center gap-0.5"
+                            >
+                              Marketplace <ExternalLink className="w-2.5 h-2.5" />
+                            </Link>
+                            <span className="text-muted-foreground/30">•</span>
+                            <Link
+                              href={`/explore/${model.id}/swagger`}
+                              target="_blank"
+                              className="hover:underline flex items-center gap-0.5"
+                            >
+                              API Docs <ExternalLink className="w-2.5 h-2.5" />
+                            </Link>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-foreground">{Number(model.costPerRequest ?? 0).toLocaleString()} credits / request</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-foreground">{model.requests}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-foreground">{Number(model.creditsCharged ?? 0).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{model.successfulRequests} success / {model.failedRequests} failed</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{model.averageLatencyMs}ms</td>
+                      </tr>
                     ))}
+                    {!isLoading && (usage?.models.length ?? 0) === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          No model consumption data recorded yet.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
-            </div>
+            </section>
           )}
-        </div>
-      </section>}
+        </TabsContent>
+
+        <TabsContent value="logs" className="space-y-4 outline-none">
+          {canViewProjectUsage && (
+            <section className="overflow-hidden rounded-lg border border-border bg-card">
+              <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Call Logs</p>
+                  <h2 className="mt-1 text-lg font-bold text-foreground">Recent model calls</h2>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {logsTotal} total call{logsTotal !== 1 ? "s" : ""}
+                </div>
+              </div>
+
+              {/* Filter Toolbar */}
+              <div className="flex flex-wrap items-center gap-4 border-b border-border bg-secondary/5 px-5 py-3.5 sm:px-6">
+                {/* Model Filter */}
+                <div className="flex flex-col gap-1 min-w-[150px]">
+                  <label className="text-[9px] font-black uppercase tracking-wider text-muted-foreground select-none">Model</label>
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => {
+                      setSelectedModel(e.target.value);
+                      setLogsPage(1);
+                    }}
+                    className="h-8.5 rounded-lg border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary cursor-pointer"
+                  >
+                    <option value="ALL">All Models</option>
+                    {usage?.models.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* API Key Filter */}
+                <div className="flex flex-col gap-1 min-w-[150px]">
+                  <label className="text-[9px] font-black uppercase tracking-wider text-muted-foreground select-none">API Key</label>
+                  <select
+                    value={selectedApiKey}
+                    onChange={(e) => {
+                      setSelectedApiKey(e.target.value);
+                      setLogsPage(1);
+                    }}
+                    className="h-8.5 rounded-lg border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary cursor-pointer"
+                  >
+                    <option value="ALL">All Keys</option>
+                    {apiKeys.map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.label} ({k.keyPrefix})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status Filter */}
+                <div className="flex flex-col gap-1 min-w-[120px]">
+                  <label className="text-[9px] font-black uppercase tracking-wider text-muted-foreground select-none">Status</label>
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => {
+                      setSelectedStatus(e.target.value);
+                      setLogsPage(1);
+                    }}
+                    className="h-8.5 rounded-lg border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary cursor-pointer"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="SUCCESS">Success</option>
+                    <option value="FAILED">Failed</option>
+                  </select>
+                </div>
+
+                {/* Clear Filters Button */}
+                {(selectedModel !== "ALL" || selectedApiKey !== "ALL" || selectedStatus !== "ALL") && (
+                  <button
+                    onClick={() => {
+                      setSelectedModel("ALL");
+                      setSelectedApiKey("ALL");
+                      setSelectedStatus("ALL");
+                      setLogsPage(1);
+                    }}
+                    className="self-end h-8.5 px-3 text-xs font-bold text-red-500 hover:text-red-600 transition-colors cursor-pointer select-none"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left">
+                  <thead>
+                    <tr className="border-b border-border bg-secondary/40">
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Model</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">API Key</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Credits</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Latency</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Status</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLogsLoading ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                          <Loader2 className="w-5 h-5 text-muted-foreground animate-spin mx-auto" strokeWidth={1.5} />
+                          <p className="mt-2 text-xs">Loading calls logs...</p>
+                        </td>
+                      </tr>
+                    ) : logs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                          No matching model calls found.
+                        </td>
+                      </tr>
+                    ) : (
+                      logs.map((log) => (
+                        <tr key={log.id} className="border-b border-border/70 last:border-0">
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-semibold text-foreground">{log.model?.name ?? "Unknown model"}</p>
+                            {log.model && (
+                              <div className="mt-1 flex items-center gap-2 text-[10px] font-semibold text-primary select-none">
+                                <Link
+                                  href={`/explore/${log.model.id}`}
+                                  target="_blank"
+                                  className="hover:underline flex items-center gap-0.5"
+                                >
+                                  Marketplace <ExternalLink className="w-2.5 h-2.5" />
+                                </Link>
+                                <span className="text-muted-foreground/30">•</span>
+                                <Link
+                                  href={`/explore/${log.model.id}/swagger`}
+                                  target="_blank"
+                                  className="hover:underline flex items-center gap-0.5"
+                                >
+                                  API Docs <ExternalLink className="w-2.5 h-2.5" />
+                                </Link>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-semibold text-foreground">{log.apiKeyLabel ?? "Project key"}</p>
+                            <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                              {can(OrgAction.MANAGE_API_KEYS) ? (log.apiKeyPrefix ?? log.apiKey ?? "Hidden") : "••••••••••••••••"}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-foreground">{Number(log.creditsCharged ?? 0).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">{log.responseTimeMs}ms</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${
+                              log.status === "SUCCESS"
+                                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
+                                : "border-destructive/20 bg-destructive/10 text-destructive"
+                            }`}>
+                              {log.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Toolbar */}
+              {!isLogsLoading && logsTotal > logsLimit && (
+                <div className="flex items-center justify-between border-t border-border px-5 py-3 sm:px-6 bg-secondary/5 font-sans">
+                  <span className="text-xs text-muted-foreground select-none">
+                    Showing <span className="font-semibold text-foreground">{(logsPage - 1) * logsLimit + 1}</span> to{" "}
+                    <span className="font-semibold text-foreground">
+                      {Math.min(logsPage * logsLimit, logsTotal)}
+                    </span>{" "}
+                    of <span className="font-semibold text-foreground">{logsTotal}</span> logs
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={logsPage === 1 || isLogsLoading}
+                      className="h-8 text-xs font-semibold cursor-pointer"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-xs text-muted-foreground px-2 font-medium select-none">
+                      Page {logsPage} of {Math.ceil(logsTotal / logsLimit)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsPage((prev) => (prev * logsLimit < logsTotal ? prev + 1 : prev))}
+                      disabled={logsPage * logsLimit >= logsTotal || isLogsLoading}
+                      className="h-8 text-xs font-semibold cursor-pointer"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {org && project && (
         <CreateApiKeyModal orgId={org.id} projectId={project.id} open={createKeyOpen} onClose={() => setCreateKeyOpen(false)} onCreated={fetchData} />

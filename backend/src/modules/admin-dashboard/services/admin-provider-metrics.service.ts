@@ -5,12 +5,10 @@ import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { Organization } from '../../organizations/entities/organization.entity';
 import { Model } from '../../models/entities/model.entity';
 import { ModelLog } from '../../models/entities/model-log.entity';
-import {
-  BillingCycle,
-  ProviderAccount,
-  ProviderAccountStatus,
-  ProviderOfferRedemption,
-} from '../../provider-accounts';
+import { BillingCycle } from '../../provider-accounts/enums/billing-cycle.enum';
+import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
+import { ProviderAccountStatus } from '../../provider-accounts/enums/provider-account-status.enum';
+import { ProviderOfferRedemption } from '../../provider-accounts/entities/provider-offer-redemption.entity';
 import { User } from '../../users/entities/user.entity';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { Wallet } from '../../wallets/entities/wallet.entity';

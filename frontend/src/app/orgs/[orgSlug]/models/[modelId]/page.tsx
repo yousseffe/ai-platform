@@ -697,8 +697,10 @@ export default function OrgModelReviewPage() {
                                     </div>
                                     <div>
                                       <p className="text-[10px] font-bold text-muted-foreground uppercase">Simulated Response</p>
-                                      <pre className={`mt-1 max-h-36 overflow-auto rounded p-2 font-mono text-[10px] ${
-                                        outcome.status === "PASSED" ? "bg-emerald-950/20 text-emerald-200 border border-emerald-500/10" : "bg-red-950/20 text-red-200 border border-red-500/10"
+                                      <pre className={`mt-1 max-h-36 overflow-auto rounded p-2 font-mono text-[10px] border ${
+                                        outcome.status === "PASSED"
+                                          ? "bg-emerald-50/70 text-emerald-700 border-emerald-200/50 dark:bg-emerald-950/20 dark:text-emerald-200 dark:border-emerald-500/10"
+                                          : "bg-red-50/70 text-red-700 border-red-200/50 dark:bg-red-950/20 dark:text-red-200 dark:border-red-500/10"
                                       }`}>
                                         {outcome.actual}
                                       </pre>

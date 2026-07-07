@@ -444,45 +444,45 @@ export function PipelineDetailsClient({ pipeline, runs, edges, readyVersionOptio
       {/* Main Tabs Container */}
       <Tabs defaultValue="builder" className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-1 select-none">
-          <TabsList className="flex items-center gap-1 bg-secondary/35 dark:bg-zinc-800/20 p-1 rounded-xl border border-border/50 shadow-xs h-10 w-fit">
+          <TabsList className="flex w-full sm:w-fit border-b border-border bg-transparent p-0 rounded-none h-10 gap-6 justify-start overflow-x-auto" variant="line">
             <TabsTrigger
               value="builder"
-              className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs hover:text-foreground cursor-pointer h-full"
+              className="flex items-center gap-2 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
             >
               <Workflow className="w-3.5 h-3.5" />
               Builder
             </TabsTrigger>
             <TabsTrigger
               value="configuration"
-              className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs hover:text-foreground cursor-pointer h-full"
+              className="flex items-center gap-2 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
             >
               <Settings2 className="w-3.5 h-3.5" />
               Configuration
             </TabsTrigger>
             <TabsTrigger
               value="runs"
-              className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs hover:text-foreground cursor-pointer h-full"
+              className="flex items-center gap-2 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
             >
               <Play className="w-3.5 h-3.5" />
               Runs
             </TabsTrigger>
             <TabsTrigger
               value="versions"
-              className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs hover:text-foreground cursor-pointer h-full"
+              className="flex items-center gap-2 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
             >
               <GitBranch className="w-3.5 h-3.5" />
               Versions
             </TabsTrigger>
             <TabsTrigger
               value="logs"
-              className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs hover:text-foreground cursor-pointer h-full"
+              className="flex items-center gap-2 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
             >
               <ScrollText className="w-3.5 h-3.5" />
               Logs
             </TabsTrigger>
             <TabsTrigger
               value="settings"
-              className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs hover:text-foreground cursor-pointer h-full"
+              className="flex items-center gap-2 cursor-pointer pb-2 pt-0 rounded-none bg-transparent"
             >
               <Wrench className="w-3.5 h-3.5" />
               Settings

@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { LoginInput, loginSchema } from "@/lib/schemas";
 
 const authInputClassName =
-  "h-[44px] rounded-lg border border-slate-200 bg-white pl-10 pr-10 text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-sm transition-all duration-150 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 outline-none w-full";
+  "h-[44px] rounded-lg border border-border bg-card pl-10 pr-10 text-xs text-foreground placeholder:text-muted-foreground shadow-sm transition-all duration-150 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 outline-none w-full";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -74,7 +74,7 @@ export default function LoginPage() {
       actionLabel="Sign up"
       actionHref="/register"
     >
-      <Card className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/40 shadow-sm backdrop-blur-md">
+      <Card className="overflow-hidden rounded-xl border border-border bg-card shadow-sm backdrop-blur-md">
         <CardContent className="p-5 sm:p-6">
           {error && (
             <div className="mb-4 rounded-lg border border-destructive/15 bg-destructive/5 px-4 py-2.5 text-[11px] font-medium text-destructive/90 animate-fade-in">

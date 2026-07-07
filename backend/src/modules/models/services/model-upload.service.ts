@@ -22,7 +22,7 @@ import { SchemaDetectionStatus } from '../enums/schema-detection-status.enum';
 import { ModelsRepository } from '../repositories/models.repository';
 import { ModelVersionsRepository } from '../repositories/model-versions.repository';
 import { MinioService } from '../../../shared/minio/minio.service';
-import { ProviderLimitsService } from '../../provider-accounts';
+import { ProviderLimitsService } from '../../provider-accounts/services/provider-limits.service';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { ModelsService } from './models.service';

@@ -51,6 +51,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 /**
  * Helper component rendering a sidebar link with a left-indicator line.
@@ -205,6 +206,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       setSettingsOpen(true);
     }
   }
+
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = React.useState(false);
 
   const handleLogout = async () => {
     document.cookie = "activeWorkspaceId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -578,7 +581,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </Button>
         <Button
           variant="ghost"
-          onClick={handleLogout}
+          onClick={() => setLogoutConfirmOpen(true)}
           className="group w-full justify-start gap-2.5 px-3 h-9 rounded-lg text-red-500 hover:bg-red-500/10 dark:hover:bg-red-950/20 text-sm mt-1 cursor-pointer select-none font-medium"
         >
           <LogOut className="w-4 h-4 text-red-500 transition-colors" strokeWidth={1.5} />
@@ -643,6 +646,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </form>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        onOpenChange={setLogoutConfirmOpen}
+        title="Confirm Sign Out"
+        description="Are you sure you want to sign out of your account? You will need to log back in to access your workspaces and models."
+        confirmLabel="Logout"
+        onConfirm={handleLogout}
+        variant="danger"
+      />
       </div>
     </>
   );

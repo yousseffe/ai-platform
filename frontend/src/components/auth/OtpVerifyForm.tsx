@@ -28,7 +28,7 @@ export default function OtpVerifyForm({
       
       {/* Visual Header */}
       <div className="flex flex-col items-center">
-        <div className="relative mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-primary shadow-sm">
+        <div className="relative mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-secondary text-primary shadow-sm">
           <div className="absolute inset-0 rounded-full bg-primary/5 animate-ping opacity-45" />
           <KeyRound className="h-5 w-5 text-primary" />
         </div>
@@ -60,7 +60,7 @@ export default function OtpVerifyForm({
               value={digit}
               onChange={(e) => onOtpChange(idx, e.target.value)}
               onKeyDown={(e) => onOtpKeyDown(idx, e)}
-              className="h-12 w-11 rounded-lg border border-slate-200 bg-white dark:bg-slate-950 dark:border-slate-800 text-center font-mono text-base font-bold text-slate-900 dark:text-slate-100 outline-none transition-all duration-150 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+              className="h-12 w-11 rounded-lg border border-border bg-card text-center font-mono text-base font-bold text-foreground outline-none transition-all duration-150 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
               disabled={loading}
               autoFocus={idx === 0}
               autoComplete={idx === 0 ? "one-time-code" : "off"}

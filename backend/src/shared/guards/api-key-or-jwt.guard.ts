@@ -17,9 +17,9 @@ import { OrgApiKey } from '../../modules/organizations/entities/org-api-key.enti
 import { SystemConfig } from '../../modules/wallets/entities/system-config.entity';
 import { AuditLog } from '../../modules/users/entities/audit-log.entity';
 import { User } from '../../modules/users/entities/user.entity';
-import { getRsaKeys } from '../../modules/auth';
+import { getRsaKeys } from '../../modules/auth/utils/keys';
 import { OwnerType } from '../enums/owner-type.enum';
-import { KeyQuotaService } from '../../modules/auth';
+import { KeyQuotaService } from '../../modules/auth/services/key-quota.service';
 
 interface AuthenticatedApiRequest extends ExpressRequest {
   user?: {

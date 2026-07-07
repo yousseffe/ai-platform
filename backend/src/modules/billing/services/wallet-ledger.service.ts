@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
-import { TransactionStatus, TransactionType } from '../../wallets';
+import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
+import { TransactionType } from '../../wallets/enums/transaction-type.enum';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { Wallet } from '../../wallets/entities/wallet.entity';
 

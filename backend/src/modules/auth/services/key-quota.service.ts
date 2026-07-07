@@ -24,14 +24,15 @@ export class KeyQuotaService {
     keyId: string,
     maxRequestsPerMinute: number | null,
   ): Promise<void> {
-    if (!maxRequestsPerMinute || maxRequestsPerMinute <= 0) {
+    const limit = maxRequestsPerMinute != null ? Number(maxRequestsPerMinute) : null;
+    if (limit === null || isNaN(limit) || limit <= 0) {
       return;
     }
     const count = await this.redisService.incrWithExpiry(
       this.rateLimitKey(keyId),
       70,
     );
-    if (count > maxRequestsPerMinute) {
+    if (count > limit) {
       throw new HttpException(
         'Rate limit exceeded for this API key',
         HttpStatus.TOO_MANY_REQUESTS,
@@ -54,11 +55,12 @@ export class KeyQuotaService {
     keyId: string,
     maxDailySpendCredits: number | null,
   ): Promise<void> {
-    if (!maxDailySpendCredits || maxDailySpendCredits <= 0) {
+    const limit = maxDailySpendCredits != null ? Number(maxDailySpendCredits) : null;
+    if (limit === null || isNaN(limit) || limit <= 0) {
       return;
     }
     const spend = await this.getDailySpend(keyId);
-    if (spend >= maxDailySpendCredits) {
+    if (spend >= limit) {
       throw new HttpException(
         'Daily spend budget exceeded for this API key',
         HttpStatus.PAYMENT_REQUIRED,
@@ -68,11 +70,12 @@ export class KeyQuotaService {
 
   /** Records a successful charge against a key's daily spend counter. */
   async recordSpend(keyId: string, cost: number): Promise<void> {
-    if (cost <= 0) {
+    const parsedCost = Number(cost);
+    if (isNaN(parsedCost) || parsedCost <= 0) {
       return;
     }
     // TTL is a cleanup safety net; the actual daily reset comes from the
     // date-stamped key, not the expiry.
-    await this.redisService.incrByFloat(this.spendKey(keyId), cost, 90000);
+    await this.redisService.incrByFloat(this.spendKey(keyId), parsedCost, 90000);
   }
 }

@@ -14,9 +14,9 @@ import CreateWorkspaceWizard from "@/components/workspaces/CreateWorkspaceWizard
  */
 export default function CreateWorkspacePage() {
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50 overflow-hidden">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-background text-foreground overflow-hidden">
       {/* Left Panel: Branding & Onboarding Graphics */}
-      <div className="w-full lg:w-1/2 bg-slate-950 p-12 text-white flex flex-col justify-between relative overflow-hidden shrink-0 min-h-[40vh] lg:min-h-0 select-none animate-in fade-in duration-500">
+      <div className="w-full lg:w-1/2 bg-slate-950 dark:bg-background border-r border-transparent dark:border-border p-12 text-white dark:text-foreground flex flex-col justify-between relative overflow-hidden shrink-0 min-h-[40vh] lg:min-h-0 select-none animate-in fade-in duration-500">
         {/* Background Gradients */}
         <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] rounded-full bg-indigo-900/30 blur-[120px] pointer-events-none" />
         <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] rounded-full bg-purple-900/20 blur-[120px] pointer-events-none" />
@@ -89,7 +89,7 @@ export default function CreateWorkspacePage() {
       </div>
 
       {/* Right Panel: Stepper Form */}
-      <div className="flex-1 p-8 lg:p-16 flex items-center justify-center overflow-y-auto bg-slate-50 dark:bg-slate-900/10">
+      <div className="flex-1 p-8 lg:p-16 flex items-center justify-center overflow-y-auto bg-background text-foreground">
         <CreateWorkspaceWizard />
       </div>
     </div>

@@ -7,7 +7,7 @@ import { MapperEngineService } from './mapper-engine.service';
 import { PipelineStepExecutorService } from './pipeline-step-executor.service';
 import { PipelineRunPersistenceService } from './pipeline-run-persistence.service';
 import { MapperContext } from '../interfaces/mapper-spec.interface';
-import { ClientRequestMeta, PredictionActor } from '../../inference';
+import { ClientRequestMeta, PredictionActor } from '../../inference/interfaces/inference.interface';
 
 export interface RunStepsOutcome {
   success: boolean;

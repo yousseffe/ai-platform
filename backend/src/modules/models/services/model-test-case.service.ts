@@ -11,7 +11,7 @@ import { ModelVersionsRepository } from '../repositories/model-versions.reposito
 import { ModelsService } from './models.service';
 import { VersionReviewAction } from '../enums/version-review-action.enum';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
-import { User } from '../../users';
+import { User } from '../../users/entities/user.entity';
 
 @Injectable()
 export class ModelTestCaseService {

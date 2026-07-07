@@ -13,7 +13,7 @@ interface RegisterFormProps {
 }
 
 const authInputClassName =
-  "h-[44px] rounded-lg border border-slate-200 bg-white pl-10 pr-10 text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-sm transition-all duration-150 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 outline-none w-full";
+  "h-[44px] rounded-lg border border-border bg-card pl-10 pr-10 text-xs text-foreground placeholder:text-muted-foreground shadow-sm transition-all duration-150 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 outline-none w-full";
 
 export default function RegisterForm({ onSubmit, loading }: RegisterFormProps) {
   const [showPassword, setShowPassword] = useState(false);

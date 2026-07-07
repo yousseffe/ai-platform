@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Copy, KeyRound, Clock, CheckCircle, XCircle, Trash2, Gauge, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { Copy, KeyRound, Clock, CheckCircle, XCircle, Trash2, Gauge, AlertTriangle, ExternalLink } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { OrgApiKey } from "@/lib/services/projects.service";
 import { ApiKeyQuotaDialog } from "@/components/orgs/ApiKeyQuotaDialog";
@@ -13,6 +14,7 @@ interface ApiKeyRowProps {
   onQuotaUpdated: (updated: OrgApiKey) => void;
   canRevoke: boolean;
   canManageQuota: boolean;
+  canShowAndCopy: boolean;
 }
 
 /**
@@ -26,9 +28,10 @@ interface ApiKeyRowProps {
  * @param onQuotaUpdated - Callback triggered with the fresh key after its quota is saved.
  * @param canRevoke - Whether the current user has RBAC permission to revoke.
  * @param canManageQuota - Whether the current user has RBAC permission to set consumption limits.
+ * @param canShowAndCopy - Whether the user is authorized to see and copy the API key prefix.
  * @returns The React table row component.
  */
-export default function ApiKeyRow({ orgId, apiKey, onRevoke, onQuotaUpdated, canRevoke, canManageQuota }: ApiKeyRowProps) {
+export default function ApiKeyRow({ orgId, apiKey, onRevoke, onQuotaUpdated, canRevoke, canManageQuota, canShowAndCopy }: ApiKeyRowProps) {
   const [showQuotaDialog, setShowQuotaDialog] = useState(false);
   const handleCopy = () => {
     navigator.clipboard
@@ -56,16 +59,35 @@ export default function ApiKeyRow({ orgId, apiKey, onRevoke, onQuotaUpdated, can
           <div>
             <span className="text-sm font-semibold text-foreground">{apiKey.label}</span>
             {apiKey.model && (
-              <p className="mt-1 text-xs text-foreground/80">
-                {apiKey.model.name}
-                {(apiKey.model.framework || apiKey.model.type) && (
-                  <span className="text-muted-foreground">
-                    {" "}· {[apiKey.model.framework, apiKey.model.type].filter(Boolean).join(" · ")}
-                  </span>
-                )}
-              </p>
+              <div className="mt-1.5 space-y-1">
+                <p className="text-xs text-foreground/85 font-medium">
+                  {apiKey.model.name}
+                  {(apiKey.model.framework || apiKey.model.type) && (
+                    <span className="text-muted-foreground font-normal">
+                      {" "}· {[apiKey.model.framework, apiKey.model.type].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                </p>
+                <div className="flex items-center gap-2 text-[10px] font-semibold text-primary select-none">
+                  <Link
+                    href={`/explore/${apiKey.model.id}`}
+                    target="_blank"
+                    className="hover:underline flex items-center gap-0.5"
+                  >
+                    Marketplace <ExternalLink className="w-2.5 h-2.5" />
+                  </Link>
+                  <span className="text-muted-foreground/30">•</span>
+                  <Link
+                    href={`/explore/${apiKey.model.id}/swagger`}
+                    target="_blank"
+                    className="hover:underline flex items-center gap-0.5"
+                  >
+                    API Docs <ExternalLink className="w-2.5 h-2.5" />
+                  </Link>
+                </div>
+              </div>
             )}
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
               Created {new Date(apiKey.createdAt).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -78,15 +100,17 @@ export default function ApiKeyRow({ orgId, apiKey, onRevoke, onQuotaUpdated, can
       <td className="px-4 py-4 align-top">
         <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2">
           <code className="text-xs text-muted-foreground font-mono">
-            {apiKey.keyPrefix}
+            {canShowAndCopy ? apiKey.keyPrefix : "••••••••••••••••"}
           </code>
-          <button
-            onClick={handleCopy}
-            title="Copy"
-            className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-          >
-            <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
-          </button>
+          {canShowAndCopy && (
+            <button
+              onClick={handleCopy}
+              title="Copy"
+              className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+          )}
         </div>
       </td>
       <td className="px-4 py-4 align-top">

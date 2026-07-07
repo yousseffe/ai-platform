@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PipelineStep } from '../entities/pipeline-step.entity';
 import { PipelinePinPolicy } from '../enums/pipeline-pin-policy.enum';
-import { ModelsService } from '../../models';
+import { ModelsService } from '../../models/services/models.service';
+import { InferenceClient } from '../../inference/services/inference-client.service';
+import { InferenceStatus } from '../../inference/enums/inference-status.enum';
 import {
   ClientRequestMeta,
-  InferenceClient,
-  InferenceStatus,
   PredictionActor,
-} from '../../inference';
+} from '../../inference/interfaces/inference.interface';
 
 export interface StepExecutionResult {
   success: boolean;

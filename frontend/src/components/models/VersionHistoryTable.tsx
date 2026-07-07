@@ -103,17 +103,14 @@ export function VersionHistoryTable({
                   displayStatus === "deployed" ||
                   displayStatus === VersionStatus.READY
                 ) {
-                  badgeClass =
-                    "bg-emerald-950/40 text-emerald-400 border-emerald-500/20";
+                  badgeClass = "badge-success";
                 } else if (
                   displayStatus === VersionStatus.BUILDING ||
                   displayStatus === DeploymentStatus.STARTING
                 ) {
-                  badgeClass =
-                    "bg-blue-950/40 text-blue-400 border-blue-500/20";
+                  badgeClass = "badge-info";
                 } else if (displayStatus === VersionStatus.DEPRECATED) {
-                  badgeClass =
-                    "bg-amber-950/40 text-amber-450 border-amber-500/20";
+                  badgeClass = "badge-warning";
                 } else if (hasError) {
                   badgeClass = "badge-danger";
                 }
@@ -147,7 +144,7 @@ export function VersionHistoryTable({
                                   fill="none"
                                   stroke="currentColor"
                                   strokeWidth="2.5"
-                                  className="text-blue-950/40"
+                                  className="text-blue-100 dark:text-blue-950/40"
                                 />
                                 <circle
                                   cx="14"
@@ -159,25 +156,25 @@ export function VersionHistoryTable({
                                   strokeLinecap="round"
                                   strokeDasharray={`${2 * Math.PI * 11}`}
                                   strokeDashoffset={`${2 * Math.PI * 11 * (1 - (v.buildProgress || 0) / 100)}`}
-                                  className="text-blue-400 transition-all duration-700 ease-out"
+                                  className="text-blue-600 dark:text-blue-400 transition-all duration-700 ease-out"
                                 />
                               </svg>
-                              <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold text-blue-400 font-mono">
+                              <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold text-blue-600 dark:text-blue-400 font-mono">
                                 {v.buildProgress || 0}
                               </span>
                             </div>
                             <div className="flex flex-col gap-0.5">
-                              <span className="text-[9px] font-bold tracking-wider uppercase font-mono text-blue-400">
+                              <span className="text-[9px] font-bold tracking-wider uppercase font-mono text-blue-600 dark:text-blue-400">
                                 Building
                               </span>
                               {/* Linear progress bar */}
-                              <div className="w-20 h-1 bg-blue-950/40 rounded-full overflow-hidden">
+                              <div className="w-20 h-1 bg-blue-100 dark:bg-blue-950/40 rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-blue-400 rounded-full transition-all duration-700 ease-out"
+                                  className="h-full bg-blue-600 dark:bg-blue-400 rounded-full transition-all duration-700 ease-out"
                                   style={{ width: `${v.buildProgress || 0}%` }}
                                 />
                               </div>
-                              <span className="text-[8px] text-blue-400/60 font-mono">
+                              <span className="text-[8px] text-blue-600/70 dark:text-blue-400/60 font-mono">
                                 {v.buildProgress || 0}% complete
                               </span>
                             </div>
@@ -186,13 +183,13 @@ export function VersionHistoryTable({
                           <div className="flex items-center gap-3">
                             {/* Circular progress spinner */}
                             <div className="relative w-7 h-7 shrink-0 flex items-center justify-center">
-                              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                              <div className="w-5 h-5 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full animate-spin"></div>
                             </div>
                             <div className="flex flex-col gap-0.5 animate-pulse">
-                              <span className="text-[9px] font-bold tracking-wider uppercase font-mono text-blue-400">
+                              <span className="text-[9px] font-bold tracking-wider uppercase font-mono text-blue-600 dark:text-blue-400">
                                 Deploying
                               </span>
-                              <span className="text-[8px] text-blue-400/60 font-mono">
+                              <span className="text-[8px] text-blue-600/70 dark:text-blue-400/60 font-mono">
                                 Warming up...
                               </span>
                             </div>
@@ -253,7 +250,7 @@ export function VersionHistoryTable({
                             onRebuild && (
                               <button
                                 onClick={() => onRebuild(v.id)}
-                                className="btn-outline px-3 py-1 text-[11px] border-blue-900/50 bg-blue-950/20 text-blue-400 hover:bg-blue-950/40 hover:text-blue-300"
+                                className="btn-outline px-3 py-1 text-[11px] border-blue-200 bg-blue-50/70 text-blue-600 hover:bg-blue-100 hover:text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-400 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
                               >
                                 Rebuild
                               </button>
@@ -280,7 +277,7 @@ export function VersionHistoryTable({
                                 DeploymentStatus.STARTING) && (
                               <button
                                 onClick={() => onStop(latestDeployment.id)}
-                                className="btn-outline px-3 py-1 text-[11px] border-red-900/50 bg-red-950/20 text-red-400 hover:bg-red-950/40 hover:text-red-300"
+                                className="btn-outline px-3 py-1 text-[11px] border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 hover:text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
                               >
                                 Stop Container
                               </button>
@@ -290,7 +287,7 @@ export function VersionHistoryTable({
                             onUndeprecate && (
                               <button
                                 onClick={() => onUndeprecate(v.id)}
-                                className="btn-outline px-3 py-1 text-[11px] border-emerald-900/50 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40 hover:text-emerald-300"
+                                className="btn-outline px-3 py-1 text-[11px] border-emerald-200 bg-emerald-50/70 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-400 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300"
                               >
                                 Activate
                               </button>
@@ -302,7 +299,7 @@ export function VersionHistoryTable({
                             onDeprecate && (
                               <button
                                 onClick={() => onDeprecate(v.id)}
-                                className="btn-outline px-3 py-1 text-[11px] border-amber-900/50 bg-amber-950/20 text-amber-400 hover:bg-amber-950/40 hover:text-amber-300"
+                                className="btn-outline px-3 py-1 text-[11px] border-amber-200 bg-amber-50/70 text-amber-600 hover:bg-amber-100 hover:text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-400 dark:hover:bg-amber-950/40 dark:hover:text-amber-300"
                               >
                                 Deprecate
                               </button>
@@ -322,12 +319,12 @@ export function VersionHistoryTable({
                       </td>
                     </tr>
                     {hasError && errorMessage && (
-                      <tr className="bg-red-950/25 border-b border-red-900/35">
+                      <tr className="bg-red-50/70 dark:bg-red-950/25 border-b border-red-100 dark:border-red-900/35">
                         <td
                           colSpan={5}
-                          className="px-6 py-3 text-xs text-red-400 font-mono wrap-break-word leading-relaxed"
+                          className="px-6 py-3 text-xs text-red-700 dark:text-red-400 font-mono wrap-break-word leading-relaxed"
                         >
-                          <span className="font-bold mr-2 text-[10px] uppercase tracking-wider text-red-300">
+                          <span className="font-bold mr-2 text-[10px] uppercase tracking-wider text-red-800 dark:text-red-300">
                             Run Failure:
                           </span>
                           {errorMessage}

@@ -1,13 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, FindOptionsWhere, Repository } from 'typeorm';
-import { ModelType } from '../../models';
+import { ModelType } from '../../models/enums/model-type.enum';
 import { Model } from '../../models/entities/model.entity';
-import {
-  ProviderAccount,
-  ProviderAccountsService,
-  ProviderUtilizationService,
-} from '../../provider-accounts';
+import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
+import { ProviderUtilizationService } from '../../provider-accounts/services/provider-utilization.service';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { ListProvidersQueryDto } from '../dto/list-providers-query.dto';
 import { AdminAuditLogService } from './admin-audit-log.service';

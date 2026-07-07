@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,11 +11,11 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { User } from '../entities/user.entity';
 import { AuditLog } from '../entities/audit-log.entity';
-import { ApiKeyType } from '../../auth';
+import { ApiKeyType } from '../../auth/enums/api-key-type.enum';
 import { ApiKey } from '../../auth/entities/api-key.entity';
 import { Model } from '../../models/entities/model.entity';
-import { WalletsService } from '../../wallets';
-import { ProviderAccountsService } from '../../provider-accounts';
+import { WalletsService } from '../../wallets/services/wallets.service';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
 import { UsersRepository } from '../repositories/users.repository';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
@@ -22,7 +24,9 @@ import { WalletType } from '../../../shared/enums/wallet-type.enum';
 export class UsersService {
   constructor(
     public readonly usersRepository: UsersRepository,
+    @Inject(forwardRef(() => WalletsService))
     private readonly walletsService: WalletsService,
+    @Inject(forwardRef(() => ProviderAccountsService))
     private readonly providerAccountsService: ProviderAccountsService,
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,

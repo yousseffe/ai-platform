@@ -24,7 +24,8 @@ import { TransactionStatus } from '../enums/transaction-status.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
 import { RedisService } from '../../../shared/redis/redis.service';
-import { OrgType, OrganizationsService } from '../../organizations';
+import { OrgType } from '../../organizations/enums/org-type.enum';
+import { OrganizationsService } from '../../organizations/services/organizations.service';
 import { ApiKey } from '../../auth/entities/api-key.entity';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
 

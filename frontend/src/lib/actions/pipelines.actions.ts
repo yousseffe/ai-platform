@@ -3,6 +3,7 @@
 import * as pipelinesService from "@/lib/services/pipelines.service";
 import { Pipeline, PipelineStep, PipelineEdge, PipelineRun, PipelineType } from "@/types";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 /**
  * Retrieves all pipelines owned by the authenticated user.
@@ -121,11 +122,12 @@ export async function deletePipeline(
   try {
     await pipelinesService.deletePipeline(id);
     revalidatePath("/pipelines");
-    return { success: true };
+    revalidatePath("/");
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Failed to delete pipeline";
     return { success: false, error: errorMessage };
   }
+  redirect("/pipelines");
 }
 
 /**

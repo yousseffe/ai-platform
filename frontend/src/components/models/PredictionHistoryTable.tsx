@@ -88,7 +88,7 @@ export function PredictionHistoryTable({
                       </span>
                     </td>
                     <td className="px-6 py-4 text-muted-foreground">{r.latency}</td>
-                    <td className={`px-6 py-4 font-bold ${r.status === "FAILED" ? "text-red-400" : "text-foreground"}`}>
+                    <td className={`px-6 py-4 font-bold ${r.status === "FAILED" ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
                       {typeof r.outcome === "object" ? JSON.stringify(r.outcome) : r.outcome}
                     </td>
                     <td className="px-6 py-4 text-right">

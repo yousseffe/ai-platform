@@ -11,19 +11,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { Organization } from '../entities/organization.entity';
 import { OrgMember } from '../entities/org-member.entity';
-import { UsersService } from '../../users';
+import { UsersService } from '../../users/services/users.service';
 import { AuditLog } from '../../users/entities/audit-log.entity';
-import {
-  TransactionStatus,
-  TransactionType,
-  WalletsService,
-} from '../../wallets';
+import { TransactionStatus } from '../../wallets/enums/transaction-status.enum';
+import { TransactionType } from '../../wallets/enums/transaction-type.enum';
+import { WalletsService } from '../../wallets/services/wallets.service';
 import { ProcessedWebhook } from '../../wallets/entities/processed-webhook.entity';
 import { SystemConfig } from '../../wallets/entities/system-config.entity';
 import { Transaction } from '../../wallets/entities/transaction.entity';
 import { Wallet } from '../../wallets/entities/wallet.entity';
 import { Model } from '../../models/entities/model.entity';
-import { ProviderAccountsService } from '../../provider-accounts';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
 import { WalletType } from '../../../shared/enums/wallet-type.enum';
@@ -54,6 +52,7 @@ export class OrganizationsService {
     private readonly mailService: MailService,
     private readonly stripeService: StripeService,
     private readonly minioService: MinioService,
+    @Inject(forwardRef(() => ProviderAccountsService))
     private readonly providerAccountsService: ProviderAccountsService,
   ) {}
 

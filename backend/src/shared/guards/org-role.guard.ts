@@ -6,9 +6,11 @@ import {
   SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Request } from 'express';
 import { User } from '../../modules/users/entities/user.entity';
-import { OrganizationsService } from '../../modules/organizations';
+import { OrgMember } from '../../modules/organizations/entities/org-member.entity';
 import { OrgRole } from '../enums/org-role.enum';
 import { OwnerType } from '../enums/owner-type.enum';
 
@@ -27,7 +29,8 @@ export const RequireOrgRole = (...roles: OrgRole[]) =>
 export class OrgRoleGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    private orgsService: OrganizationsService,
+    @InjectRepository(OrgMember)
+    private readonly orgMemberRepository: Repository<OrgMember>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -58,12 +61,15 @@ export class OrgRoleGuard implements CanActivate {
       return true;
     }
 
-    const userRole = await this.orgsService.getMemberRole(workspaceId, user.id);
-    if (!userRole) {
+    const member = await this.orgMemberRepository.findOne({
+      where: { orgId: workspaceId, userId: user.id },
+    });
+
+    if (!member) {
       throw new ForbiddenException('You are not a member of this workspace');
     }
 
-    const hasRole = requiredRoles.includes(userRole);
+    const hasRole = requiredRoles.includes(member.role);
     if (!hasRole) {
       throw new ForbiddenException('Insufficient workspace permissions');
     }

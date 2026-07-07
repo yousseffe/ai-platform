@@ -63,10 +63,18 @@ export async function smartFetch<T = unknown>(
 
   const url = `${backendUrl}/api/v1${path.startsWith("/") ? "" : "/"}${path}`;
 
-  const res = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    const origin = isServer ? "server" : window.location.origin;
+    const message = `Network request failed for ${url} from ${origin}. Check that the backend is running and CORS_ORIGINS includes this frontend origin.`;
+    console.error("[smartFetch]", message, error);
+    throw new Error(message);
+  }
 
   if (!res.ok) {
     let errorMessage = "An error occurred while fetching the data.";

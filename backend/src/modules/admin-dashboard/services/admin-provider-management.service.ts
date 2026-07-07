@@ -8,10 +8,8 @@ import {
   AdminProviderOverridesDto,
 } from '../dto/provider-management.dto';
 import { AdminAuditLogService } from './admin-audit-log.service';
-import {
-  ProviderAccount,
-  ProviderAccountsService,
-} from '../../provider-accounts';
+import { ProviderAccount } from '../../provider-accounts/entities/provider-account.entity';
+import { ProviderAccountsService } from '../../provider-accounts/services/provider-accounts.service';
 
 @Injectable()
 export class AdminProviderManagementService {

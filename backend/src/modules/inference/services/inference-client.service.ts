@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { Model } from '../../models/entities/model.entity';
-import { KeyQuotaService } from '../../auth';
+import { KeyQuotaService } from '../../auth/services/key-quota.service';
 import { InferenceDeploymentResolverService } from './inference-deployment-resolver.service';
 import {
   InferenceCallPreparerService,
@@ -154,6 +155,12 @@ export class InferenceClient {
         }),
       );
       output = response.data;
+      const containerError = this.extractContainerError(output);
+      if (containerError) {
+        status = InferenceStatus.FAILED;
+        statusCode = 500;
+        errorMessage = containerError.slice(0, 1000);
+      }
       try {
         responseSizeBytes = Buffer.byteLength(JSON.stringify(response.data));
       } catch {}
@@ -180,8 +187,8 @@ export class InferenceClient {
       }
     } catch (err: unknown) {
       status = InferenceStatus.FAILED;
-      statusCode = 500;
-      const message = err instanceof Error ? err.message : String(err);
+      statusCode = this.extractHttpStatus(err) ?? 500;
+      const message = this.extractHttpErrorMessage(err);
       errorMessage = message.slice(0, 1000);
     }
 
@@ -228,6 +235,48 @@ export class InferenceClient {
       errorMessage,
       deploymentId,
     };
+  }
+
+  private extractContainerError(output: unknown): string | null {
+    if (!output || typeof output !== 'object') {
+      return null;
+    }
+
+    const body = output as Record<string, unknown>;
+    if (typeof body.error === 'string' && body.error.trim()) {
+      return body.error;
+    }
+
+    return null;
+  }
+
+  private extractHttpStatus(error: unknown): number | null {
+    if (error instanceof AxiosError && error.response?.status) {
+      return error.response.status;
+    }
+
+    return null;
+  }
+
+  private extractHttpErrorMessage(error: unknown): string {
+    if (error instanceof AxiosError && error.response?.data) {
+      const data = error.response.data;
+      if (typeof data === 'string') {
+        return data;
+      }
+      if (typeof data === 'object') {
+        const body = data as Record<string, unknown>;
+        const detail = body.detail ?? body.error ?? body.message;
+        if (typeof detail === 'string') {
+          return detail;
+        }
+        try {
+          return JSON.stringify(body);
+        } catch {}
+      }
+    }
+
+    return error instanceof Error ? error.message : String(error);
   }
 
   private async serveCachedResult(

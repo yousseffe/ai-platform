@@ -100,7 +100,7 @@ export default function StepCollaborators({
                   setInviteEmail(e.target.value);
                   setInviteError("");
                 }}
-                className={`pl-10 h-10 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary ${
+                className={`pl-10 h-10 border-border focus-visible:ring-primary/20 focus-visible:border-primary ${
                   inviteError ? "border-red-500" : ""
                 }`}
                 placeholder="collaborator@company.com"
@@ -117,7 +117,7 @@ export default function StepCollaborators({
               value={inviteRole}
               onValueChange={(val) => setInviteRole(val as OrgRole)}
             >
-              <SelectTrigger className="w-full sm:w-[130px] h-10 border-slate-200 text-xs font-semibold">
+              <SelectTrigger className="w-full sm:w-[130px] h-10 border-border text-xs font-semibold">
                 <SelectValue placeholder="Select Role" />
               </SelectTrigger>
               <SelectContent>
@@ -143,21 +143,21 @@ export default function StepCollaborators({
         </div>
 
         {fields.length > 0 ? (
-          <div className="border border-slate-100 dark:border-border/60 rounded-xl overflow-hidden bg-slate-50/50 dark:bg-slate-900/10 transition-all duration-300">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider p-3 border-b border-slate-100 dark:border-border/60 bg-white dark:bg-slate-950/20 flex justify-between items-center">
+          <div className="border border-border/60 rounded-xl overflow-hidden bg-secondary/20 dark:bg-slate-900/10 transition-all duration-300">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider p-3 border-b border-border/60 bg-card dark:bg-slate-950/20 flex justify-between items-center">
               <span>Invited Members</span>
               <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-[9px]">
                 {fields.length}
               </span>
             </p>
-            <div className="divide-y divide-slate-100 dark:divide-border/60 max-h-[180px] overflow-y-auto bg-white dark:bg-slate-950/10">
+            <div className="divide-y divide-border/60 max-h-[180px] overflow-y-auto bg-card dark:bg-slate-950/10">
               {fields.map((member, index) => (
                 <div
                   key={member.id}
-                  className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors group animate-in slide-in-from-left-2 duration-200"
+                  className="p-3 flex items-center justify-between text-xs hover:bg-secondary/40 dark:hover:bg-slate-900/10 transition-colors group animate-in slide-in-from-left-2 duration-200"
                 >
                   <div className="flex flex-col">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    <span className="font-semibold text-foreground dark:text-slate-200">
                       {member.email}
                     </span>
                     <span className="text-[9px] text-primary font-bold uppercase tracking-wider mt-0.5">
@@ -177,7 +177,7 @@ export default function StepCollaborators({
             </div>
           </div>
         ) : (
-          <div className="h-[120px] border border-dashed border-slate-200 dark:border-border/80 rounded-xl flex flex-col items-center justify-center text-slate-400 gap-1 bg-slate-50/30 dark:bg-slate-900/5 transition-all">
+          <div className="h-[120px] border border-dashed border-border rounded-xl flex flex-col items-center justify-center text-slate-400 gap-1 bg-secondary/10 dark:bg-slate-900/5 transition-all">
             <Users className="w-6 h-6 opacity-30" />
             <p className="text-xs">No team members invited yet.</p>
           </div>

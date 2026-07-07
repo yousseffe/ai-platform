@@ -11,7 +11,7 @@ import { Project } from '../entities/project.entity';
 import { OrgApiKey } from '../entities/org-api-key.entity';
 import { Model } from '../../models/entities/model.entity';
 import { ModelLog } from '../../models/entities/model-log.entity';
-import { InferenceStatus } from '../../inference';
+import { InferenceStatus } from '../../inference/enums/inference-status.enum';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
 
 @Injectable()
@@ -694,15 +694,40 @@ export class ProjectsService {
   async listProjectApiKeyLogs(
     orgId: string,
     projectId: string,
-    limit = 50,
-  ): Promise<ModelLog[]> {
+    query: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      modelId?: string;
+      apiKeyId?: string;
+    },
+  ): Promise<{ items: ModelLog[]; total: number }> {
     await this.getProject(orgId, projectId);
 
-    return this.modelLogRepository.find({
-      where: { orgId, projectId },
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const where: any = { orgId, projectId };
+
+    if (query.status) {
+      where.status = query.status;
+    }
+    if (query.modelId) {
+      where.model = { id: query.modelId };
+    }
+    if (query.apiKeyId) {
+      where.orgApiKey = { id: query.apiKeyId };
+    }
+
+    const [items, total] = await this.modelLogRepository.findAndCount({
+      where,
       relations: ['model', 'orgApiKey'],
       order: { createdAt: 'DESC' },
       take: limit,
+      skip,
     });
+
+    return { items, total };
   }
 }

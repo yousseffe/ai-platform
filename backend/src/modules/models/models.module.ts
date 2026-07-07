@@ -39,6 +39,7 @@ import { InferenceModule } from '../inference/inference.module';
 import { MinioModule } from '../../shared/minio/minio.module';
 import { ModelsRepository } from './repositories/models.repository';
 import { ModelVersionsRepository } from './repositories/model-versions.repository';
+import { SearchSyncSubscriber } from './subscribers/search-sync.subscriber';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { ModelVersionsRepository } from './repositories/model-versions.repositor
     ModelsRepository,
     ModelVersionsRepository,
     UploadCleanupProcessor,
+    SearchSyncSubscriber,
   ],
   controllers: [
     SearchController,

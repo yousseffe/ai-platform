@@ -334,7 +334,7 @@ export default function McpChat({ activeToken }: Props) {
           </Button>
         </div>
         <p className="text-[8px] text-muted-foreground font-sans mt-1.5 ml-1">
-          Powered by Qwen2.5-1.5B via llama.cpp · Tool calls run against your MCP server
+          Powered by Qwen2.5-0.5B via llama.cpp · Tool calls run against your MCP server
         </p>
       </div>
     </div>

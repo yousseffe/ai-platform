@@ -23,7 +23,7 @@ import { AdminController } from './controllers/admin.controller';
       SystemConfig,
       Wallet,
     ]),
-    WalletsModule,
+    forwardRef(() => WalletsModule),
     forwardRef(() => ProviderAccountsModule),
   ],
   providers: [UsersService, UsersRepository],

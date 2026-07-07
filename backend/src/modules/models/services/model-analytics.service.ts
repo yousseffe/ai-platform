@@ -5,7 +5,7 @@ import { ModelsService } from './models.service';
 import { ModelLog } from '../entities/model-log.entity';
 import { VersionReviewStatus } from '../enums/version-review-status.enum';
 import { VersionStatus } from '../enums/version-status.enum';
-import { DeploymentStatus } from '../../deployments';
+import { DeploymentStatus } from '../../deployments/enums/deployment-status.enum';
 import { OrgRole } from '../../../shared/enums/org-role.enum';
 
 @Injectable()

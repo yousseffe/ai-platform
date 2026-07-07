@@ -28,6 +28,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 
 interface SidebarLinkProps {
@@ -171,38 +172,19 @@ export default function AdminSidebar() {
         </button>
       </div>
 
-      <Dialog open={showLogoutModal} onOpenChange={setShowLogoutModal}>
-        <DialogContent className="sm:max-w-[420px] bg-card border border-border text-foreground font-sans p-5 rounded-xl shadow-xl">
-          <DialogHeader className="space-y-1 text-left">
-            <DialogTitle className="text-sm font-bold text-foreground">Confirm Sign Out</DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              Are you sure you want to log out from the platform admin console?
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter className="flex gap-2.5 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowLogoutModal(false)}
-              className="py-1.5 h-8 text-[11px] flex-1 cursor-pointer rounded-lg border border-border hover:bg-secondary text-foreground"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={async () => {
-                document.cookie = "activeWorkspaceId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-                document.cookie = "viewMode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-                await signOut({ callbackUrl: "/login" });
-              }}
-              className="bg-red-500 hover:bg-red-600 text-white py-1.5 h-8 text-[11px] flex-1 cursor-pointer font-bold rounded-lg border-none"
-            >
-              Sign Out
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={showLogoutModal}
+        onOpenChange={setShowLogoutModal}
+        title="Confirm Sign Out"
+        description="Are you sure you want to log out from the platform admin console?"
+        confirmLabel="Sign Out"
+        onConfirm={async () => {
+          document.cookie = "activeWorkspaceId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          document.cookie = "viewMode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          await signOut({ callbackUrl: "/login" });
+        }}
+        variant="danger"
+      />
     </aside>
   );
 }

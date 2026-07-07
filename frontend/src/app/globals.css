@@ -195,32 +195,35 @@ body {
 }
 
 .dark {
-  --background: #0b0b0c; /* Expo Go deep canvas background */
-  --foreground: #f3f4f6; /* Soft readable text */
-  --card: #101113; /* Expo Go sidebar and card container background */
-  --card-foreground: #f3f4f6;
-  --popover: #101113;
-  --popover-foreground: #f3f4f6;
-  --primary: #5e6ad2; /* Linear signature premium periwinkle-violet */
-  --primary-foreground: #ffffff;
-  --secondary: #1f2023; /* Distinct lighter dark background for panels and secondary buttons */
-  --secondary-foreground: #f3f4f6;
-  --muted: #16171a;
-  --muted-foreground: #888d96; /* Expo Go muted label gray */
-  --accent: #2c2e33; /* Distinct accent hover state */
-  --accent-foreground: #ffffff;
-  --destructive: #ef4444;
-  --border: #202124; /* Expo Go soft border */
-  --input: #101113;
-  --ring: #5e6ad2;
-  --sidebar: #101113;
-  --sidebar-foreground: #f3f4f6;
-  --sidebar-primary: #5e6ad2;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #2c2e33;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #202124;
-  --sidebar-ring: #5e6ad2;
+  --background: #111827;
+  --foreground: #F8FAFC;
+  --card: #1A2233;
+  --card-foreground: #F8FAFC;
+  --popover: #1A2233;
+  --popover-foreground: #F8FAFC;
+  --primary: #6D7CFF;
+  --primary-foreground: #FFFFFF;
+  --secondary: #232D42;
+  --secondary-foreground: #F8FAFC;
+  --muted: #2B364C;
+  --muted-foreground: #94A3B8;
+  --accent: #313C52;
+  --accent-foreground: #F8FAFC;
+  --border: #313C52;
+  --input: #313C52;
+  --ring: #6D7CFF;
+  --destructive: #EF4444;
+  --success: #22C55E;
+  --warning: #F59E0B;
+  --info: #38BDF8;
+  --sidebar: #1A2233;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #6D7CFF;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #313C52;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #313C52;
+  --sidebar-ring: #6D7CFF;
 }
 
 @layer base {

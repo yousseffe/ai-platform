@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { OwnerType } from '../../../shared/enums/owner-type.enum';
-import { ModelType } from '../../models';
+import { ModelType } from '../../models/enums/model-type.enum';
 import { ProviderAccount } from '../entities/provider-account.entity';
 import { ProviderAccountStatus } from '../enums/provider-account-status.enum';
 import { assertWithinLimit } from '../utils/limit.util';

@@ -5,6 +5,7 @@ import { ApiKey } from './entities/api-key.entity';
 import { AuditLog } from '../users/entities/audit-log.entity';
 import { UsersModule } from '../users/users.module';
 import { OrgApiKey } from '../organizations/entities/org-api-key.entity';
+import { OrgMember } from '../organizations/entities/org-member.entity';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { WalletsModule } from '../wallets/wallets.module';
 import { McpToken } from './entities/mcp-token.entity';
@@ -29,6 +30,7 @@ import { getRsaKeys } from './utils/keys';
       AuditLog,
       ApiKey,
       OrgApiKey,
+      OrgMember,
       McpToken,
     ]),
     forwardRef(() => UsersModule),
