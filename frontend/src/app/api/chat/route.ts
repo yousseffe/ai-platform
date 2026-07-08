@@ -6,7 +6,7 @@ const MCP_PROXY_URL = process.env.NEXT_PUBLIC_BACKEND_URL
   : undefined;
 
 const SYSTEM_PROMPT =
-  "You are an ops assistant for the ModelOps AI platform. " +
+  "You are an ops assistant for the Qantara AI platform. " +
   "Use tools to answer questions about models, deployments, fraud risk, logs, alerts, " +
   "users, organizations, billing/transactions, background jobs, and Docker/storage health. " +
   "For open-ended questions about errors or suspicious activity with no specific model named, " +

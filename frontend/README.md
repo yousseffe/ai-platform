@@ -1,4 +1,4 @@
-# ModelOps AI Frontend
+# Qantara AI Frontend
 
 > [!IMPORTANT]
 > **Developers and AI Assistants:** Before reading this document or editing code, you MUST review and adhere to [AGENTS.md](file:///Users/ahmedamr/Desktop/gp/frontend/AGENTS.md) / [agent.md](file:///Users/ahmedamr/Desktop/gp/frontend/agent.md) for strict guidelines on project roles, reusability, strict typing (zero-any), humanized code, and mandatory JSDoc declarations.

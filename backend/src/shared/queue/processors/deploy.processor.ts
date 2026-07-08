@@ -174,7 +174,7 @@ export class DeployProcessor extends WorkerHost {
         LARGE: 2048,
       };
 
-      const DIFFUSION_MIN_RAM_MB = 2048;
+      const DIFFUSION_MIN_RAM_MB = 6144;
       const getRamMb = (model: { tier?: string; type?: ModelType }): number => {
         const tier = model.tier?.toUpperCase() || 'SMALL';
         const tierRam = TIER_RAM_MAP[tier] || 512;
@@ -187,7 +187,7 @@ export class DeployProcessor extends WorkerHost {
         deployment.modelVersion.model.tier?.toUpperCase() || 'SMALL';
       const newModelRamMb = getRamMb(deployment.modelVersion.model);
       const MAX_SYSTEM_RAM_MB = parseInt(
-        process.env.MAX_SYSTEM_RAM_MB || '3072',
+        process.env.MAX_SYSTEM_RAM_MB || '10240',
         10,
       );
 

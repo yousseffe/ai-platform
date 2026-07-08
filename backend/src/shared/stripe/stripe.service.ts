@@ -46,7 +46,7 @@ export class StripeService {
           price_data: {
             currency: 'egp',
             product_data: {
-              name: 'ModelOps AI Credit Deposit',
+              name: 'َQantara AI Credit Deposit',
               description: `Workspace ID: ${workspaceId}`,
             },
             unit_amount: amountInCents,
@@ -91,7 +91,7 @@ export class StripeService {
           price_data: {
             currency: 'egp',
             product_data: {
-              name: 'ModelOps AI Organization Creation Fee',
+              name: 'Qantara AI Organization Creation Fee',
               description: `Pending Org ID: ${pendingId}`,
             },
             unit_amount: amountInCents,
@@ -134,7 +134,7 @@ export class StripeService {
           price_data: {
             currency: 'egp',
             product_data: {
-              name: `ModelOps Provider Tier: ${params.tierName}`,
+              name: `Qantara Provider Tier: ${params.tierName}`,
               description: `${params.billingCycle} provider subscription`,
             },
             unit_amount: Math.round(params.amountEgp * 100),
